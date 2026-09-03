@@ -1,0 +1,13 @@
+.gradle/
+build/
+*.iml
+.idea/
+local.properties
+.kotlin/
+.DS_Store
+kotlin-js-store/
+
+# Reference source tree, for porting and study only. It is the full Rhino clone
+# (about 40 MB) pinned at the release the port mirrors. It never gets committed;
+# reference/REFERENCES.md records the pin and the file mapping.
+reference/

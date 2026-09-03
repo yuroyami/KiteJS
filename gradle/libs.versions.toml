@@ -1,0 +1,20 @@
+[versions] #######################################################################################
+# Toolchain, kept in lock-step with KiteArchive / KiteTorrent / KitePDF so the Kite
+# lineage builds with one shared stack.
+kotlin = "2.4.10"
+agp = "9.2.1"
+vanniktechPublish = "0.36.0"
+dokka = "2.2.0"
+
+# jvmTest only: upstream Rhino, pinned to the exact release the port mirrors.
+# It is the differential-testing oracle. It must never become a runtime dependency.
+rhino = "1.9.1"
+
+[libraries] ######################################################################################
+rhino-oracle = { module = "org.mozilla:rhino", version.ref = "rhino" }
+
+[plugins] ########################################################################################
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+android-kmp-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
+vanniktech-publish = { id = "com.vanniktech.maven.publish", version.ref = "vanniktechPublish" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }

@@ -1,0 +1,16 @@
+KiteJS
+Copyright 2026 yuroyami
+
+This product is a Kotlin Multiplatform port of Mozilla Rhino
+(https://github.com/mozilla/rhino), pinned at release 1.9.1
+(tag Rhino1_9_1_Release, commit f2d1ffef9dafbd625ca1ea79b8893ecbaee07e61).
+
+Rhino is Copyright Mozilla and individual contributors, licensed under the
+Mozilla Public License, Version 2.0. As a derivative work, KiteJS keeps the
+MPL-2.0 license, and every ported source file keeps the MPL license header.
+See LICENSE for the full text, which also covers the BSD-licensed number
+formatting code (v8dtoa) that Rhino itself vendors.
+
+The interpreter path is ported; Rhino's JVM bytecode compiler, E4X/XML support,
+Java interop (LiveConnect) and tooling are out of scope and contain no KiteJS
+code.
