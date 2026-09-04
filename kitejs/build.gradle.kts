@@ -41,7 +41,12 @@ kotlin {
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     js(IR) {
         browser()
-        nodejs()
+        nodejs {
+            testTask {
+                // The eval corpus runs whole programs; Mocha's two-second default is not enough on Node.
+                useMocha { timeout = "300s" }
+            }
+        }
         binaries.library()
     }
 

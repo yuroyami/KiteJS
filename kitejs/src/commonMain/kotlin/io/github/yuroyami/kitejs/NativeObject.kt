@@ -239,7 +239,7 @@ open class NativeObject : ScriptableObject {
                 throw Context.reportRuntimeErrorById(
                     "msg.extend.scriptable",
                     if (thisObj == null) "null" else thisObj::class.simpleName,
-                    args[0].toString(),
+                    JavaNumbers.toString(args[0]),
                 )
             }
             val s = ScriptRuntime.toStringIdOrIndex(args[0])
@@ -351,8 +351,8 @@ open class NativeObject : ScriptableObject {
             arg = getCompatibleObject(cx, scope, arg)
             val obj = cx.newObject(scope)
             ScriptRuntime.loadFromIterable(cx, scope, arg) { key, value ->
-                if (key is Int) {
-                    obj.put(key, obj, value)
+                if (ScriptRuntime.isInt(key)) {
+                    obj.put(key as Int, obj, value)
                 } else if (key is Symbol && obj is SymbolScriptable) {
                     obj.put(key, obj, value)
                 } else {

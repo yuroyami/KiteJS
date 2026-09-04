@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs
 
+
 /**
  * KMP replacement for the ResourceBundle + MessageFormat pipeline (ledger D-4).
  *
@@ -80,7 +81,8 @@ internal object Messages {
         }
         val index = pattern.substring(start + 1, j).toInt()
         if (index < args.size) {
-            out.append(args[index]?.toString() ?: "null")
+            val arg = args[index]
+            out.append(if (arg is Number) JavaNumbers.messageFormat(arg) else arg?.toString() ?: "null")
         } else {
             // MessageFormat leaves a slot with no argument exactly as it was written.
             out.append(pattern, start, j + 1)

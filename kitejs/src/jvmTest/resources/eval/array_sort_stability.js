@@ -1,0 +1,12 @@
+var items = [];
+for (var i = 0; i < 20; i++) items.push({ key: i % 3, id: i });
+var byKey = items.slice().sort(function (a, b) { return a.key - b.key; }).map(function (x) { return x.id; });
+var mixed = [10, 9, 1, '10', '9', 'b', 'a', undefined, null, true, false, NaN, -1, 0].sort();
+var numeric = [10, 9, 1, 100, -5, 2.5].sort(function (a, b) { return a - b; });
+var desc = ['b', 'c', 'a'].sort(function (a, b) { return a < b ? 1 : a > b ? -1 : 0; });
+var byLength = ['ccc', 'a', 'bb', 'dd', 'e'].sort(function (a, b) { return a.length - b.length; });
+var withHoles = [3, , 1, undefined, 2].sort();
+var boolCmp = [3, 1, 2].sort(function (a, b) { return a > b; });
+var chained = items.slice().sort(function (a, b) { return b.key - a.key || b.id - a.id; }).slice(0, 5).map(function (x) { return x.key + ':' + x.id; });
+var toSorted = [3, 1, 2].toSorted();
+[byKey.join(), mixed.join(), numeric.join(), desc.join(), byLength.join(), withHoles.length, withHoles.join(), boolCmp.join(), chained.join(), toSorted.join(), [5, 1, 4].sort().reverse().join()].join('|');

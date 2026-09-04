@@ -58,6 +58,19 @@ object DecimalFormatter {
         return toFixedString(bd, fractionDigits, negative)
     }
 
+    /**
+     * Plain positional notation with [fractionDigits] digits, never switching to an exponent.
+     * With [halfEven] the rounding is BigDecimal's HALF_EVEN, which is what `MessageFormat` uses.
+     */
+    internal fun toPlainString(v: Double, fractionDigits: Int, halfEven: Boolean): String {
+        val negative = v < 0
+        var bd = Exact.of(if (negative) -v else v)
+        if (bd.scale > fractionDigits) {
+            bd = bd.setScale(fractionDigits, halfEven)
+        }
+        return toFixedString(bd, fractionDigits, negative)
+    }
+
     private fun toFixedString(d: Exact, fractionDigits: Int, negative: Boolean): String {
         val scale = d.scale
         val digits = d.digits
@@ -120,10 +133,10 @@ object DecimalFormatter {
             return Exact(d, s)
         }
 
-        /** BigDecimal.setScale with HALF_UP, for a smaller scale only. */
-        fun setScale(newScale: Int): Exact {
+        /** BigDecimal.setScale with HALF_UP (or HALF_EVEN), for a smaller scale only. */
+        fun setScale(newScale: Int, halfEven: Boolean = false): Exact {
             val drop = scale - newScale
-            return if (drop <= 0) this else Exact(dropDigits(digits, drop), newScale)
+            return if (drop <= 0) this else Exact(dropDigits(digits, drop, halfEven), newScale)
         }
 
         companion object {
@@ -169,10 +182,17 @@ object DecimalFormatter {
                 for (i in 1 until it.size) it[i] = it[i - 1] * 5
             }
 
-            /** Drops the last [drop] digits with HALF_UP rounding. Returns "0" when nothing is left. */
-            fun dropDigits(digits: String, drop: Int): String {
+            /** Drops the last [drop] digits with HALF_UP (or HALF_EVEN) rounding. "0" when nothing is left. */
+            fun dropDigits(digits: String, drop: Int, halfEven: Boolean = false): String {
                 val keep = digits.length - drop
-                val roundUp = keep >= 0 && digits[keep] >= '5'
+                val roundUp = when {
+                    keep < 0 -> false
+                    digits[keep] > '5' -> true
+                    digits[keep] < '5' -> false
+                    !halfEven -> true
+                    // A tie: up when anything follows the 5, or when the kept digit is odd.
+                    else -> digits.substring(keep + 1).any { it != '0' } || (keep > 0 && (digits[keep - 1] - '0') % 2 == 1)
+                }
                 var kept = if (keep > 0) digits.substring(0, keep) else "0"
                 if (roundUp) kept = increment(kept)
                 return kept

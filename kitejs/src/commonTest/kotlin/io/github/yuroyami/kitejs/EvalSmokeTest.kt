@@ -48,6 +48,22 @@ class EvalSmokeTest {
         assertEquals("34", eval("'3' + 4"))
         assertEquals("1e+21", eval("'' + 1e21"))
         assertEquals("1e-7", eval("'' + 1e-7"))
+        // Values read back out of an array are boxed. On Kotlin/JS every number passes `is Int`,
+        // and the Int fast paths used to swallow fractions, NaN and infinities (D-32).
+        assertEquals("1.5", eval("[2.5][0] - 1"))
+        assertEquals("NaN", eval("['a'][0] - 1"))
+        assertEquals("NaN", eval("[NaN][0] * 2"))
+        assertEquals("Infinity", eval("[Infinity][0] - 1"))
+        assertEquals("2", eval("[2.5][0] | 0"))
+        assertEquals("-2.5", eval("-[2.5][0]"))
+        assertEquals("-3", eval("~[2.5][0]"))
+        assertEquals("3.5", eval("var a = [2.5]; a[0]++; a[0]"))
+        assertEquals("9999999999", eval("[1e10][0] - 1"))
+        assertEquals("-Infinity", eval("1 / ([-0][0] + [-0][0])"))
+        assertEquals("v", eval("Object.fromEntries([[1.5, 'v']])['1.5']"))
+        assertEquals("5", eval("[5.5][0] - [0.5][0]"))
+        // Upstream prints the operand with Java's Double.toString here, so the port does the same everywhere.
+        assertEquals("throws TypeError: 5.5 is not a function, it is number.", eval("new 5.5"))
     }
 
     @Test

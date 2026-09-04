@@ -138,10 +138,20 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   `Context.captureContinuation`, `resumeContinuation`, `executeScriptWithContinuations` and the
   `ContinuationJump` paths in the interpreter. They are a Rhino extension no ECMAScript program
   uses, and the generator machinery does not depend on them.
-- D-32: Kotlin/JS cannot tell an `Int` from a `Double` at runtime, so the `is Int` fast paths in
-  the arithmetic (`add(Int, Int)`, `negate`) take a different branch there than on the JVM. The
-  results are the same numbers; only which branch computed them differs. The cross-target eval
-  smoke test is what checks this.
+- D-32: Kotlin/JS cannot tell an `Int` from a `Double` at runtime: every number passes `is Int`
+  there, so `NaN`, `Infinity` and `2.5` would take the Int fast paths in the arithmetic and get
+  truncated. `ScriptRuntime.isInt` therefore also checks the value is a whole 32-bit number that
+  is not `-0`, and every fast path that does integer work (`add`, `subtract`, `multiply`, the
+  bitwise operators, `negate`, `toInt32`, `toIntegerOrInfinity`, `++`/`--`, `Object.fromEntries`)
+  goes through it. The check is free on the JVM. The eval smoke test and the corpus slice run on
+  every target to keep this honest; the corpus slice is what found it. One visible leftover: a
+  message that prints a whole `Double` with Java's `Double.toString` (`new 5` says `5.0 is not a
+  function` upstream and on the JVM) says `5` on JS, because the value cannot be told from an Int
+  there.
+- D-39: `Messages` formats number arguments the way `java.text.MessageFormat` does (thousands
+  separators, three fraction digits with half-even rounding, no `.0` on a whole double, `∞` for an
+  infinity), checked against the real `MessageFormat` by `MessageFormatOracleTest`. Without it a
+  `Double` printed as `5.0` on one platform and `5` on another.
 - D-33: `dtoa/DecimalFormatter` is written without `BigDecimal`. It expands the double into its
   exact decimal digits by hand (every double is a finite decimal) and rounds the digit string
   HALF_UP the way `MathContext` and `setScale` do. `DecimalFormatterOracleTest` compares it with
@@ -701,16 +711,24 @@ Part 2, the collections and text:
 
 #### P3.9: Eval oracle
 
-- [ ] Build `kitejs/src/jvmTest/resources/eval/*.js`, a corpus of scripts whose last expression is
-      the result: arithmetic, string operations, object and array manipulation, function calls and
-      closures, control flow, exceptions, prototype chains, coercion corners, and the ECMAScript
-      edge cases that separate a correct engine from a plausible one
-- [ ] Test `jvmTest/EvalOracleTest`: run each script through `org.mozilla.javascript.Context` and
-      through the port, then compare the string form of the result and the name and message of any
-      thrown error
-- [ ] Test `commonTest/EvalSmokeTest`: a small slice of the same corpus, so evaluation is proven to
-      work on every target rather than only on the JVM
-- [ ] Cross-target check, update `PORTING_STATUS.md`, commit
+- [x] `kitejs/src/jvmTest/resources/eval/*.js`: 47 whole programs, each ending in the expression
+      that is its result. Closures, recursion, sorting, string processing, prototypes, destructuring,
+      default and rest parameters, template literals and tagged templates, control flow, exceptions,
+      accessors and property attributes, coercion tables, number formatting and parsing, JSON round
+      trips, `this` binding, hoisting and scope, modules by IIFE, enumeration order, Unicode strings,
+      array holes, higher-order functions, linked lists, trees, stacks and queues, matrices, primes,
+      `arguments`, deep equality, a pretty printer, engine error messages, sort stability, eval
+      scoping, optional chaining, exponent and bitwise corners, `Object.assign` and spread,
+      array-likes, wrapper objects, a tokenizer, string building, logical assignment and optional
+      catch bindings. Rhino 1.9.1 has no class syntax, so the corpus uses constructor functions.
+- [x] `EvalOracleTest.corpusMatchesUpstream` runs every file on both engines and compares the
+      rendered result or the thrown error. Passed on the first run. With the one-liner groups the
+      oracle now covers about 1900 scripts.
+- [x] `commonTest/EvalCorpusSlice.kt`: twenty of the programs with the answer upstream gives,
+      generated from the corpus; `commonTest/EvalCorpusTest` runs them on every target, and
+      `jvmTest/EvalCorpusSliceOracleTest` fails if a recorded answer stops being upstream's or a
+      program stops matching its file.
+- [x] Cross-target check, `PORTING_STATUS.md` updated, committed.
 
 **Done when:** the eval corpus produces identical results and identical errors on both engines, on
 the JVM, and the smoke slice passes on every other target.

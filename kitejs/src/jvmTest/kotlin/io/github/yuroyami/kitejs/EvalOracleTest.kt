@@ -397,7 +397,8 @@ class EvalOracleTest {
 
     // Number.prototype.toString with a radix other than 10 waits for the phase 5 BigInt. The array
     // and string scripts that look at Symbol.iterator, Symbol.unscopables and Symbol.species join
-    // in phase 4, as do match, search, matchAll and the regexp forms of split and replace.
+    // in phase 4, as do match, search, matchAll and the regexp forms of split and replace. Rhino
+    // 1.9.1 has no class syntax at all, so nothing here uses it.
 
     @Test
     fun stringBuiltin() = check(listOf(
@@ -579,9 +580,7 @@ class EvalOracleTest {
         
         "Object.getOwnPropertyNames(Array.prototype).indexOf('') >= 0",
         
-        "class A extends Array {} new A(1, 2, 3).length", "class A extends Array {} new A(1, 2, 3).map(x => x) instanceof A",
-        "class A extends Array {} A.from([1, 2]) instanceof A", "class A extends Array {} A.of(1) instanceof A",
-        "var a = [1, 2, 3]; a.forEach(function (x) { if (x == 1) a.push(4) }); a.length",
+                        "var a = [1, 2, 3]; a.forEach(function (x) { if (x == 1) a.push(4) }); a.length",
         "var a = [1, 2, 3]; var r = 0; a.forEach(function (x) { r++; if (x == 1) a.length = 1 }); r",
         "var a = [1, 2, 3]; a.sort(function (x, y) { return x < y ? 1 : -1 }).join()",
         "[1, 2, 3].sort(function () { throw 'boom' })", "var a = [1, 2]; a.map(function () { throw 'boom' })",
@@ -598,6 +597,25 @@ class EvalOracleTest {
         "Object.getPrototypeOf(Script.prototype) === Function.prototype", "typeof Script.prototype.compile",
         "new Script('1')() + new Script('2')()", "Script('9')()", "new Script('').length", "'' + Script.prototype",
     ))
+
+    /**
+     * The corpus: whole programs under `src/jvmTest/resources/eval`, each ending in the expression
+     * that is its result. Both engines run every file and the results have to match.
+     */
+    @Test
+    fun corpusMatchesUpstream() {
+        val dir = java.io.File("src/jvmTest/resources/eval")
+        val files = dir.listFiles { f -> f.name.endsWith(".js") }?.sortedBy { it.name } ?: emptyList()
+        assertTrue(files.size >= 40, "corpus not found at ${dir.absolutePath}")
+        val failures = mutableListOf<String>()
+        for (file in files) {
+            val source = file.readText()
+            val expected = upstream(source)
+            val actual = try { ported(source) } catch (e: Throwable) { "CRASH $e" }
+            if (expected != actual) failures.add("${file.name}\n  upstream: $expected\n  ported:   $actual")
+        }
+        assertEquals(emptyList(), failures, "corpus evaluation differs from upstream")
+    }
 
     @Test
     fun errorsThrownByTheEngineHaveTheSameText() = check(listOf(

@@ -1,0 +1,13 @@
+var parts = [];
+for (var i = 0; i < 100; i++) parts.push(i % 10);
+var joined = parts.join('');
+var concat = '';
+for (var j = 0; j < 100; j++) concat += j % 10;
+var table = [['name', 'qty', 'price'], ['apple', 3, 1.5], ['kiwi', 12, 0.25], ['melon', 1, 4]];
+var widths = table[0].map(function (_, c) { return Math.max.apply(null, table.map(function (row) { return String(row[c]).length; })); });
+var lines = table.map(function (row) { return row.map(function (cell, c) { return typeof cell === 'number' ? String(cell).padStart(widths[c]) : String(cell).padEnd(widths[c]); }).join(' | '); });
+var sep = widths.map(function (w) { return '-'.repeat(w); }).join('-+-');
+lines.splice(1, 0, sep);
+var big = 'ab'.repeat(1000);
+var wrapped = 'the quick brown fox jumps over the lazy dog'.split(' ').reduce(function (acc, w) { var last = acc[acc.length - 1]; if ((last + ' ' + w).trim().length > 12) acc.push(w); else acc[acc.length - 1] = (last + ' ' + w).trim(); return acc; }, ['']);
+[joined === concat, joined.length, lines.join('\n'), big.length, big.indexOf('ba'), big.lastIndexOf('ab'), big.slice(-4), wrapped.join('/'), 'x'.concat(1, [2, 3], {}).length, [1, [2, [3]]].toString(), String([null, undefined, [], [1]])].join('|');

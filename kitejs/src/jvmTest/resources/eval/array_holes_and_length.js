@@ -1,0 +1,26 @@
+var a = [1, , 3];
+var out = [a.length, 1 in a, a[1], a.hasOwnProperty(1), a.indexOf(undefined), a.includes(undefined), a.join('-'), String(a)];
+var visited = [];
+a.forEach(function (v, i) { visited.push(i); });
+out.push(visited.join(), a.map(function (x) { return x * 2; }).length, a.filter(function () { return true; }).length, Object.keys(a).join());
+var b = [1, 2, 3, 4, 5];
+b.length = 2;
+out.push(b.join(), b[3]);
+b.length = 4;
+out.push(b.length, b.join('-'), 3 in b);
+b[10] = 'far';
+out.push(b.length, Object.keys(b).join());
+delete b[0];
+out.push(b.length, 0 in b, b.join('|'));
+var c = new Array(3);
+out.push(c.length, c.join('x'), c.fill(0).join(), Array(3).fill().map(function (_, i) { return i; }).join(), [, ,].length, [1, 2, ,].length);
+var d = [];
+d[2] = 'c';
+d.unshift('a');
+out.push(d.length, d.join(), d.shift(), d.length, d.pop(), d.length);
+out.push([NaN].indexOf(NaN), [NaN].includes(NaN), [1, 2, 3].indexOf('2'), [1, 2, 3].lastIndexOf(3, -2), [0].includes(-0), [-0].indexOf(0));
+var sparse = [];
+sparse[4294967294] = 'max';
+out.push(sparse.length);
+try { sparse.length = 4294967296; } catch (e) { out.push(e.name); }
+out.join('|');

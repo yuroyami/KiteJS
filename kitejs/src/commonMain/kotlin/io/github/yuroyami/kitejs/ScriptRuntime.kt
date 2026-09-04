@@ -617,7 +617,7 @@ object ScriptRuntime {
     fun notFunctionError(value: Any?): RuntimeException = notFunctionError(value, value)
 
     fun notFunctionError(value: Any?, messageHelper: Any?): RuntimeException {
-        val msg = messageHelper?.toString() ?: "null"
+        val msg = JavaNumbers.toString(messageHelper)
         if (value === Scriptable.NOT_FOUND) return typeErrorById("msg.function.not.found", msg)
         return typeErrorById("msg.isnt.function", msg, typeOf(value))
     }
@@ -770,7 +770,7 @@ object ScriptRuntime {
     }
 
     fun toInt32(value: Any?): Int {
-        if (value is Int) return value
+        if (isInt(value)) return value as Int
         return toInt32(toNumber(value))
     }
 
@@ -1052,7 +1052,7 @@ object ScriptRuntime {
     }
 
     fun toIntegerOrInfinity(value: Any?): Double {
-        if (value is Int) return value.toDouble()
+        if (isInt(value)) return (value as Int).toDouble()
         return toIntegerOrInfinity(toNumber(value))
     }
 
@@ -1362,6 +1362,18 @@ object ScriptRuntime {
 
     fun wrapInt(i: Int): Int = i
 
+    /**
+     * `value is Int` that stays true to its name on Kotlin/JS (D-32), where every number passes the
+     * `is Int` check. The extra test is free on the JVM, where an Int is always a whole number.
+     */
+    fun isInt(value: Any?): Boolean {
+        if (value !is Int) return false
+        val d = value.toDouble()
+        return d.toInt().toDouble() == d && d.toRawBits() != NEGATIVE_ZERO_BITS
+    }
+
+    private val NEGATIVE_ZERO_BITS = (-0.0).toRawBits()
+
     /** ToNumeric: a number or a bigint. */
     fun toNumeric(value: Any?): Number {
         val v = toPrimitive(value, NumberClass)
@@ -1442,7 +1454,7 @@ object ScriptRuntime {
 
     /** The `+` operator: string concatenation when either side is a string, addition otherwise. */
     fun add(lval: Any?, rval: Any?, cx: Context): Any? {
-        if (lval is Int && rval is Int) return add(lval, rval)
+        if (isInt(lval) && isInt(rval)) return add(lval as Int, rval as Int)
         if (lval is KBigInt && rval is KBigInt) return lval.add(rval)
         if (lval is Number && lval !is KBigInt && rval is Number && rval !is KBigInt) {
             return wrapNumber(lval.toDouble() + rval.toDouble())
@@ -1484,14 +1496,14 @@ object ScriptRuntime {
     fun subtract(val1: Number, val2: Number): Number = when {
         val1 is KBigInt && val2 is KBigInt -> val1.subtract(val2)
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
-        val1 is Int && val2 is Int -> subtract(val1, val2)
+        isInt(val1) && isInt(val2) -> subtract(val1 as Int, val2 as Int)
         else -> val1.toDouble() - val2.toDouble()
     }
 
     fun multiply(val1: Number, val2: Number): Number = when {
         val1 is KBigInt && val2 is KBigInt -> val1.multiply(val2)
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
-        val1 is Int && val2 is Int -> multiply(val1, val2)
+        isInt(val1) && isInt(val2) -> multiply(val1 as Int, val2 as Int)
         else -> val1.toDouble() * val2.toDouble()
     }
 
@@ -1527,7 +1539,7 @@ object ScriptRuntime {
     fun bitwiseAND(val1: Number, val2: Number): Number = when {
         val1 is KBigInt && val2 is KBigInt -> val1.and(val2)
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
-        val1 is Int && val2 is Int -> val1 and val2
+        isInt(val1) && isInt(val2) -> (val1 as Int) and (val2 as Int)
         else -> (toInt32(val1.toDouble()) and toInt32(val2.toDouble())).toDouble()
     }
 
@@ -1536,7 +1548,7 @@ object ScriptRuntime {
     fun bitwiseOR(val1: Number, val2: Number): Number = when {
         val1 is KBigInt && val2 is KBigInt -> val1.or(val2)
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
-        val1 is Int && val2 is Int -> val1 or val2
+        isInt(val1) && isInt(val2) -> (val1 as Int) or (val2 as Int)
         else -> (toInt32(val1.toDouble()) or toInt32(val2.toDouble())).toDouble()
     }
 
@@ -1545,7 +1557,7 @@ object ScriptRuntime {
     fun bitwiseXOR(val1: Number, val2: Number): Number = when {
         val1 is KBigInt && val2 is KBigInt -> val1.xor(val2)
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
-        val1 is Int && val2 is Int -> val1 xor val2
+        isInt(val1) && isInt(val2) -> (val1 as Int) xor (val2 as Int)
         else -> (toInt32(val1.toDouble()) xor toInt32(val2.toDouble())).toDouble()
     }
 
@@ -1554,7 +1566,7 @@ object ScriptRuntime {
     fun leftShift(val1: Number, val2: Number): Number = when {
         val1 is KBigInt && val2 is KBigInt -> val1.shiftLeft(val2.intValueExact())
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
-        val1 is Int && val2 is Int -> val1 shl val2
+        isInt(val1) && isInt(val2) -> (val1 as Int) shl (val2 as Int)
         else -> (toInt32(val1.toDouble()) shl toInt32(val2.toDouble())).toDouble()
     }
 
@@ -1563,21 +1575,22 @@ object ScriptRuntime {
     fun signedRightShift(val1: Number, val2: Number): Number = when {
         val1 is KBigInt && val2 is KBigInt -> val1.shiftRight(val2.intValueExact())
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
-        val1 is Int && val2 is Int -> val1 shr val2
+        isInt(val1) && isInt(val2) -> (val1 as Int) shr (val2 as Int)
         else -> (toInt32(val1.toDouble()) shr toInt32(val2.toDouble())).toDouble()
     }
 
-    fun bitwiseNOT(value: Number): Number = when (value) {
-        is KBigInt -> value.not()
-        is Int -> value.inv()
+    fun bitwiseNOT(value: Number): Number = when {
+        value is KBigInt -> value.not()
+        isInt(value) -> (value as Int).inv()
         else -> toInt32(value.toDouble()).inv().toDouble()
     }
 
     fun negate(value: Number): Number {
         if (value is KBigInt) return value.negate()
-        if (value is Int) {
-            if (value == 0) return negativeZeroObj
-            if (value > Int.MIN_VALUE && value < Int.MAX_VALUE) return -value
+        if (isInt(value)) {
+            val i = value as Int
+            if (i == 0) return negativeZeroObj
+            if (i > Int.MIN_VALUE && i < Int.MAX_VALUE) return -i
         }
         return -value.toDouble()
     }
@@ -2473,9 +2486,9 @@ object ScriptRuntime {
         return NaNobj
     }
 
-    private fun incrDecrResult(number: Number, incrDecrMask: Int): Number = when (number) {
-        is KBigInt -> if ((incrDecrMask and Node.DECR_FLAG) == 0) number.add(KBigInt.ONE) else number.subtract(KBigInt.ONE)
-        is Int -> if ((incrDecrMask and Node.DECR_FLAG) == 0) number + 1 else number - 1
+    private fun incrDecrResult(number: Number, incrDecrMask: Int): Number = when {
+        number is KBigInt -> if ((incrDecrMask and Node.DECR_FLAG) == 0) number.add(KBigInt.ONE) else number.subtract(KBigInt.ONE)
+        isInt(number) -> if ((incrDecrMask and Node.DECR_FLAG) == 0) (number as Int) + 1 else (number as Int) - 1
         else -> if ((incrDecrMask and Node.DECR_FLAG) == 0) number.toDouble() + 1.0 else number.toDouble() - 1.0
     }
 
