@@ -135,6 +135,34 @@ class EvalSmokeTest {
     }
 
     @Test
+    fun arrays() {
+        assertEquals("3", eval("[1, 2, 3].length"))
+        assertEquals("1,2,3", eval("'' + [1, 2, 3]"))
+        assertEquals("1-2-3", eval("[1, 2, 3].join('-')"))
+        assertEquals("4", eval("var a = [1, 2, 3]; a.push(4); a.length"))
+        assertEquals("3", eval("var a = [1, 2, 3]; a.pop()"))
+        assertEquals("1,10,9", eval("[10, 9, 1].sort().join()"))
+        assertEquals("3,2,1", eval("[3, 1, 2].sort((a, b) => b - a).join()"))
+        assertEquals("2,3", eval("[1, 2, 3, 4, 5].slice(1, 3).join()"))
+        assertEquals("1,x,y,3", eval("var a = [1, 2, 3]; a.splice(1, 1, 'x', 'y'); a.join()"))
+        assertEquals("2,4", eval("[1, 2, 3, 4].filter(x => x % 2 == 0).join()"))
+        assertEquals("1,4,9", eval("[1, 2, 3].map(x => x * x).join()"))
+        assertEquals("6", eval("[1, 2, 3].reduce((a, b) => a + b)"))
+        assertEquals("true", eval("[NaN].includes(NaN)"))
+        assertEquals("-1", eval("[NaN].indexOf(NaN)"))
+        assertEquals("1,2,3,4", eval("[1, [2, [3, [4]]]].flat(Infinity).join()"))
+        assertEquals("123", eval("var r = ''; for (var x of [1, 2, 3]) r += x; r"))
+        assertEquals("2", eval("var [a, b] = [1, 2, 3]; b"))
+        assertEquals("5", eval("Math.max.apply(null, [1, 5, 3])"))
+        assertEquals("a,b", eval("Object.keys({ a: 1, b: 2 }).join()"))
+        assertEquals("6", eval("var a = []; a[5] = 1; a.length"))
+        assertEquals("1", eval("var a = [1, 2, 3]; a.length = 1; a.join()"))
+        assertEquals("true", eval("Array.isArray([])"))
+        assertEquals("[object Array]", eval("Object.prototype.toString.call([])"))
+        assertEquals("throws RangeError: Inappropriate array length.", eval("new Array(-1)"))
+    }
+
+    @Test
     fun objectsAndPrototypes() {
         assertEquals("deep", eval("var o = { a: { b: { c: 'deep' } } }; o.a.b.c"))
         assertEquals("42", eval("var o = { get x() { return 42 } }; o.x"))

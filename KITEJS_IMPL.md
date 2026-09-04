@@ -153,6 +153,9 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   out of scope.
 - D-35: `RhinoException` captures the interpreter frames itself (`Interpreter().captureStackInfo`)
   instead of asking `Context.createInterpreter()`; there is only one evaluator to ask.
+- D-36: `NativeArray` no longer implements `java.util.List`; only `toArray()`, `size()`,
+  `isEmpty()` and `get(Long)` stay, because the abstract operations use them. Same reasoning as
+  D-34.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -672,9 +675,13 @@ Part 1, the objects everything else hangs off:
 
 Part 2, the collections and text:
 
-- [ ] `NativeArray.kt` (2573) with `ArrayLikeAbstractOperations.kt` (455) and
-      `NativeArrayIterator.kt`; fill `Context.newArray`, `ScriptRuntime.isArrayLike`,
-      `getArrayElements` and the `js_defineGetterOrSetter` dense-storage note.
+- [x] `NativeArray.kt` (2573) with `ArrayLikeAbstractOperations.kt` (455) and
+      `NativeArrayIterator.kt` (D-36 drops the `java.util.List` view); `Context.newArray`,
+      `ScriptRuntime.isArrayLike`, `getArrayElements`, `sameZero` and the dense-storage hook in
+      `__defineGetter__` are filled in. About 300 array scripts match upstream on the first run,
+      including the dense/sparse switch, `length` truncation, species, subclassing, holes,
+      destructuring and `for...of`. The scripts that look at `Symbol.iterator`,
+      `Symbol.unscopables` and `Symbol.species` wait for phase 4.
 - [ ] `NativeString.kt` (1495) with `AbstractEcmaStringOperations.kt` (330); fill the
       `toObject` and `toCharSequence` string paths; the string scripts return to the oracle.
 - [ ] `NativeJSON.kt` (601) with `json/JsonParser.kt` (414), registered lazily like `Math`.

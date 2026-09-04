@@ -166,7 +166,7 @@ abstract class ScriptableObject :
 
     open fun getAttributes(name: String): Int = getAttributeSlot(name, 0).attributes
 
-    fun getAttributes(index: Int): Int = getAttributeSlot(null, index).attributes
+    open fun getAttributes(index: Int): Int = getAttributeSlot(null, index).attributes
 
     open fun getAttributes(sym: Symbol): Int = getAttributeSlot(sym).attributes
 
@@ -852,9 +852,9 @@ abstract class ScriptableObject :
     // ---- Map-like helpers ----------------------------------------------------------------------
 
     /** Part of what `java.util.Map` needs. `NativeObject` finishes the job. */
-    fun size(): Int = map.size()
+    open fun size(): Int = map.size()
 
-    fun isEmpty(): Boolean = map.isEmpty()
+    open fun isEmpty(): Boolean = map.isEmpty()
 
     operator fun get(key: Any?): Any? {
         val value = when (key) {

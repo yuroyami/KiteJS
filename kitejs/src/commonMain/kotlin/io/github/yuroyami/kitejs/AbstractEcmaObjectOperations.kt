@@ -155,7 +155,15 @@ object AbstractEcmaObjectOperations {
 
     internal fun createListFromArrayLike(cx: Context, o: Scriptable, elementTypesPredicate: (Any?) -> Boolean, msg: String): List<Any?> {
         val obj = ScriptableObject.ensureScriptableObject(o)
-        // TODO(P3.8): the NativeArray fast path lands with the array.
+        if (obj is NativeArray) {
+            val arr = obj.toArray()
+            for (next in arr) {
+                if (!elementTypesPredicate(next)) {
+                    throw ScriptRuntime.typeError(msg)
+                }
+            }
+            return arr.asList()
+        }
         val len = lengthOfArrayLike(cx, obj)
         val list = mutableListOf<Any?>()
         var index = 0L

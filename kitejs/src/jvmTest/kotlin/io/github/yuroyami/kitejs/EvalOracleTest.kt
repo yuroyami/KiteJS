@@ -59,15 +59,18 @@ class EvalOracleTest {
             render(ucx.evaluateString(uscope, source, "test.js", 1, null))
         } catch (e: org.mozilla.javascript.RhinoException) {
             // The port names classes without the package (D-23).
-            "throws " + e.details().replace("org.mozilla.javascript.", "")
+            "throws " + normalise(e.details().replace("org.mozilla.javascript.", ""))
         }
 
     private fun ported(source: String): String =
         try {
             render(Context.getContext().evaluateString(kscope, source, "test.js", 1, null))
         } catch (e: RhinoException) {
-            "throws " + e.details()
+            "throws " + normalise(e.details().replace("io.github.yuroyami.kitejs.", ""))
         }
+
+    /** A message that prints an object's identity hash can never match; the hash is dropped. */
+    private fun normalise(details: String): String = details.replace(Regex("@[0-9a-f]+"), "@")
 
     private fun check(sources: List<String>) {
         val failures = mutableListOf<String>()
@@ -392,7 +395,112 @@ class EvalOracleTest {
         "'' + Math", "Object.prototype.toString.call(Math)", "typeof Math", "Math.abs()", "Math.max('1', '2')",
     ))
 
-    // Number.prototype.toString with a radix other than 10 waits for the phase 5 BigInt.
+    // Number.prototype.toString with a radix other than 10 waits for the phase 5 BigInt. The array
+    // scripts that look at Symbol.iterator, Symbol.unscopables and Symbol.species join in phase 4;
+    // the ones that pass a string to an array method join with NativeString.
+
+    @Test
+    fun arrayBuiltin() = check(listOf(
+        "[1, 2, 3].length", "[].length", "[1, , 3].length", "[1, , 3][1]", "1 in [1, , 3]", "0 in [1, , 3]",
+        "'' + [1, 2, 3]", "'' + []", "'' + [null, undefined, 1]", "[1, [2, [3]]].toString()", "[1, 2].toLocaleString()",
+        "[1, 'a', null].toSource()", "[1, , 3].toSource()", "[, ].toSource()", "[1, , ].toSource()",
+        "[1, 2, 3].join()", "[1, 2, 3].join('-')", "[1, 2, 3].join('')", "[null, undefined].join('x')", "[].join()",
+        "new Array(3).length", "new Array(3).join('x')", "new Array(1, 2).length", "new Array('3').length",
+        "Array(3).length", "Array(1, 2, 3)[2]", "new Array(-1)", "new Array(4294967296)", "new Array(2.5)",
+        "Array.isArray([])", "Array.isArray({})", "Array.isArray(Array.prototype)", "Array.isArray()",
+        "Array.of(1, 2, 3).length", "Array.of(7)[0]", "Array.of().length",
+        "Array.from({ length: 3, 0: 'a', 1: 'b', 2: 'c' }).join()", "Array.from([1, 2, 3], x => x * 2).join()",
+        "Array.from({ length: 2 }).join()", "Array.from([1, 2], function (x) { return x + this.k }, { k: 10 }).join()",
+        "var a = [1, 2, 3]; a.push(4); a.length", "var a = [1, 2, 3]; a.push(4, 5)", "var a = []; a.push()",
+        "var a = [1, 2, 3]; a.pop()", "var a = [1, 2, 3]; a.pop(); a.length", "[].pop()",
+        "var a = [1, 2, 3]; a.shift()", "var a = [1, 2, 3]; a.shift(); '' + a", "[].shift()",
+        "var a = [1, 2, 3]; a.unshift(0)", "var a = [1, 2, 3]; a.unshift(-1, 0); '' + a",
+        "[1, 2, 3].reverse().join()", "[1, 2, 3, 4].reverse().join()", "var a = [1, 2]; a.reverse() === a",
+        "[3, 1, 2].sort().join()", "[10, 9, 1].sort().join()", "[3, 1, 2].sort((a, b) => b - a).join()",
+        "[3, undefined, 1, , 2].sort().length", "[3, undefined, 1, , 2].sort().join()", "['b', 'a', 'c'].sort().join()",
+        "var a = [3, 1, 2]; a.sort() === a", "[1, 2, 3].sort(() => 0).join()",
+        "[1, 2, 3, 4, 5].slice(1, 3).join()", "[1, 2, 3, 4, 5].slice(-2).join()", "[1, 2, 3].slice().join()",
+        "[1, 2, 3].slice(5).length", "[1, 2, 3].slice(1, -1).join()", "[1, 2, 3].slice(undefined, undefined).join()",
+        "var a = [1, 2, 3, 4, 5]; a.splice(1, 2).join()", "var a = [1, 2, 3, 4, 5]; a.splice(1, 2); a.join()",
+        "var a = [1, 2, 3]; a.splice(1, 0, 'x', 'y'); a.join()", "var a = [1, 2, 3]; a.splice(1); a.join()",
+        "var a = [1, 2, 3]; a.splice(); a.length", "var a = [1, 2, 3]; a.splice(-1, 1).join()",
+        "var a = [1, 2, 3]; a.splice(1, 1, 'a').join()", "var a = [1, 2, 3]; a.splice(1, 1, 'a'); a.join()",
+        "[1, 2].concat([3, 4]).join()", "[1].concat(2, [3, [4]]).length", "[1].concat().length", "[].concat([1], [2, 3]).join()",
+        "var a = [1]; a.concat(a) !== a", "[1, 2].concat({ length: 1, 0: 'x' }).length",
+        "[1, 2, 3, 2].indexOf(2)", "[1, 2, 3].indexOf(4)", "[1, 2, 3].indexOf(2, 2)", "[1, 2, 3].indexOf(3, -1)", "[NaN].indexOf(NaN)",
+        "[1, 2, 3, 2].lastIndexOf(2)", "[1, 2, 3].lastIndexOf(9)", "[1, 2, 3, 2].lastIndexOf(2, 2)", "[1, 2].lastIndexOf(1, -5)",
+        "[1, 2, 3].includes(2)", "[1, 2, 3].includes(4)", "[NaN].includes(NaN)", "[1, , 3].includes(undefined)", "[0].includes(-0)",
+        "[1, 2, 3].includes(1, 1)", "[1, 2, 3].includes(3, -1)",
+        "[1, 2, 3].every(x => x > 0)", "[1, 2, 3].every(x => x > 1)", "[].every(x => false)",
+        "[1, 2, 3].some(x => x > 2)", "[1, 2, 3].some(x => x > 3)", "[].some(x => true)",
+        "[1, 2, 3, 4].filter(x => x % 2 == 0).join()", "[1, 2, 3].map(x => x * x).join()", "[1, , 3].map(x => x * 2).length",
+        "var s = 0; [1, 2, 3].forEach(x => s += x); s", "[1, 2, 3].forEach(x => x)", "var r = []; [1, 2].forEach(function (x, i, a) { r.push(x + i + a.length) }); r.join()",
+        "[1, 2, 3].find(x => x > 1)", "[1, 2, 3].find(x => x > 5)", "[1, 2, 3].findIndex(x => x > 1)", "[1, 2, 3].findIndex(x => x > 5)",
+        "[1, 2, 3].findLast(x => x < 3)", "[1, 2, 3].findLastIndex(x => x < 3)", "[1, 2, 3].findLast(x => x > 5)",
+        "[1, 2, 3].reduce((a, b) => a + b)", "[1, 2, 3].reduce((a, b) => a + b, 10)", "[[1], [2]].reduce((a, b) => a.concat(b)).join()",
+        "['a', 'b', 'c'].reduceRight((a, b) => a + b)", "[].reduce((a, b) => a + b, 'init')", "[, 1].reduce((a, b) => a + b)",
+        "[1, 2, 3].map(function (x) { return this.m * x }, { m: 3 }).join()",
+        "[1, 2, 3].fill(0).join()", "[1, 2, 3].fill(0, 1).join()", "[1, 2, 3].fill(0, 1, 2).join()", "[1, 2, 3].fill(9, -1).join()",
+        "[1, 2, 3, 4, 5].copyWithin(0, 3).join()", "[1, 2, 3, 4, 5].copyWithin(1, 3, 4).join()", "[1, 2, 3, 4, 5].copyWithin(-2).join()",
+        "[1, 2, 3].at(0)", "[1, 2, 3].at(-1)", "[1, 2, 3].at(5)", "[1, 2, 3].at()",
+        "[1, [2, [3, [4]]]].flat().length", "[1, [2, [3, [4]]]].flat(2).length", "[1, [2, [3, [4]]]].flat(Infinity).join()", "[1, , 3].flat().length",
+        "[1, 2].flatMap(x => [x, x * 2]).join()", "[1, 2].flatMap(x => x).join()", "[[1], [2]].flatMap(x => x).join()",
+        "[1, 2, 3].keys().next().value", "[1, 2, 3].entries().next().value.join()", "[1, 2, 3].values().next().value",
+        "var it = [1, 2].values(); it.next(); it.next(); it.next().done", 
+        "Object.prototype.toString.call([].values())", "'' + [].values()",
+        "var r = ''; for (var x of [1, 2, 3]) r += x; r", "var r = ''; for (var [k, v] of [[1, 'a'], [2, 'b']]) r += k + v; r",
+        "var [a, b] = [1, 2]; a + b", "var [a, , c] = [1, 2, 3]; c", "var [a = 5] = []; a", "var [a, ...rest] = [1, 2, 3]; rest.join()",
+        "var { x, y } = { x: 1, y: 2 }; x + y", "[...[1, 2], ...[3]].join()", "function f(...a) { return a.length } f(1, 2, 3)",
+        "function f(a, b) { return a + b } f(...[1, 2])", "Math.max(...[1, 5, 3])",
+        "[3, 1, 2].toSorted().join()", "var a = [3, 1, 2]; a.toSorted(); a.join()", "[1, 2, 3].toReversed().join()",
+        "[1, 2, 3].toSpliced(1, 1).join()", "[1, 2, 3].toSpliced(1, 1, 'x', 'y').join()", "[1, 2, 3].toSpliced().join()",
+        "[1, 2, 3].with(1, 'x').join()", "[1, 2, 3].with(-1, 'x').join()",
+        "var a = [1, 2, 3]; a.length = 1; a.join()", "var a = [1, 2, 3]; a.length = 5; a.length", "var a = []; a[5] = 1; a.length",
+        "var a = [1, 2, 3]; a.length = 0; a[0]", "var a = []; a['2'] = 'x'; a.length", "var a = []; a[-1] = 'x'; a.length",
+        "var a = []; a[4294967295] = 'x'; a.length", "var a = []; a[4294967294] = 'x'; a.length", "var a = [1, 2]; delete a[0]; a.length",
+        "var a = [1, 2]; delete a[0]; 0 in a", "var a = [1, 2, 3]; a.length = 'x'", "var a = [1, 2, 3]; a.length = -1",
+        "var a = [1, 2, 3]; a.length = 2.5", "Object.keys([1, 2, 3]).join()", "Object.keys([1, , 3]).join()",
+        "Object.getOwnPropertyNames([1, 2]).join()", "Object.entries({ a: 1, b: 2 }).join(';')", "Object.values({ a: 1, b: 2 }).join()",
+        "Object.fromEntries([['a', 1], ['b', 2]]).b", "Object.getOwnPropertySymbols({}).length",
+        "var a = [1, 2, 3]; Object.freeze(a); a.push(4)", "var a = [1, 2, 3]; Object.freeze(a); a[0] = 9; a[0]",
+        "var a = Object.freeze([1, 2]); a.length = 0; a.length", "Object.isFrozen(Object.freeze([1]))",
+        "var a = [1, 2, 3]; Object.defineProperty(a, 'length', { writable: false }); a.push(4)",
+        "var a = [1, 2, 3]; Object.defineProperty(a, 'length', { value: 1 }); a.join()",
+        "var a = [1, 2, 3]; Object.defineProperty(a, 1, { get: function () { return 'g' } }); a.join()",
+        "var a = [1]; Object.defineProperty(a, 0, { value: 2, writable: false }); a[0] = 3; a[0]",
+        "Object.getOwnPropertyDescriptor([1], 0).writable", "Object.getOwnPropertyDescriptor([1], 'length').enumerable",
+        "Object.getOwnPropertyDescriptor([1], 'length').configurable", "Object.getOwnPropertyDescriptor([1], 'length').writable",
+        "[].propertyIsEnumerable('length')", "[1].propertyIsEnumerable(0)", "[1].hasOwnProperty(0)", "[1].hasOwnProperty('length')",
+        "var a = [1, 2]; a.x = 'y'; Object.keys(a).join()", "var a = [1, 2]; var r = ''; for (var k in a) r += k; r",
+        "var a = [1, , 3]; var r = ''; for (var k in a) r += k; r", "Array.prototype.length", "Array.length", "Array.name",
+        "Array.prototype.constructor === Array", "[].constructor === Array", "Object.getPrototypeOf([]) === Array.prototype",
+        "Array.prototype.toString.call({ join: function () { return 'J' } })", "Array.prototype.toString.call({})",
+        "Array.prototype.join.call({ length: 2, 0: 'a', 1: 'b' }, '+')", "Array.prototype.slice.call({ length: 2, 0: 'a', 1: 'b' }).join()",
+        "Array.prototype.push.call({ length: 1 }, 'x')", 
+        "Array.prototype.indexOf.call({ length: 2, 0: 'a', 1: 'b' }, 'b')", "function f() { return Array.prototype.slice.call(arguments).join() } f(1, 2)",
+        "Array.join([1, 2], '+')", "Array.push([1], 2)", "Array.isArray(Array.slice([1, 2], 1))",
+        "[] instanceof Array", "[] instanceof Object", "Object.prototype.toString.call([])", "typeof []",
+        "[1, 2] == '1,2'", "[] == false", "[0] == false", "[1] == 1", "[1, 2] + [3]", "[] + {}", "+[]", "+[5]",
+        "var a = [1, 2, 3]; a[1]", "var a = [1, 2, 3]; a['1']", "var a = [1, 2, 3]; a[1.0]", "var a = [1, 2, 3]; a[1.5]",
+        "var a = [1, 2, 3]; a[' 1']", "var a = [1, 2, 3]; a[-0]", "var a = []; a[1e3] = 1; a.length", "var a = new Array(10001); a[5] = 1; a.length",
+        "var a = new Array(5); a.push(1); a.length", "var a = new Array(5); a.join('')", "new Array(20000).map(x => 1).length",
+        "var a = [1, 2, 3]; a.__proto__ = { x: 1 }; a.x", "var a = [1, 2, 3]; a.__proto__ = {}; a.length",
+        "var a = [1, 2, 3]; Object.setPrototypeOf(a, null); a.length", "var a = [1, 2, 3]; a.__defineGetter__('x', function () { return 1 }); a.join()",
+        "['1', '2', '3'].map(Number).join()", "[1, 2, 3].map((x, i) => i).join()",
+        "var a = []; a.length = 4294967295; a.length", "var a = [1, 2, 3]; a.length = 4294967296",
+        
+        "Object.getOwnPropertyNames(Array.prototype).indexOf('') >= 0",
+        
+        "class A extends Array {} new A(1, 2, 3).length", "class A extends Array {} new A(1, 2, 3).map(x => x) instanceof A",
+        "class A extends Array {} A.from([1, 2]) instanceof A", "class A extends Array {} A.of(1) instanceof A",
+        "var a = [1, 2, 3]; a.forEach(function (x) { if (x == 1) a.push(4) }); a.length",
+        "var a = [1, 2, 3]; var r = 0; a.forEach(function (x) { r++; if (x == 1) a.length = 1 }); r",
+        "var a = [1, 2, 3]; a.sort(function (x, y) { return x < y ? 1 : -1 }).join()",
+        "[1, 2, 3].sort(function () { throw 'boom' })", "var a = [1, 2]; a.map(function () { throw 'boom' })",
+        "[1, 2, 3].reduce(function () { throw 'boom' })", "[].reduce(function () {})", "[1].map()", "[1].forEach(1)",
+        "[1].sort(1)", "Array.from()", "Array.from(null)", "new Array(1, 2).indexOf()", "[].at.call(null)",
+        "Array.prototype.join.call(null)", "Array.from([1], 5)",
+    ))
 
     @Test
     fun scriptObject() = check(listOf(

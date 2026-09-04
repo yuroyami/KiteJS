@@ -221,13 +221,17 @@ open class Context internal constructor(val factory: ContextFactory) : AutoClose
     open fun newObject(scope: Scriptable, constructorName: String, args: Array<Any?>): Scriptable =
         ScriptRuntime.newObject(this, scope, constructorName, args)
 
-    open fun newArray(scope: Scriptable, length: Int): Scriptable =
-        // TODO(P3.8): NativeArray lands with the natives.
-        TODO("NativeArray lands in phase 3.8")
+    open fun newArray(scope: Scriptable, length: Int): Scriptable {
+        val result = NativeArray(length.toLong())
+        ScriptRuntime.setBuiltinProtoAndParent(result, scope, TopLevel.Builtins.Array)
+        return result
+    }
 
-    open fun newArray(scope: Scriptable, elements: Array<Any?>): Scriptable =
-        // TODO(P3.8): NativeArray lands with the natives.
-        TODO("NativeArray lands in phase 3.8")
+    open fun newArray(scope: Scriptable, elements: Array<Any?>): Scriptable {
+        val result = NativeArray(elements)
+        ScriptRuntime.setBuiltinProtoAndParent(result, scope, TopLevel.Builtins.Array)
+        return result
+    }
 
     /** The elements of an array-like object, with holes read as `undefined`. */
     fun getElements(obj: Scriptable): Array<Any?> = ScriptRuntime.getArrayElements(obj)

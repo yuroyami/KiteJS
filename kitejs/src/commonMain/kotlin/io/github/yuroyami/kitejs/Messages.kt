@@ -302,5 +302,10 @@ internal object Messages {
         "msg.method.missing.parameter" to "{0}: At least {1} arguments required, but only {2} passed",
         "msg.object.cyclic.prototype" to "Cyclic prototype \"{0}\" value not allowed.",
         "msg.script.is.not.constructor" to "Script objects are not constructors.",
+        "msg.arraylength.bad" to "Inappropriate array length.",
+        "msg.arraylength.too.big" to "Array length {0} exceeds supported capacity limit.",
+        "msg.empty.array.reduce" to "Reduce of empty array with no initial value",
+        "msg.map.function.not" to "Map function is not actually a function",
+        "msg.typed.array.out.of.bounds" to "TypedArray is out of bounds",
     )
 }

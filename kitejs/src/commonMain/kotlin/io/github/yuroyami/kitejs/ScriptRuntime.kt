@@ -951,8 +951,7 @@ object ScriptRuntime {
     }
 
     internal fun isArrayLike(obj: Scriptable?): Boolean =
-        // TODO(P3.8): NativeArray is also array-like on sight, without a property lookup.
-        obj != null && (obj is Arguments || ScriptableObject.hasProperty(obj, "length"))
+        obj != null && (obj is NativeArray || obj is Arguments || ScriptableObject.hasProperty(obj, "length"))
 
     /** Calls [fun_] the way script would, with [thisArg] converted to an object. */
     fun call(cx: Context, fun_: Any?, thisArg: Any?, args: Array<Any?>, scope: Scriptable): Any? {
@@ -1054,6 +1053,22 @@ object ScriptRuntime {
         if (x is Number) {
             if (isNaN(x) && isNaN(y)) return true
             return x == y
+        }
+        return eq(x, y)
+    }
+
+    /** SameValueZero: like [same], but +0 and -0 are equal. */
+    fun sameZero(x: Any?, y: Any?): Boolean {
+        if (typeOf(x) != typeOf(y)) return false
+        if (x is KBigInt) return x == y
+        if (x is Number) {
+            if (isNaN(x) && isNaN(y)) return true
+            val dx = x.toDouble()
+            if (y is Number) {
+                val dy = y.toDouble()
+                if ((dx == negativeZero && dy == 0.0) || (dx == 0.0 && dy == negativeZero)) return true
+            }
+            return eqNumber(dx, y)
         }
         return eq(x, y)
     }
@@ -1218,9 +1233,8 @@ object ScriptRuntime {
 
     /** The elements of an array-like object, with holes read as `undefined`. */
     fun getArrayElements(obj: Scriptable): Array<Any?> {
-        // TODO(P3.8): NativeArray.getLengthProperty handles a real array's length directly.
-        val lengthValue = ScriptableObject.getProperty(obj, "length")
-        val longLen = if (lengthValue === Scriptable.NOT_FOUND) 0L else toUint32(toNumber(lengthValue))
+        val cx = Context.getContext()
+        val longLen = NativeArray.getLengthProperty(cx, obj)
         require(longLen <= Int.MAX_VALUE)
         val len = longLen.toInt()
         if (len == 0) return emptyArgs
@@ -1278,7 +1292,7 @@ object ScriptRuntime {
         NativeError.init(scope, sealed)
         NativeGlobal.init(cx, scope, sealed)
 
-        // TODO(P3.8): NativeArray.init(cx, scope, sealed)
+        NativeArray.init(cx, scope, sealed)
         // TODO(P3.8): NativeString.init(scope, sealed)
         NativeBoolean.init(scope, sealed)
         NativeNumber.init(scope, sealed)
@@ -1291,7 +1305,7 @@ object ScriptRuntime {
         NativeScript.init(cx, scope, sealed)
 
         // TODO(P4): NativeIterator.init(cx, scope, sealed)
-        // TODO(P3.8): NativeArrayIterator.init(scope, sealed)
+        NativeArrayIterator.init(scope, sealed)
         NativeStringIterator.init(scope, sealed)
 
         // TODO(P4): registerRegExp(cx, scope, sealed)

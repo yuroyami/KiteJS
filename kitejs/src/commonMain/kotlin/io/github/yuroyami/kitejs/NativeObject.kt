@@ -246,7 +246,7 @@ open class NativeObject : ScriptableObject {
             val index = if (s.stringId != null) 0 else s.index
             val getterOrSetter = args[1] as Callable
             thisObj.setGetterOrSetter(s.stringId, index, getterOrSetter, isSetter)
-            // TODO(P3.8): a NativeArray drops its dense storage here.
+            if (thisObj is NativeArray) thisObj.setDenseOnly(false)
             return Undefined.instance
         }
 
