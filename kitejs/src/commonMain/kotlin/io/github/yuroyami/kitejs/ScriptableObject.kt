@@ -164,13 +164,13 @@ abstract class ScriptableObject :
 
     // ---- Attributes ---------------------------------------------------------------------------
 
-    fun getAttributes(name: String): Int = getAttributeSlot(name, 0).attributes
+    open fun getAttributes(name: String): Int = getAttributeSlot(name, 0).attributes
 
     fun getAttributes(index: Int): Int = getAttributeSlot(null, index).attributes
 
-    fun getAttributes(sym: Symbol): Int = getAttributeSlot(sym).attributes
+    open fun getAttributes(sym: Symbol): Int = getAttributeSlot(sym).attributes
 
-    fun setAttributes(name: String, attributes: Int) {
+    open fun setAttributes(name: String, attributes: Int) {
         checkNotSealed(name, 0)
         map.modify(this, name, 0, 0).attributes = attributes
     }
@@ -812,7 +812,7 @@ abstract class ScriptableObject :
     private fun getAttributeSlot(key: Symbol): Slot =
         map.query(key, 0) ?: throw Context.reportRuntimeErrorById("msg.prop.not.found", key)
 
-    internal fun getIds(map: CompoundOperationMap, getNonEnumerable: Boolean, getSymbols: Boolean): Array<Any?> {
+    internal open fun getIds(map: CompoundOperationMap, getNonEnumerable: Boolean, getSymbols: Boolean): Array<Any?> {
         var a: Array<Any?>
         val externalLen = externalData?.getArrayLength() ?: 0
         if (externalLen == 0) {
@@ -868,10 +868,10 @@ abstract class ScriptableObject :
         }
     }
 
-    protected open fun getOwnPropertyDescriptor(cx: Context, id: Any?): DescriptorInfo? =
+    internal open fun getOwnPropertyDescriptor(cx: Context, id: Any?): DescriptorInfo? =
         querySlot(cx, id)?.getPropertyDescriptor(cx, this)
 
-    protected fun querySlot(cx: Context, id: Any?): Slot? {
+    internal fun querySlot(cx: Context, id: Any?): Slot? {
         if (id is Symbol) return map.query(id, 0)
         val s = ScriptRuntime.toStringIdOrIndex(id)
         return if (s.stringId == null) map.query(null, s.index) else map.query(s.stringId, 0)

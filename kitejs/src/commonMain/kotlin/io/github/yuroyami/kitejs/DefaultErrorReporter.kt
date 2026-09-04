@@ -12,24 +12,41 @@ package io.github.yuroyami.kitejs
  */
 internal class DefaultErrorReporter private constructor() : ErrorReporter {
 
+    private var forEval = false
+    private var chainedReporter: ErrorReporter? = null
+
     companion object {
         val instance = DefaultErrorReporter()
+
+        /** A reporter for `eval` code: a parse error becomes a script `SyntaxError`. */
+        fun forEval(reporter: ErrorReporter?): ErrorReporter {
+            val r = DefaultErrorReporter()
+            r.forEval = true
+            r.chainedReporter = reporter
+            return r
+        }
     }
 
     override fun warning(
         message: String, sourceName: String?, line: Int, lineSource: String?, lineOffset: Int,
     ) {
-        // Do nothing
+        chainedReporter?.warning(message, sourceName, line, lineSource, lineOffset)
     }
 
     override fun error(
         message: String, sourceName: String?, line: Int, lineSource: String?, lineOffset: Int,
     ) {
-        throw runtimeError(message, sourceName, line, lineSource, lineOffset)
+        if (forEval) {
+            throw ScriptRuntime.constructError("SyntaxError", message, sourceName, line, lineSource, lineOffset)
+        }
+        val chained = chainedReporter
+        if (chained != null) chained.error(message, sourceName, line, lineSource, lineOffset)
+        else throw runtimeError(message, sourceName, line, lineSource, lineOffset)
     }
 
     override fun runtimeError(
         message: String, sourceName: String?, line: Int, lineSource: String?, lineOffset: Int,
     ): EvaluatorException =
-        EvaluatorException(message, sourceName, line, lineSource, lineOffset)
+        chainedReporter?.runtimeError(message, sourceName, line, lineSource, lineOffset)
+            ?: EvaluatorException(message, sourceName, line, lineSource, lineOffset)
 }

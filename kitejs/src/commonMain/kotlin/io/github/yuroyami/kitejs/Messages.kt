@@ -255,5 +255,12 @@ internal object Messages {
         "msg.primitive.expected" to "Primitive type expected (had {0} instead)",
         "msg.cant.convert.to.number" to "Cannot convert {0} to a number",
         "msg.not.a.number" to "The object is not a number",
+        "msg.only.from.new" to "\"Constructor {0}\" may only be invoked from a \"new\" expression.",
+        "msg.null.to.object" to "Cannot convert null to an object.",
+        "msg.undef.to.object" to "Cannot convert undefined to an object.",
+        "msg.arg.isnt.array" to "second argument to Function.prototype.apply must be an array",
+        "msg.undef.method.call" to "Cannot call method \"{1}\" of {0}",
+        "msg.deprec.ctor" to "The \"{0}\" constructor is deprecated.",
+        "msg.op.not.allowed" to "This operation is not allowed.",
     )
 }

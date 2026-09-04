@@ -12,6 +12,36 @@ package io.github.yuroyami.kitejs
  */
 abstract class RhinoException : RuntimeException {
 
+    /** How a script stack trace is rendered. */
+    enum class StackStyle { RHINO, MOZILLA, MOZILLA_LF, V8 }
+
+    companion object {
+        /** How many frames a trace shows by default. */
+        internal const val DEFAULT_STACK_LIMIT = 10
+
+        var stackStyle: StackStyle = StackStyle.RHINO
+
+        fun usesMozillaStackStyle(): Boolean = stackStyle == StackStyle.MOZILLA
+
+        fun useMozillaStackStyle(flag: Boolean) {
+            stackStyle = if (flag) StackStyle.MOZILLA else StackStyle.RHINO
+        }
+
+        internal fun formatStackTrace(stack: Array<ScriptStackElement>, message: String): String {
+            val buffer = StringBuilder()
+            if (stackStyle == StackStyle.V8 && message != "null") buffer.append(message).append('\n')
+            for (elem in stack) {
+                when (stackStyle) {
+                    StackStyle.MOZILLA, StackStyle.MOZILLA_LF -> elem.renderMozillaStyle(buffer)
+                    StackStyle.V8 -> elem.renderV8Style(buffer)
+                    StackStyle.RHINO -> elem.renderJavaStyle(buffer)
+                }
+                buffer.append('\n')
+            }
+            return buffer.toString()
+        }
+    }
+
     private val detailsMessage: String?
 
     constructor() : super() {
@@ -73,6 +103,36 @@ abstract class RhinoException : RuntimeException {
         if (lineSource != null) initLineSource(lineSource)
         if (columnNumber != 0) initColumnNumber(columnNumber)
     }
+
+    /** The interpreter frame that was live when this was thrown, if any. */
+    internal var interpreterStackInfo: Any? = null
+    internal var interpreterLineData: Int = 0
+
+    /** The script frames at the time of the throw, innermost first. */
+    fun getScriptStack(): Array<ScriptStackElement> = getScriptStack(-1, null)
+
+    fun getScriptStack(limit: Int, hideFunction: String?): Array<ScriptStackElement> {
+        if (interpreterStackInfo == null) return emptyArray()
+        val list = ArrayList<ScriptStackElement>()
+        var count = 0
+        var printStarted = hideFunction == null
+        for (group in Interpreter.getScriptStackElements(this)) {
+            for (elem in group) {
+                if (!printStarted && hideFunction == elem.functionName) {
+                    printStarted = true
+                } else if (printStarted && (limit < 0 || count < limit)) {
+                    list.add(elem)
+                    count++
+                }
+            }
+        }
+        return list.toTypedArray()
+    }
+
+    fun getScriptStackTrace(): String = getScriptStackTrace(DEFAULT_STACK_LIMIT, null)
+
+    fun getScriptStackTrace(limit: Int, functionName: String?): String =
+        formatStackTrace(getScriptStack(limit, functionName), details())
 
     final override val message: String
         get() {

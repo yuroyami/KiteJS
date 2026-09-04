@@ -15,7 +15,6 @@ open class BaseFunction : ScriptableObject, Function {
     private var prototypePropertyValue: Any? = null
     private var argumentsObj: Any? = Scriptable.NOT_FOUND
     private var nameValue: Any? = null
-    private var homeObject: Scriptable? = null
     private var isGeneratorFunctionField: Boolean = false
 
     /**
@@ -65,7 +64,7 @@ open class BaseFunction : ScriptableObject, Function {
         nameValue = name
     }
 
-    protected fun createPrototypeProperty() {
+    protected open fun createPrototypeProperty() {
         startCompoundOp(true).use { createPrototypeProperty(it) }
     }
 
@@ -99,7 +98,7 @@ open class BaseFunction : ScriptableObject, Function {
     protected open fun isGeneratorFunction(): Boolean = isGeneratorFunctionField
 
     /** Generated code overrides this. */
-    protected open fun hasDefaultParameters(): Boolean = false
+    internal open fun hasDefaultParameters(): Boolean = false
 
     /** "function", or "undefined" when [avoidObjectDetection] says so. */
     override val typeOf: String
@@ -230,7 +229,7 @@ open class BaseFunction : ScriptableObject, Function {
         prototypePropertyValue = obj
 
         val proto: Scriptable? = if (isGeneratorFunction()) {
-            // TODO(P3.4): a generator function's prototype should be %GeneratorPrototype%, which
+            // TODO(P4): a generator function's prototype should be %GeneratorPrototype%, which
             // needs ES6Generator.GENERATOR_TAG. Falling back to Object.prototype until it lands.
             getObjectPrototype(this)
         } else {
@@ -242,11 +241,8 @@ open class BaseFunction : ScriptableObject, Function {
         return obj
     }
 
-    fun setHomeObject(homeObject: Scriptable?) {
-        this.homeObject = homeObject
-    }
-
-    fun getHomeObject(): Scriptable? = homeObject
+    /** The object a method was defined on, which `super` resolves against. Null for a plain function. */
+    open var homeObject: Scriptable? = null
 
     companion object {
         private const val FUNCTION_CLASS = "Function"
@@ -343,17 +339,168 @@ open class BaseFunction : ScriptableObject, Function {
             return tag === APPLY_TAG || tag === CALL_TAG
         }
 
-        /**
-         * TODO(P3.4): builds the `Function` constructor and its prototype. It needs the `apply`,
-         * `call`, `bind` and `toString` implementations, which in turn need BoundFunction,
-         * ScriptRuntime.applyOrCall and the interpreter's compileFunction.
-         */
-        internal fun init(cx: Context, scope: Scriptable, sealed: Boolean): LambdaConstructor =
-            TODO("the Function constructor lands with the natives in phase 3.4")
+        /** Builds the `Function` constructor and `Function.prototype`. */
+        internal fun init(cx: Context, scope: Scriptable, sealed: Boolean): LambdaConstructor {
+            val ctor = LambdaConstructor(scope, FUNCTION_CLASS, 1, ::js_constructorCall, ::js_constructor)
+            val proto = LambdaFunction(scope, "", 0, null, SerializableCallable { _, _, _, _ -> Undefined.instance })
+            proto.defineProperty("constructor", ctor, DONTENUM)
+            // ctor.prototype.constructor has to be ctor itself.
+            ctor.setPrototypeProperty(proto)
+            // Defined early so the prototype's own functions pick up the right prototype.
+            defineProperty(scope, FUNCTION_CLASS, ctor, DONTENUM)
+            ctor.prototype = ctor.prototypeProperty as Scriptable
+            ctor.defineKnownBuiltInPrototypeMethod(APPLY_TAG, scope, "apply", 2, null, ::js_apply, DONTENUM, DONTENUM or READONLY)
+            ctor.definePrototypeMethod(scope, "bind", 1, ::js_bind)
+            ctor.defineKnownBuiltInPrototypeMethod(CALL_TAG, scope, "call", 1, null, ::js_call, DONTENUM, DONTENUM or READONLY)
+            ctor.definePrototypeMethod(scope, "toSource", 1, ::js_toSource)
+            ctor.definePrototypeMethod(scope, "toString", 0, ::js_toString)
+            ctor.definePrototypeMethod(
+                scope, SymbolKey.HAS_INSTANCE, 1, null, ::js_hasInstance, DONTENUM or READONLY or PERMANENT, DONTENUM or READONLY,
+            )
+            // Function.prototype attributes, ECMA 15.3.3.1.
+            ctor.setPrototypePropertyAttributes(DONTENUM or READONLY or PERMANENT)
+            if (cx.languageVersion >= Context.VERSION_ES6) ctor.setStandardPropertyAttributes(READONLY or DONTENUM)
+            defineProperty(scope, FUNCTION_CLASS, ctor, DONTENUM)
+            if (sealed) {
+                ctor.sealObject()
+                (ctor.prototypeProperty as ScriptableObject).sealObject()
+            }
+            return ctor
+        }
 
-        /** TODO(P3.4): needs ES6Generator.GENERATOR_TAG. */
-        internal fun initAsGeneratorFunction(scope: Scriptable, sealed: Boolean): Any =
-            TODO("GeneratorFunction lands with ES6Generator in phase 3.4")
+        /** Builds `GeneratorFunction`, which never appears in the global scope under that name. */
+        internal fun initAsGeneratorFunction(scope: Scriptable, sealed: Boolean): Any {
+            val proto = NativeObject()
+            val function = getProperty(scope, FUNCTION_CLASS) as Scriptable
+            val functionProto = getProperty(function, PROTOTYPE_PROPERTY_NAME) as Scriptable
+            proto.prototype = functionProto
+            // TODO(P4): proto.prototype should be %GeneratorPrototype%, read through
+            // ES6Generator.GENERATOR_TAG, which lands with the generators.
+            val ctor = LambdaConstructor(scope, GENERATOR_FUNCTION_CLASS, 1, proto, ::js_gen_constructorCall, ::js_gen_constructor)
+            proto.defineProperty("constructor", ctor, READONLY or DONTENUM)
+            ctor.setPrototypePropertyAttributes(DONTENUM or READONLY or PERMANENT)
+            proto.defineProperty(SymbolKey.TO_STRING_TAG, "GeneratorFunction", READONLY or DONTENUM)
+            putProperty(scope, GENERATOR_FUNCTION_CLASS, ctor)
+            return ctor
+        }
+
+        private fun js_hasInstance(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
+            if (thisObj !is Callable) return false
+            val protoProp =
+                if (thisObj is BoundFunction) (thisObj.getTargetFunction() as JSFunction).prototypeProperty
+                else getProperty(thisObj, PROTOTYPE_PROPERTY_NAME)
+            if (ScriptRuntime.isObject(protoProp)) {
+                val obj = args.getOrNull(0)
+                if (obj is Scriptable) return ScriptRuntime.jsDelegatesTo(obj, protoProp as Scriptable)
+                return false
+            }
+            throw ScriptRuntime.typeErrorById(
+                "msg.instanceof.bad.prototype",
+                if (thisObj is BaseFunction) thisObj.getFunctionName() else "unknown",
+            )
+        }
+
+        private fun js_bind(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
+            if (thisObj !is Callable) throw ScriptRuntime.notFunctionError(thisObj)
+            val argc = args.size
+            val boundThis: Scriptable?
+            val boundArgs: Array<Any?>
+            if (argc > 0) {
+                boundThis = ScriptRuntime.toObjectOrNull(cx, args[0], scope)
+                boundArgs = args.copyOfRange(1, argc)
+            } else {
+                boundThis = null
+                boundArgs = ScriptRuntime.emptyArgs
+            }
+            return BoundFunction(cx, scope, thisObj, boundThis, boundArgs)
+        }
+
+        private fun js_apply(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
+            ScriptRuntime.applyOrCall(true, cx, scope, thisObj, args)
+
+        private fun js_call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
+            ScriptRuntime.applyOrCall(false, cx, scope, thisObj, args)
+
+        private fun js_toSource(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
+            val realf = realFunction(thisObj, "toSource")
+            var indent = 0
+            var flags: Set<DecompilerFlag> = setOf(DecompilerFlag.TO_SOURCE)
+            if (args.isNotEmpty()) {
+                indent = ScriptRuntime.toInt32(args[0])
+                if (indent >= 0) flags = emptySet() else indent = 0
+            }
+            return realf.decompile(indent, flags)
+        }
+
+        private fun js_toString(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
+            val realf = realFunction(thisObj, "toString")
+            return realf.decompile(ScriptRuntime.toInt32(args, 0), emptySet())
+        }
+
+        private fun js_gen_constructorCall(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
+            js_gen_constructor(cx, scope, args)
+
+        private fun js_constructor(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable =
+            withoutStrictMode(cx) { jsConstructor(cx, scope, args, false) }
+
+        private fun js_constructorCall(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
+            js_constructor(cx, scope, args)
+
+        private fun js_gen_constructor(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable =
+            withoutStrictMode(cx) { jsConstructor(cx, scope, args, true) }
+
+        /** The Function constructor compiles sloppy code even when called from strict code. */
+        private inline fun withoutStrictMode(cx: Context, block: () -> Scriptable): Scriptable {
+            if (!cx.isStrictMode()) return block()
+            val activation = cx.currentActivationCall
+            val strictMode = cx.isTopLevelStrict
+            try {
+                cx.currentActivationCall = null
+                cx.isTopLevelStrict = false
+                return block()
+            } finally {
+                cx.isTopLevelStrict = strictMode
+                cx.currentActivationCall = activation
+            }
+        }
+
+        private fun realFunction(thisObj: Scriptable?, functionName: String): BaseFunction {
+            if (thisObj == null) throw ScriptRuntime.notFunctionError(null)
+            val x = thisObj.getDefaultValue(ScriptRuntime.FunctionClass)
+            return ensureType<BaseFunction>(x, functionName)
+        }
+
+        /** `new Function(p1, p2, body)`: builds source text and compiles it in the global scope. */
+        private fun jsConstructor(cx: Context, scope: Scriptable, args: Array<Any?>, isGeneratorFunction: Boolean): Scriptable {
+            val arglen = args.size
+            val sourceBuf = StringBuilder()
+            sourceBuf.append("function ")
+            if (isGeneratorFunction) sourceBuf.append("* ")
+            // Every version but 1.2 names the function "anonymous", which is closer to the spec.
+            if (cx.languageVersion != Context.VERSION_1_2) sourceBuf.append("anonymous")
+            sourceBuf.append('(')
+            for (i in 0 until arglen - 1) {
+                if (i > 0) sourceBuf.append(',')
+                sourceBuf.append(ScriptRuntime.toString(args[i]))
+            }
+            sourceBuf.append(") {")
+            if (arglen != 0) sourceBuf.append(ScriptRuntime.toString(args[arglen - 1]))
+            sourceBuf.append("\n}")
+            val source = sourceBuf.toString()
+
+            val linep = IntArray(1)
+            var filename = Context.getSourcePositionFromStack(linep)
+            if (filename == null) {
+                filename = "<eval'ed string>"
+                linep[0] = 1
+            }
+            val sourceURI = ScriptRuntime.makeUrlForGeneratedScript(false, filename, linep[0])
+            val global = getTopLevelScope(scope)
+            val reporter = DefaultErrorReporter.forEval(cx.errorReporter)
+            val evaluator = Context.createInterpreter()
+            // Compiled with an explicit interpreter, which forces interpreted mode.
+            return cx.compileFunction(global, source, evaluator, reporter, sourceURI, 1, null)
+        }
     }
 
     /**
@@ -361,9 +508,15 @@ open class BaseFunction : ScriptableObject, Function {
      * than costing anything on every call.
      */
     private fun getArguments(): Any? {
-        // A value assigned to .arguments wins over the live activation.
+        // A value assigned to .arguments wins over the live activation. This assumes the activation
+        // should not stay reachable after that assignment.
         if (argumentsObj !== Scriptable.NOT_FOUND) return argumentsObj
-        // TODO(P3.4): the live value needs NativeCall and Arguments, which hold a JSFunction.
-        return null
+        val cx = Context.getContext()
+        val activation = ScriptRuntime.findFunctionActivation(cx, this) ?: return null
+        val arguments = activation.get("arguments", activation)
+        if (arguments is Arguments && cx.languageVersion >= Context.VERSION_ES6) {
+            return Arguments.ReadonlyArguments(arguments, cx)
+        }
+        return arguments
     }
 }

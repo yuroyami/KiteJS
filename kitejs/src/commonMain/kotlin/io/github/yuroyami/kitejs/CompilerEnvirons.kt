@@ -75,15 +75,30 @@ class CompilerEnvirons {
 
     var activationNames: Set<String>? = null
 
-    // KMP: typed Scriptable once the object model lands in Phase 3.
     // The field name keeps upstream's typo on purpose (1:1 mapping).
-    private var homeObjecgt: Any? = null
+    private var homeObjecgt: Scriptable? = null
 
-    fun setHomeObject(homeObject: Any?) {
+    fun setHomeObject(homeObject: Scriptable?) {
         this.homeObjecgt = homeObject
     }
 
-    fun homeObject(): Any? = homeObjecgt
+    fun homeObject(): Scriptable? = homeObjecgt
+
+    /** Copies the settings that matter for compilation out of [cx]. */
+    fun initFromContext(cx: Context) {
+        errorReporter = cx.errorReporter
+        languageVersion = cx.languageVersion
+        generateDebugInfo = !cx.isGeneratingDebugChanged() || cx.isGeneratingDebug()
+        reservedKeywordAsIdentifier = cx.hasFeature(Context.FEATURE_RESERVED_KEYWORD_AS_IDENTIFIER)
+        allowMemberExprAsFunctionName = cx.hasFeature(Context.FEATURE_MEMBER_EXPR_AS_FUNCTION_NAME)
+        strictMode = cx.hasFeature(Context.FEATURE_STRICT_MODE)
+        warningAsError = cx.hasFeature(Context.FEATURE_WARNING_AS_ERROR)
+        xmlAvailable = cx.hasFeature(Context.FEATURE_E4X)
+        interpretedMode = cx.isInterpretedMode()
+        generatingSource = cx.isGeneratingSource()
+        activationNames = cx.activationNames
+        generateObserverCount = cx.isGenerateObserverCount()
+    }
 
     fun reportWarningAsError(): Boolean = warningAsError
 

@@ -816,4 +816,227 @@ object ScriptRuntime {
         obj.parentScope = top
         obj.prototype = TopLevel.getBuiltinPrototype(top, type)
     }
+
+    // ---- The top call ------------------------------------------------------------------------
+
+    /** The function `caller` and `arguments` throw through in strict mode. */
+    private class ThrowTypeError(scope: Scriptable) : BaseFunction() {
+        init {
+            prototype = ScriptableObject.getFunctionPrototype(scope)
+            setAttributes("length", DONTENUM or PERMANENT or READONLY)
+            setAttributes("name", DONTENUM or PERMANENT or READONLY)
+            // arity and arguments go without the usual checks.
+            map.compute(this, "arity", 0) { _, _, _, _, _ -> null }
+            map.compute(this, "arguments", 0) { _, _, _, _, _ -> null }
+            preventExtensions()
+        }
+
+        override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
+            throw typeErrorById("msg.op.not.allowed")
+    }
+
+    fun typeErrorThrower(cx: Context): BaseFunction {
+        var t = cx.typeErrorThrower
+        if (t == null) {
+            t = ThrowTypeError(cx.topCallScope!!)
+            cx.typeErrorThrower = t
+        }
+        return t
+    }
+
+    fun hasTopCall(cx: Context): Boolean = cx.topCallScope != null
+
+    fun getTopCallScope(cx: Context): Scriptable = cx.topCallScope ?: throw IllegalStateException()
+
+    internal fun findFunctionActivation(cx: Context, f: Function): NativeCall? {
+        var call = cx.currentActivationCall
+        while (call != null) {
+            if (call.function === f) return call
+            call = call.parentActivationCall
+        }
+        return null
+    }
+
+    fun doTopCall(callable: Callable, cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
+        doTopCall(callable, cx, scope, thisObj, args, cx.isTopLevelStrict)
+
+    fun doTopCall(script: Script, cx: Context, scope: Scriptable, thisObj: Scriptable): Any? =
+        doTopCall(script, cx, scope, thisObj, cx.isTopLevelStrict)
+
+    /** Runs [callable] as the outermost call, setting up and tearing down the top scope around it. */
+    fun doTopCall(callable: Callable, cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>, isTopLevelStrict: Boolean): Any? {
+        check(cx.topCallScope == null)
+        cx.topCallScope = ScriptableObject.getTopLevelScope(scope)
+        cx.useDynamicScope = cx.hasFeature(Context.FEATURE_DYNAMIC_SCOPE)
+        val previousTopLevelStrict = cx.isTopLevelStrict
+        cx.isTopLevelStrict = isTopLevelStrict
+        try {
+            return cx.factory.doTopCall(callable, cx, scope, thisObj, args)
+        } finally {
+            cx.topCallScope = null
+            cx.isTopLevelStrict = previousTopLevelStrict
+            check(cx.currentActivationCall == null)
+        }
+    }
+
+    fun doTopCall(script: Script, cx: Context, scope: Scriptable, thisObj: Scriptable, isTopLevelStrict: Boolean): Any? {
+        check(cx.topCallScope == null)
+        cx.topCallScope = ScriptableObject.getTopLevelScope(scope)
+        cx.useDynamicScope = cx.hasFeature(Context.FEATURE_DYNAMIC_SCOPE)
+        val previousTopLevelStrict = cx.isTopLevelStrict
+        cx.isTopLevelStrict = isTopLevelStrict
+        try {
+            return cx.factory.doTopCall(script, cx, scope, thisObj)
+        } finally {
+            cx.topCallScope = null
+            cx.isTopLevelStrict = previousTopLevelStrict
+            check(cx.currentActivationCall == null)
+        }
+    }
+
+    // ---- apply and call ------------------------------------------------------------------------
+
+    /** `Function.prototype.apply` and `call`, which differ only in how the arguments arrive. */
+    fun applyOrCall(isApply: Boolean, cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
+        val l = args.size
+        val function = getCallable(thisObj)
+        val callThis = getApplyOrCallThis(cx, scope, if (l == 0) null else args[0], l, function)
+        val callArgs: Array<Any?> =
+            if (isApply) {
+                if (l <= 1) emptyArgs else getApplyArguments(cx, args[1])
+            } else {
+                if (l <= 1) emptyArgs else args.copyOfRange(1, l)
+            }
+        return function.call(cx, scope, callThis, callArgs)
+    }
+
+    internal fun getCallable(thisObj: Scriptable?): Callable {
+        if (thisObj is Callable) return thisObj
+        if (thisObj == null) throw notFunctionError(null, null)
+        val value = thisObj.getDefaultValue(FunctionClass)
+        if (value !is Callable) throw notFunctionError(value, thisObj)
+        return value
+    }
+
+    fun getApplyOrCallThis(cx: Context, scope: Scriptable, arg0: Any?, l: Int, target: Callable): Scriptable? {
+        var callThis: Scriptable?
+        if (cx.hasFeature(Context.FEATURE_OLD_UNDEF_NULL_THIS)) {
+            // The old rule: a missing or null this becomes the global object for everyone.
+            callThis = if (l != 0) toObjectOrNull(cx, arg0, scope) else null
+            if (callThis == null) callThis = getTopCallScope(cx)
+        } else {
+            callThis =
+                if (l != 0) {
+                    if (arg0 === Undefined.instance) Undefined.SCRIPTABLE_UNDEFINED else toObjectOrNull(cx, arg0, scope)
+                } else {
+                    Undefined.SCRIPTABLE_UNDEFINED
+                }
+            // Only a sloppy function gets the global object in place of a missing this.
+            val missingCallThis = callThis == null || callThis === Undefined.SCRIPTABLE_UNDEFINED
+            val isFunctionStrict = target !is JSFunction || target.isStrict
+            if (missingCallThis && !isFunctionStrict) callThis = getTopCallScope(cx)
+        }
+        return callThis
+    }
+
+    internal fun getApplyArguments(cx: Context, arg1: Any?): Array<Any?> = when {
+        arg1 == null || Undefined.isUndefined(arg1) -> emptyArgs
+        arg1 is Scriptable && isArrayLike(arg1) -> cx.getElements(arg1)
+        arg1 is ScriptableObject -> emptyArgs
+        else -> throw typeErrorById("msg.arg.isnt.array")
+    }
+
+    internal fun isArrayLike(obj: Scriptable?): Boolean =
+        // TODO(P3.8): NativeArray is also array-like on sight, without a property lookup.
+        obj != null && (obj is Arguments || ScriptableObject.hasProperty(obj, "length"))
+
+    /** Calls [fun_] the way script would, with [thisArg] converted to an object. */
+    fun call(cx: Context, fun_: Any?, thisArg: Any?, args: Array<Any?>, scope: Scriptable): Any? {
+        if (fun_ !is Function) throw notFunctionError(toString(fun_))
+        val thisObj = toObjectOrNull(cx, thisArg, scope) ?: throw undefCallError(null, "function")
+        return fun_.call(cx, scope, thisObj, args)
+    }
+
+    fun undefCallError(obj: Any?, id: Any?): RuntimeException =
+        typeErrorById("msg.undef.method.call", toString(obj), toString(id))
+
+    // ---- ToObject ------------------------------------------------------------------------------
+
+    fun toObject(scope: Scriptable, value: Any?): Scriptable {
+        if (value is Scriptable) return value
+        return toObject(Context.getContext(), scope, value)
+    }
+
+    /** ToObject: wraps a primitive in its object, and refuses null and undefined. */
+    fun toObject(cx: Context, scope: Scriptable, value: Any?): Scriptable {
+        if (value == null) throw typeErrorById("msg.null.to.object")
+        if (Undefined.isUndefined(value)) throw typeErrorById("msg.undef.to.object")
+        if (value is Scriptable) return value
+        // TODO(P3.8): the wrapper objects NativeString, NativeNumber, NativeBoolean, NativeSymbol
+        // and NativeBigInt land with the natives. Until then a primitive cannot be wrapped.
+        TODO("the primitive wrapper objects land in phase 3.8")
+    }
+
+    fun toObjectOrNull(cx: Context, obj: Any?): Scriptable? {
+        if (obj is Scriptable) return obj
+        if (obj != null && !Undefined.isUndefined(obj)) return toObject(cx, getTopCallScope(cx), obj)
+        return null
+    }
+
+    fun toObjectOrNull(cx: Context, obj: Any?, scope: Scriptable): Scriptable? {
+        if (obj is Scriptable) return obj
+        if (obj != null && !Undefined.isUndefined(obj)) return toObject(cx, scope, obj)
+        return null
+    }
+
+    // ---- Making objects ------------------------------------------------------------------------
+
+    fun newObject(cx: Context, scope: Scriptable, constructorName: String, args: Array<Any?>?): Scriptable {
+        val top = ScriptableObject.getTopLevelScope(scope)
+        val ctor = getExistingCtor(cx, top, constructorName)
+        return ctor.construct(cx, top, args ?: emptyArgs)
+    }
+
+    fun newObject(ctor: Any?, cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable {
+        if (ctor !is Constructable) throw notFunctionError(ctor)
+        return ctor.construct(cx, scope, args)
+    }
+
+    /** The elements of an array-like object, with holes read as `undefined`. */
+    fun getArrayElements(obj: Scriptable): Array<Any?> {
+        // TODO(P3.8): NativeArray.getLengthProperty handles a real array's length directly.
+        val lengthValue = ScriptableObject.getProperty(obj, "length")
+        val longLen = if (lengthValue === Scriptable.NOT_FOUND) 0L else toUint32(toNumber(lengthValue))
+        require(longLen <= Int.MAX_VALUE)
+        val len = longLen.toInt()
+        if (len == 0) return emptyArgs
+        return Array(len) { i ->
+            val elem = ScriptableObject.getProperty(obj, i)
+            if (elem === Scriptable.NOT_FOUND) Undefined.instance else elem
+        }
+    }
+
+    // ---- Generated scripts ---------------------------------------------------------------------
+
+    internal fun makeUrlForGeneratedScript(isEval: Boolean, masterScriptUrl: String?, masterScriptLine: Int): String =
+        if (isEval) "$masterScriptUrl#$masterScriptLine(eval)" else "$masterScriptUrl#$masterScriptLine(Function)"
+
+    internal fun isGeneratedScript(sourceUrl: String): Boolean =
+        sourceUrl.contains("(eval)") || sourceUrl.contains("(Function)")
+
+    internal fun checkDeprecated(cx: Context, name: String) {
+        val version = cx.languageVersion
+        if (version >= Context.VERSION_1_4 || version == Context.VERSION_DEFAULT) {
+            val msg = getMessageById("msg.deprec.ctor", name)
+            if (version == Context.VERSION_DEFAULT) Context.reportWarning(msg) else throw Context.reportRuntimeError(msg)
+        }
+    }
+
+    /** Builds the global scope. */
+    fun initStandardObjects(cx: Context, scope: ScriptableObject?, sealed: Boolean): ScriptableObject =
+        initSafeStandardObjects(cx, scope, sealed)
+
+    fun initSafeStandardObjects(cx: Context, scope: ScriptableObject?, sealed: Boolean): ScriptableObject =
+        // TODO(P3.8): the natives land in phase 3.8; this is where they get registered.
+        TODO("the standard objects land in phase 3.8")
 }

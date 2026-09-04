@@ -123,6 +123,15 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   `ThreadSafeEmbeddedSlotMap`, `ThreadSafeHashSlotMap`, `ThreadSafeCompoundOperationMap`,
   `LockAwareSlotMap`, `SlotMapOwner.ThreadedAccess` and the two thread-safe empty and single-entry
   maps are all gone. `Context.FEATURE_THREAD_SAFE_OBJECTS` is always false.
+- D-26: `NativeFunction` is not ported. At this pin `JSFunction` extends `BaseFunction` directly and
+  nothing in scope extends `NativeFunction`; it only serves the bytecode compiler's generated classes.
+- D-27: `EqualObjectGraphs`, the structural graph comparison, is not ported. The `equals` overrides
+  on `BoundFunction` and `IdFunctionObject` that used it are gone, so two bound functions with the
+  same target and arguments compare by identity, as any other object does.
+- D-28: `Context` drops class shutters, wrap factories, security controllers, class loaders, the
+  debugger, property-change listeners and locale. The debugger's `DebuggableScript` interface is not
+  ported either; `JSDescriptor` keeps the same members as plain methods. The continuations API
+  (`captureContinuation`, `resumeContinuation`) is decided with the interpreter in P3.7.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -532,37 +541,48 @@ Three commits, each of which compiles on its own.
       random sequence checked against an ordinary `LinkedHashMap`.
 - [x] jvmTest green
 
-#### P3.4: Forward references left behind by P3.3
+#### P3.4: The id-function machinery and the forward references from P3.3
 
-A short list of places in P3.3 that name classes landing later. Each is marked `TODO(P3.4)` in the
-source, so `grep` finds them, and none of them can survive the eval oracle in P3.9.
-
-- [ ] `SymbolKey.equals` and `ScriptRuntime.isSymbol` also have to accept a `NativeSymbol`.
-- [ ] `ScriptableObject.put(index)` on an object with external data should throw a
-      `JavaScriptException` wrapping a `NativeError`, not a plain `EcmaError`.
-- [ ] `JavaScriptException` should pull the cause, file name and line out of a thrown `NativeError`.
-- [ ] `BaseFunction.setupDefaultPrototype` should give a generator function `%GeneratorPrototype%`,
-      which needs `ES6Generator.GENERATOR_TAG`.
-- [ ] `BaseFunction.getArguments` should read the live activation, which needs `NativeCall` and
-      `Arguments`, both of which hold a `JSFunction`.
-- [ ] `BaseFunction.init` and `initAsGeneratorFunction` build the `Function` constructor. They need
-      `apply`, `call` and `bind`, so they wait for `BoundFunction` and `ScriptRuntime.applyOrCall`,
-      and the `Function` constructor itself needs the interpreter's `compileFunction`.
-- [ ] Port the rest of the function objects: `NativeFunction.kt` (128), `IdFunctionObject.kt` (133),
-      `IdFunctionCall.kt` (17), `IdScriptableObject.kt` (1019), `BoundFunction.kt` (113).
-- [ ] `BoundFunction.equals` and `IdFunctionObject.equals` use `EqualObjectGraphs` (347), the
-      structural graph comparison. Port it here or drop both `equals` overrides.
-- [ ] jvmTest green
+- [x] `IdFunctionObject.kt`, `IdFunctionCall.kt`, `IdScriptableObject.kt`, `BoundFunction.kt`.
+- [x] `NativeFunction` is not ported. Nothing in scope extends it: at this pin `JSFunction` extends
+      `BaseFunction` directly, and `NativeFunction` only exists for the bytecode compiler's generated
+      classes (D-26).
+- [x] `EqualObjectGraphs` is not ported, so the `equals` overrides on `BoundFunction` and
+      `IdFunctionObject` that used it are gone (D-27).
+- [x] `BaseFunction.init`, `initAsGeneratorFunction`, `apply`, `call`, `bind`, `toString`,
+      `toSource` and the live `arguments` object are filled in.
+- [x] Test `jvmTest/IdScriptableObjectOracleTest`: the same small class, written against each
+      side's `IdScriptableObject`, driven through instance ids, prototype ids, attributes, deletion,
+      method calls and constructor export, compared step by step.
+- [ ] Still waiting on later phases, each marked `TODO(P3.8)` or `TODO(P4)` in the source:
+      `NativeSymbol` in `SymbolKey.equals`, `ScriptRuntime.isSymbol` and `IdScriptableObject`;
+      `NativeError` in `JavaScriptException` and the external-array `put`; the generator prototype
+      in `BaseFunction.setupDefaultPrototype` and `initAsGeneratorFunction`.
 
 #### P3.5: Context
 
-- [ ] Port `Context.kt` (2865) properly, replacing the phase 0 shell, and `ContextFactory.kt` (532)
-      in its minimal form. Cut: class shutters, wrap factories, security controllers, the
-      `ClassLoader` and reflection paths, and the debugger surface beyond what the interpreter needs.
-- [ ] `Context.enter`/`exit` use a plain singleton slot rather than a `ThreadLocal`, under D-3.
-- [ ] This retires D-18: `Context.reportError` can route through a real error reporter again, and
-      `getSourcePositionFromStack` becomes implementable once the interpreter lands in P3.7.
-- [ ] jvmTest green
+- [x] `Context.kt` replaces the shell, with `ContextFactory.kt`, `ContextAction.kt`,
+      `WrappedException.kt`, `RegExpProxy.kt` and `ScriptStackElement.kt`. Cut: class shutters,
+      wrap factories, security controllers, class loaders, the debugger, property-change listeners,
+      locale and the E4X hooks (D-28). The time zone waits for the `Date` decision in P4.
+- [x] `Context.enter`/`exit` use a plain singleton slot rather than a `ThreadLocal`, under D-3.
+- [x] `reportError` and `reportRuntimeError` route through the context's reporter again. The
+      source-position fallback that walked the Java stack is gone for good (D-18 stays for that
+      half); the interpreter half becomes real in P3.7.
+- [x] `ScriptRuntime` grows the top-call machinery: `doTopCall`, `hasTopCall`, `getTopCallScope`,
+      `typeErrorThrower`, `applyOrCall`, `toObject`, `toObjectOrNull`, `newObject`,
+      `getArrayElements` and `call`.
+- [x] The descriptor layer moved up from P3.6, because `Context` and `BaseFunction` name it:
+      `ScriptOrFn.kt`, `JSCode.kt` (with `JSCodeExec` and `JSCodeResume`), `JSScript.kt`,
+      `JSFunction.kt`, `JSDescriptor.kt`, `NativeCall.kt`, `Arguments.kt`, `InterpreterData.kt`,
+      `CodeGenUtils.kt`. The debugger's `DebuggableScript` interface is not ported; `JSDescriptor`
+      has the same members as plain methods (D-28).
+- [x] `Interpreter.kt` exists as a shell implementing `Evaluator`: the create methods and the stack
+      capture are real, `compile` waits for P3.6 and `interpret` for P3.7. Both are `TODO()` calls,
+      not silent stubs.
+- [x] Test `commonTest/ContextTest`: enter and exit counting, `call`, feature flags by version,
+      sealing, factory listeners, microtask ordering, and error routing through the reporter.
+- [x] jvmTest green
 
 #### P3.6: Code generation
 
@@ -570,10 +590,8 @@ Moved here from P2, because `CodeGenerator` is generic over `ScriptOrFn<T>` and 
 `JSDescriptor<T>` whose root type `JSFunction` extends `BaseFunction`, and because it reads
 `Interpreter`'s exception-table constants directly.
 
-- [ ] Port the descriptor layer: `ScriptOrFn.kt` (21), `JSCode.kt` (31), `JSDescriptor.kt` (404),
-      `JSFunction.kt` (226), `CodeGenUtils.kt`, and whatever `JSCodeExec`/`JSCodeResume` turn out to
-      be at the pin.
-- [ ] Port `InterpreterData.kt` (177) and `CodeGenerator.kt` (1971).
+- [x] The descriptor layer and `InterpreterData` landed in P3.5, since `Context` needs them.
+- [ ] Port `CodeGenerator.kt` (1971).
 - [ ] Test `jvmTest/IcodeOracleTest`: generate icode for the whole corpus on both sides and compare
       the byte arrays, the string and number pools, the exception tables and the nested-function
       tables. This is the phase 2 promise finally kept, and it is a strong check: the icode array is
