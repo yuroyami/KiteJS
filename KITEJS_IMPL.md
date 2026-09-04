@@ -109,6 +109,10 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   `JSDescriptor`, which is part of the descriptor layer landing in P3.6, and `Evaluator`'s
   `getDebuggableScript` belongs to the debugger surface, which is never ported. Both are recorded in
   the contract parity test's expected-difference list, so the test fails if either becomes stale.
+- D-22: `SerializableCallable` and `SerializableConstructable` stay as names but carry nothing.
+  Upstream uses them to mark a lambda as serializable; there is no serialization in this port, so
+  they are empty markers over `Callable` and `Constructable`. They are kept because
+  `LambdaFunction` and `LambdaConstructor` name them all over their public API.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -470,12 +474,39 @@ than it was in P1 and P2, and P3.9 is where the guarantee comes back.
       known-absent and listed with a reason (D-21); a second test fails if either entry goes stale.
 - [x] jvmTest green
 
-#### P3.3: The property machinery
+#### P3.3: The object model
 
-- [ ] Port `Slot.kt` (145), `AccessorSlot.kt` (289), `BuiltInSlot.kt` (201), `LambdaSlot.kt` (74),
-      `SlotMap.kt` (94), `EmbeddedSlotMap.kt` (318), `HashSlotMap.kt` (100), `SlotMapOwner.kt` (375).
-      The thread-safe slot map variant is dropped under D-3.
-- [ ] Port `ScriptableObject.kt` (3345), the base of every JavaScript object.
+**Why P3.3 and P3.4 are now one cluster.** The plan used to split the property machinery from the
+function objects. That split does not compile. `ScriptableObject` names `BaseFunction`, `TopLevel`,
+`LambdaFunction` and `LambdaConstructor` in its public static helpers, and `TopLevel` names
+`BaseFunction` back, so the object base and the function base are one strongly connected group.
+Kotlin cannot add methods to a class in a later file, so the group has to land together. This is the
+same kind of scope error the plan already hit with `CodeGenerator` in P2, found the same way: by
+listing what each file actually names before writing any of it.
+
+The reflection half of `ScriptableObject` (`defineClass`, the annotation scan, `MemberBox`,
+`FunctionObject`) is LiveConnect and never gets ported, so a large part of the file drops out with
+it. `Delegator` goes the same way.
+
+Three commits, each of which compiles on its own.
+
+- [x] Commit 1, the standalone support types: `SymbolKey.kt` (83), `ExternalArrayData.kt` (28),
+      `Initializable.kt` (12), `SerializableCallable.kt` (11), `SerializableConstructable.kt` (9).
+      `JavaScriptException` and `LazilyLoadedCtor` were meant to be here too, but the first needs
+      `RhinoException.recordErrorOrigin` and a `NativeError`, and the second calls
+      `ScriptableObject.addLazilyInitializedValue`, so both move to commit 2.
+- [ ] Commit 2, the core: `Slot.kt` (145), `AccessorSlot.kt` (289), `BuiltInSlot.kt` (201),
+      `LambdaSlot.kt` (74), `LambdaAccessorSlot.kt` (167), `LazyLoadSlot.kt` (38), `SlotMap.kt` (94),
+      `CompoundOperationMap.kt` (103), `EmbeddedSlotMap.kt` (318), `HashSlotMap.kt` (100),
+      `SlotMapOwner.kt` (375), `ScriptableObject.kt` (3345), `BaseFunction.kt` (828),
+      `LambdaFunction.kt` (124), `KnownBuiltInFunction.kt` (44), `LambdaConstructor.kt` (473),
+      `TopLevel.kt` (266), `JavaScriptException.kt` (118), `LazilyLoadedCtor.kt` (174). The
+      thread-safe slot maps, the lock-aware map and the thread-safe compound operation map are all
+      dropped under D-3.
+- [ ] Commit 3, the id-function machinery: `NativeFunction.kt` (128), `IdFunctionObject.kt` (133),
+      `IdFunctionCall.kt` (17), `IdScriptableObject.kt` (1019), `BoundFunction.kt` (113).
+- [ ] `Arguments.kt` and `NativeCall.kt` move to P3.6. Both hold a `JSFunction`, which is part of
+      the descriptor layer.
 - [ ] Test `jvmTest/SlotMapOracleTest`: drive both the upstream slot maps and the ported ones through
       the same long random sequence of put, get, remove, iterate and compaction, then compare the
       resulting key order and contents. Slot maps switch representation as they grow, so the
@@ -485,13 +516,17 @@ than it was in P1 and P2, and P3.9 is where the guarantee comes back.
       prototype chain lookup
 - [ ] jvmTest green
 
-#### P3.4: Function objects
+#### P3.4: Forward references left behind by P3.3
 
-- [ ] Port `BaseFunction.kt` (828), `NativeFunction.kt` (128), `Arguments.kt` (369),
-      `NativeCall.kt` (154), `BoundFunction.kt` (113), `LambdaFunction.kt` (124),
-      `LambdaConstructor.kt` (473), `IdFunctionObject.kt` (133), `IdScriptableObject.kt` (1019),
-      `IdFunctionCall.kt` (moved here from P3.2, it needs `IdFunctionObject`).
-- [ ] Structural tests only at this point: the eval oracle in P3.9 is what really exercises them.
+A handful of use sites in P3.3 name classes that land later. Each one is listed here so it is filled
+in rather than forgotten, and each has a test in P3.9 that would catch it if it were not.
+
+- [ ] `BaseFunction` reads `ES6Generator.GENERATOR_TAG` in two places, and casts to `JSFunction` in
+      one. Fill in when those land.
+- [ ] `SymbolKey.equals` and `IdScriptableObject` compare against `NativeSymbol`.
+- [ ] `JavaScriptException` reads the message and line out of a `NativeError`.
+- [ ] `BoundFunction.equals` and `IdFunctionObject.equals` use `EqualObjectGraphs` (347), the
+      structural graph comparison. Port it here or drop both `equals` overrides.
 - [ ] jvmTest green
 
 #### P3.5: Context
