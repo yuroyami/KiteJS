@@ -23,7 +23,8 @@ plan, read [KITEJS_IMPL.md](KITEJS_IMPL.md).
 | Parser | ✅ | Matches upstream on a 30 file construct corpus: same rendered source, same node positions and line numbers, same recorded comments, same accept-or-reject decision. Error reporting matches too, over 60 malformed sources, in both collecting and throwing modes. E4X syntax is rejected rather than parsed |
 | Number formatting (Schubfach) | ✅ | `ScriptRuntime.numberToString` at radix 10 matches upstream on 300000 sampled values plus every boundary case. Same answer on every target. Other radixes wait for BigInt |
 | Icode constants | ✅ | All 89 values equal the upstream table, checked by reflection. The icode range and the bytecode token range still do not overlap |
-| IR generator (IRFactory, NodeTransformer) | ⛔ | Phase 2, in progress |
+| IR generator (IRFactory) | ✅ | The whole corpus lowers to an IR tree identical to upstream's at both language versions: same node types, values, positions, property slots and function tables. E4X transforms are out of scope |
+| IR transform pass (NodeTransformer) | ⛔ | Phase 2, next |
 | Bytecode generator (CodeGenerator, InterpreterData) | ⛔ | Moved to phase 3: it is generic over the descriptor layer, whose root type extends BaseFunction |
 | Interpreter + core runtime (Object, Function, Array, String, Number, Boolean, Math, JSON, errors) | ⛔ | Phase 3 |
 | RegExp engine | ⛔ | Phase 4 |

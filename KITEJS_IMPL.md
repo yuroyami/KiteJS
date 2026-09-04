@@ -97,6 +97,10 @@ Living list. Every entry is a known, deliberate behavior or structure difference
 - D-18: `Context.reportError` always throws, because there is no runtime Context to route through
   until P3, and its no-position overload cannot recover a source position from the interpreter stack
   for the same reason. Both become faithful once the runtime Context lands.
+- D-19: `IRFactory.createForIn` unwinds with a `ParserException` where upstream returns null on a bad
+  for-in left side. Upstream's caller then dereferences that null, so in IDE mode it fails with a
+  null pointer instead of abandoning the subtree. Outside IDE mode both behave the same, since
+  `reportError` throws.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -362,13 +366,21 @@ and more precise about what is being asserted.
 
 #### P2.3: IRFactory
 
-- [ ] Port `IRFactory.kt` (2644), including its nested `AstNodePosition` helper. One commit: the
+- [x] Port `IRFactory.kt` (2644), including its nested `AstNodePosition` helper. One commit: the
       transform methods form one recursive cluster and a half-ported file does not compile.
       Cut at port time: the eight `Xml*` transform methods, which follow D-16 and report
       "XML not available".
-- [ ] Test `commonTest/IRFactorySmokeTest`: a handful of scripts lowered to IR with the expected
+- [x] Test `commonTest/IRFactorySmokeTest`: a handful of scripts lowered to IR with the expected
       node types, so the transform runs on every target
-- [ ] jvmTest green
+- [x] Test `jvmTest/IRFactoryOracleTest` landed here rather than in P2.5, because it is what proves
+      the port: the whole corpus lowers to an IR tree identical to upstream's at both language
+      versions, and the function tables match too
+- [x] jvmTest green (256 tests), `jsNodeTest` green, iOS compiles
+
+Bug the oracle caught: upstream's `Parser.destructuringObject` guards on `ts != null` and leaves the
+position at zero when the token stream was never started, which is exactly the case when IRFactory
+drives destructuring through a parser it made but never ran. The port called `lineNumber()`
+unconditionally and produced -1. `lateinit` had hidden the guard; `this::ts.isInitialized` restores it.
 
 #### P2.4: NodeTransformer
 

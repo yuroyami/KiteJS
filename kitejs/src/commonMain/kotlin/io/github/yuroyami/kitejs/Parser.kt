@@ -112,8 +112,8 @@ class Parser(
     private var scannedComments: MutableList<Comment>? = null
     private var currentJsDocComment: Comment? = null
 
-    protected var nestingOfFunction = 0
-    protected var nestingOfFunctionParams = 0
+    internal var nestingOfFunction = 0
+    internal var nestingOfFunctionParams = 0
     private var currentLabel: LabeledStatement? = null
     private var inDestructuringAssignment = false
 
@@ -4077,7 +4077,7 @@ class Parser(
         return result
     }
 
-    protected fun checkActivationName(name: String, token: Int) {
+    internal fun checkActivationName(name: String, token: Int) {
         if ("arguments" == name && currentScriptOrFn is FunctionNode) {
             // A usage of "arguments" means it has to be initialized. This check comes before the
             // insideFunctionBody one, because the usage may sit in a function's default arguments.
@@ -4108,7 +4108,7 @@ class Parser(
         }
     }
 
-    protected fun setRequiresActivation() {
+    internal fun setRequiresActivation() {
         if (insideFunctionBody()) {
             (currentScriptOrFn as FunctionNode).requiresActivation = true
         }
@@ -4123,7 +4123,7 @@ class Parser(
         }
     }
 
-    protected fun setIsGenerator() {
+    internal fun setIsGenerator() {
         if (insideFunctionBody()) {
             (currentScriptOrFn as FunctionNode).isGenerator = true
         }
@@ -4713,10 +4713,18 @@ class Parser(
             }
             val prop = abstractProp as ObjectProperty
 
-            // This is sometimes called from IRFactory while running regression tests, where the
-            // token stream is not set. Deal with it.
-            val lineno = lineNumber()
-            val column = columnNumber()
+            // This is also called from IRFactory, where the parser it made never scanned
+            // anything, so the token stream was never started. Upstream tests `ts != null` and
+            // leaves the position at zero in that case.
+            val lineno: Int
+            val column: Int
+            if (this::ts.isInitialized) {
+                lineno = lineNumber()
+                column = columnNumber()
+            } else {
+                lineno = 0
+                column = 0
+            }
             val id = prop.key
 
             val rightElem: Node
@@ -4790,22 +4798,22 @@ class Parser(
         return empty
     }
 
-    protected fun createName(name: String): Node {
+    internal fun createName(name: String): Node {
         checkActivationName(name, Token.NAME)
         return Node.newString(Token.NAME, name)
     }
 
-    protected fun createName(type: Int, name: String, child: Node?): Node {
+    internal fun createName(type: Int, name: String, child: Node?): Node {
         val result = createName(name)
         result.type = type
         if (child != null) result.addChildToBack(child)
         return result
     }
 
-    protected fun createNumber(number: Double): Node = Node.newNumber(number)
+    internal fun createNumber(number: Double): Node = Node.newNumber(number)
 
     /** Creates a node that can hold lexically scoped variable definitions, i.e. let declarations. */
-    protected fun createScopeNode(token: Int, lineno: Int, column: Int): Scope {
+    internal fun createScopeNode(token: Int, lineno: Int, column: Int): Scope {
         val scope = Scope()
         scope.type = token
         scope.setLineColumnNumber(lineno, column)
@@ -4890,7 +4898,7 @@ class Parser(
         throw codeBug()
     }
 
-    protected fun checkMutableReference(n: Node) {
+    internal fun checkMutableReference(n: Node) {
         val memberTypeFlags = n.getIntProp(Node.MEMBER_TYPE_PROP, 0)
         if ((memberTypeFlags and Node.DESCENDANTS_FLAG) != 0) {
             reportError("msg.bad.assign.left")
@@ -4898,7 +4906,7 @@ class Parser(
     }
 
     /** Removes any [ParenthesizedExpression] wrappers. */
-    protected fun removeParens(node: AstNode): AstNode {
+    internal fun removeParens(node: AstNode): AstNode {
         var n = node
         while (n is ParenthesizedExpression) {
             n = n.expression!!
