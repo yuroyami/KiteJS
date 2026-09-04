@@ -16,7 +16,7 @@
 - File mapping is 1:1 by name: `TokenStream.java` becomes `TokenStream.kt`. Same class names, method names and behavior. Deviations only where a JVM-ism forces one, via the substitution table below, and each deviation gets a row in the divergence ledger.
 - Zero expect/actual until Phase 5 (KiteCore's `WeakRef` hides the only one we need inside its own artifact).
 - `:kitejs` runtime classpath = kotlin-stdlib. Nothing else. `jvmTest` additionally carries `org.mozilla:rhino:1.9.1` as the differential-testing oracle; it never ships.
-- Never ported: `optimizer/` (bytecode codegen), `xml/` + the 10 `ast/Xml*` files (E4X), `lc/` + `annotations/` + `FunctionObject` reflection binding (LiveConnect), `serialize/`, `commonjs/` (revisit after Phase 7), `debug/` beyond the interfaces the interpreter needs, Intl.
+- Never ported: `optimizer/` (bytecode codegen), `xml/` + the 9 `ast/Xml*` files (E4X), `lc/` + `annotations/` + `FunctionObject` reflection binding (LiveConnect), `serialize/`, `commonjs/` (revisit after Phase 7), `debug/` beyond the interfaces the interpreter needs, Intl.
 - Every ported file starts with the 3-line MPL header (same header upstream uses). License MPL-2.0, NOTICE credits Mozilla.
 - Threading: v0 is single-thread confined (JS is single-threaded). Drop `synchronized`/`volatile` at port time; each dropped site gets a one-line `// KMP:` comment. No atomics until a real need appears.
 - Comments: keep upstream's substantive comments, drop Javadoc boilerplate. New comments only for KMP deviations, 1-2 lines.
@@ -219,12 +219,15 @@ follow those waves, so every commit leaves the module compiling and jvmTest gree
 
 #### P1.3: AST waves 2 and 3 (containers)
 
-- [ ] Port 16 files (2018 lines): wave 2 is `ErrorCollector`, `GeneratorExpression`,
+- [x] Port 16 files (2018 lines): wave 2 is `ErrorCollector`, `GeneratorExpression`,
       `LabeledStatement`, `ObjectProperty`, `SpreadObjectProperty`, `SwitchStatement`; wave 3 is
       `ArrayLiteral`, `CatchClause`, `DestructuringForm`, `ForLoop`, `LetNode`, `NewExpression`,
       `ObjectLiteral`, `TryStatement`, `VariableDeclaration`, `VariableInitializer`
-- [ ] Test: `AstSourceTest` extended to the container nodes; `ErrorCollectorTest`
-- [ ] jvmTest green. At this point the whole AST exists and the `ast` package is closed.
+- [x] Test (`commonTest`): `AstContainerSourceTest`, the cross-target renderer check
+- [x] Test (`jvmTest`): `AstContainerOracleTest`, the differential test against the upstream jar
+- [x] jvmTest green (181 tests), `jsNodeTest` green (128 tests), iOS compiles. The `ast` package is
+      closed: all 70 non-E4X node types are ported, verified by a file-by-file comparison against
+      the upstream directory.
 
 #### P1.4: CompilerEnvirons completion
 
