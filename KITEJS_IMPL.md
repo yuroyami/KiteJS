@@ -101,6 +101,14 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   for-in left side. Upstream's caller then dereferences that null, so in IDE mode it fails with a
   null pointer instead of abandoning the subtree. Outside IDE mode both behave the same, since
   `reportError` throws.
+- D-20: `Scriptable.getDefaultValue` takes a `KClass<*>?` instead of a `java.lang.Class`, and
+  `ScriptRuntime` keeps its type sentinels (`StringClass`, `NumberClass` and the rest) as `KClass`
+  values. Common Kotlin has no `java.lang.Class`. The sentinels are only ever compared by identity,
+  so the switch changes nothing an engine caller can observe.
+- D-21: two contract members wait on code that is not ported yet. `Script.getDescriptor` returns a
+  `JSDescriptor`, which is part of the descriptor layer landing in P3.6, and `Evaluator`'s
+  `getDebuggableScript` belongs to the debugger surface, which is never ported. Both are recorded in
+  the contract parity test's expected-difference list, so the test fails if either becomes stale.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -434,30 +442,33 @@ than it was in P1 and P2, and P3.9 is where the guarantee comes back.
 
 #### P3.1: Values and the conversion surface
 
-- [ ] Port `Undefined.kt` (151), `UniqueTag.kt` (73), `ConsString.kt` (107). Self-contained value
+- [x] Port `Undefined.kt` (151), `UniqueTag.kt` (73), `ConsString.kt` (107). Self-contained value
       types with no dependency on the object model.
-- [ ] Grow `ScriptRuntime` with the conversion surface that needs no Scriptable: `toNumber(String)`
+- [x] Grow `ScriptRuntime` with the conversion surface that needs no Scriptable: `toNumber(String)`
       and its string-scanning helpers, `toInteger(double)`, `toInt32(double)`, `toUint32(double)`,
       `toIndex`, plus the numeric predicates. 54 of upstream's static methods take only primitives
       and strings, and they are the ones ported here.
-- [ ] `DToA.JS_dtobasestr` stays out: it needs arbitrary-precision integers and waits for P5 with
+- [x] `DToA.JS_dtobasestr` stays out: it needs arbitrary-precision integers and waits for P5 with
       `KBigInt`, so `numberToString` keeps handling radix 10 only.
-- [ ] Test `jvmTest/ConversionOracleTest`: every ported conversion compared against upstream over a
+- [x] Test `jvmTest/ConversionOracleTest`: every ported conversion compared against upstream over a
       wide sample, including the string-to-number edge cases (whitespace, signs, hex, octal, binary,
       infinity, empty, trailing junk) and the full double range for the integer conversions
-- [ ] Test `commonTest/ConversionTest`: the same edge cases on every target
-- [ ] jvmTest green
+- [x] Test `commonTest/ConversionTest`: the same edge cases on every target
+- [x] jvmTest green
 
 #### P3.2: Contracts
 
-- [ ] Port the interfaces the rest of the runtime is written against: `Scriptable.kt` (292),
+- [x] Port the interfaces the rest of the runtime is written against: `Scriptable.kt` (292),
       `SymbolScriptable.kt`, `Callable.kt`, `Constructable.kt`, `Function.kt`, `Evaluator.kt`,
-      `Script.kt`, `RefCallable.kt`, `IdFunctionCall.kt`, `Ref.kt`, `ConstProperties.kt`
-      (moved here from P2), `Wrapper.kt` if the pin has one.
-- [ ] These are declarations, so the check is that they compile and that their member sets match
-      upstream. Test `jvmTest/ContractParityTest` compares each interface's method names and arity
-      against the upstream class by reflection.
-- [ ] jvmTest green
+      `Script.kt`, `RefCallable.kt`, `Ref.kt`, `ConstProperties.kt` (moved here from P2),
+      `Symbol.kt`, `Wrapper.kt`.
+- [x] `IdFunctionCall.kt` moves to P3.4. Its one method takes an `IdFunctionObject`, which is a
+      P3.4 class, so it cannot compile here.
+- [x] These are declarations, so the check is that they compile and that their member sets match
+      upstream. Test `jvmTest/ContractParityTest` compares each interface by reflection: method
+      names, arity, parameter shapes, return shapes and the interfaces it extends. Two members are
+      known-absent and listed with a reason (D-21); a second test fails if either entry goes stale.
+- [x] jvmTest green
 
 #### P3.3: The property machinery
 
@@ -478,7 +489,8 @@ than it was in P1 and P2, and P3.9 is where the guarantee comes back.
 
 - [ ] Port `BaseFunction.kt` (828), `NativeFunction.kt` (128), `Arguments.kt` (369),
       `NativeCall.kt` (154), `BoundFunction.kt` (113), `LambdaFunction.kt` (124),
-      `LambdaConstructor.kt` (473), `IdFunctionObject.kt` (133), `IdScriptableObject.kt` (1019).
+      `LambdaConstructor.kt` (473), `IdFunctionObject.kt` (133), `IdScriptableObject.kt` (1019),
+      `IdFunctionCall.kt` (moved here from P3.2, it needs `IdFunctionObject`).
 - [ ] Structural tests only at this point: the eval oracle in P3.9 is what really exercises them.
 - [ ] jvmTest green
 

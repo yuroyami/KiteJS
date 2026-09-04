@@ -25,6 +25,9 @@ plan, read [KITEJS_IMPL.md](KITEJS_IMPL.md).
 | Icode constants | ✅ | All 89 values equal the upstream table, checked by reflection. The icode range and the bytecode token range still do not overlap |
 | IR generator (IRFactory) | ✅ | The whole corpus lowers to an IR tree identical to upstream's at both language versions: same node types, values, positions, property slots and function tables. E4X transforms are out of scope |
 | IR transform pass (NodeTransformer) | ✅ | The whole corpus transforms to a tree identical to upstream's at both language versions and in strict mode, script tree and every nested function compared |
+| Runtime conversions (ScriptRuntime, string to number and back) | 🟡 | The whole primitive conversion surface is ported and matches upstream: `toNumber(String)` over 25000 strings, `toInteger` and `toUint32` over 160000 doubles, `escapeString` over 40000 cases, and format-then-parse round trips. The conversions that need a Scriptable wait for the object model |
+| Runtime contracts (Scriptable, Function, Callable, Script, Evaluator, Ref, Symbol) | ✅ | Every interface has the same members as upstream: names, arity, parameter and return shapes, and the interfaces it extends, all compared by reflection. Two members are known-absent and listed with a reason |
+| Value types (Undefined, UniqueTag, ConsString) | ✅ | Same behaviour as upstream, including the lazy rope that repeated string concatenation builds |
 | Bytecode generator (CodeGenerator, InterpreterData) | ⛔ | Moved to phase 3: it is generic over the descriptor layer, whose root type extends BaseFunction |
 | Interpreter + core runtime (Object, Function, Array, String, Number, Boolean, Math, JSON, errors) | ⛔ | Phase 3 |
 | RegExp engine | ⛔ | Phase 4 |

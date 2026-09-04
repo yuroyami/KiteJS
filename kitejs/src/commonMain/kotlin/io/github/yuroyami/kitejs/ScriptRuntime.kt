@@ -5,6 +5,9 @@
 package io.github.yuroyami.kitejs
 
 import io.github.yuroyami.kitejs.dtoa.DoubleFormatter
+import kotlin.math.ceil
+import kotlin.math.floor
+import kotlin.reflect.KClass
 import io.github.yuroyami.kitejs.v8dtoa.DoubleConversion
 
 /**
@@ -199,9 +202,128 @@ object ScriptRuntime {
         return sum
     }
 
+    /*
+     * Type sentinels for the getDefaultValue hint and the runtime's type tests.
+     *
+     * KMP: upstream looks these up reflectively by name and compares java.lang.Class objects. They
+     * are only ever compared by identity, so KClass values map exactly (D-20).
+     */
+    val BooleanClass: KClass<*> = Boolean::class
+    val StringClass: KClass<*> = String::class
+    val NumberClass: KClass<*> = Number::class
+    val FunctionClass: KClass<*> = Function::class
+    val ScriptableClass: KClass<*> = Scriptable::class
+    val ObjectClass: KClass<*> = Any::class
+    val BigIntegerClass: KClass<*> = KBigInt::class
+
     val emptyArgs: Array<Any?> = arrayOf()
 
     fun toInt32(d: Double): Int = DoubleConversion.doubleToInt32(d)
+
+    fun toUint32(d: Double): Long = DoubleConversion.doubleToInt32(d).toLong() and 0xffffffffL
+
+    /** ECMAScript ToInteger: truncates toward zero, and maps NaN to positive zero. */
+    fun toInteger(d: Double): Double {
+        if (d.isNaN()) return +0.0
+        if (d == 0.0 || d.isInfinite()) return d
+        return if (d > 0.0) floor(d) else ceil(d)
+    }
+
+    /**
+     * ECMAScript ToNumber for a string.
+     *
+     * Two old behaviours are kept on purpose below the ES6 language level, so scripts that relied
+     * on them keep working (upstream bug 368): a hexadecimal literal parses only its valid prefix,
+     * like `parseInt` does, a sign is allowed in front of one, and the binary and octal prefixes
+     * are not recognised at all.
+     */
+    fun toNumber(s: String): Double {
+        val len = s.length
+
+        // Skip the leading whitespace.
+        var start = 0
+        var startChar: Char
+        while (true) {
+            if (start == len) {
+                // Empty, or nothing but whitespace.
+                return +0.0
+            }
+            startChar = s[start]
+            if (!isStrWhiteSpaceChar(startChar.code)) {
+                break
+            }
+            start++
+        }
+
+        // Skip the trailing whitespace.
+        var end = len - 1
+        var endChar = s[end]
+        while (isStrWhiteSpaceChar(endChar.code)) {
+            end--
+            endChar = s[end]
+        }
+
+        val cx = Context.getCurrentContext()
+        val oldParsingMode = cx == null || cx.languageVersion < Context.VERSION_ES6
+
+        // Handle the non-decimal prefixes.
+        if (startChar == '0') {
+            if (start + 2 <= end) {
+                val radixC = s[start + 1]
+                var radix = -1
+                if (radixC == 'x' || radixC == 'X') {
+                    radix = 16
+                } else if (!oldParsingMode && (radixC == 'o' || radixC == 'O')) {
+                    radix = 8
+                } else if (!oldParsingMode && (radixC == 'b' || radixC == 'B')) {
+                    radix = 2
+                }
+                if (radix != -1) {
+                    if (oldParsingMode) {
+                        return stringPrefixToNumber(s, start + 2, radix)
+                    }
+                    return stringToNumber(s, start + 2, end, radix)
+                }
+            }
+        } else if (oldParsingMode && (startChar == '+' || startChar == '-')) {
+            // In the old mode a hexadecimal literal may carry a sign.
+            if (start + 3 <= end && s[start + 1] == '0') {
+                val radixC = s[start + 2]
+                if (radixC == 'x' || radixC == 'X') {
+                    val value = stringPrefixToNumber(s, start + 3, 16)
+                    return if (startChar == '-') -value else value
+                }
+            }
+        }
+
+        if (endChar == 'y') {
+            // Could be "Infinity".
+            if (startChar == '+' || startChar == '-') {
+                start++
+            }
+            if (start + 7 == end && s.regionMatches(start, "Infinity", 0, 8)) {
+                return if (startChar == '-') {
+                    Double.NEGATIVE_INFINITY
+                } else {
+                    Double.POSITIVE_INFINITY
+                }
+            }
+            return NaN
+        }
+
+        // A finite decimal number, so a plain floating point conversion will do. The character
+        // check first, because the parser is slow and accepts input this has to reject.
+        val sub = s.substring(start, end + 1)
+        for (i in sub.length - 1 downTo 0) {
+            val c = sub[i]
+            if ((c in '0'..'9') || c == '.' || c == 'e' || c == 'E' || c == '+' || c == '-') {
+                continue
+            }
+            return NaN
+        }
+        return sub.toDoubleOrNull() ?: NaN
+    }
+
 
     internal fun isSpecialProperty(s: String): Boolean =
         s == NativeObject.PROTO_PROPERTY || s == NativeObject.PARENT_PROPERTY

@@ -10,6 +10,19 @@ package io.github.yuroyami.kitejs
  */
 class Context internal constructor() {
 
+    /**
+     * The language version this context evaluates at.
+     *
+     * Phase 2 slice: the full Context, with its scopes, features and evaluation entry points,
+     * arrives in phase 3.
+     */
+    var languageVersion: Int = VERSION_DEFAULT
+        set(value) {
+            checkLanguageVersion(value)
+            field = value
+        }
+
+
     companion object {
         /** The unknown version. */
         const val VERSION_UNSUPPORTED = -1
@@ -40,6 +53,16 @@ class Context internal constructor() {
             VERSION_ES6, VERSION_ECMASCRIPT -> true
             else -> false
         }
+
+        /**
+         * KMP: upstream keeps the current context in a `ThreadLocal`. The engine is single-thread
+         * confined (D-3), so this becomes a plain slot. It stays null until the runtime Context
+         * lands in phase 3, which is also what upstream falls back to when nothing entered a
+         * context.
+         */
+        internal var currentContext: Context? = null
+
+        fun getCurrentContext(): Context? = currentContext
 
         /**
          * Reports an error through the current context's error reporter, or throws when there is
