@@ -101,7 +101,7 @@ Living list. Every entry is a known, deliberate behavior or structure difference
 | Phase | Deliverable | Done when |
 |---|---|---|
 | P0 | Scaffold + lexer | `TokenStreamTest` green on jvm; iOS and JS targets compile |
-| P1 | AST + Parser | `toSource()` parity with upstream on the corpus (jvm oracle) |
+| P1 | AST + Parser | DONE. `toSource()`, positions and error parity with upstream on the corpus (jvm oracle) |
 | P2 | IR + Icode generator | Icode generation completes on the corpus without error; dump comparison vs upstream where accessible |
 | P3 | Interpreter + core runtime | eval oracle: identical results vs upstream on the arithmetic/string/object/array/function/closure/control-flow/exception corpus |
 | P4 | RegExp, Date, collections, iterators, generators, typed arrays, Promise, template runtime | extended oracle corpus green |
@@ -265,19 +265,29 @@ follow those waves, so every commit leaves the module compiling and jvmTest gree
 
 #### P1.6: Oracle parity and corpus
 
-- [ ] Build `kitejs/src/jvmTest/resources/corpus/*.js`, one construct family per file: literals,
-      operators, precedence, functions, closures, arrow functions, destructuring, spread, template
-      strings, tagged templates, generators, `for-of`, `for-in`, `try/catch/finally`, labels,
-      `switch`, regex literals, getters and setters, computed keys, optional chaining, nullish
-      coalescing, `let`/`const` scoping, comma expressions, ASI edge cases, comments in odd places
-- [ ] Test `jvmTest/ParserOracleTest`: for every corpus file, `upstream.toSource()` equals
-      `ported.toSource()`, at ES6 language version and again at VERSION_DEFAULT
-- [ ] Test `jvmTest/ParserErrorParityTest`: malformed sources produce the same error message text
-      and the same error count as upstream, collected through `ErrorCollector`
-- [ ] Cross-target check: iosSimulatorArm64 and JS compile, `jsNodeTest` green
-- [ ] Update `PORTING_STATUS.md` (AST + Parser row), commit
+- [x] Built `kitejs/src/jvmTest/resources/corpus/*.js`, 30 files, one construct family each:
+      literals, operators, precedence, assignments, update expressions, functions, closures, arrow
+      functions, control flow, `for-in`/`for-of`, labels, `switch`, `try/catch/finally`, objects,
+      arrays, member access, optional chaining, template literals, destructuring, spread and rest,
+      generators, `let`/`const`, comments in odd places, ASI edge cases, plain statements, strict
+      mode, unicode identifiers, nested scopes, getters and setters, computed keys
+- [x] Test `jvmTest/ParserOracleTest`. For every corpus file the port and the upstream jar must
+      agree on: the rendered source at ES6 and at VERSION_DEFAULT, the accept-or-reject decision,
+      the recorded comment list, and every node's type, position, length and line number
+- [x] Test `jvmTest/ParserErrorParityTest`. 60 malformed sources produce the same problems in the
+      same order with the same text, offset and length, both in IDE mode through `ErrorCollector`
+      and in throwing mode. Strict-mode warnings are compared too
+- [x] Cross-target check: iosSimulatorArm64 and iosArm64 compile, `jsNodeTest` green (149 tests)
+- [x] Updated `PORTING_STATUS.md`, committed
 
-**Done when:** corpus parity green on both language versions, error parity green, all targets compile.
+**Done when:** corpus parity green on both language versions, error parity green, all targets
+compile. **All green: 214 jvmTest, 149 jsNodeTest.**
+
+Two corpus notes worth keeping. Rhino 1.9.1 accepts spread in array literals, object literals and
+rest parameters, but rejects it in call arguments (`f(...a)`), in `new` arguments and in an arrow
+function's parameter list. Those forms are out of the corpus because upstream cannot parse them,
+not because the port cannot. And many corpus files are invalid at VERSION_DEFAULT; the oracle
+turns that into a test of its own by requiring both parsers to reject them.
 
 ### P2: IR + Icode generator
 

@@ -20,7 +20,7 @@ plan, read [KITEJS_IMPL.md](KITEJS_IMPL.md).
 | Support slice (Kit, Messages, Characters, ErrorReporter, exceptions, Context version surface) | 🟡 | Only what the lexer and parser need; each file grows in its own later phase. Every error message carried so far is verified against the upstream bundle |
 | CompilerEnvirons | ✅ | Complete except `initFromContext`, which needs a real Context (phase 3). Security controllers and the deprecated optimization level are out of scope |
 | AST node hierarchy | ✅ | All 70 node types ported. Every one is checked against the upstream jar: rendered source, positions, line-number fallback, child-list surgery and symbol tables all match. E4X node types are out of scope |
-| Parser | 🟡 | Ported and running: declarations, expressions, control flow, functions, destructuring, template literals, generators, optional chaining and error recovery all parse. The corpus-wide comparison against upstream is the next task. E4X syntax is rejected rather than parsed |
+| Parser | ✅ | Matches upstream on a 30 file construct corpus: same rendered source, same node positions and line numbers, same recorded comments, same accept-or-reject decision. Error reporting matches too, over 60 malformed sources, in both collecting and throwing modes. E4X syntax is rejected rather than parsed |
 | IR + bytecode generator (Icode) | ⛔ | Phase 2 |
 | Interpreter + core runtime (Object, Function, Array, String, Number, Boolean, Math, JSON, errors) | ⛔ | Phase 3 |
 | RegExp engine | ⛔ | Phase 4 |

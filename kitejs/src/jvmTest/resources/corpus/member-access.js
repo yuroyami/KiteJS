@@ -1,0 +1,16 @@
+a.b;
+a.b.c;
+a[0];
+a["key"];
+a[b + c];
+a.b[c].d;
+a();
+a(b);
+a(b, c);
+a.b();
+a[0]();
+a()();
+new A();
+new A(b);
+new a.B(c);
+new new A()();
