@@ -109,7 +109,7 @@ Living list. Every entry is a known, deliberate behavior or structure difference
 |---|---|---|
 | P0 | Scaffold + lexer | `TokenStreamTest` green on jvm; iOS and JS targets compile |
 | P1 | AST + Parser | DONE. `toSource()`, positions and error parity with upstream on the corpus (jvm oracle) |
-| P2 | IR generator | The corpus lowers to an IR tree identical to upstream's, before and after the transform pass. Code generation moved to P3, see that block |
+| P2 | IR generator | DONE. The corpus lowers to an IR tree identical to upstream's, before and after the transform pass. Code generation moved to P3, see that block |
 | P3 | Interpreter + core runtime | eval oracle: identical results vs upstream on the arithmetic/string/object/array/function/closure/control-flow/exception corpus |
 | P4 | RegExp, Date, collections, iterators, generators, typed arrays, Promise, template runtime | extended oracle corpus green |
 | P5 | WeakMap/WeakSet via KiteCore, real BigInt | weak semantics tests + BigInt oracle slice green |
@@ -384,25 +384,33 @@ unconditionally and produced -1. `lateinit` had hidden the guard; `this::ts.isIn
 
 #### P2.4: NodeTransformer
 
-- [ ] Port `NodeTransformer.kt` (567). It is independent of `IRFactory` despite the comment that
+- [x] Port `NodeTransformer.kt` (567). It is independent of `IRFactory` despite the comment that
       mentions it, and it needs only `Kit.codeBug`, `ScriptRuntime.getIndexObject` and
       `Context.reportError`.
-- [ ] Test `commonTest/NodeTransformerSmokeTest`: loops, labels, try/finally and `with` come out with
-      the expected jump and scope structure
-- [ ] jvmTest green
+- [x] Test `commonTest/NodeTransformerSmokeTest`: break and continue become gotos, declarations
+      become stores, local names resolve to variable slots unless an activation is needed, strict
+      mode rewrites stores, a return inside try jsrs to the finally, `typeof o.p` stops warning,
+      generator resumption points are recorded, and a let block becomes a `with` under activation
+- [x] Test `jvmTest/NodeTransformerOracleTest`: the whole corpus, transformed on both sides and
+      compared node by node, at both language versions and again in strict mode. The script tree and
+      every nested function are compared, since the transform runs per function and the flattening
+      decision differs between them
+- [x] jvmTest green (271 tests)
 
-#### P2.5: IR oracle over the corpus
+#### P2.5: Close out
 
-- [ ] Test `jvmTest/IRFactoryOracleTest`: for every P1 corpus file, run parse plus `transformTree`
-      through the upstream jar and through the port, then compare the two IR trees node by node
-      (type, string and number values, property list, line and column, child order)
-- [ ] Test `jvmTest/NodeTransformerOracleTest`: the same comparison after the transform pass, which
-      is where loops become labeled jumps and scopes get flattened
-- [ ] Cross-target check: iosSimulatorArm64 and JS compile, `jsNodeTest` green
-- [ ] Update `PORTING_STATUS.md`, commit
+The two oracle tests landed with the code they check, in P2.3 and P2.4, which is where a failure is
+easiest to act on. What is left here is the shared plumbing and the cross-target pass.
+
+- [x] `jvmTest/IrDump`: the shared tree renderer both oracles use. It walks the public API rather
+      than `Node.toStringTree`, which upstream gates behind the `rhino.printTrees` system property
+      read once at class-init time
+- [x] Cross-target check: iosSimulatorArm64 and iosArm64 compile, `jsNodeTest` green (185 tests)
+- [x] Update `PORTING_STATUS.md`, commit
 
 **Done when:** the whole corpus lowers to IR and survives the transform pass with a tree identical
-to upstream's, on both language versions, and every target compiles.
+to upstream's, on both language versions, and every target compiles. **All green: 271 jvmTest,
+185 jsNodeTest.**
 
 ### P3: Interpreter + core runtime
 
