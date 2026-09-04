@@ -87,6 +87,13 @@ Living list. Every entry is a known, deliberate behavior or structure difference
 - D-15: the deprecated `getOptimizationLevel`/`setOptimizationLevel` pair on `CompilerEnvirons` and
   `Context` is not ported. There is no bytecode compiler, so `interpretedMode` is the only switch and
   the level would always read -1.
+- D-16: E4X syntax is rejected rather than parsed. `xmlInitializer`, `attributeAccess`, `xmlElemRef`,
+  the qualified-name branch of `propertyName` and the `DOTQUERY` branch of `memberExprTail` report
+  "XML not available" and return an error node. `compilerEnv.xmlAvailable` keeps upstream's default
+  of true so the surrounding control flow is unchanged.
+- D-17: the parser does not catch stack overflow. Upstream turns a `StackOverflowError` on deeply
+  nested input into a "too deep parser recursion" error; common Kotlin has no portable way to catch
+  it, so such input fails with the platform's own stack error.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -242,17 +249,19 @@ follow those waves, so every commit leaves the module compiling and jvmTest gree
 
 #### P1.5: Parser
 
-- [ ] Port `Parser.kt` (5210). One commit because a half-ported parser does not compile.
-      Cut at port time: the `Reader` overloads (D-2), the four E4X methods
-      (`xmlInitializer`, `attributeAccess`, `propertyName` XML branch, `memberExprTail` XML branch),
-      and `parse(Reader)`.
-      Order inside the file follows upstream: token plumbing, `parse`, statements, expressions,
-      primary expressions, function parsing, destructuring, template literals, error recovery,
-      `createNameNode`/`createStringLiteral` helpers, the `CurrentPositionReporter` implementation
-      that P0 declared.
-- [ ] Test: `ParserSmokeTest` in commonTest, a handful of scripts parsed to `AstRoot` with the
-      expected node types. The real verification is P1.6.
-- [ ] jvmTest green
+- [x] Port `Parser.kt` (5210 upstream lines, 4988 Kotlin). One commit because a half-ported parser
+      does not compile. Cut at port time: the `Reader` overloads (D-2) and the E4X methods
+      (`xmlInitializer`, `attributeAccess`, `xmlElemRef`, the `XmlPropRef` branch of `propertyName`
+      and the `DOTQUERY` branch of `memberExprTail`), which now report "XML not available" (D-16).
+      `getPropKey` waits for P2: it needs `ScriptRuntime.getIndexObject`, and only IRFactory calls it.
+- [x] `Messages.kt` grows the 100 parser keys, copied from upstream's properties file. The
+      `MessageFormat` shim gained real single-quote handling, so `'{'` renders as a bare brace.
+- [x] Test: `ParserSmokeTest` in commonTest, covering declarations, precedence, functions, control
+      flow, literals, ES6 syntax, try/catch, switch, labels, regexp-vs-division, comment recording,
+      error reporting, IDE-mode error collection, single-use enforcement, scopes and source bounds
+- [x] Test: `jvmTest/MessageParityTest`, which checks every ported message key against the upstream
+      bundle with zero, one and two arguments
+- [x] jvmTest green (204 tests), `jsNodeTest` green (149 tests), iOS compiles
 
 #### P1.6: Oracle parity and corpus
 
