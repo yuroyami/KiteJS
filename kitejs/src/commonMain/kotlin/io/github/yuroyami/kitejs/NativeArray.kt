@@ -694,7 +694,7 @@ class NativeArray : ScriptableObject {
 
         /** The `length` of any array-like, clamped to a safe integer. */
         internal fun getLengthProperty(cx: Context, obj: Scriptable): Long {
-            // TODO(P3.8): a NativeString answers with its own length.
+            if (obj is NativeString) return obj.length.toLong()
             if (obj is NativeArray) return obj.length
             val len = ScriptableObject.getProperty(obj, "length")
             if (len === Scriptable.NOT_FOUND) {

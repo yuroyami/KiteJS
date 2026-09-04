@@ -307,5 +307,9 @@ internal object Messages {
         "msg.empty.array.reduce" to "Reduce of empty array with no initial value",
         "msg.map.function.not" to "Map function is not actually a function",
         "msg.typed.array.out.of.bounds" to "TypedArray is out of bounds",
+        "msg.first.arg.not.regexp" to "First argument to {0}.prototype.{1} must not be a regular expression",
+        "msg.json.cant.serialize" to "Do not know how to serialize a {0}",
+        "msg.str.match.all.no.global.flag" to "String.prototype.matchAll called with a non-global RegExp argument",
+        "msg.str.replace.all.no.global.flag" to "replaceAll must be called with a global RegExp",
     )
 }

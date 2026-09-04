@@ -163,6 +163,39 @@ class EvalSmokeTest {
     }
 
     @Test
+    fun stringsAndJson() {
+        assertEquals("3", eval("'abc'.length"))
+        assertEquals("b", eval("'abc'[1]"))
+        assertEquals("98", eval("'abc'.charCodeAt(1)"))
+        assertEquals("128512", eval("'\uD83D\uDE00'.codePointAt(0)"))
+        assertEquals("2", eval("'abcabc'.indexOf('c')"))
+        assertEquals("5", eval("'abcabc'.lastIndexOf('c')"))
+        assertEquals("bc", eval("'abcdef'.slice(1, 3)"))
+        assertEquals("ef", eval("'abcdef'.slice(-2)"))
+        assertEquals("bcd", eval("'abcdef'.substr(1, 3)"))
+        assertEquals("ABC", eval("'abc'.toUpperCase()"))
+        assertEquals("a b", eval("'  a b  '.trim()"))
+        assertEquals("a|b|c", eval("'a,b,c'.split(',').join('|')"))
+        assertEquals("a|b|c", eval("'abc'.split('').join('|')"))
+        assertEquals("ababab", eval("'ab'.repeat(3)"))
+        assertEquals("005", eval("'5'.padStart(3, '0')"))
+        assertEquals("a-b-c", eval("'aXbXc'.replaceAll('X', '-')"))
+        assertEquals("a[b]c", eval("'abc'.replace('b', '[$&]')"))
+        assertEquals("Hi", eval("String.fromCharCode(72, 105)"))
+        assertEquals("true", eval("'abc'.startsWith('ab') && 'abc'.endsWith('bc') && 'abc'.includes('b')"))
+        assertEquals("a-b-c-", eval("var r = ''; for (var c of 'abc') r += c + '-'; r"))
+        assertEquals("0,1,2", eval("Object.keys('abc').join()"))
+        assertEquals("{\"a\":1,\"b\":[1,\"x\",null,true,null]}", eval("JSON.stringify({ a: 1, b: [1, 'x', null, true, undefined] })"))
+        assertEquals("{\n  \"a\": [\n    1\n  ]\n}", eval("JSON.stringify({ a: [1] }, null, 2)"))
+        assertEquals("\"\\u001f\\\"\\n\"", eval("JSON.stringify('\\u001f\"\\n')"))
+        assertEquals("2", eval("JSON.parse('{\"a\":[1,2]}').a[1]"))
+        assertEquals("A\n", eval("JSON.parse('\"\\\\u0041\\\\n\"')"))
+        assertEquals("4", eval("JSON.parse('[1,2]', function (k, v) { return typeof v == 'number' ? v * 2 : v })[1]"))
+        assertEquals("throws SyntaxError: Unterminated object literal", eval("JSON.parse('{')"))
+        assertEquals("throws TypeError: Cyclic {0} value not allowed.".replace("{0}", "NativeObject"), eval("var o = {}; o.o = o; JSON.stringify(o)"))
+    }
+
+    @Test
     fun objectsAndPrototypes() {
         assertEquals("deep", eval("var o = { a: { b: { c: 'deep' } } }; o.a.b.c"))
         assertEquals("42", eval("var o = { get x() { return 42 } }; o.x"))

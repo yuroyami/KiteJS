@@ -36,7 +36,8 @@ plan, read [KITEJS_IMPL.md](KITEJS_IMPL.md).
 | Interpreter | ✅ | Runs the icode. 220 scripts match upstream: arithmetic, coercion, strings, templates, functions, closures, control flow, objects, prototypes, `new`, `with`, `try`/`finally`, getters and setters, optional chaining and the engine's own error messages. Generator objects and continuations are out until phase 4 and never, respectively |
 | Standard objects, wave 1 (Object, Function, Error and the error kinds, the global functions, Boolean, Number, Math, Script) | ✅ | Registered by `initStandardObjects()` in upstream's order. About 420 oracle scripts match upstream, including `Number.prototype.toFixed`, `toExponential` and `toPrecision`, which use a hand-written exact decimal path instead of BigDecimal. `Number.prototype.toString(radix)` with a radix other than 10 waits for the phase 5 BigInt |
 | Array | ✅ | Dense and sparse storage, every `Array.prototype` method through `with` and `toSpliced`, the iterators, species and subclassing. About 300 oracle scripts match upstream |
-| String, JSON | ⛔ | Phase 3.8 part 2, next |
+| String | ✅ | The wrapper object, indexing, every `String.prototype` method and the statics. About 190 oracle scripts match upstream. Two gaps: `localeCompare` is code-unit order, not collation, and `normalize` returns its input unchanged (common Kotlin has neither a collator nor normalization tables). `match`, `search`, `matchAll` and the regexp forms of `split` and `replace` wait for the phase 4 regexp engine |
+| JSON | ✅ | `JSON.parse` with reviver and `JSON.stringify` with replacer and indentation. About 130 oracle scripts match upstream |
 | RegExp engine | ⛔ | Phase 4 |
 | Date | ⛔ | Phase 4, needs a timezone decision |
 | Map, Set, Symbol, iterators, generators, typed arrays, Promise | ⛔ | Phase 4 |

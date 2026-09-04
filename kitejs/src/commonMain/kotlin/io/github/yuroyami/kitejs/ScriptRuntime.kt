@@ -980,8 +980,9 @@ object ScriptRuntime {
         }
         if (value is Scriptable) return value
         if (value is CharSequence) {
-            // TODO(P3.8): NativeString wraps a string.
-            TODO("NativeString lands in phase 3.8")
+            val result = NativeString(value)
+            setBuiltinProtoAndParent(result, scope, TopLevel.Builtins.String)
+            return result
         }
         if (cx.languageVersion >= Context.VERSION_ES6 && value is KBigInt) {
             // TODO(P5): NativeBigInt wraps a big integer.
@@ -1017,6 +1018,18 @@ object ScriptRuntime {
 
     fun toNumber(args: Array<Any?>, index: Int): Double =
         if (index < args.size) toNumber(args[index]) else Double.NaN
+
+    /** ToUint16: the low 16 bits of ToInt32, as a char. */
+    fun toUint16(value: Any?): Char {
+        val d = toNumber(value)
+        return DoubleConversion.doubleToInt32(d).toChar()
+    }
+
+    fun clamp(value: Int, min: Int, max: Int): Int = when {
+        value < min -> min
+        value > max -> max
+        else -> value
+    }
 
     fun toString(args: Array<Any?>, index: Int): String =
         if (index < args.size) toString(args[index]) else "undefined"
@@ -1293,12 +1306,12 @@ object ScriptRuntime {
         NativeGlobal.init(cx, scope, sealed)
 
         NativeArray.init(cx, scope, sealed)
-        // TODO(P3.8): NativeString.init(scope, sealed)
+        NativeString.init(scope, sealed)
         NativeBoolean.init(scope, sealed)
         NativeNumber.init(scope, sealed)
         // TODO(P4): NativeDate.init(scope, sealed)
         LazilyLoadedCtor(scope, "Math", sealed, Initializable { icx, s, sld -> NativeMath.init(icx, s, sld) })
-        // TODO(P3.8): LazilyLoadedCtor(scope, "JSON", sealed, NativeJSON::init)
+        LazilyLoadedCtor(scope, "JSON", sealed, Initializable { icx, s, sld -> NativeJSON.init(icx, s, sld) })
 
         NativeWith.init(scope, sealed)
         NativeCall.init(scope, sealed)
@@ -1357,7 +1370,7 @@ object ScriptRuntime {
     }
 
     fun toCharSequence(value: Any?): CharSequence {
-        // TODO(P3.8): a NativeString unwraps to its own character sequence.
+        if (value is NativeString) return value.toCharSequence()
         return if (value is CharSequence) value else toString(value)
     }
 

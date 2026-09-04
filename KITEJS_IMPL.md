@@ -156,6 +156,14 @@ Living list. Every entry is a known, deliberate behavior or structure difference
 - D-36: `NativeArray` no longer implements `java.util.List`; only `toArray()`, `size()`,
   `isEmpty()` and `get(Long)` stay, because the abstract operations use them. Same reasoning as
   D-34.
+- D-37: `String.prototype.localeCompare` compares UTF-16 code units and answers -1, 0 or 1.
+  Upstream uses a `java.text.Collator` at IDENTICAL strength with canonical decomposition, and
+  common Kotlin has no collator. Mixed-case and accented comparisons differ from upstream until a
+  Kotlin Multiplatform collation exists; the oracle only checks same-case ASCII.
+- D-38: `String.prototype.normalize` checks the form name and returns the text unchanged.
+  Upstream uses `java.text.Normalizer`; common Kotlin has no normalization tables. Combining
+  sequences therefore stay as written. This is a real gap and stays listed in
+  `PORTING_STATUS.md` until it is closed.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -682,10 +690,14 @@ Part 2, the collections and text:
       including the dense/sparse switch, `length` truncation, species, subclassing, holes,
       destructuring and `for...of`. The scripts that look at `Symbol.iterator`,
       `Symbol.unscopables` and `Symbol.species` wait for phase 4.
-- [ ] `NativeString.kt` (1495) with `AbstractEcmaStringOperations.kt` (330); fill the
-      `toObject` and `toCharSequence` string paths; the string scripts return to the oracle.
-- [ ] `NativeJSON.kt` (601) with `json/JsonParser.kt` (414), registered lazily like `Math`.
-- [ ] jvmTest green
+- [x] `NativeString.kt` (1495) with `AbstractEcmaStringOperations.kt` (330); `toObject`,
+      `toCharSequence` and `NativeArray.getLengthProperty` know strings. `localeCompare` and
+      `normalize` lose their Java library support (D-37, D-38). The regexp-driven methods compile
+      but go through the `RegExpProxy`, which phase 4 installs.
+- [x] `NativeJSON.kt` (601) with `json/JsonParser.kt` (414), registered lazily like `Math`; the
+      LiveConnect branches (Java maps, collections, arrays) are gone.
+- [x] About 190 string scripts and 130 JSON scripts match upstream on the first run.
+- [x] jvmTest green
 
 #### P3.9: Eval oracle
 
