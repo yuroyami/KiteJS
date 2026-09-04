@@ -34,7 +34,7 @@ open class ForInLoop(pos: Int = -1, len: Int = 1) : Loop(pos, len) {
     /** Position of the `each` keyword in a `for each..in` loop, relative to this node. */
     var eachPosition: Int = -1
 
-    var isForEach: Boolean = false
+    open var isForEach: Boolean = false
 
     var isForOf: Boolean = false
 

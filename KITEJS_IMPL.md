@@ -74,6 +74,16 @@ Living list. Every entry is a known, deliberate behavior or structure difference
 - D-11: D-7 applies to symmetric accessor pairs. Where upstream's getter and setter disagree on
   nullability or semantics (`FunctionNode.getParams`/`setParams`, `TemplateLiteral.getElements`/
   `setElements`, `ScriptNode.getFunctions`), the port keeps them as methods.
+- D-12: `ContinueStatement.getTarget` becomes `targetLoop`. Upstream's `Jump.target` is a public
+  field, so a Java subclass can add an unrelated `getTarget`; in Kotlin both are properties and would
+  collide.
+- D-13: `BigIntLiteral.toSource` matches upstream only for decimal literals until Phase 5, because
+  the `KBigInt` stub cannot convert a hex, octal or binary literal to its decimal digits (follows
+  from D-5).
+- D-14: `NumberLiteral(Double)` derives its source text from `Double.toString`, whose output differs
+  between the JVM, JS and native. Phase 3 replaces it with the ported DToA, which is platform
+  independent. Only the `NumberLiteral(Double)` constructor is affected; a literal parsed from source
+  keeps the original token text.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -193,16 +203,19 @@ follow those waves, so every commit leaves the module compiling and jvmTest gree
 
 #### P1.2: AST wave 1 (leaf nodes)
 
-- [ ] Port 29 files (2563 lines), all depending only on the P1.1 core:
+- [x] Port 29 files (2563 lines), all depending only on the P1.1 core:
       `AbstractObjectProperty`, `Assignment`, `BigIntLiteral`, `BreakStatement`,
       `ComputedPropertyKey`, `ConditionalExpression`, `ContinueStatement`, `DoLoop`, `ElementGet`,
       `EmptyStatement`, `ErrorNode`, `FunctionCall`, `GeneratorExpressionLoop`,
       `GeneratorMethodDefinition`, `IdeErrorReporter` (replaces the P0 stub), `IfStatement`,
       `KeywordLiteral`, `Label`, `ParenthesizedExpression`, `ParseProblem`, `Spread`, `SwitchCase`,
       `TaggedTemplateLiteral`, `ThrowStatement`, `UnaryExpression`, `UpdateExpression`, `WhileLoop`,
-      `WithStatement`, `Yield`
-- [ ] Test: `AstSourceTest` builds each node by hand and asserts `toSource()` text
-- [ ] jvmTest green
+      `WithStatement`, `Yield`. `IdeErrorReporter` already landed in P0 unchanged.
+- [x] Test (`commonTest`): `AstSourceTest` builds each node by hand and asserts `toSource()` text,
+      so the renderers run on every target, not just the JVM
+- [x] Test (`jvmTest`): `AstLeafOracleTest`, the differential test for these node types against the
+      upstream jar
+- [x] jvmTest green (151 tests), `jsNodeTest` green (113 tests), iOS compiles
 
 #### P1.3: AST waves 2 and 3 (containers)
 

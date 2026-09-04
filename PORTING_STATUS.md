@@ -18,7 +18,7 @@ plan, read [KITEJS_IMPL.md](KITEJS_IMPL.md).
 |---|---|---|
 | Lexer (Token, TokenStream) | ✅ | Token-by-token identical to upstream on the parity corpus (codes, boundaries, columns, line numbers, values). E4X tokenizer methods not ported; BigInt literals lex into a stub value until Phase 5 |
 | Phase 0 support slice (Kit, Messages, Characters, CompilerEnvirons, ErrorReporter, exceptions, Context version surface, Parser error plumbing) | 🟡 | Only what the lexer needs; each file grows in its own later phase |
-| AST node hierarchy | 🟡 | The 26-class core is ported and checked against the upstream jar (`toSource`, positions, line-number fallback, child-list surgery, symbol tables). The remaining 45 node types land next |
+| AST node hierarchy | 🟡 | 54 of 70 node types ported and checked against the upstream jar (`toSource`, positions, line-number fallback, child-list surgery, symbol tables). Object and array literals, destructuring, try/catch, switch and the remaining container nodes land next |
 | Parser | ⛔ | Phase 1, after the AST is complete |
 | IR + bytecode generator (Icode) | ⛔ | Phase 2 |
 | Interpreter + core runtime (Object, Function, Array, String, Number, Boolean, Math, JSON, errors) | ⛔ | Phase 3 |

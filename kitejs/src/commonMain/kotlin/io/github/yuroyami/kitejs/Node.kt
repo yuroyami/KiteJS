@@ -349,7 +349,7 @@ open class Node : Iterable<Node> {
         }
 
     /** Only valid when `type == Token.BIGINT`. */
-    open var bigInt: KBigInt
+    open var bigInt: KBigInt?
         get() = throw UnsupportedOperationException("Can only be called when Token.BIGINT")
         set(value) {
             throw UnsupportedOperationException("Can only be called when Token.BIGINT")
