@@ -1039,4 +1039,15 @@ object ScriptRuntime {
     fun initSafeStandardObjects(cx: Context, scope: ScriptableObject?, sealed: Boolean): ScriptableObject =
         // TODO(P3.8): the natives land in phase 3.8; this is where they get registered.
         TODO("the standard objects land in phase 3.8")
+
+    // ---- Regular expressions -------------------------------------------------------------------
+
+    fun getRegExpProxy(cx: Context): RegExpProxy? = cx.regExpProxy
+
+    fun setRegExpProxy(cx: Context, proxy: RegExpProxy?) {
+        cx.regExpProxy = proxy
+    }
+
+    fun checkRegExpProxy(cx: Context): RegExpProxy =
+        getRegExpProxy(cx) ?: throw Context.reportRuntimeErrorById("msg.no.regexp")
 }

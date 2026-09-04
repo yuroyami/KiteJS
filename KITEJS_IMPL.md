@@ -591,12 +591,17 @@ Moved here from P2, because `CodeGenerator` is generic over `ScriptOrFn<T>` and 
 `Interpreter`'s exception-table constants directly.
 
 - [x] The descriptor layer and `InterpreterData` landed in P3.5, since `Context` needs them.
-- [ ] Port `CodeGenerator.kt` (1971).
-- [ ] Test `jvmTest/IcodeOracleTest`: generate icode for the whole corpus on both sides and compare
-      the byte arrays, the string and number pools, the exception tables and the nested-function
-      tables. This is the phase 2 promise finally kept, and it is a strong check: the icode array is
-      exactly what the interpreter executes.
-- [ ] jvmTest green
+- [x] Port `CodeGenerator.kt` (1971).
+- [x] Test `jvmTest/IcodeOracleTest`: generate icode for the whole corpus on both sides and compare
+      the byte arrays, the string and number pools, the exception tables, the frame sizes, the
+      literal ids and the nested-function tables, recursively. This is the phase 2 promise finally
+      kept, and it is a strong check: the icode array is exactly what the interpreter executes. A
+      second test does the same over 57 short hand-written sources that hit the paths a corpus of
+      whole programs skips past. Both passed on the first run; a negative control (emitting ADD for
+      string concatenation) fails both.
+- [x] Upstream's `CodeGenerator` and `InterpreterData` are package-private, so the test reads the
+      upstream result through the public `Script.getDescriptor()` and reflection on the fields.
+- [x] jvmTest green
 
 #### P3.7: Interpreter
 

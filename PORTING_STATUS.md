@@ -32,7 +32,7 @@ plan, read [KITEJS_IMPL.md](KITEJS_IMPL.md).
 | Descriptor layer (JSDescriptor, JSScript, NativeCall, Arguments, InterpreterData) | ✅ | The compiled form of a script or function and its activation record. Exercised once the interpreter runs |
 | Runtime contracts (Scriptable, Function, Callable, Script, Evaluator, Ref, Symbol) | ✅ | Every interface has the same members as upstream: names, arity, parameter and return shapes, and the interfaces it extends, all compared by reflection. Two members are known-absent and listed with a reason |
 | Value types (Undefined, UniqueTag, ConsString) | ✅ | Same behaviour as upstream, including the lazy rope that repeated string concatenation builds |
-| Icode generator (CodeGenerator) | ⛔ | Phase 3.6, next |
+| Icode generator (CodeGenerator) | ✅ | The whole corpus and 57 hand-written sources compile to icode identical to upstream's: same bytes, string and number pools, exception tables, frame sizes and nested function tables |
 | Interpreter + core runtime (Object, Function, Array, String, Number, Boolean, Math, JSON, errors) | ⛔ | Phase 3 |
 | RegExp engine | ⛔ | Phase 4 |
 | Date | ⛔ | Phase 4, needs a timezone decision |

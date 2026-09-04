@@ -262,5 +262,6 @@ internal object Messages {
         "msg.undef.method.call" to "Cannot call method \"{1}\" of {0}",
         "msg.deprec.ctor" to "The \"{0}\" constructor is deprecated.",
         "msg.op.not.allowed" to "This operation is not allowed.",
+        "msg.no.regexp" to "Regular expressions are not available.",
     )
 }

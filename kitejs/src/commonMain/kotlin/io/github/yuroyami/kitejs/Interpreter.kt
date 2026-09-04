@@ -18,7 +18,9 @@ class Interpreter : Evaluator {
     internal class CompilationResult<T : ScriptOrFn<T>>(val descriptor: JSDescriptor<T>, val homeObject: Scriptable?)
 
     override fun compile(compilerEnv: CompilerEnvirons, tree: ScriptNode, rawSource: String, returnFunction: Boolean): Any {
-        TODO("CodeGenerator lands in phase 3.6")
+        val cgen = CodeGenerator<JSFunction>()
+        val itsData = cgen.compile(compilerEnv, tree, rawSource, returnFunction)
+        return CompilationResult(itsData, compilerEnv.homeObject())
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -56,6 +58,15 @@ class Interpreter : Evaluator {
     }
 
     companion object {
+        // The layout of one entry in the exception table.
+        internal const val EXCEPTION_TRY_START_SLOT = 0
+        internal const val EXCEPTION_TRY_END_SLOT = 1
+        internal const val EXCEPTION_HANDLER_SLOT = 2
+        internal const val EXCEPTION_TYPE_SLOT = 3
+        internal const val EXCEPTION_LOCAL_SLOT = 4
+        internal const val EXCEPTION_SCOPE_SLOT = 5
+        internal const val EXCEPTION_SLOT_SIZE = 6
+
         internal fun <T : ScriptOrFn<T>> interpret(
             fnOrScript: T,
             idata: InterpreterData<T>,
