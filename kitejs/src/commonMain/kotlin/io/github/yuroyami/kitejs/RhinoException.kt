@@ -46,10 +46,12 @@ abstract class RhinoException : RuntimeException {
 
     constructor() : super() {
         detailsMessage = null
+        Interpreter().captureStackInfo(this)
     }
 
     constructor(details: String) : super() {
         detailsMessage = details
+        Interpreter().captureStackInfo(this)
     }
 
     var sourceName: String? = null

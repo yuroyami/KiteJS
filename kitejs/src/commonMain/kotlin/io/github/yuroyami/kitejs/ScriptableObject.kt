@@ -84,7 +84,7 @@ abstract class ScriptableObject :
         start.put(name, start, value)
     }
 
-    protected open fun putOwnProperty(
+    internal open fun putOwnProperty(
         name: String,
         start: Scriptable,
         value: Any?,
@@ -107,7 +107,7 @@ abstract class ScriptableObject :
         start.put(index, start, value)
     }
 
-    protected open fun putOwnProperty(
+    internal open fun putOwnProperty(
         index: Int,
         start: Scriptable,
         value: Any?,
@@ -120,7 +120,7 @@ abstract class ScriptableObject :
         ensureSymbolScriptable(start).put(key, start, value)
     }
 
-    protected open fun putOwnProperty(
+    internal open fun putOwnProperty(
         key: Symbol,
         start: Scriptable,
         value: Any?,

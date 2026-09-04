@@ -220,6 +220,8 @@ object ScriptRuntime {
 
     val emptyArgs: Array<Any?> = arrayOf()
 
+    private const val LIBRARY_SCOPE_KEY = "LIBRARY_SCOPE"
+
     fun toInt32(d: Double): Int = DoubleConversion.doubleToInt32(d)
 
     fun toUint32(d: Double): Long = DoubleConversion.doubleToInt32(d).toLong() and 0xffffffffL
@@ -412,7 +414,7 @@ object ScriptRuntime {
             return DoubleFormatter.toString(d)
         }
         if (base < 2 || base > 36) {
-            throw IllegalArgumentException(getMessageById("msg.bad.radix", base.toString()))
+            throw rangeErrorById("msg.bad.radix", base.toString())
         }
         if (d.isNaN()) return "NaN"
         if (d == Double.POSITIVE_INFINITY) return "Infinity"
@@ -973,10 +975,31 @@ object ScriptRuntime {
     fun toObject(cx: Context, scope: Scriptable, value: Any?): Scriptable {
         if (value == null) throw typeErrorById("msg.null.to.object")
         if (Undefined.isUndefined(value)) throw typeErrorById("msg.undef.to.object")
+        if (value is SymbolKey) {
+            // TODO(P4): NativeSymbol wraps a symbol key.
+            TODO("NativeSymbol lands in phase 4")
+        }
         if (value is Scriptable) return value
-        // TODO(P3.8): the wrapper objects NativeString, NativeNumber, NativeBoolean, NativeSymbol
-        // and NativeBigInt land with the natives. Until then a primitive cannot be wrapped.
-        TODO("the primitive wrapper objects land in phase 3.8")
+        if (value is CharSequence) {
+            // TODO(P3.8): NativeString wraps a string.
+            TODO("NativeString lands in phase 3.8")
+        }
+        if (cx.languageVersion >= Context.VERSION_ES6 && value is KBigInt) {
+            // TODO(P5): NativeBigInt wraps a big integer.
+            TODO("NativeBigInt lands in phase 5")
+        }
+        if (value is Number) {
+            val result = NativeNumber(value.toDouble())
+            setBuiltinProtoAndParent(result, scope, TopLevel.Builtins.Number)
+            return result
+        }
+        if (value is Boolean) {
+            val result = NativeBoolean(value)
+            setBuiltinProtoAndParent(result, scope, TopLevel.Builtins.Boolean)
+            return result
+        }
+        // Wrapping arbitrary Kotlin objects is LiveConnect territory and is not ported.
+        throw errorWithClassName("msg.invalid.type", value)
     }
 
     fun toObjectOrNull(cx: Context, obj: Any?): Scriptable? {
@@ -989,6 +1012,195 @@ object ScriptRuntime {
         if (obj is Scriptable) return obj
         if (obj != null && !Undefined.isUndefined(obj)) return toObject(cx, scope, obj)
         return null
+    }
+
+    // ---- Small helpers the natives share ---------------------------------------------------------
+
+    fun toNumber(args: Array<Any?>, index: Int): Double =
+        if (index < args.size) toNumber(args[index]) else Double.NaN
+
+    fun toString(args: Array<Any?>, index: Int): String =
+        if (index < args.size) toString(args[index]) else "undefined"
+
+    fun toInteger(value: Any?): Double = toInteger(toNumber(value))
+
+    fun toInteger(args: Array<Any?>, index: Int): Double =
+        if (index < args.size) toInteger(args[index]) else +0.0
+
+    fun toLength(args: Array<Any?>, index: Int): Long {
+        val len = toInteger(args, index)
+        if (len <= 0.0) return 0
+        return minOf(len, NativeNumber.MAX_SAFE_INTEGER).toLong()
+    }
+
+    fun toLength(value: Any?): Long {
+        val len = toInteger(value)
+        if (len <= 0.0) return 0
+        return minOf(len, NativeNumber.MAX_SAFE_INTEGER).toLong()
+    }
+
+    fun toIntegerOrInfinity(value: Any?): Double {
+        if (value is Int) return value.toDouble()
+        return toIntegerOrInfinity(toNumber(value))
+    }
+
+    fun toIntegerOrInfinity(d: Double): Double = DoubleConversion.truncate(d)
+
+    fun isNaN(n: Any?): Boolean = (n is Double && n.isNaN()) || (n is Float && n.isNaN())
+
+    /** SameValue: `Object.is`. NaN equals NaN, and +0 and -0 differ. */
+    fun same(x: Any?, y: Any?): Boolean {
+        if (typeOf(x) != typeOf(y)) return false
+        if (x is Number) {
+            if (isNaN(x) && isNaN(y)) return true
+            return x == y
+        }
+        return eq(x, y)
+    }
+
+    fun getTopLevelProp(scope: Scriptable, id: String): Any? {
+        val top = ScriptableObject.getTopLevelScope(scope)
+        return ScriptableObject.getProperty(top, id)
+    }
+
+    internal fun isValidIdentifierName(s: String, cx: Context, isStrict: Boolean): Boolean {
+        val l = s.length
+        if (l == 0) return false
+        if (!isJavaIdentifierStart(s[0])) return false
+        for (i in 1 until l) {
+            if (!isJavaIdentifierPart(s[i])) return false
+        }
+        return !TokenStream.isKeyword(s, cx.languageVersion, isStrict)
+    }
+
+    // Character.isJavaIdentifierStart / isJavaIdentifierPart, from the Java definitions.
+    private fun isJavaIdentifierStart(c: Char): Boolean =
+        c.isLetter() ||
+            c.category == CharCategory.LETTER_NUMBER ||
+            c.category == CharCategory.CURRENCY_SYMBOL ||
+            c.category == CharCategory.CONNECTOR_PUNCTUATION
+
+    private fun isJavaIdentifierPart(c: Char): Boolean {
+        if (isJavaIdentifierStart(c) || c.isDigit()) return true
+        return when (c.category) {
+            CharCategory.COMBINING_SPACING_MARK, CharCategory.NON_SPACING_MARK, CharCategory.FORMAT -> true
+            else -> c.code in 0..8 || c.code in 0xE..0x1B || c.code in 0x7F..0x9F
+        }
+    }
+
+    /** `uneval`: source text that rebuilds [value]. */
+    internal fun uneval(cx: Context, scope: Scriptable, value: Any?): String {
+        if (value == null) return "null"
+        if (Undefined.isUndefined(value)) return "undefined"
+        if (value is CharSequence) {
+            val escaped = escapeString(value.toString())
+            val sb = StringBuilder(escaped.length + 2)
+            sb.append('"')
+            sb.append(escaped)
+            sb.append('"')
+            return sb.toString()
+        }
+        if (value is Number) {
+            val d = value.toDouble()
+            if (d == 0.0 && 1 / d < 0) return "-0"
+            return toString(d)
+        }
+        if (value is Boolean) return toString(value)
+        if (value is Scriptable) {
+            // Wrapped Java objects won't have "toSource" and will report errors for get()s of
+            // nonexistent name, so use has() first.
+            if (ScriptableObject.hasProperty(value, "toSource")) {
+                val v = ScriptableObject.getProperty(value, "toSource")
+                if (v is Function) {
+                    return toString(v.call(cx, scope, value, emptyArgs))
+                }
+            }
+            return toString(value)
+        }
+        return value.toString()
+    }
+
+    /** `Object.prototype.toSource`: an object literal that rebuilds [thisObj]. */
+    internal fun defaultObjectToSource(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): String {
+        val toplevel: Boolean
+        val iterating: Boolean
+        var cxIterating = cx.iterating
+        if (cxIterating == null) {
+            toplevel = true
+            iterating = false
+            cxIterating = mutableSetOf()
+            cx.iterating = cxIterating
+        } else {
+            toplevel = false
+            iterating = cxIterating.contains(thisObj)
+        }
+        val result = StringBuilder(128)
+        if (toplevel) result.append("(")
+        result.append('{')
+        try {
+            if (!iterating) {
+                cxIterating.add(thisObj!!) // stop recursion
+                val ids = thisObj.getIds()
+                for (i in ids.indices) {
+                    val id = ids[i]
+                    val value: Any?
+                    if (id is Int) {
+                        value = thisObj.get(id, thisObj)
+                        if (value === Scriptable.NOT_FOUND) continue // a property has been removed
+                        if (i > 0) result.append(", ")
+                        result.append(id)
+                    } else {
+                        val strId = id as String
+                        value = thisObj.get(strId, thisObj)
+                        if (value === Scriptable.NOT_FOUND) continue // a property has been removed
+                        if (i > 0) result.append(", ")
+                        if (isValidIdentifierName(strId, cx, cx.isStrictMode())) {
+                            result.append(strId)
+                        } else {
+                            result.append('\'')
+                            result.append(escapeString(strId, '\''))
+                            result.append('\'')
+                        }
+                    }
+                    result.append(':')
+                    result.append(uneval(cx, scope, value))
+                }
+            }
+        } finally {
+            if (toplevel) cx.iterating = null
+        }
+        result.append('}')
+        if (toplevel) result.append(')')
+        return result.toString()
+    }
+
+    /**
+     * Walks the iterable [arg1] and hands each `[key, value]` pair to [setter]. Returns false when
+     * there is nothing to walk.
+     */
+    fun loadFromIterable(cx: Context, scope: Scriptable, arg1: Any?, setter: (Any?, Any?) -> Unit): Boolean {
+        if (arg1 == null || Undefined.isUndefined(arg1)) return false
+        // Call the "[Symbol.iterator]" property as a function.
+        val ito = callIterator(arg1, cx, scope)
+        if (Undefined.isUndefined(ito)) {
+            // Per spec, ignore if the iterator is undefined.
+            return false
+        }
+        // Finally, run through all the iterated values and add them.
+        IteratorLikeIterable(cx, scope, ito).use { it ->
+            for (value in it) {
+                val sVal = ScriptableObject.ensureScriptable(value)
+                if (sVal is Symbol) {
+                    throw typeErrorById("msg.arg.not.object", typeOf(sVal))
+                }
+                var finalKey = sVal.get(0, sVal)
+                if (finalKey === Scriptable.NOT_FOUND) finalKey = Undefined.instance
+                var finalVal = sVal.get(1, sVal)
+                if (finalVal === Scriptable.NOT_FOUND) finalVal = Undefined.instance
+                setter(finalKey, finalVal)
+            }
+        }
+        return true
     }
 
     // ---- Making objects ------------------------------------------------------------------------
@@ -1038,9 +1250,59 @@ object ScriptRuntime {
     fun initStandardObjects(cx: Context, scope: ScriptableObject?, sealed: Boolean): ScriptableObject =
         initSafeStandardObjects(cx, scope, sealed)
 
-    fun initSafeStandardObjects(cx: Context, scope: ScriptableObject?, sealed: Boolean): ScriptableObject =
-        // TODO(P3.8): the natives land in phase 3.8; this is where they get registered.
-        TODO("the standard objects land in phase 3.8")
+    fun initSafeStandardObjects(cx: Context, scopeIn: ScriptableObject?, sealed: Boolean): ScriptableObject {
+        var scope = scopeIn
+        if (scope == null) {
+            scope = NativeObject()
+        } else if (scope is TopLevel) {
+            scope.clearCache()
+        }
+        scope.put("global", scope, scope)
+        scope.associateValue(LIBRARY_SCOPE_KEY, scope)
+        // ClassCache and ConcurrentFactory are LiveConnect and threading support, neither ported.
+
+        val function = BaseFunction.init(cx, scope, sealed)
+        val obj = NativeObject.init(cx, scope, sealed)
+
+        val objectPrototype = obj.prototypeProperty as ScriptableObject
+        val functionPrototype = function.prototypeProperty as ScriptableObject
+
+        // Function.prototype.__proto__ should be Object.prototype
+        objectPrototype.prototype = null
+        functionPrototype.prototype = objectPrototype
+        // Set the prototype of the object passed in if need be
+        function.prototype = functionPrototype
+        obj.prototype = functionPrototype
+        if (scope.prototype == null) scope.prototype = objectPrototype
+
+        NativeError.init(scope, sealed)
+        NativeGlobal.init(cx, scope, sealed)
+
+        // TODO(P3.8): NativeArray.init(cx, scope, sealed)
+        // TODO(P3.8): NativeString.init(scope, sealed)
+        NativeBoolean.init(scope, sealed)
+        NativeNumber.init(scope, sealed)
+        // TODO(P4): NativeDate.init(scope, sealed)
+        LazilyLoadedCtor(scope, "Math", sealed, Initializable { icx, s, sld -> NativeMath.init(icx, s, sld) })
+        // TODO(P3.8): LazilyLoadedCtor(scope, "JSON", sealed, NativeJSON::init)
+
+        NativeWith.init(scope, sealed)
+        NativeCall.init(scope, sealed)
+        NativeScript.init(cx, scope, sealed)
+
+        // TODO(P4): NativeIterator.init(cx, scope, sealed)
+        // TODO(P3.8): NativeArrayIterator.init(scope, sealed)
+        NativeStringIterator.init(scope, sealed)
+
+        // TODO(P4): registerRegExp(cx, scope, sealed)
+        // NativeJavaObject, NativeJavaMap, Continuation and E4X are out of scope.
+        // TODO(P4): the typed arrays, ArrayBuffer and DataView.
+        // TODO(P4): NativeSymbol, the collection iterators, Map, Set, WeakMap, WeakSet, Promise,
+        // Proxy and Reflect. TODO(P5): BigInt.
+
+        if (scope is TopLevel) scope.cacheBuiltins(scope, sealed)
+        return scope
+    }
 
     // ---- Regular expressions -------------------------------------------------------------------
 
@@ -1057,6 +1319,7 @@ object ScriptRuntime {
 
     val NaNobj: Double = Double.NaN
     val negativeZeroObj: Double = -0.0
+    val zeroObj: Double = 0.0
 
     /** The `+` operator applied to two values that both have to become strings. */
     fun concat(lhs: Any?, rhs: Any?): Any {

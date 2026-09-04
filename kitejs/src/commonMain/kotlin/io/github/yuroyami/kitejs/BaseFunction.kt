@@ -211,7 +211,7 @@ open class BaseFunction : ScriptableObject, Function {
             else -> result
         }
 
-    protected open fun setPrototypeProperty(prototype: Any?) {
+    internal open fun setPrototypeProperty(prototype: Any?) {
         if (prototype != null) {
             createPrototypeProperty()
             prototypePropertyValue = prototype

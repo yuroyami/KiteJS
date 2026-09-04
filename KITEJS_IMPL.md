@@ -142,6 +142,17 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   the arithmetic (`add(Int, Int)`, `negate`) take a different branch there than on the JVM. The
   results are the same numbers; only which branch computed them differs. The cross-target eval
   smoke test is what checks this.
+- D-33: `dtoa/DecimalFormatter` is written without `BigDecimal`. It expands the double into its
+  exact decimal digits by hand (every double is a finite decimal) and rounds the digit string
+  HALF_UP the way `MathContext` and `setScale` do. `DecimalFormatterOracleTest` compares it with
+  upstream over a fixed corpus and 350 seeded random doubles for every digit count the
+  JavaScript methods accept.
+- D-34: `NativeObject` no longer implements `java.util.Map`; the `keySet`, `values`, `entrySet`
+  and `containsKey` views are gone. They were a Java host convenience, not JavaScript behaviour.
+  The global `isXMLName` is registered for parity but throws "XML is not available", since E4X is
+  out of scope.
+- D-35: `RhinoException` captures the interpreter frames itself (`Interpreter().captureStackInfo`)
+  instead of asking `Context.createInterpreter()`; there is only one evaluator to ask.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -634,15 +645,39 @@ Moved here from P2, because `CodeGenerator` is generic over `ScriptOrFn<T>` and 
 
 #### P3.8: Natives wave 1
 
-- [ ] Port the number formatting that phase 2 deferred: `dtoa/DecimalFormatter.kt` needs
-      `BigDecimal`, so `NativeNumber.toFixed`, `toExponential` and `toPrecision` either wait for P5
-      or get a hand-written decimal path; decide and record it in the ledger when the file is reached.
-- [ ] Port the errors: `RhinoException.kt` (387) properly, `EcmaError.kt`, `EvaluatorException.kt`,
-      `NativeError.kt` (459), `ScriptStackElement.kt`, `JavaScriptException.kt`.
-- [ ] Port `TopLevel.kt` (266), `LazilyLoadedCtor.kt` (174), `NativeObject.kt` (1085, replacing the
-      phase 2 stub), `NativeFunction` prototype wiring, `NativeGlobal.kt` (761), `NativeArray.kt`
-      (2573), `NativeString.kt` (1495), `NativeNumber.kt` (310), `NativeBoolean.kt` (90),
-      `NativeMath.kt` (621), `NativeJSON.kt` (601) with `json/JsonParser.kt` (414).
+Part 1, the objects everything else hangs off:
+
+- [x] `dtoa/DecimalFormatter.kt` gets a hand-written exact decimal path instead of `BigDecimal`
+      (D-33), checked against upstream by `jvmTest/DecimalFormatterOracleTest`.
+- [x] `NativeError.kt` (459) with `NativeCallSite.kt`; `JavaScriptException` fills in its
+      `NativeError` branch; `RhinoException` now captures the script stack (D-35), so `e.stack`
+      renders the same frames as upstream.
+- [x] `NativeObject.kt` (1085) gets its constructor and every `Object.*` and
+      `Object.prototype.*` method (D-34 drops the `java.util.Map` view). `NativeGlobal.kt` (761)
+      replaces the shell: `eval` (recognised by type), `parseInt`, `parseFloat`, `isNaN`,
+      `isFinite`, `escape`, `unescape`, the URI functions, `uneval`, `NaN`, `Infinity`, `undefined`,
+      `globalThis` and the seven error constructors. `NativeBoolean.kt`, `NativeNumber.kt`,
+      `NativeMath.kt`, `NativeScript.kt`, `ScriptRuntimeES6.kt`, the rest of
+      `AbstractEcmaObjectOperations.kt`, the `ES6Iterator` base and `NativeStringIterator`.
+- [x] `ScriptRuntime`: `initSafeStandardObjects` registers everything in upstream's order, with the
+      objects still to come marked `TODO(P3.8)` and `TODO(P4)` at their slots; `toObject` wraps
+      numbers and booleans; `same`, `uneval`, `defaultObjectToSource`, `loadFromIterable`,
+      `toInteger`, `toLength`, `toIntegerOrInfinity`, `getTopLevelProp` and the `(args, index)`
+      overloads.
+- [x] `EvalOracleTest` now runs both engines with `initStandardObjects()`. Seven new groups (about
+      420 scripts in all) cover Object, Function, Error, the globals, Boolean, Number, Math and
+      Script, plus 60 more engine-error scripts. `EvalSmokeTest` runs a slice on every target.
+- [x] `Number.prototype.toString(radix)` for a radix other than 10 still throws until the phase 5
+      BigInt lands (`DToA.JS_dtobasestr` is bignum arithmetic).
+
+Part 2, the collections and text:
+
+- [ ] `NativeArray.kt` (2573) with `ArrayLikeAbstractOperations.kt` (455) and
+      `NativeArrayIterator.kt`; fill `Context.newArray`, `ScriptRuntime.isArrayLike`,
+      `getArrayElements` and the `js_defineGetterOrSetter` dense-storage note.
+- [ ] `NativeString.kt` (1495) with `AbstractEcmaStringOperations.kt` (330); fill the
+      `toObject` and `toCharSequence` string paths; the string scripts return to the oracle.
+- [ ] `NativeJSON.kt` (601) with `json/JsonParser.kt` (414), registered lazily like `Math`.
 - [ ] jvmTest green
 
 #### P3.9: Eval oracle

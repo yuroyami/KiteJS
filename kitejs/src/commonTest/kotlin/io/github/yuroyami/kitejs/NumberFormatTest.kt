@@ -76,8 +76,8 @@ class NumberFormatTest {
 
     @Test
     fun rejectsAnImpossibleRadix() {
-        assertFailsWith<IllegalArgumentException> { ScriptRuntime.numberToString(1.0, 1) }
-        assertFailsWith<IllegalArgumentException> { ScriptRuntime.numberToString(1.0, 37) }
+        assertFailsWith<EcmaError> { ScriptRuntime.numberToString(1.0, 1) }
+        assertFailsWith<EcmaError> { ScriptRuntime.numberToString(1.0, 37) }
     }
 
     @Test

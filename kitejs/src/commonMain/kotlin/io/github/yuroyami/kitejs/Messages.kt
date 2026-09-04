@@ -291,5 +291,16 @@ internal object Messages {
         "msg.bigint.out.of.range.arithmetic" to "BigInt is too large.",
         "msg.yield.closing" to "Yield from closing generator",
         "msg.compare.symbol" to "Symbol objects may not be compared",
+        "msg.bad.destruct.op" to "Invalid destructuring assignment operator",
+        "msg.bad.esc.mask" to "invalid string escape mask",
+        "msg.bad.for.in.destruct" to "Left hand side of for..in loop must be an array of length 2 to accept key/value pair.",
+        "msg.bad.for.in.lhs" to "Invalid left-hand side of for..in loop.",
+        "msg.bad.precision" to "Precision {0} out of range.",
+        "msg.bad.uri" to "Malformed URI sequence.",
+        "msg.called.null.or.undefined" to "{0}.prototype.{1} method called on null or undefined",
+        "msg.iterable.expected" to "Expected the first argument to be iterable",
+        "msg.method.missing.parameter" to "{0}: At least {1} arguments required, but only {2} passed",
+        "msg.object.cyclic.prototype" to "Cyclic prototype \"{0}\" value not allowed.",
+        "msg.script.is.not.constructor" to "Script objects are not constructors.",
     )
 }

@@ -34,7 +34,8 @@ plan, read [KITEJS_IMPL.md](KITEJS_IMPL.md).
 | Value types (Undefined, UniqueTag, ConsString) | ✅ | Same behaviour as upstream, including the lazy rope that repeated string concatenation builds |
 | Icode generator (CodeGenerator) | ✅ | The whole corpus and 57 hand-written sources compile to icode identical to upstream's: same bytes, string and number pools, exception tables, frame sizes and nested function tables |
 | Interpreter | ✅ | Runs the icode. 220 scripts match upstream: arithmetic, coercion, strings, templates, functions, closures, control flow, objects, prototypes, `new`, `with`, `try`/`finally`, getters and setters, optional chaining and the engine's own error messages. Generator objects and continuations are out until phase 4 and never, respectively |
-| Standard objects (Object, Function, Array, String, Number, Boolean, Math, JSON, errors) | ⛔ | Phase 3.8, next |
+| Standard objects, wave 1 (Object, Function, Error and the error kinds, the global functions, Boolean, Number, Math, Script) | ✅ | Registered by `initStandardObjects()` in upstream's order. About 420 oracle scripts match upstream, including `Number.prototype.toFixed`, `toExponential` and `toPrecision`, which use a hand-written exact decimal path instead of BigDecimal. `Number.prototype.toString(radix)` with a radix other than 10 waits for the phase 5 BigInt |
+| Array, String, JSON | ⛔ | Phase 3.8 part 2, next |
 | RegExp engine | ⛔ | Phase 4 |
 | Date | ⛔ | Phase 4, needs a timezone decision |
 | Map, Set, Symbol, iterators, generators, typed arrays, Promise | ⛔ | Phase 4 |

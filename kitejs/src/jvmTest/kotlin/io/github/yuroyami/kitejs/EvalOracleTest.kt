@@ -15,8 +15,8 @@ import org.mozilla.javascript.Context as UContext
  * The phase 3 acceptance test: scripts run on both engines, and the result of the last expression
  * has to match, as does the name and message of anything thrown.
  *
- * Until the standard objects land, the port runs each script in a bare top-level scope, so this
- * first batch only uses what the language itself provides.
+ * Both engines run with their standard objects installed. Scripts that need a builtin the port
+ * does not have yet (Array, String, JSON, RegExp, Date and the phase 4 set) join as those land.
  */
 class EvalOracleTest {
 
@@ -32,7 +32,7 @@ class EvalOracleTest {
         uscope = ucx.initStandardObjects()
         val kcx = Context.enter()
         kcx.languageVersion = Context.VERSION_ES6
-        kscope = TopLevel()
+        kscope = kcx.initStandardObjects()
     }
 
     @AfterTest
@@ -58,7 +58,8 @@ class EvalOracleTest {
         try {
             render(ucx.evaluateString(uscope, source, "test.js", 1, null))
         } catch (e: org.mozilla.javascript.RhinoException) {
-            "throws " + e.details()
+            // The port names classes without the package (D-23).
+            "throws " + e.details().replace("org.mozilla.javascript.", "")
         }
 
     private fun ported(source: String): String =
@@ -220,8 +221,187 @@ class EvalOracleTest {
         "var f = function () {}; f.prototype.constructor === f",
     ))
 
-    // The scripts that need the standard objects (arguments, NaN, new Function, the __proto__
-    // setter) join this test when phase 3.8 lands.
+    @Test
+    fun objectBuiltin() = check(listOf(
+        "typeof Object", "Object.name", "Object.length", "Object.prototype.constructor === Object",
+        "var o = new Object(); o.constructor === Object", "Object(null) instanceof Object", "Object(5) === 5",
+        "new Object(1) instanceof Number", "Object(true) instanceof Boolean", "typeof Object(1)",
+        "var o = {}; Object.getPrototypeOf(o) === Object.prototype", "Object.getPrototypeOf(Object.prototype)",
+        "var p = {}; var o = Object.create(p); Object.getPrototypeOf(o) === p",
+        "var o = Object.create(null, { a: { value: 1, enumerable: true } }); o.a",
+        "var o = Object.create(null); o.toString",
+        "var o = {}; Object.defineProperty(o, 'x', { value: 5 }); o.x",
+        "var o = {}; Object.defineProperty(o, 'x', { value: 5 }); o.x = 6; o.x",
+        "var o = {}; Object.defineProperty(o, 'x', { value: 5, writable: true }); o.x = 6; o.x",
+        "var o = {}; Object.defineProperty(o, 'x', { get: function () { return 'g' } }); o.x",
+        "var o = {}; Object.defineProperty(o, 'x', { set: function (v) { this.y = v } }); o.x = 2; o.y",
+        "var o = {}; Object.defineProperties(o, { a: { value: 1 }, b: { value: 2 } }); o.a + o.b",
+        "var o = { a: 1 }; Object.getOwnPropertyDescriptor(o, 'a').writable",
+        "var o = { a: 1 }; var d = Object.getOwnPropertyDescriptor(o, 'a'); d.value + '' + d.enumerable + d.configurable",
+        "var o = { get g() { return 1 } }; typeof Object.getOwnPropertyDescriptor(o, 'g').get",
+        "Object.getOwnPropertyDescriptor({}, 'nope')",
+        "var o = { a: 1 }; Object.getOwnPropertyDescriptors(o).a.value",
+        "var o = Object.freeze({ a: 1 }); o.a = 2; o.a",
+        "var o = Object.freeze({ a: 1 }); delete o.a; o.a",
+        "Object.isFrozen(Object.freeze({}))", "Object.isFrozen({})", "Object.isFrozen(1)",
+        "Object.isSealed(Object.seal({ a: 1 }))", "Object.isSealed({})",
+        "var o = Object.seal({ a: 1 }); o.a = 2; o.a", "var o = Object.seal({ a: 1 }); o.b = 2; o.b",
+        "Object.isExtensible({})", "Object.isExtensible(Object.preventExtensions({}))", "Object.isExtensible(1)",
+        "var o = Object.preventExtensions({}); o.x = 1; o.x",
+        "Object.assign({}, { a: 1 }, { b: 2 }).b", "Object.assign({ a: 1 }, null, undefined, { a: 2 }).a",
+        "var t = {}; Object.assign(t, { a: 1 }) === t",
+        "Object.is(NaN, NaN)", "Object.is(0, -0)", "Object.is(1, 1)", "Object.is('a', 'a')", "Object.is({}, {})",
+        "var o = { a: 1 }; o.hasOwnProperty('a')", "var o = { a: 1 }; o.hasOwnProperty('toString')",
+        "Object.hasOwn({ a: 1 }, 'a')", "Object.hasOwn({ a: 1 }, 'b')",
+        "({}).propertyIsEnumerable('toString')", "({ a: 1 }).propertyIsEnumerable('a')",
+        "Object.prototype.isPrototypeOf({})", "var p = {}; p.isPrototypeOf(Object.create(p))", "({}).isPrototypeOf({})",
+        "var o = {}; o.__proto__ === Object.prototype", "var o = {}; o.__proto__ = { z: 9 }; o.z",
+        "var o = {}; o.__proto__ = 5; o.__proto__ === Object.prototype",
+        "var o = {}; Object.setPrototypeOf(o, { q: 1 }); o.q", "Object.setPrototypeOf(1, null)",
+        "var o = Object.setPrototypeOf({}, null); Object.getPrototypeOf(o)",
+        "({}).toString()", "({}).toLocaleString()", "({}).valueOf() instanceof Object",
+        "Object.prototype.toString.call(1)", "Object.prototype.toString.call(true)", "Object.prototype.toString.call(null)",
+        "Object.prototype.toString.call(undefined)", "Object.prototype.toString.call(function () {})",
+        "var o = {}; o.__defineGetter__('g', function () { return 'got' }); o.g",
+        "var o = {}; o.__defineSetter__('s', function (v) { this.t = v }); o.s = 3; o.t",
+        "var o = { get g() { return 1 } }; typeof o.__lookupGetter__('g')", "var o = {}; o.__lookupGetter__('none')",
+        "var o = { set s(v) {} }; typeof o.__lookupSetter__('s')",
+        "typeof Object.groupBy", "typeof Object.fromEntries", "typeof Object.keys",
+        "var o = {}; o.__proto__ = o",
+        "function F() {} F.prototype = { m() { return 'proto' } }; new F().m()",
+    ))
+
+    @Test
+    fun functionBuiltin() = check(listOf(
+        "new Function('a', 'b', 'return a + b')(2, 3)", "Function('return 7')()", "new Function()()",
+        "(function () {}).constructor === Function", "typeof Function.prototype", "Function.prototype()",
+        "Function.prototype.call.call(function () { return this.v }, { v: 4 })",
+        "function f() { return arguments.length } f(1, 2, 3)", "function f() { return arguments[1] } f('a', 'b')",
+        "function f(a) { arguments[0] = 'changed'; return a } f('orig')",
+        "function f(a) { 'use strict'; arguments[0] = 'changed'; return a } f('orig')",
+        "function f() { return typeof arguments } f()",
+        "function f() { return Object.prototype.toString.call(arguments) } f()",
+        "function f(a, b) { return f.length + arguments.length } f(1)",
+        "(function f(a) { return a }).toString()", "(function (a, b) { return a + b }).toString()",
+        "var b = (function () { return this.v }).bind({ v: 'bound' }); b()",
+        "var b = (function (a, b) { return a + b }).bind(null, 1); b(2)",
+        "function F() {} var B = F.bind({}); new B() instanceof F",
+        "(function () {}).hasOwnProperty('prototype')", "(() => 1).hasOwnProperty('prototype')",
+        "var f = function (a, b) { return this.x + a + b }; f.call({ x: 1 }, 2, 3)",
+        "var f = function () { return this }; f.call(null) === globalThis",
+        "var f = function () { 'use strict'; return this }; f.call(null)",
+        "(function () {}).length", "Function.length", "Function.name", "Function.prototype.name",
+        "(function () {}).bind().name", "(function named() {}).bind().name",
+    ))
+
+    @Test
+    fun errorBuiltin() = check(listOf(
+        "new Error('m').message", "new Error('m').name", "'' + new Error('m')", "new Error('m').toString()",
+        "new Error().message", "new Error(undefined).message", "Error('call').message",
+        "new TypeError('t') instanceof Error", "new TypeError('t').name", "'' + new RangeError('r')",
+        "'' + new SyntaxError('s')", "'' + new ReferenceError('e')", "'' + new EvalError('v')", "'' + new URIError('u')",
+        "'' + new InternalError('i')", "'' + new JavaException('j')",
+        "try { null.x } catch (e) { e.name }", "try { null.x } catch (e) { e instanceof TypeError }",
+        "try { undeclared } catch (e) { e.constructor === ReferenceError }",
+        "try { (1)() } catch (e) { e instanceof TypeError }",
+        "try { throw new Error('x') } catch (e) { e.message }",
+        "try { throw new TypeError('x') } catch (e) { '' + e }",
+        "var e = new Error('m', { cause: 'c' }); e.cause", "var e = new Error('m', { cause: 'c' }); e.propertyIsEnumerable('cause')",
+        "var e = new Error('m', 'file.js', 7); e.fileName + ':' + e.lineNumber",
+        "Error.prototype.name", "Error.prototype.message", "TypeError.prototype.name", "TypeError.prototype.message",
+        "Object.getPrototypeOf(TypeError.prototype) === Error.prototype", "TypeError.prototype instanceof Error",
+        "Object.getPrototypeOf(TypeError) === Error", "TypeError.name", "TypeError.length", "AggregateError.length",
+        "typeof Error.captureStackTrace", "Error.stackTraceLimit", "typeof new Error('x').stack",
+        "Error.prototype.toString.call({ name: 'N', message: 'M' })", "Error.prototype.toString.call({})",
+        "Error.prototype.toString.call({ name: '', message: 'only' })", "Error.prototype.toString.call({ name: 'only' })",
+        "Error.isError(new Error())", "Error.isError({})", "Error.isError(new TypeError('t'))",
+        "new Error('e').toSource()", "new Error('e', 'f.js', 3).toSource()", "new Error('e').propertyIsEnumerable('message')",
+        "try { throw new Error('t') } catch (e) { e.lineNumber }", "try { throw new Error('t') } catch (e) { e.fileName }",
+        "var e = new Error('x'); e.name = 'Custom'; '' + e",
+        "var o = { __proto__: Error.prototype, message: 'inherited' }; '' + o",
+        "new Error('with stack').stack",
+    ))
+
+    @Test
+    fun globalFunctions() = check(listOf(
+        "parseInt('42')", "parseInt('  42abc')", "parseInt('0x1f')", "parseInt('1f', 16)", "parseInt('101', 2)",
+        "parseInt('')", "parseInt('-7')", "parseInt('08')", "parseInt('z', 36)", "parseInt('12', 1)", "parseInt(15.9)",
+        "parseInt('  -0x10')", "parseInt('0x')", "parseInt('123', 0)", "parseInt('99999999999999999999')",
+        "parseFloat('3.14abc')", "parseFloat('.5')", "parseFloat('-.5e2')", "parseFloat('1e')", "parseFloat('1e+')",
+        "parseFloat('Infinity')", "parseFloat('-Infinityx')", "parseFloat('abc')", "parseFloat('')", "parseFloat('5.')",
+        "parseFloat('  12  ')", "parseFloat('1.2.3')", "parseFloat('+')", "parseFloat('1e5x')", "parseFloat()",
+        "isNaN('x')", "isNaN('1')", "isNaN()", "isFinite(1 / 0)", "isFinite('5')", "isFinite()",
+        "NaN == NaN", "NaN !== NaN", "Infinity > 1e308", "-Infinity", "undefined === void 0", "typeof globalThis",
+        "globalThis === this", "typeof NaN", "delete NaN", "NaN = 1; NaN",
+        "escape('a b+c/@*_-.')", "escape('\u00fc\u1234')", "unescape('%41%u0042%')", "unescape('%zz%4')",
+        "encodeURI('http://x.y/a b?q=1&r=\u00fc#f')", "encodeURIComponent('a b&c=d/\u00e9')",
+        "decodeURI('%41%20%C3%BC%3F%26')", "decodeURIComponent('%41%20%C3%BC%3F%26')",
+        "encodeURI('\uD83D\uDE00')", "decodeURIComponent('%F0%9F%98%80') === '\uD83D\uDE00'",
+        "eval('1 + 1')", "var x = 5; eval('x * 2')", "eval('var y = 3'); y",
+        "function f() { var l = 1; return eval('l + 1') } f()", "eval('(function () { return 9 })')()",
+        "typeof eval", "eval()", "eval(5)", "(0, eval)('1')", "eval('')",
+        "uneval({ a: 1, b: 'x' })", "uneval('s')", "uneval(-0)", "uneval(null)", "uneval(undefined)", "uneval(true)",
+        "uneval({ a: { b: 1 } })", "({}).toSource()", "({ 'a b': 1 }).toSource()", "({ 1: 2 }).toSource()",
+        "(function f(a) { return a }).toSource()", "uneval(1.5)",
+    ))
+
+    @Test
+    fun booleanAndNumberBuiltins() = check(listOf(
+        "new Boolean(false) ? 'y' : 'n'", "Boolean(0)", "Boolean('')", "Boolean('x')", "Boolean()",
+        "new Boolean(1).valueOf()", "'' + new Boolean(true)", "new Boolean(false).toString()", "typeof new Boolean(1)",
+        "true.toString()", "false.valueOf()", "new Boolean(true) == true", "new Boolean(true) === true",
+        "new Boolean(true).toSource()", "Boolean.name", "Boolean.length", "Boolean.prototype.constructor === Boolean",
+        "Object.getPrototypeOf(Boolean.prototype) === Object.prototype", "'' + Boolean.prototype",
+        "Number('42')", "Number('')", "Number('  0x10 ')", "Number('abc')", "Number(true)", "Number(null)",
+        "Number(undefined)", "Number()", "new Number(5).valueOf()", "typeof new Number(5)", "new Number(5) + 1",
+        "'' + new Number(5)", "(255).toString(10)", "(1e21).toString()", "(123.456).toFixed(2)", "(1.005).toFixed(2)", "(2.5).toFixed(0)",
+        "(1e21).toFixed(2)", "(0).toFixed(2)", "(-1.5).toFixed(0)", "(0.000001).toFixed(7)", "(123.456).toFixed()",
+        "(123.456).toExponential(2)", "(0).toExponential()", "(123456).toExponential()", "(0.00015).toExponential(1)",
+        "(123.456).toPrecision(4)", "(0.000123).toPrecision(2)", "(123456).toPrecision(2)", "(123.456).toPrecision()",
+        "(1).toPrecision(1)", "(NaN).toFixed(2)", "(Infinity).toPrecision(2)", "(-Infinity).toExponential(1)",
+        "Number.MAX_SAFE_INTEGER", "Number.MIN_SAFE_INTEGER", "Number.EPSILON", "Number.MIN_VALUE", "Number.MAX_VALUE",
+        "Number.POSITIVE_INFINITY", "Number.NEGATIVE_INFINITY", "Number.NaN",
+        "Number.isInteger(5)", "Number.isInteger(5.5)", "Number.isInteger('5')", "Number.isInteger()",
+        "Number.isSafeInteger(2 ** 53)", "Number.isSafeInteger(2 ** 53 - 1)", "Number.isNaN('x')", "Number.isNaN(NaN)",
+        "Number.isFinite('1')", "Number.isFinite(1)", "Number.isFinite(1 / 0)", "Number.parseInt === parseInt",
+        "Number.parseFloat === parseFloat", "Number.parseFloat('1.5')", "(5).toLocaleString()", "(5).toSource()",
+        "Number.length", "Number.name", "Number.prototype.valueOf()", "'' + Number.prototype",
+        "Number.prototype.constructor === Number", "(5).constructor === Number", "(5).hasOwnProperty('x')",
+        "var n = 5; n.prop = 1; n.prop",
+    ))
+
+    @Test
+    fun mathBuiltin() = check(listOf(
+        "Math.PI", "Math.E", "Math.SQRT2", "Math.LN2", "Math.LN10", "Math.LOG2E", "Math.LOG10E", "Math.SQRT1_2",
+        "Math.abs(-3)", "Math.abs('-2')", "1 / Math.abs(-0)", "Math.floor(-1.5)", "Math.ceil(-1.5)", "1 / Math.ceil(-0.5)",
+        "Math.round(2.5)", "Math.round(-2.5)", "Math.round(0.49999999999999994)", "1 / Math.round(-0.4)", "Math.round(1e16)",
+        "Math.round(4503599627370497)", "Math.round(NaN)", "Math.round(-Infinity)",
+        "Math.max()", "Math.min()", "Math.max(1, 'x')", "Math.max(1, 2, 3)", "1 / Math.min(-0, 0)", "1 / Math.max(-0, 0)",
+        "Math.pow(2, 10)", "Math.pow(-8, 1 / 3)", "Math.pow(NaN, 0)", "Math.pow(1, Infinity)", "Math.pow(-1, Infinity)",
+        "Math.pow(0, -1)", "1 / Math.pow(-0, 3)", "Math.pow(-0, -3)", "Math.pow(-Infinity, 3)", "Math.pow(2, -1074)",
+        "Math.sqrt(16)", "Math.sqrt(-1)", "Math.cbrt(27)", "Math.cbrt(-8)", "Math.hypot(3, 4)", "Math.hypot()",
+        "Math.hypot(NaN, Infinity)", "Math.sign(-5)", "1 / Math.sign(-0)", "Math.sign('x')", "Math.trunc(-4.7)",
+        "Math.log(Math.E)", "Math.log(-1)", "Math.log2(8)", "Math.log10(1000)", "Math.log1p(0)", "Math.expm1(0)",
+        "Math.exp(1) === Math.E", "Math.exp(-Infinity)", "Math.sin(0)", "Math.sin(Infinity)", "Math.cos(0)", "Math.tan(0)",
+        "Math.atan2(1, 1)", "Math.atan(1)", "Math.asin(2)", "Math.asin(1)", "Math.acos(1)", "Math.sinh(0)", "Math.cosh(0)",
+        "Math.tanh(Infinity)", "1 / Math.asinh(-0)", "Math.asinh(1)", "Math.acosh(1)", "Math.acosh(0)", "Math.atanh(0)",
+        "Math.atanh(0.5)", "Math.clz32(1)", "Math.clz32(0)", "Math.clz32(-1)", "Math.clz32(0x10000)",
+        "Math.imul(0xffffffff, 5)", "Math.imul(2, 4)", "Math.imul(0x7fffffff, 2)", "Math.fround(5.5)", "Math.fround(5.05)",
+        "Math.f16round(1.337)", "Math.f16round(65520)", "Math.f16round(5.960464477539063e-8)", "Math.f16round(0.1)",
+        "Math.f16round()", "Math.f16round(-1e-9)", "typeof Math.random()", "Math.random() < 1", "Math.toSource",
+        "'' + Math", "Object.prototype.toString.call(Math)", "typeof Math", "Math.abs()", "Math.max('1', '2')",
+    ))
+
+    // Number.prototype.toString with a radix other than 10 waits for the phase 5 BigInt.
+
+    @Test
+    fun scriptObject() = check(listOf(
+        "typeof Script", "new Script('1 + 2')()", "'' + new Script('1 + 2')", "new Script('var q = 8')(); q",
+        "typeof new Script('1')", "Object.prototype.toString.call(new Script(''))", "new Script('').compile('3')()",
+        "typeof Script.prototype.exec", "Script.length", "Script.name", "new Script('7').toString()",
+        "Object.getPrototypeOf(Script.prototype) === Function.prototype", "typeof Script.prototype.compile",
+        "new Script('1')() + new Script('2')()", "Script('9')()", "new Script('').length", "'' + Script.prototype",
+    ))
 
     @Test
     fun errorsThrownByTheEngineHaveTheSameText() = check(listOf(
@@ -244,5 +424,30 @@ class EvalOracleTest {
         "const c = 1; c = 2",
         "throw 'plain'",
         "throw 1",
+        "Object.defineProperty(1, 'x', {})", "Object.create(1)", "Object.setPrototypeOf({})",
+        "Object.defineProperty({}, 'x', 1)", "Object.defineProperty({}, 'x', { get: 1 })",
+        "Object.defineProperty({}, 'x', { get: function () {}, value: 1 })",
+        "var o = {}; Object.defineProperty(o, 'x', { value: 1 }); Object.defineProperty(o, 'x', { value: 2 })",
+        "'use strict'; var o = {}; Object.defineProperty(o, 'x', { value: 5 }); o.x = 6",
+        "'use strict'; var o = Object.freeze({ a: 1 }); o.a = 2",
+        "'use strict'; var o = Object.freeze({ a: 1 }); delete o.a",
+        "'use strict'; var o = Object.preventExtensions({}); o.x = 1",
+        "Object.freeze(Object.prototype); Object.prototype.x = 1; 'use strict'; Object.prototype.y = 2",
+        "(1).toString(1)", "(1).toFixed(-1)", "(1).toFixed(101)", "(1).toExponential(101)", "(1).toPrecision(0)",
+        "(1).toPrecision(101)", "Boolean.prototype.valueOf.call(1)",
+        "Boolean.prototype.toString.call({})", "decodeURI('%')", "decodeURIComponent('%C3')", "encodeURIComponent('\\uD800')",
+        "encodeURI('\\uDC00')", "decodeURI('%ZZ')", "escape('x', 9)", "new Script()()", "Script.prototype.exec()",
+        "new AggregateError()", "eval('throw 1')", "eval('syntax error here')",
+        "eval('var')", "new Function('return')", "new Function('a b', '')", "Function.prototype.call.call(1)",
+        "Function.prototype.bind.call(1)", "(function () {}).bind.call(undefined)", "new (function () {}).bind()",
+        "var o = {}; o.__defineGetter__('x', 1)", "Object.prototype.__lookupGetter__.call(null, 'x')",
+        "Object.assign(null)", "Object.assign()", "Object.getPrototypeOf(null)", "Object.getOwnPropertyDescriptor(null, 'x')",
+        "Object.isFrozen()", "Object.preventExtensions(1)", "({}).hasOwnProperty.call(null, 'x')",
+        "({}).propertyIsEnumerable.call(undefined, 'x')", "({}).isPrototypeOf.call(null, {})",
+        "Object.prototype.toString.call()", "Object.prototype.toLocaleString.call(null)", "Object.prototype.valueOf.call(null)",
+        "var o = {}; o.__proto__ = 5; o.__proto__ = o", "Object.setPrototypeOf(null, {})", "Object.setPrototypeOf({}, 1)",
+        "var a = {}; var b = Object.create(a); Object.setPrototypeOf(a, b)", "Object.setPrototypeOf(Object.preventExtensions({}), {})",
+        "Math.max.call()", "new Math.max()", "new parseInt()", "new Error.prototype.toString()", "Number.isInteger.call()",
+        "new Number.prototype.constructor.prototype.valueOf()",
     ))
 }

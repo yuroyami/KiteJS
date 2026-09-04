@@ -16,7 +16,7 @@ class EvalSmokeTest {
 
     private fun eval(source: String): String = ContextFactory.getGlobal().call { cx ->
         cx.languageVersion = Context.VERSION_ES6
-        val scope = TopLevel()
+        val scope = cx.initStandardObjects()
         val v = try {
             cx.evaluateString(scope, source, "smoke.js", 1)
         } catch (e: RhinoException) {
@@ -98,6 +98,40 @@ class EvalSmokeTest {
         assertEquals("throws ReferenceError: \"undeclared\" is not defined.", eval("undeclared"))
         assertEquals("throws TypeError: Cannot read property \"x\" from null", eval("null.x"))
         assertEquals("throws TypeError: 1 is not a function, it is number.", eval("(1)()"))
+    }
+
+    @Test
+    fun standardObjects() {
+        assertEquals("42", eval("parseInt('42abc')"))
+        assertEquals("31", eval("parseInt('0x1f')"))
+        assertEquals("3.14", eval("parseFloat('3.14abc')"))
+        assertEquals("NaN", eval("parseFloat('')"))
+        assertEquals("true", eval("isNaN('x')"))
+        assertEquals("3", eval("Math.max(1, 2, 3)"))
+        assertEquals("-Infinity", eval("Math.max()"))
+        assertEquals("3", eval("Math.round(2.5)"))
+        assertEquals("-2", eval("Math.round(-2.5)"))
+        assertEquals("1.00", eval("(1.005).toFixed(2)"))
+        assertEquals("3", eval("(2.5).toFixed(0)"))
+        assertEquals("1.23e+2", eval("(123.456).toExponential(2)"))
+        assertEquals("123.5", eval("(123.456).toPrecision(4)"))
+        assertEquals("true", eval("Object.is(NaN, NaN)"))
+        assertEquals("false", eval("Object.is(0, -0)"))
+        assertEquals("5", eval("var o = {}; Object.defineProperty(o, 'x', { value: 5 }); o.x = 6; o.x"))
+        assertEquals("true", eval("Object.isFrozen(Object.freeze({}))"))
+        assertEquals("throws TypeError: Cannot add properties to this object because extensible is false.", eval("'use strict'; var o = Object.preventExtensions({}); o.x = 1"))
+        assertEquals("m", eval("new Error('m').message"))
+        assertEquals("TypeError: t", eval("'' + new TypeError('t')"))
+        assertEquals("true", eval("try { null.x } catch (e) { e instanceof TypeError }"))
+        assertEquals("true", eval("new Boolean(false) == false"))
+        assertEquals("true", eval("Number.isInteger(5)"))
+        assertEquals("false", eval("Number.isSafeInteger(2 ** 53)"))
+        assertEquals("a%20b%26c%3Dd%2F%C3%A9", eval("encodeURIComponent('a b&c=d/\u00e9')"))
+        assertEquals("A \u00fc?", eval("decodeURIComponent('%41%20%C3%BC%3F')"))
+        assertEquals("10", eval("var x = 5; eval('x * 2')"))
+        assertEquals("5", eval("new Function('a', 'b', 'return a + b')(2, 3)"))
+        assertEquals("3", eval("function f() { return arguments.length } f(1, 2, 3)"))
+        assertEquals("({a:1, b:\"x\"})", eval("uneval({ a: 1, b: 'x' })"))
     }
 
     @Test

@@ -4,11 +4,8 @@
 
 package io.github.yuroyami.kitejs
 
-/**
- * A JavaScript `throw` reaching the host. It carries whatever value the script threw.
- */
+/** A JavaScript `throw` that reached Kotlin: [value] is whatever the script threw. */
 class JavaScriptException(
-    /** The value the script threw. */
     val value: Any?,
     sourceName: String?,
     lineNumber: Int,
@@ -18,9 +15,19 @@ class JavaScriptException(
 
     init {
         recordErrorOrigin(sourceName, lineNumber, null, 0)
-        // TODO(P3.4): when the thrown value is a NativeError, upstream also pulls the Java cause
-        // out of it and fills in fileName, lineNumber and stack. NativeError lands later.
-
+        if (value is NativeError) {
+            // Upstream also chains a wrapped Java exception as the cause; that is LiveConnect
+            // territory and is not ported.
+            if (Context.getContext().hasFeature(Context.FEATURE_LOCATION_INFORMATION_IN_ERROR)) {
+                if (!value.has("fileName", value)) {
+                    value.put("fileName", value, sourceName)
+                }
+                if (!value.has("lineNumber", value)) {
+                    value.put("lineNumber", value, lineNumber)
+                }
+                value.setStackProvider(this)
+            }
+        }
         // The details are worked out now rather than lazily, because building them calls back into
         // the runtime and that is not safe from wherever the message is finally printed.
         detailsText = buildDetails()
@@ -30,6 +37,7 @@ class JavaScriptException(
 
     private fun buildDetails(): String {
         if (value == null) return "null"
+        if (value is NativeError) return value.toString()
         return try {
             ScriptRuntime.toString(value)
         } catch (e: RuntimeException) {
