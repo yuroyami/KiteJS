@@ -198,4 +198,68 @@ object ScriptRuntime {
 
     fun getMessageById(messageId: String, vararg args: Any?): String =
         Messages.getMessageById(messageId, *args)
+
+    /**
+     * Escapes a string for printing inside an object or array literal. Not quite the same as
+     * the `escape` builtin: control characters become the short escapes where they exist and
+     * hex escapes otherwise.
+     */
+    fun escapeString(s: String, escapeQuote: Char = '"'): String {
+        if (!(escapeQuote == '"' || escapeQuote == '\'')) Kit.codeBug()
+        var sb: StringBuilder? = null
+
+        for (i in s.indices) {
+            val c = s[i].code
+
+            if (' '.code <= c && c <= '~'.code && c != escapeQuote.code && c != '\\'.code) {
+                // An ordinary printable character, and neither the quote nor a backslash.
+                sb?.append(c.toChar())
+                continue
+            }
+            if (sb == null) {
+                sb = StringBuilder(s.length + 3)
+                sb.append(s, 0, i)
+            }
+
+            val escape = when (c) {
+                '\b'.code -> 'b'.code
+                '\u000C'.code -> 'f'.code
+                '\n'.code -> 'n'.code
+                '\r'.code -> 'r'.code
+                '\t'.code -> 't'.code
+                0xb -> 'v'.code // Java lacks \v.
+                ' '.code -> ' '.code
+                '\\'.code -> '\\'.code
+                else -> -1
+            }
+            if (escape >= 0) {
+                // An escaped character.
+                sb.append('\\')
+                sb.append(escape.toChar())
+            } else if (c == escapeQuote.code) {
+                sb.append('\\')
+                sb.append(escapeQuote)
+            } else {
+                val hexSize: Int
+                if (c < 256) {
+                    // Two-digit hex.
+                    sb.append("\\x")
+                    hexSize = 2
+                } else {
+                    // Unicode.
+                    sb.append("\\u")
+                    hexSize = 4
+                }
+                // Append the hexadecimal form of c, left-padded with zeroes.
+                var shift = (hexSize - 1) * 4
+                while (shift >= 0) {
+                    val digit = 0xf and (c shr shift)
+                    val hc = if (digit < 10) '0'.code + digit else 'a'.code - 10 + digit
+                    sb.append(hc.toChar())
+                    shift -= 4
+                }
+            }
+        }
+        return sb?.toString() ?: s
+    }
 }

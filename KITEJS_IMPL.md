@@ -63,6 +63,17 @@ Living list. Every entry is a known, deliberate behavior or structure difference
 - D-4: error messages exist in English only, and only the keys the ported code uses.
 - D-5: BigInt is a stub until Phase 5 (literals lex and store, arithmetic throws).
 - D-6: feature flags are compile-time constants, not system properties.
+- D-8: where upstream pairs a protected field with a public accessor that has extra behavior
+  (`Node.type/lineno/column`, `AstNode.parent`, `Scope.parentScope`, `Loop.body`), the port keeps the
+  public name as a property and the raw storage as a `*Field` sibling. Java subclasses that wrote the
+  raw field write the `*Field` name here, so the field-versus-accessor distinction survives.
+- D-9: `AstRoot` keeps its comments in an insertion-sorted list, not a `java.util.TreeSet`. Ordering
+  and the drop-on-equal-position behavior match; the type in the public API is `List<Comment>`.
+- D-10: `Jump.getFinally`, `getContinue` and `getDefault` become `finallyTarget`, `continueTarget`
+  and `defaultTarget`, since `finally` and `continue` are Kotlin keywords.
+- D-11: D-7 applies to symmetric accessor pairs. Where upstream's getter and setter disagree on
+  nullability or semantics (`FunctionNode.getParams`/`setParams`, `TemplateLiteral.getElements`/
+  `setElements`, `ScriptNode.getFunctions`), the port keeps them as methods.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -141,26 +152,103 @@ Rolling-wave rule: before starting a phase, expand its block below into per-file
 
 ### P1: AST + Parser
 
-**Upstream files:** `ast/` (79 files minus the 10 `Xml*`: port 69, mostly small data classes), `CompilerEnvirons.java` (321), `ErrorReporter.java`, `DefaultErrorReporter.java`, `ParserException` (inside Parser), `Parser.java` (5210).
+**Upstream files:** `Node.java` (1297), `ast/` minus the 9 `Xml*` files (70 files, 8499 lines),
+`Parser.java` (5210), `CompilerEnvirons.java` completion. Total port surface: ~15000 upstream lines.
 
-**Port order:** `AstNode` + `Node` split note: `AstNode` extends `Node` (P2 file); port `Node.kt` (1297 lines) at the START of P1 despite living in the P2 cluster. Then leaf AST nodes bottom-up (`Name`, `NumberLiteral`, `StringLiteral`, ...), then containers (`Block`, `Scope`, `ScriptNode`, `FunctionNode`, `AstRoot`), then `Parser.kt` last.
+**Why the tasks are grouped the way they are:** the `ast/` package is one connected graph, not
+a tree. Starting from `Node`, the transitive dependency closure is 25 classes wide, so those 25
+plus `Node.kt` are the smallest set that compiles. The other 45 files then fall into three
+dependency waves, each of which compiles once the wave before it has landed. Task boundaries
+follow those waves, so every commit leaves the module compiling and jvmTest green.
 
-**Oracle (the reason P1 is safe):** upstream `Parser`, `CompilerEnvirons` and `AstNode.toSource()` are public. jvmTest feeds every corpus file to both parsers and asserts equal `toSource()` output:
+**Port conventions for this phase (on top of the global rules):**
+- D-7 everywhere: `getX()/setX()` become Kotlin properties, `isX()` becomes `val x`. Upstream
+  constructor overload chains collapse into one constructor with default arguments.
+- `AstNode.toSource(depth)` and `makeIndent` are ported verbatim. They are the P1 oracle, so any
+  cosmetic drift there fails the phase.
+- Upstream `Node.java` needs `java.math.BigInteger` for `getBigInt`. It takes `KBigInt` (D-5).
+- `Node` implements `Iterable<Node>`. Kotlin keeps that, with the same eager-snapshot iterator
+  semantics upstream documents.
 
-```kotlin
-// jvmTest: ParserOracleTest.kt
-fun upstream(src: String): String {
-    val env = org.mozilla.javascript.CompilerEnvirons().apply { languageVersion = 200 /* ES6 */ }
-    return org.mozilla.javascript.Parser(env).parse(src, "o.js", 1).toSource()
-}
-fun ported(src: String): String =
-    Parser(CompilerEnvirons.es6()).parse(src, "o.js", 1).toSource()
-@Test fun corpusParity() = Corpus.all.forEach { assertEquals(upstream(it), ported(it), it) }
-```
+#### P1.1: Node and the AST core spine
 
-**Corpus:** `kitejs/src/jvmTest/resources/corpus/*.js`, one construct family per file, built while porting (literals, operators, functions, closures, destructuring, spread, template strings, generators, for-of, try/catch, labels, switch, regex literals, getters/setters, computed keys, optional chaining, nullish coalescing).
+- [x] Port `Node.kt` (1297) plus the 25-class closure, all in one commit because nothing smaller
+      compiles: `ast/NodeVisitor.kt`, `AstNode.kt` (623), `Jump.kt`, `Symbol.kt`, `Scope.kt` (240),
+      `ScriptNode.kt` (353), `FunctionNode.kt` (568), `AstRoot.kt`, `Name.kt`, `NumberLiteral.kt`,
+      `StringLiteral.kt`, `TemplateLiteral.kt`, `TemplateCharacters.kt`, `RegExpLiteral.kt`,
+      `Comment.kt`, `Block.kt`, `EmptyExpression.kt`, `ExpressionStatement.kt`, `ReturnStatement.kt`,
+      `InfixExpression.kt`, `PropertyGet.kt`, `Loop.kt`, `ForInLoop.kt`, `ArrayComprehension.kt`,
+      `ArrayComprehensionLoop.kt`
+- [x] `ScriptRuntime.escapeString` added, since `StringLiteral.toSource` needs it
+- [x] Tests (`commonTest`): `NodeTest` (child list add/remove/replace, `Iterable`, prop list
+      get/set/remove, `getLineno/getColumn`), `AstNodeTest` (absolute/relative position, `getParent`
+      chain, `visit` order, `toSource` on the literals ported here), `ScopeTest` (symbol table,
+      `getDefiningScope`, `joinScopes`)
+- [x] Test (`jvmTest`): `AstCoreOracleTest`, a differential test against the upstream jar. Both
+      sides build the same hand-made tree; `toSource`, position math, line-number fallback, child
+      list surgery, symbol bookkeeping and `escapeString` must match exactly. Added beyond the
+      original P1.1 list because the oracle is available at this level and catches design mistakes
+      before they reach the parser.
+- [x] `./gradlew :kitejs:jvmTest` green (107 tests, was 53)
 
-**Done when:** corpus parity green, malformed-input smoke tests (recorded errors match upstream's message keys) green.
+#### P1.2: AST wave 1 (leaf nodes)
+
+- [ ] Port 29 files (2563 lines), all depending only on the P1.1 core:
+      `AbstractObjectProperty`, `Assignment`, `BigIntLiteral`, `BreakStatement`,
+      `ComputedPropertyKey`, `ConditionalExpression`, `ContinueStatement`, `DoLoop`, `ElementGet`,
+      `EmptyStatement`, `ErrorNode`, `FunctionCall`, `GeneratorExpressionLoop`,
+      `GeneratorMethodDefinition`, `IdeErrorReporter` (replaces the P0 stub), `IfStatement`,
+      `KeywordLiteral`, `Label`, `ParenthesizedExpression`, `ParseProblem`, `Spread`, `SwitchCase`,
+      `TaggedTemplateLiteral`, `ThrowStatement`, `UnaryExpression`, `UpdateExpression`, `WhileLoop`,
+      `WithStatement`, `Yield`
+- [ ] Test: `AstSourceTest` builds each node by hand and asserts `toSource()` text
+- [ ] jvmTest green
+
+#### P1.3: AST waves 2 and 3 (containers)
+
+- [ ] Port 16 files (2018 lines): wave 2 is `ErrorCollector`, `GeneratorExpression`,
+      `LabeledStatement`, `ObjectProperty`, `SpreadObjectProperty`, `SwitchStatement`; wave 3 is
+      `ArrayLiteral`, `CatchClause`, `DestructuringForm`, `ForLoop`, `LetNode`, `NewExpression`,
+      `ObjectLiteral`, `TryStatement`, `VariableDeclaration`, `VariableInitializer`
+- [ ] Test: `AstSourceTest` extended to the container nodes; `ErrorCollectorTest`
+- [ ] jvmTest green. At this point the whole AST exists and the `ast` package is closed.
+
+#### P1.4: CompilerEnvirons completion
+
+- [ ] Fill the P0 slice: `ideEnvirons()`, the `ErrorCollector` wiring, `activationNames`,
+      the accessors `Parser` reads. `initFromContext` still waits for P3 (Context is a shell).
+- [ ] Test: `CompilerEnvironsTest` on the ide preset
+- [ ] jvmTest green
+
+#### P1.5: Parser
+
+- [ ] Port `Parser.kt` (5210). One commit because a half-ported parser does not compile.
+      Cut at port time: the `Reader` overloads (D-2), the four E4X methods
+      (`xmlInitializer`, `attributeAccess`, `propertyName` XML branch, `memberExprTail` XML branch),
+      and `parse(Reader)`.
+      Order inside the file follows upstream: token plumbing, `parse`, statements, expressions,
+      primary expressions, function parsing, destructuring, template literals, error recovery,
+      `createNameNode`/`createStringLiteral` helpers, the `CurrentPositionReporter` implementation
+      that P0 declared.
+- [ ] Test: `ParserSmokeTest` in commonTest, a handful of scripts parsed to `AstRoot` with the
+      expected node types. The real verification is P1.6.
+- [ ] jvmTest green
+
+#### P1.6: Oracle parity and corpus
+
+- [ ] Build `kitejs/src/jvmTest/resources/corpus/*.js`, one construct family per file: literals,
+      operators, precedence, functions, closures, arrow functions, destructuring, spread, template
+      strings, tagged templates, generators, `for-of`, `for-in`, `try/catch/finally`, labels,
+      `switch`, regex literals, getters and setters, computed keys, optional chaining, nullish
+      coalescing, `let`/`const` scoping, comma expressions, ASI edge cases, comments in odd places
+- [ ] Test `jvmTest/ParserOracleTest`: for every corpus file, `upstream.toSource()` equals
+      `ported.toSource()`, at ES6 language version and again at VERSION_DEFAULT
+- [ ] Test `jvmTest/ParserErrorParityTest`: malformed sources produce the same error message text
+      and the same error count as upstream, collected through `ErrorCollector`
+- [ ] Cross-target check: iosSimulatorArm64 and JS compile, `jsNodeTest` green
+- [ ] Update `PORTING_STATUS.md` (AST + Parser row), commit
+
+**Done when:** corpus parity green on both language versions, error parity green, all targets compile.
 
 ### P2: IR + Icode generator
 
