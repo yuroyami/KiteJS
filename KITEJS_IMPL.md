@@ -94,6 +94,9 @@ Living list. Every entry is a known, deliberate behavior or structure difference
 - D-17: the parser does not catch stack overflow. Upstream turns a `StackOverflowError` on deeply
   nested input into a "too deep parser recursion" error; common Kotlin has no portable way to catch
   it, so such input fails with the platform's own stack error.
+- D-18: `Context.reportError` always throws, because there is no runtime Context to route through
+  until P3, and its no-position overload cannot recover a source position from the interpreter stack
+  for the same reason. Both become faithful once the runtime Context lands.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -339,22 +342,23 @@ and more precise about what is being asserted.
 
 #### P2.2: Icode constants and the runtime helper slice
 
-- [ ] Port `Icode.kt` (378) and `DecompilerFlag.kt` (17). `Icode` is a plain constant table with a
+- [x] Port `Icode.kt` (378) and `DecompilerFlag.kt` (17). `Icode` is a plain constant table with a
       name lookup and no dependencies; its values sit below `Token.EOF`, which is why P0 pinned the
       token numbering.
-- [ ] Grow `ScriptRuntime` with `emptyArgs`, `isSpecialProperty`, `toInt32`, `indexFromString` and
+- [x] Grow `ScriptRuntime` with `emptyArgs`, `isSpecialProperty`, `toInt32`, `indexFromString` and
       `getIndexObject`. This also unblocks `Parser.getPropKey`, which P1 deferred for exactly this
       reason, so port it now and drop the deferral note.
-- [ ] Create `NativeObject.kt` holding only `PROTO_PROPERTY` and `PARENT_PROPERTY`; the class grows
+- [x] Create `NativeObject.kt` holding only `PROTO_PROPERTY` and `PARENT_PROPERTY`; the class grows
       into the real object in P3, the same way `ScriptRuntime` and `Context` have been growing.
-- [ ] Grow `Context` with the static `reportError` pair. The no-position overload cannot recover a
+- [x] Grow `Context` with the static `reportError` pair. The no-position overload cannot recover a
       source position from the interpreter stack yet, so it reports an unknown position until P3
       (ledger entry).
-- [ ] Test `jvmTest/IcodeParityTest`: every Icode constant and the whole `bytecodeName` range equal
+- [x] Test `jvmTest/IcodeParityTest`: every Icode constant and the whole `bytecodeName` range equal
       the upstream jar, the same way `TokenParityTest` pins the token numbering
-- [ ] Test `jvmTest/RuntimeHelperParityTest`: `toInt32`, `indexFromString` and `getIndexObject`
-      compared against upstream over a wide value sample
-- [ ] jvmTest green
+- [x] Test `jvmTest/RuntimeHelperParityTest`: `toInt32`, `indexFromString` and `getIndexObject`
+      compared against upstream over a wide value sample, plus 150000 random doubles for `toInt32`
+- [x] `toInt32` needs `v8dtoa/DoubleConversion` (89 lines, BSD, from V8), so that landed too
+- [x] jvmTest green (237 tests)
 
 #### P2.3: IRFactory
 

@@ -41,6 +41,32 @@ class Context internal constructor() {
             else -> false
         }
 
+        /**
+         * Reports an error through the current context's error reporter, or throws when there is
+         * no context.
+         */
+        fun reportError(
+            message: String,
+            sourceName: String?,
+            lineno: Int,
+            lineSource: String?,
+            lineOffset: Int,
+        ) {
+            // KMP: the runtime Context arrives in phase 3, so there is never a current context to
+            // route through yet and this always throws (D-18).
+            throw EvaluatorException(message, sourceName, lineno, lineSource, lineOffset)
+        }
+
+        /**
+         * Reports an error with no source position.
+         *
+         * KMP: upstream recovers a position by walking the interpreter stack. That machinery
+         * arrives in phase 3, so the position is unknown until then (D-18).
+         */
+        fun reportError(message: String) {
+            reportError(message, null, 0, null, 0)
+        }
+
         fun checkLanguageVersion(version: Int) {
             if (isValidLanguageVersion(version)) {
                 return

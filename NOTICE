@@ -18,6 +18,10 @@ it and which keeps its own license:
   algorithm, the same code OpenJDK and Jackson use. Each file carries the full
   MIT text in its header.
 
+  io/github/yuroyami/kitejs/v8dtoa/DoubleConversion
+  Copyright 2011 the V8 project authors, three-clause BSD license. The file
+  carries the full text in its header.
+
 The interpreter path is ported; Rhino's JVM bytecode compiler, E4X/XML support,
 Java interop (LiveConnect) and tooling are out of scope and contain no KiteJS
 code.

@@ -4973,6 +4973,18 @@ class Parser(
             return null
         }
 
+        /**
+         * The runtime key for an object-literal property name: an Int when the name is an array
+         * index, the String otherwise, and null when the key is computed and only known later.
+         */
+        internal fun getPropKey(id: Node?): Any? = when (id) {
+            is Name -> ScriptRuntime.getIndexObject(id.identifier!!)
+            is StringLiteral -> ScriptRuntime.getIndexObject(id.value!!)
+            is NumberLiteral -> ScriptRuntime.getIndexObject(id.number)
+            is GeneratorMethodDefinition -> getPropKey(id.methodName)
+            else -> null // filled in later
+        }
+
         /** True when every bit in [mask] is set in [after] but not in [before]. */
         private fun nowAllSet(before: Int, after: Int, mask: Int): Boolean =
             ((before and mask) != mask) && ((after and mask) == mask)

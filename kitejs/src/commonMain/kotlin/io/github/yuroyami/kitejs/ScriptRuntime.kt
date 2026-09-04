@@ -5,6 +5,7 @@
 package io.github.yuroyami.kitejs
 
 import io.github.yuroyami.kitejs.dtoa.DoubleFormatter
+import io.github.yuroyami.kitejs.v8dtoa.DoubleConversion
 
 /**
  * The runtime method collection. Phase 0 ports only what the lexer needs: line
@@ -196,6 +197,82 @@ object ScriptRuntime {
             /* We don't worry about inaccurate numbers for any other base. */
         }
         return sum
+    }
+
+    val emptyArgs: Array<Any?> = arrayOf()
+
+    fun toInt32(d: Double): Int = DoubleConversion.doubleToInt32(d)
+
+    internal fun isSpecialProperty(s: String): Boolean =
+        s == NativeObject.PROTO_PROPERTY || s == NativeObject.PARENT_PROPERTY
+
+    /**
+     * If [str] is an array index, returns it as a value in 0..2^32-1. Otherwise returns -1.
+     * Leading zeroes and "-0" are not indexes.
+     */
+    fun indexFromString(str: String): Long {
+        // The length of the decimal form of Int.MAX_VALUE, 2147483647.
+        val maxValueLength = 10
+
+        val len = str.length
+        if (len > 0) {
+            var i = 0
+            var negate = false
+            var c: Int = str[0].code
+            if (c == '-'.code) {
+                if (len > 1) {
+                    c = str[1].code
+                    if (c == '0'.code) return -1L // "-0" is not an index
+                    i = 1
+                    negate = true
+                }
+            }
+            c -= '0'.code
+            if (c in 0..9 && len <= (if (negate) maxValueLength + 1 else maxValueLength)) {
+                // Accumulate as a negative number, so Int.MIN_VALUE, whose absolute value is one
+                // greater than Int.MAX_VALUE, still fits.
+                var index = -c
+                var oldIndex = 0
+                i++
+                if (index != 0) {
+                    // 00, 01, 000 and so on are not indexes.
+                    while (i != len) {
+                        c = str[i].code - '0'.code
+                        if (c < 0 || c > 9) break
+                        oldIndex = index
+                        index = 10 * index - c
+                        i++
+                    }
+                }
+                // Every character must be consumed, and the value must not have overflowed.
+                if (i == len &&
+                    (oldIndex > (Int.MIN_VALUE / 10) ||
+                        (oldIndex == (Int.MIN_VALUE / 10) &&
+                            c <= (if (negate) -(Int.MIN_VALUE % 10) else (Int.MAX_VALUE % 10))))
+                ) {
+                    return 0xFFFFFFFFL and (if (negate) index else -index).toLong()
+                }
+            }
+        }
+        return -1L
+    }
+
+    /** If [s] is an array index, returns it boxed as an Int. Otherwise returns [s] itself. */
+    internal fun getIndexObject(s: String): Any {
+        val indexTest = indexFromString(s)
+        if (indexTest in 0..Int.MAX_VALUE.toLong()) {
+            return indexTest.toInt()
+        }
+        return s
+    }
+
+    /** If [d] is an exact int, returns it boxed as an Int. Otherwise returns it as a String. */
+    internal fun getIndexObject(d: Double): Any {
+        val i = d.toInt()
+        if (i.toDouble() == d) {
+            return i
+        }
+        return toString(d)
     }
 
     /**
