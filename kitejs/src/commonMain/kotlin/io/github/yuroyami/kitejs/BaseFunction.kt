@@ -229,9 +229,9 @@ open class BaseFunction : ScriptableObject, Function {
         prototypePropertyValue = obj
 
         val proto: Scriptable? = if (isGeneratorFunction()) {
-            // TODO(P4): a generator function's prototype should be %GeneratorPrototype%, which
-            // needs ES6Generator.GENERATOR_TAG. Falling back to Object.prototype until it lands.
-            getObjectPrototype(this)
+            // A generator function's prototype hangs off %GeneratorPrototype%, not Object.prototype.
+            val top = getTopLevelScope(scope)
+            getTopScopeValue(top, ES6Generator.GENERATOR_TAG) as? Scriptable ?: getObjectPrototype(this)
         } else {
             getObjectPrototype(this)
         }
@@ -374,8 +374,8 @@ open class BaseFunction : ScriptableObject, Function {
             val function = getProperty(scope, FUNCTION_CLASS) as Scriptable
             val functionProto = getProperty(function, PROTOTYPE_PROPERTY_NAME) as Scriptable
             proto.prototype = functionProto
-            // TODO(P4): proto.prototype should be %GeneratorPrototype%, read through
-            // ES6Generator.GENERATOR_TAG, which lands with the generators.
+            val top = getTopLevelScope(scope)
+            putProperty(proto, PROTOTYPE_PROPERTY_NAME, getTopScopeValue(top, ES6Generator.GENERATOR_TAG))
             val ctor = LambdaConstructor(scope, GENERATOR_FUNCTION_CLASS, 1, proto, ::js_gen_constructorCall, ::js_gen_constructor)
             proto.defineProperty("constructor", ctor, READONLY or DONTENUM)
             ctor.setPrototypePropertyAttributes(DONTENUM or READONLY or PERMANENT)

@@ -308,6 +308,8 @@ open class Context internal constructor(val factory: ContextFactory) : AutoClose
         factory.observeInstructionCount(this, instructionCount)
     }
 
+    internal fun observeInstructionCountInternal(instructionCount: Int) = observeInstructionCount(instructionCount)
+
     // ---- Microtasks ----------------------------------------------------------------------------
 
     /** Queues work to run after the current top-level call finishes. */

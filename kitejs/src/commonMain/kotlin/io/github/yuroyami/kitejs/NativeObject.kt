@@ -22,6 +22,13 @@ open class NativeObject : ScriptableObject {
     override fun toString(): String = ScriptRuntime.defaultObjectToString(this)
 
     companion object {
+        /** `obj.__proto__ = proto` with the spec's checks. */
+        fun js_protoSetter(thisObj: Scriptable, proto: Any?) {
+            // TODO(P3.8): the full setter, with the cycle and extensibility checks, lands with the
+            // Object builtin. Until then a plain assignment.
+            thisObj.prototype = proto as? Scriptable
+        }
+
         const val CLASS_NAME = "Object"
 
         const val PROTO_PROPERTY = "__proto__"

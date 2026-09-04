@@ -132,6 +132,16 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   debugger, property-change listeners and locale. The debugger's `DebuggableScript` interface is not
   ported either; `JSDescriptor` keeps the same members as plain methods. The continuations API
   (`captureContinuation`, `resumeContinuation`) is decided with the interpreter in P3.7.
+- D-30: `Interpreter` dispatches with a `when` over the opcodes instead of upstream's table of one
+  object per instruction. The cases hold the same code; only the dispatch differs.
+- D-31: continuations are not ported: `NativeContinuation`, `ContinuationPending`,
+  `Context.captureContinuation`, `resumeContinuation`, `executeScriptWithContinuations` and the
+  `ContinuationJump` paths in the interpreter. They are a Rhino extension no ECMAScript program
+  uses, and the generator machinery does not depend on them.
+- D-32: Kotlin/JS cannot tell an `Int` from a `Double` at runtime, so the `is Int` fast paths in
+  the arithmetic (`add(Int, Int)`, `negate`) take a different branch there than on the JVM. The
+  results are the same numbers; only which branch computed them differs. The cross-target eval
+  smoke test is what checks this.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -605,9 +615,22 @@ Moved here from P2, because `CodeGenerator` is generic over `ScriptOrFn<T>` and 
 
 #### P3.7: Interpreter
 
-- [ ] Port `Interpreter.kt` (5106): the call-frame machine, `ContinuationJump`, the generator
-      resumption path and the microtask hooks.
-- [ ] jvmTest green
+- [x] Port `Interpreter.kt` (5106): the call-frame machine, the generator resumption path and the
+      exception unwinding. With it: `NativeWith.kt`, `SpecialRef.kt`, `NewLiteralStorage.kt`,
+      `IteratorLikeIterable.kt`, the iterator and generator name shells, `setIntegrityLevel`, and
+      the ~90 `ScriptRuntime` functions the interpreter calls (property access, names and scopes,
+      arithmetic, equality, comparison, enumeration, activations, catch scopes and literals).
+- [x] Upstream dispatches through a table of one object per opcode; this port uses a `when` over
+      the same opcodes, which is what older Rhino did (D-30). Continuations are not ported (D-31).
+- [x] Test `jvmTest/EvalOracleTest`: scripts run on both engines and the last expression's value,
+      or the thrown error's name and message, has to match. The first batch of 220 scripts covers
+      arithmetic, coercion, strings, templates, functions, closures, control flow, objects,
+      prototypes, `new`, `with`, `try`/`finally`, getters and setters, optional chaining and the
+      engine's own error messages. It passed on the first run except for eight scripts that need
+      the standard objects, which join the P3.8 batch.
+- [x] Test `commonTest/EvalSmokeTest`: 60 of the same scripts with fixed expectations, run on every
+      target.
+- [x] jvmTest green
 
 #### P3.8: Natives wave 1
 

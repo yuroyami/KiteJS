@@ -311,11 +311,11 @@ abstract class ScriptableObject :
     override fun hasInstance(instance: Scriptable): Boolean {
         // The default for a plain object is to walk the prototype chain. Function objects and the
         // non-script ones override this.
-        val cx = Context.getCurrentContext()
+        val cx = Context.getContext()
         val hasInstance = ScriptRuntime.getObjectElem(this, SymbolKey.HAS_INSTANCE, cx)
         if (hasInstance is Function) {
             return ScriptRuntime.toBoolean(
-                hasInstance.call(cx!!, hasInstance.declarationScope!!, this, arrayOf(this)),
+                hasInstance.call(cx, hasInstance.declarationScope!!, this, arrayOf(this)),
             )
         }
         if (this !is Callable) throw ScriptRuntime.typeErrorById("msg.instanceof.bad.target")
@@ -327,6 +327,8 @@ abstract class ScriptableObject :
 
     protected open fun equivalentValues(value: Any?): Any? =
         if (this === value) true else Scriptable.NOT_FOUND
+
+    internal fun equivalentValuesInternal(value: Any?): Any? = equivalentValues(value)
 
     // ---- Defining properties ------------------------------------------------------------------
 
@@ -482,7 +484,7 @@ abstract class ScriptableObject :
     open fun defineOwnProperty(cx: Context, id: Any?, desc: DescriptorInfo): Boolean =
         defineOwnProperty(cx, id, desc, true)
 
-    protected open fun defineOwnProperty(
+    internal open fun defineOwnProperty(
         cx: Context,
         id: Any?,
         desc: DescriptorInfo,

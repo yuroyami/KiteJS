@@ -22,11 +22,10 @@ internal open class Arguments(private val activation: NativeCall, cx: Context) :
         lengthObj = args.size
         val f = activation.function
         calleeObj = f
-        defineProperty(
-            SymbolKey.ITERATOR,
-            TopLevel.getBuiltinPrototype(getTopLevelScope(parent), TopLevel.Builtins.Array)!!.get("values", parent),
-            DONTENUM,
-        )
+        // Without the standard objects there is no Array.prototype.values to borrow. Upstream never
+        // runs in that state; this port does during the tests that come before phase 3.8.
+        val arrayProto = TopLevel.getBuiltinPrototype(getTopLevelScope(parent), TopLevel.Builtins.Array)
+        if (arrayProto != null) defineProperty(SymbolKey.ITERATOR, arrayProto.get("values", parent), DONTENUM)
         defineProperty("length", lengthObj, DONTENUM)
         if (activation.isStrict) {
             val typeErrorThrower = ScriptRuntime.typeErrorThrower(cx)

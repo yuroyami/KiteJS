@@ -33,7 +33,8 @@ plan, read [KITEJS_IMPL.md](KITEJS_IMPL.md).
 | Runtime contracts (Scriptable, Function, Callable, Script, Evaluator, Ref, Symbol) | ✅ | Every interface has the same members as upstream: names, arity, parameter and return shapes, and the interfaces it extends, all compared by reflection. Two members are known-absent and listed with a reason |
 | Value types (Undefined, UniqueTag, ConsString) | ✅ | Same behaviour as upstream, including the lazy rope that repeated string concatenation builds |
 | Icode generator (CodeGenerator) | ✅ | The whole corpus and 57 hand-written sources compile to icode identical to upstream's: same bytes, string and number pools, exception tables, frame sizes and nested function tables |
-| Interpreter + core runtime (Object, Function, Array, String, Number, Boolean, Math, JSON, errors) | ⛔ | Phase 3 |
+| Interpreter | ✅ | Runs the icode. 220 scripts match upstream: arithmetic, coercion, strings, templates, functions, closures, control flow, objects, prototypes, `new`, `with`, `try`/`finally`, getters and setters, optional chaining and the engine's own error messages. Generator objects and continuations are out until phase 4 and never, respectively |
+| Standard objects (Object, Function, Array, String, Number, Boolean, Math, JSON, errors) | ⛔ | Phase 3.8, next |
 | RegExp engine | ⛔ | Phase 4 |
 | Date | ⛔ | Phase 4, needs a timezone decision |
 | Map, Set, Symbol, iterators, generators, typed arrays, Promise | ⛔ | Phase 4 |
