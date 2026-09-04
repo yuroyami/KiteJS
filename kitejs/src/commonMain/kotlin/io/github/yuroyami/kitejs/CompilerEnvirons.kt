@@ -4,12 +4,14 @@
 
 package io.github.yuroyami.kitejs
 
+import io.github.yuroyami.kitejs.ast.ErrorCollector
+
 /**
  * Compiler configuration shared by the lexer, parser and code generator.
  *
- * Ported subset notes: initFromContext and ideEnvirons arrive with Context (Phase 3)
- * and ErrorCollector (Phase 1); the security-controller fields are out of the port's
- * scope entirely.
+ * Ported subset notes: initFromContext arrives with Context in Phase 3. The
+ * security-controller fields and the deprecated optimizationLevel pair are out of the
+ * port's scope: there is no bytecode compiler, so interpretedMode is the only switch.
  */
 class CompilerEnvirons {
 
@@ -71,7 +73,7 @@ class CompilerEnvirons {
 
     var inEval: Boolean = false
 
-    internal var activationNames: Set<String>? = null
+    var activationNames: Set<String>? = null
 
     // KMP: typed Scriptable once the object model lands in Phase 3.
     // The field name keeps upstream's typo on purpose (1:1 mapping).
@@ -84,4 +86,21 @@ class CompilerEnvirons {
     fun homeObject(): Any? = homeObjecgt
 
     fun reportWarningAsError(): Boolean = warningAsError
+
+    companion object {
+        /**
+         * The preset an IDE wants: error recovery on, comments recorded, strict warnings, and
+         * an [ErrorCollector] gathering the problems instead of throwing.
+         */
+        fun ideEnvirons(): CompilerEnvirons = CompilerEnvirons().apply {
+            recoverFromErrors = true
+            recordingComments = true
+            strictMode = true
+            warnTrailingComma = true
+            languageVersion = Context.VERSION_1_7
+            reservedKeywordAsIdentifier = true
+            ideMode = true
+            errorReporter = ErrorCollector()
+        }
+    }
 }

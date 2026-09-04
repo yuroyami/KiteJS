@@ -17,7 +17,8 @@ plan, read [KITEJS_IMPL.md](KITEJS_IMPL.md).
 | Cluster | Status | Notes |
 |---|---|---|
 | Lexer (Token, TokenStream) | ✅ | Token-by-token identical to upstream on the parity corpus (codes, boundaries, columns, line numbers, values). E4X tokenizer methods not ported; BigInt literals lex into a stub value until Phase 5 |
-| Phase 0 support slice (Kit, Messages, Characters, CompilerEnvirons, ErrorReporter, exceptions, Context version surface, Parser error plumbing) | 🟡 | Only what the lexer needs; each file grows in its own later phase |
+| Support slice (Kit, Messages, Characters, ErrorReporter, exceptions, Context version surface, Parser error plumbing) | 🟡 | Only what the lexer and parser need; each file grows in its own later phase |
+| CompilerEnvirons | ✅ | Complete except `initFromContext`, which needs a real Context (phase 3). Security controllers and the deprecated optimization level are out of scope |
 | AST node hierarchy | ✅ | All 70 node types ported. Every one is checked against the upstream jar: rendered source, positions, line-number fallback, child-list surgery and symbol tables all match. E4X node types are out of scope |
 | Parser | ⛔ | Phase 1, after the AST is complete |
 | IR + bytecode generator (Icode) | ⛔ | Phase 2 |

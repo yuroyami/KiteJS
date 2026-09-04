@@ -84,6 +84,9 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   between the JVM, JS and native. Phase 3 replaces it with the ported DToA, which is platform
   independent. Only the `NumberLiteral(Double)` constructor is affected; a literal parsed from source
   keeps the original token text.
+- D-15: the deprecated `getOptimizationLevel`/`setOptimizationLevel` pair on `CompilerEnvirons` and
+  `Context` is not ported. There is no bytecode compiler, so `interpretedMode` is the only switch and
+  the level would always read -1.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -231,10 +234,11 @@ follow those waves, so every commit leaves the module compiling and jvmTest gree
 
 #### P1.4: CompilerEnvirons completion
 
-- [ ] Fill the P0 slice: `ideEnvirons()`, the `ErrorCollector` wiring, `activationNames`,
+- [x] Fill the P0 slice: `ideEnvirons()`, the `ErrorCollector` wiring, `activationNames`,
       the accessors `Parser` reads. `initFromContext` still waits for P3 (Context is a shell).
-- [ ] Test: `CompilerEnvironsTest` on the ide preset
-- [ ] jvmTest green
+      Cross-checked the 14 `compilerEnv.*` members `Parser.java` actually touches: all present.
+- [x] Test: `CompilerEnvironsTest` on the defaults and the ide preset
+- [x] jvmTest green (186 tests)
 
 #### P1.5: Parser
 
