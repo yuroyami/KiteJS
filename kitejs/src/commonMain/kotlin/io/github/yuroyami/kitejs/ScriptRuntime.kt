@@ -487,4 +487,333 @@ object ScriptRuntime {
         }
         return sb?.toString() ?: s
     }
+
+    // ---- Value tests -------------------------------------------------------------------------
+
+    /** True for a symbol, either a well-known [SymbolKey] or a script-made one. */
+    internal fun isSymbol(obj: Any?): Boolean =
+        // TODO(P3.4): NativeSymbol lands later; upstream also accepts one whose isSymbol() is true.
+        obj is SymbolKey
+
+    /** True for what the spec calls an Object: everything except the primitives. */
+    fun isObject(value: Any?): Boolean {
+        if (value == null) return false
+        if (Undefined.isUndefined(value)) return false
+        if (value is ScriptableObject) {
+            val type = value.typeOf
+            return type == "object" || type == "function"
+        }
+        if (value is Scriptable) return value !is Callable
+        return false
+    }
+
+    /** The result of the `typeof` operator. */
+    fun typeOf(value: Any?): String {
+        if (value == null) return "object"
+        if (value === Undefined.instance) return "undefined"
+        if (value is ScriptableObject) return value.typeOf
+        if (value is Scriptable) return if (value is Callable) "function" else "object"
+        if (value is CharSequence) return "string"
+        if (value is KBigInt) return "bigint"
+        if (value is Number) return "number"
+        if (value is Boolean) return "boolean"
+        if (isSymbol(value)) return "symbol"
+        throw errorWithClassName("msg.invalid.type", value)
+    }
+
+    // ---- Conversions that need an object -------------------------------------------------------
+
+    /**
+     * ToPrimitive: turns an object into a primitive, asking `Symbol.toPrimitive` first and falling
+     * back to the object's own `getDefaultValue`.
+     *
+     * [preferredType] is [StringClass], [NumberClass], or null for no preference.
+     */
+    fun toPrimitive(input: Any?, preferredType: KClass<*>? = null): Any? {
+        // Scriptables always go through getDefaultValue, even the ones isObject rejects.
+        if (input !is Scriptable && !isObject(input)) return input
+
+        val s = input as Scriptable
+        // getProperty(obj, Symbol) throws when obj is not a SymbolScriptable, so guard it first.
+        val exoticToPrim =
+            if (s is SymbolScriptable) ScriptableObject.getProperty(s, SymbolKey.TO_PRIMITIVE)
+            else null
+
+        if (exoticToPrim is Function) {
+            val cx = Context.getCurrentContext()!!
+            val hint = when (preferredType) {
+                null -> "default"
+                StringClass -> "string"
+                else -> "number"
+            }
+            val result = exoticToPrim.call(cx, exoticToPrim.declarationScope!!, s, arrayOf(hint))
+            if (isObject(result)) throw typeErrorById("msg.cant.convert.to.primitive")
+            return result
+        }
+        if (exoticToPrim != null &&
+            exoticToPrim !== Scriptable.NOT_FOUND &&
+            !Undefined.isUndefined(exoticToPrim)
+        ) {
+            throw notFunctionError(exoticToPrim)
+        }
+
+        val result = s.getDefaultValue(preferredType)
+        if (result is Scriptable && !isSymbol(result)) throw typeErrorById("msg.bad.default.value")
+        return result
+    }
+
+    /** ToString: what `String(value)` gives. */
+    fun toString(value: Any?): String {
+        var v = value
+        while (true) {
+            when {
+                v == null -> return "null"
+                Undefined.isUndefined(v) -> return "undefined"
+                v is String -> return v
+                v is CharSequence -> return v.toString()
+                v is KBigInt -> return v.toString(10)
+                v is Number -> return numberToString(v.toDouble(), 10)
+                v is Boolean -> return v.toString()
+                isSymbol(v) -> throw typeErrorById("msg.not.a.string")
+                v is Scriptable -> v = toPrimitive(v, StringClass)
+                // Upstream warns here about a plain Java object reaching script. There is no Java
+                // interop in this port, so there is nothing to warn about.
+                else -> return v.toString()
+            }
+        }
+    }
+
+    // ---- Errors ------------------------------------------------------------------------------
+
+    fun constructError(error: String, message: String): EcmaError {
+        val linep = IntArray(1)
+        val filename = Context.getSourcePositionFromStack(linep)
+        return constructError(error, message, filename, linep[0], null, 0)
+    }
+
+    fun constructError(
+        error: String,
+        message: String,
+        sourceName: String?,
+        lineNumber: Int,
+        lineSource: String?,
+        columnNumber: Int,
+    ): EcmaError = EcmaError(error, message, sourceName, lineNumber, lineSource, columnNumber)
+
+    fun typeError(message: String): EcmaError = constructError("TypeError", message)
+
+    fun typeErrorById(messageId: String, vararg args: Any?): EcmaError =
+        typeError(getMessageById(messageId, *args))
+
+    fun rangeError(message: String): EcmaError = constructError("RangeError", message)
+
+    fun rangeErrorById(messageId: String, vararg args: Any?): EcmaError =
+        rangeError(getMessageById(messageId, *args))
+
+    fun notFunctionError(value: Any?): RuntimeException = notFunctionError(value, value)
+
+    fun notFunctionError(value: Any?, messageHelper: Any?): RuntimeException {
+        val msg = messageHelper?.toString() ?: "null"
+        if (value === Scriptable.NOT_FOUND) return typeErrorById("msg.function.not.found", msg)
+        return typeErrorById("msg.isnt.function", msg, typeOf(value))
+    }
+
+    /**
+     * KMP: upstream puts the Java class name in the message. There is no `Class.getName` in common
+     * Kotlin, so this uses the simple name (D-23).
+     */
+    private fun errorWithClassName(msg: String, value: Any): RuntimeException =
+        Context.reportRuntimeErrorById(msg, value::class.simpleName ?: "?")
+
+    /**
+     * The `===` comparison. Numbers compare by value (so `NaN` is never equal to itself), strings
+     * by their characters, and everything else by identity.
+     */
+    fun shallowEq(x: Any?, y: Any?): Boolean {
+        if (x === y) {
+            if (x !is Number) return true
+            return !x.toDouble().isNaN()
+        }
+        if (x == null || x === Undefined.instance || x === Undefined.SCRIPTABLE_UNDEFINED) {
+            // The two spellings of undefined are equal to each other.
+            return (x === Undefined.instance && y === Undefined.SCRIPTABLE_UNDEFINED) ||
+                (x === Undefined.SCRIPTABLE_UNDEFINED && y === Undefined.instance)
+        }
+        when {
+            x is KBigInt -> if (y is KBigInt) return x == y
+            x is Number -> if (y is Number && y !is KBigInt) return x.toDouble() == y.toDouble()
+            x is CharSequence -> if (y is CharSequence) return x.toString() == y.toString()
+            x is Boolean -> if (y is Boolean) return x == y
+            x is Scriptable -> if (x is Wrapper && y is Wrapper) return x.unwrap() === y.unwrap()
+            // Upstream warns about a plain Java object here. There is no Java interop in this port.
+            else -> return x === y
+        }
+        return false
+    }
+
+    // ---- Property keys ------------------------------------------------------------------------
+
+    /** A property key resolved to either a string name or an array index, never both. */
+    class StringIdOrIndex {
+        val stringId: String?
+        val index: Int
+
+        constructor(index: Int) {
+            this.stringId = null
+            this.index = index
+        }
+
+        constructor(stringId: String) {
+            this.stringId = stringId
+            this.index = -1
+        }
+    }
+
+    /** Works out whether [id] names an array index or an ordinary property. */
+    fun toStringIdOrIndex(id: Any?): StringIdOrIndex {
+        if (id is Number) {
+            val d = id.toDouble()
+            if (d < 0.0) return StringIdOrIndex(toString(id))
+            val index = d.toInt()
+            return if (index.toDouble() == d) StringIdOrIndex(index) else StringIdOrIndex(toString(id))
+        }
+        val s = if (id is String) id else toString(id)
+        val indexTest = indexFromString(s)
+        return if (indexTest in 0..Int.MAX_VALUE.toLong()) StringIdOrIndex(indexTest.toInt())
+        else StringIdOrIndex(s)
+    }
+
+    /** `obj[elem]`, giving `undefined` where the property is missing. */
+    fun getObjectElem(obj: Scriptable, elem: Any?, cx: Context?): Any? {
+        val result = when {
+            isSymbol(elem) -> ScriptableObject.getProperty(obj, elem as Symbol)
+            else -> {
+                val s = toStringIdOrIndex(elem)
+                if (s.stringId == null) ScriptableObject.getProperty(obj, s.index)
+                else ScriptableObject.getProperty(obj, s.stringId)
+            }
+        }
+        return if (result === Scriptable.NOT_FOUND) Undefined.instance else result
+    }
+
+    // ---- Truthiness and the prototype chain ---------------------------------------------------
+
+    /** ToBoolean. */
+    fun toBoolean(value: Any?): Boolean {
+        var v = value
+        while (true) {
+            when {
+                v is Boolean -> return v
+                v == null || Undefined.isUndefined(v) -> return false
+                v is CharSequence -> return v.isNotEmpty()
+                v is KBigInt -> return !v.isZero()
+                v is Number -> {
+                    val d = v.toDouble()
+                    return !d.isNaN() && d != 0.0
+                }
+                v is Scriptable -> {
+                    if (v is ScriptableObject && v.avoidObjectDetection()) return false
+                    if (Context.getContext().isVersionECMA1()) return true
+                    // The pre-ECMA extension: ask the object for a primitive first.
+                    v = v.getDefaultValue(BooleanClass)
+                    if (v is Scriptable && !isSymbol(v)) {
+                        throw errorWithClassName("msg.primitive.expected", v)
+                    }
+                }
+                else -> return true
+            }
+        }
+    }
+
+    /** Whether [rhs] is somewhere in [lhs]'s prototype chain. */
+    fun jsDelegatesTo(lhs: Scriptable, rhs: Scriptable): Boolean {
+        var proto = lhs.prototype
+        while (proto != null) {
+            if (proto == rhs) return true
+            proto = proto.prototype
+        }
+        return false
+    }
+
+    /** The constructor named [constructorName] in [scope], or a failure explaining why not. */
+    fun getExistingCtor(cx: Context, scope: Scriptable, constructorName: String): Function {
+        val ctorVal = ScriptableObject.getProperty(scope, constructorName)
+        if (ctorVal is Function) return ctorVal
+        if (ctorVal === Scriptable.NOT_FOUND) {
+            throw Context.reportRuntimeErrorById("msg.ctor.not.found", constructorName)
+        }
+        throw Context.reportRuntimeErrorById("msg.not.ctor", constructorName)
+    }
+
+    /** ToNumber. */
+    fun toNumber(value: Any?): Double {
+        var v = value
+        while (true) {
+            when {
+                v is KBigInt -> throw typeErrorById("msg.cant.convert.to.number", "BigInt")
+                v is Number -> return v.toDouble()
+                v == null -> return +0.0
+                Undefined.isUndefined(v) -> return Double.NaN
+                v is String -> return toNumber(v)
+                v is CharSequence -> return toNumber(v.toString())
+                v is Boolean -> return if (v) 1.0 else +0.0
+                isSymbol(v) -> throw typeErrorById("msg.not.a.number")
+                v is Scriptable -> v = toPrimitive(v, NumberClass)
+                // Upstream warns about a plain Java object here. There is no Java interop here.
+                else -> return Double.NaN
+            }
+        }
+    }
+
+    fun toInt32(value: Any?): Int {
+        if (value is Int) return value
+        return toInt32(toNumber(value))
+    }
+
+    fun toInt32(args: Array<Any?>, index: Int): Int =
+        if (index < args.size) toInt32(args[index]) else 0
+
+    /** What `Object.prototype.toString` gives for [obj]. */
+    internal fun defaultObjectToString(obj: Scriptable?): String {
+        if (obj == null) return "[object Null]"
+        if (Undefined.isUndefined(obj)) return "[object Undefined]"
+        // NOT_FOUND is not a CharSequence, so a missing tag needs no separate check.
+        val tagValue = ScriptableObject.getProperty(obj, SymbolKey.TO_STRING_TAG)
+        if (tagValue is CharSequence) return "[object $tagValue]"
+        return "[object " + obj.className + "]"
+    }
+
+    // ---- Wiring a new object into its scope ----------------------------------------------------
+
+    fun setFunctionProtoAndParent(
+        fn: BaseFunction,
+        cx: Context?,
+        scope: Scriptable,
+        es6GeneratorFunction: Boolean = false,
+    ) {
+        fn.parentScope = scope
+        fn.prototype =
+            if (es6GeneratorFunction) ScriptableObject.getGeneratorFunctionPrototype(scope)
+            else ScriptableObject.getFunctionPrototype(scope)
+        if (cx != null && cx.languageVersion >= Context.VERSION_ES6) {
+            fn.setStandardPropertyAttributes(ScriptableObject.READONLY or ScriptableObject.DONTENUM)
+        }
+    }
+
+    fun setObjectProtoAndParent(obj: ScriptableObject, scope: Scriptable) {
+        // Unlike a function, an object always hangs off the top scope.
+        val top = ScriptableObject.getTopLevelScope(scope)
+        obj.parentScope = top
+        obj.prototype = ScriptableObject.getClassPrototype(top, obj.className)
+    }
+
+    fun setBuiltinProtoAndParent(
+        obj: ScriptableObject,
+        scope: Scriptable,
+        type: TopLevel.Builtins,
+    ) {
+        val top = ScriptableObject.getTopLevelScope(scope)
+        obj.parentScope = top
+        obj.prototype = TopLevel.getBuiltinPrototype(top, type)
+    }
 }

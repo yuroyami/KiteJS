@@ -52,4 +52,17 @@ object Kit {
         ex.printStackTrace()
         throw ex
     }
+
+    /**
+     * Puts [initialValue] under [key] unless something is already there, and returns whichever
+     * value ended up in the map.
+     */
+    fun initHash(h: MutableMap<Any, Any>, key: Any, initialValue: Any): Any {
+        val current = h[key]
+        if (current == null) {
+            h[key] = initialValue
+            return initialValue
+        }
+        return current
+    }
 }

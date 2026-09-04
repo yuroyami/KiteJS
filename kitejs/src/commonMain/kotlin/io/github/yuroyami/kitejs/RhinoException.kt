@@ -36,20 +36,42 @@ abstract class RhinoException : RuntimeException {
 
     open fun details(): String = detailsMessage ?: ""
 
+    /** Each of these may be set once, and only to a real value. */
     fun initSourceName(sourceName: String) {
+        check(this.sourceName == null) { "the source name is already set" }
         this.sourceName = sourceName
     }
 
     fun initLineNumber(lineNumber: Int) {
+        require(lineNumber > 0) { "$lineNumber" }
+        check(this.lineNumber <= 0) { "the line number is already set" }
         this.lineNumber = lineNumber
     }
 
     fun initLineSource(lineSource: String) {
+        check(this.lineSource == null) { "the line source is already set" }
         this.lineSource = lineSource
     }
 
     fun initColumnNumber(columnNumber: Int) {
+        require(columnNumber > 0) { "$columnNumber" }
+        check(this.columnNumber <= 0) { "the column number is already set" }
         this.columnNumber = columnNumber
+    }
+
+    /** Sets whichever of the four the caller actually knows. */
+    internal fun recordErrorOrigin(
+        sourceName: String?,
+        lineNumber: Int,
+        lineSource: String?,
+        columnNumber: Int,
+    ) {
+        // Upstream keeps taking -1 to mean 0 for compatibility.
+        val line = if (lineNumber == -1) 0 else lineNumber
+        if (sourceName != null) initSourceName(sourceName)
+        if (line != 0) initLineNumber(line)
+        if (lineSource != null) initLineSource(lineSource)
+        if (columnNumber != 0) initColumnNumber(columnNumber)
     }
 
     final override val message: String

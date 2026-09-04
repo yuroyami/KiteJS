@@ -7,14 +7,25 @@ package io.github.yuroyami.kitejs
 /**
  * The JavaScript `Object` builtin.
  *
- * Phase 2 slice: only the two magic property names the IR generator checks for. The real object,
- * with its constructor and prototype methods, arrives in phase 3 with the object model.
+ * The class itself is here, since the rest of the object model builds plain objects with it. The
+ * `Object` constructor and its prototype methods arrive with the other natives.
  */
-object NativeObject {
+open class NativeObject : ScriptableObject {
 
-    const val CLASS_NAME = "Object"
+    constructor() : super()
 
-    const val PROTO_PROPERTY = "__proto__"
+    constructor(scope: Scriptable, prototype: Scriptable?) : super(scope, prototype)
 
-    const val PARENT_PROPERTY = "__parent__"
+    override val className: String
+        get() = CLASS_NAME
+
+    override fun toString(): String = ScriptRuntime.defaultObjectToString(this)
+
+    companion object {
+        const val CLASS_NAME = "Object"
+
+        const val PROTO_PROPERTY = "__proto__"
+
+        const val PARENT_PROPERTY = "__parent__"
+    }
 }

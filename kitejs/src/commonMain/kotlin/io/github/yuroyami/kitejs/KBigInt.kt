@@ -11,4 +11,17 @@ package io.github.yuroyami.kitejs
 @ConsistentCopyVisibility
 data class KBigInt internal constructor(val digits: String, val radix: Int) {
     override fun toString(): String = if (radix == 10) digits else "$digits (radix $radix)"
+
+    /**
+     * The decimal spelling. Only radix 10 works until the real big integer lands, because the stub
+     * cannot convert between radixes (D-5).
+     */
+    fun toString(radix: Int): String {
+        require(radix == 10) { "only radix 10 is supported until BigInt lands" }
+        require(this.radix == 10) { "this literal was written in radix ${this.radix}" }
+        return digits
+    }
+
+    /** Whether this is zero. Works on the stub because a zero literal only ever spells out zeroes. */
+    fun isZero(): Boolean = digits.all { it == '0' }
 }

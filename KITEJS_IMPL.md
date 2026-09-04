@@ -113,6 +113,16 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   Upstream uses them to mark a lambda as serializable; there is no serialization in this port, so
   they are empty markers over `Callable` and `Constructable`. They are kept because
   `LambdaFunction` and `LambdaConstructor` name them all over their public API.
+- D-23: `ScriptRuntime.typeof` becomes `typeOf`, because `typeof` is a reserved word in Kotlin.
+  Same reason as D-10. Two error messages that upstream fills with a Java class name use the Kotlin
+  simple name instead, since common Kotlin has no `Class.getName`.
+- D-24: `setExternalArrayData` defines the `length` property with a lambda getter, where upstream
+  points it at a reflected `getExternalArrayLength` method. Both give a read-only, non-enumerable
+  accessor property that reports the external array's length.
+- D-25: the thread-safe half of the slot maps is not ported, which follows from D-3.
+  `ThreadSafeEmbeddedSlotMap`, `ThreadSafeHashSlotMap`, `ThreadSafeCompoundOperationMap`,
+  `LockAwareSlotMap`, `SlotMapOwner.ThreadedAccess` and the two thread-safe empty and single-entry
+  maps are all gone. `Context.FEATURE_THREAD_SAFE_OBJECTS` is always false.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -495,7 +505,7 @@ Three commits, each of which compiles on its own.
       `JavaScriptException` and `LazilyLoadedCtor` were meant to be here too, but the first needs
       `RhinoException.recordErrorOrigin` and a `NativeError`, and the second calls
       `ScriptableObject.addLazilyInitializedValue`, so both move to commit 2.
-- [ ] Commit 2, the core: `Slot.kt` (145), `AccessorSlot.kt` (289), `BuiltInSlot.kt` (201),
+- [x] Commit 2, the core: `Slot.kt` (145), `AccessorSlot.kt` (289), `BuiltInSlot.kt` (201),
       `LambdaSlot.kt` (74), `LambdaAccessorSlot.kt` (167), `LazyLoadSlot.kt` (38), `SlotMap.kt` (94),
       `CompoundOperationMap.kt` (103), `EmbeddedSlotMap.kt` (318), `HashSlotMap.kt` (100),
       `SlotMapOwner.kt` (375), `ScriptableObject.kt` (3345), `BaseFunction.kt` (828),
@@ -507,24 +517,39 @@ Three commits, each of which compiles on its own.
       `IdFunctionCall.kt` (17), `IdScriptableObject.kt` (1019), `BoundFunction.kt` (113).
 - [ ] `Arguments.kt` and `NativeCall.kt` move to P3.6. Both hold a `JSFunction`, which is part of
       the descriptor layer.
-- [ ] Test `jvmTest/SlotMapOracleTest`: drive both the upstream slot maps and the ported ones through
-      the same long random sequence of put, get, remove, iterate and compaction, then compare the
-      resulting key order and contents. Slot maps switch representation as they grow, so the
-      sequence has to cross those thresholds.
-- [ ] Test `jvmTest/ScriptableObjectOracleTest`: define, redefine, delete, enumerate and seal
-      properties on both sides and compare the observable results, including attribute handling and
-      prototype chain lookup
-- [ ] jvmTest green
+- [x] Test `jvmTest/ScriptableObjectOracleTest`: define, redefine, delete, enumerate and seal
+      properties on both sides and compare the observable results, including attributes, symbol
+      keys, constants, descriptors and prototype chain lookup. This also drives the slot maps,
+      which is why the separate `SlotMapOracleTest` in the old plan is gone: the maps are not
+      reachable from outside `ScriptableObject`, and their public behaviour is exactly what this
+      test compares. A 20000 step random sequence and a 2500 property object cross every point
+      where the map changes shape.
+- [x] The map's change of shape is not visible through that comparison, since every shape keeps
+      insertion order. A separate white-box test asserts the shape directly, so a regression in the
+      promotion rule is still caught. This was found by a negative control: breaking the promotion
+      threshold did not fail any comparison test.
+- [x] Test `commonTest/ObjectModelTest`: the same behaviour on every target, including a 20000 step
+      random sequence checked against an ordinary `LinkedHashMap`.
+- [x] jvmTest green
 
 #### P3.4: Forward references left behind by P3.3
 
-A handful of use sites in P3.3 name classes that land later. Each one is listed here so it is filled
-in rather than forgotten, and each has a test in P3.9 that would catch it if it were not.
+A short list of places in P3.3 that name classes landing later. Each is marked `TODO(P3.4)` in the
+source, so `grep` finds them, and none of them can survive the eval oracle in P3.9.
 
-- [ ] `BaseFunction` reads `ES6Generator.GENERATOR_TAG` in two places, and casts to `JSFunction` in
-      one. Fill in when those land.
-- [ ] `SymbolKey.equals` and `IdScriptableObject` compare against `NativeSymbol`.
-- [ ] `JavaScriptException` reads the message and line out of a `NativeError`.
+- [ ] `SymbolKey.equals` and `ScriptRuntime.isSymbol` also have to accept a `NativeSymbol`.
+- [ ] `ScriptableObject.put(index)` on an object with external data should throw a
+      `JavaScriptException` wrapping a `NativeError`, not a plain `EcmaError`.
+- [ ] `JavaScriptException` should pull the cause, file name and line out of a thrown `NativeError`.
+- [ ] `BaseFunction.setupDefaultPrototype` should give a generator function `%GeneratorPrototype%`,
+      which needs `ES6Generator.GENERATOR_TAG`.
+- [ ] `BaseFunction.getArguments` should read the live activation, which needs `NativeCall` and
+      `Arguments`, both of which hold a `JSFunction`.
+- [ ] `BaseFunction.init` and `initAsGeneratorFunction` build the `Function` constructor. They need
+      `apply`, `call` and `bind`, so they wait for `BoundFunction` and `ScriptRuntime.applyOrCall`,
+      and the `Function` constructor itself needs the interpreter's `compileFunction`.
+- [ ] Port the rest of the function objects: `NativeFunction.kt` (128), `IdFunctionObject.kt` (133),
+      `IdFunctionCall.kt` (17), `IdScriptableObject.kt` (1019), `BoundFunction.kt` (113).
 - [ ] `BoundFunction.equals` and `IdFunctionObject.equals` use `EqualObjectGraphs` (347), the
       structural graph comparison. Port it here or drop both `equals` overrides.
 - [ ] jvmTest green
