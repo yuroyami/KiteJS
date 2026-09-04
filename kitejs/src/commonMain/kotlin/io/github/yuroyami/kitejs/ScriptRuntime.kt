@@ -4,6 +4,8 @@
 
 package io.github.yuroyami.kitejs
 
+import io.github.yuroyami.kitejs.dtoa.DoubleFormatter
+
 /**
  * The runtime method collection. Phase 0 ports only what the lexer needs: line
  * terminator and whitespace classification, string-to-number parsing, and the error
@@ -195,6 +197,30 @@ object ScriptRuntime {
         }
         return sum
     }
+
+    /**
+     * Converts a number to its ECMAScript string form.
+     *
+     * Only radix 10 is ported so far. The other radixes go through `DToA.JS_dtobasestr`, which
+     * needs arbitrary-precision integers, so they arrive with real BigInt support in phase 5.
+     */
+    fun numberToString(d: Double, base: Int): String {
+        if (base == 10) {
+            // The common case. DoubleFormatter identifies the non-finite values efficiently, so
+            // it runs before any other check.
+            return DoubleFormatter.toString(d)
+        }
+        if (base < 2 || base > 36) {
+            throw IllegalArgumentException(getMessageById("msg.bad.radix", base.toString()))
+        }
+        if (d.isNaN()) return "NaN"
+        if (d == Double.POSITIVE_INFINITY) return "Infinity"
+        if (d == Double.NEGATIVE_INFINITY) return "-Infinity"
+        if (d == 0.0) return "0"
+        throw UnsupportedOperationException("radix $base needs BigInt, which arrives in phase 5")
+    }
+
+    fun toString(d: Double): String = numberToString(d, 10)
 
     fun getMessageById(messageId: String, vararg args: Any?): String =
         Messages.getMessageById(messageId, *args)

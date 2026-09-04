@@ -8,8 +8,15 @@ This product is a Kotlin Multiplatform port of Mozilla Rhino
 Rhino is Copyright Mozilla and individual contributors, licensed under the
 Mozilla Public License, Version 2.0. As a derivative work, KiteJS keeps the
 MPL-2.0 license, and every ported source file keeps the MPL license header.
-See LICENSE for the full text, which also covers the BSD-licensed number
-formatting code (v8dtoa) that Rhino itself vendors.
+See LICENSE for the full text.
+
+Rhino vendors third-party number formatting code, which KiteJS ports along with
+it and which keeps its own license:
+
+  io/github/yuroyami/kitejs/dtoa/  (MathUtils, Decimal, DoubleFormatter)
+  Copyright 2018-2020 Raffaello Giulietti, MIT license. This is the Schubfach
+  algorithm, the same code OpenJDK and Jackson use. Each file carries the full
+  MIT text in its header.
 
 The interpreter path is ported; Rhino's JVM bytecode compiler, E4X/XML support,
 Java interop (LiveConnect) and tooling are out of scope and contain no KiteJS

@@ -102,6 +102,9 @@ internal object Messages {
         "msg.syntax" to "syntax error",
         "msg.got.syntax.errors" to "Compilation produced {0} syntax errors.",
 
+        // Phase 2 keys.
+        "msg.bad.radix" to "illegal radix {0}.",
+
         // Parser keys (phase 1).
         "msg.XML.not.available" to "XML runtime not available",
         "msg.anon.generator.returns" to "anonymous generator function returns a value",

@@ -80,10 +80,10 @@ Living list. Every entry is a known, deliberate behavior or structure difference
 - D-13: `BigIntLiteral.toSource` matches upstream only for decimal literals until Phase 5, because
   the `KBigInt` stub cannot convert a hex, octal or binary literal to its decimal digits (follows
   from D-5).
-- D-14: `NumberLiteral(Double)` derives its source text from `Double.toString`, whose output differs
-  between the JVM, JS and native. Phase 3 replaces it with the ported DToA, which is platform
-  independent. Only the `NumberLiteral(Double)` constructor is affected; a literal parsed from source
-  keeps the original token text.
+- D-14: RETIRED in P2.1. `NumberLiteral(Double)` used to derive its text from `Double.toString`,
+  which differs between the JVM, JS and native. The Schubfach formatter is now ported, so
+  `ScriptRuntime.numberToString` gives the same answer on every target. Only radix 10 is covered;
+  the other radixes still wait for BigInt (D-5).
 - D-15: the deprecated `getOptimizationLevel`/`setOptimizationLevel` pair on `CompilerEnvirons` and
   `Context` is not ported. There is no bytecode compiler, so `interpretedMode` is the only switch and
   the level would always read -1.
@@ -102,7 +102,7 @@ Living list. Every entry is a known, deliberate behavior or structure difference
 |---|---|---|
 | P0 | Scaffold + lexer | `TokenStreamTest` green on jvm; iOS and JS targets compile |
 | P1 | AST + Parser | DONE. `toSource()`, positions and error parity with upstream on the corpus (jvm oracle) |
-| P2 | IR + Icode generator | Icode generation completes on the corpus without error; dump comparison vs upstream where accessible |
+| P2 | IR generator | The corpus lowers to an IR tree identical to upstream's, before and after the transform pass. Code generation moved to P3, see that block |
 | P3 | Interpreter + core runtime | eval oracle: identical results vs upstream on the arithmetic/string/object/array/function/closure/control-flow/exception corpus |
 | P4 | RegExp, Date, collections, iterators, generators, typed arrays, Promise, template runtime | extended oracle corpus green |
 | P5 | WeakMap/WeakSet via KiteCore, real BigInt | weak semantics tests + BigInt oracle slice green |
@@ -289,13 +289,104 @@ function's parameter list. Those forms are out of the corpus because upstream ca
 not because the port cannot. And many corpus files are invalid at VERSION_DEFAULT; the oracle
 turns that into a test of its own by requiring both parsers to reject them.
 
-### P2: IR + Icode generator
+### P2: IR generator
 
-**Upstream files:** `IRFactory.java` (2644), `NodeTransformer.java`, `CodeGenerator.java` (1971), `InterpreterData` + Icode constant definitions (inside `Interpreter.java`/`InterpreterCodegen` region), `Icode` helpers, `ConstProperties`, `DecompilerFlag`.
+**Upstream files:** `IRFactory.java` (2644), `NodeTransformer.java` (567), `Icode.java` (378),
+`DecompilerFlag.java` (17), and the number-formatting trio `dtoa/MathUtils.java` (791),
+`dtoa/Decimal.java` (305), `dtoa/DoubleFormatter.java` (253).
 
-**Oracle:** upstream's Icode dumper is not public; jvmTest reaches it with the same-package trick (a test file declared in package `org.mozilla.javascript` sees package-private members on the upstream jar). If the trick fails on some member, fall back to asserting the port's own dump is stable and that P3 eval parity catches codegen bugs (it does, Icode feeds straight into eval results).
+**Scope correction, made when P2 was expanded.** The original block listed `CodeGenerator` and
+`InterpreterData` here. They cannot land in this phase. In Rhino 1.9.1 the code generator is
+`CodeGenerator<T extends ScriptOrFn<T>> extends Icode` and it returns a `JSDescriptor<T>`, so it is
+generic over a descriptor layer (`JSDescriptor`, `JSCode`, `JSFunction`, `ScriptOrFn`) whose root
+type is `JSFunction extends BaseFunction`. That is the P3 object model. It also reads
+`Interpreter.EXCEPTION_*` constants and calls `ScriptRuntime.checkRegExpProxy`. Porting it now would
+mean stubbing the runtime and rewriting it in P3, so the code generator, `InterpreterData`,
+`CodeGenUtils` and the descriptor layer move to the front of P3, next to `Interpreter` itself.
+`ConstProperties` moves with them: it is a runtime interface over `Scriptable`, not an IR concern.
 
-**Done when:** whole corpus lowers to Icode without exceptions; dumps compared where reachable.
+What stays in P2 is the half that is genuinely independent: lowering the AST to the `Node` IR.
+
+**Runtime surface this phase adds.** `IRFactory` and `NodeTransformer` need exactly six things that
+do not exist yet: `ScriptRuntime.emptyArgs`, `isSpecialProperty`, `toInt32`, `indexFromString`,
+`getIndexObject` and `numberToString`, plus `NativeObject`'s two magic property names and
+`Context.reportError`. Everything else they touch is already ported.
+
+**Oracle:** upstream `IRFactory` is public, with a public constructor and a public `transformTree`,
+so the differential test runs the same corpus through both and compares the resulting IR trees. The
+comparison does not use `Node.toStringTree`, which is gated behind upstream's `rhino.printTrees`
+system property. jvmTest walks both trees through the public API instead (type, string and number
+values, property list, line and column, children) and compares the dumps, which is both reachable
+and more precise about what is being asserted.
+
+#### P2.1: Number formatting
+
+- [x] Port `dtoa/MathUtils.kt` (791), `dtoa/Decimal.kt` (305) and `dtoa/DoubleFormatter.kt` (253).
+      All three are pure arithmetic with no imports at all, so they cross to common Kotlin untouched.
+- [x] Grow `ScriptRuntime` with `numberToString(d, base)` for base 10 and `toString(d)`.
+      `DToA.JS_dtobasestr` handles the other radixes and needs `BigInteger`, so it waits for P5 with
+      `KBigInt`; `dtoa/DecimalFormatter` needs `BigDecimal` and is only used by `NativeNumber`, so it
+      waits for its own phase.
+- [x] This retires ledger entry D-14: number-to-string no longer goes through `Double.toString`, so
+      it stops varying between the JVM, JS and native.
+- [x] Test `jvmTest/NumberFormatOracleTest`: compare against upstream `ScriptRuntime.numberToString`
+      over the boundary values (zero, negative zero, NaN, both infinities, the subnormal edge, the
+      largest and smallest finite doubles, the integer-exact range, the exponent-notation switch
+      points) plus a large deterministic random sample of bit patterns
+- [x] Test `commonTest/NumberFormatTest`: the same boundary values, so the formatter is exercised on
+      every target
+- [x] jvmTest green (229 tests)
+
+#### P2.2: Icode constants and the runtime helper slice
+
+- [ ] Port `Icode.kt` (378) and `DecompilerFlag.kt` (17). `Icode` is a plain constant table with a
+      name lookup and no dependencies; its values sit below `Token.EOF`, which is why P0 pinned the
+      token numbering.
+- [ ] Grow `ScriptRuntime` with `emptyArgs`, `isSpecialProperty`, `toInt32`, `indexFromString` and
+      `getIndexObject`. This also unblocks `Parser.getPropKey`, which P1 deferred for exactly this
+      reason, so port it now and drop the deferral note.
+- [ ] Create `NativeObject.kt` holding only `PROTO_PROPERTY` and `PARENT_PROPERTY`; the class grows
+      into the real object in P3, the same way `ScriptRuntime` and `Context` have been growing.
+- [ ] Grow `Context` with the static `reportError` pair. The no-position overload cannot recover a
+      source position from the interpreter stack yet, so it reports an unknown position until P3
+      (ledger entry).
+- [ ] Test `jvmTest/IcodeParityTest`: every Icode constant and the whole `bytecodeName` range equal
+      the upstream jar, the same way `TokenParityTest` pins the token numbering
+- [ ] Test `jvmTest/RuntimeHelperParityTest`: `toInt32`, `indexFromString` and `getIndexObject`
+      compared against upstream over a wide value sample
+- [ ] jvmTest green
+
+#### P2.3: IRFactory
+
+- [ ] Port `IRFactory.kt` (2644), including its nested `AstNodePosition` helper. One commit: the
+      transform methods form one recursive cluster and a half-ported file does not compile.
+      Cut at port time: the eight `Xml*` transform methods, which follow D-16 and report
+      "XML not available".
+- [ ] Test `commonTest/IRFactorySmokeTest`: a handful of scripts lowered to IR with the expected
+      node types, so the transform runs on every target
+- [ ] jvmTest green
+
+#### P2.4: NodeTransformer
+
+- [ ] Port `NodeTransformer.kt` (567). It is independent of `IRFactory` despite the comment that
+      mentions it, and it needs only `Kit.codeBug`, `ScriptRuntime.getIndexObject` and
+      `Context.reportError`.
+- [ ] Test `commonTest/NodeTransformerSmokeTest`: loops, labels, try/finally and `with` come out with
+      the expected jump and scope structure
+- [ ] jvmTest green
+
+#### P2.5: IR oracle over the corpus
+
+- [ ] Test `jvmTest/IRFactoryOracleTest`: for every P1 corpus file, run parse plus `transformTree`
+      through the upstream jar and through the port, then compare the two IR trees node by node
+      (type, string and number values, property list, line and column, child order)
+- [ ] Test `jvmTest/NodeTransformerOracleTest`: the same comparison after the transform pass, which
+      is where loops become labeled jumps and scopes get flattened
+- [ ] Cross-target check: iosSimulatorArm64 and JS compile, `jsNodeTest` green
+- [ ] Update `PORTING_STATUS.md`, commit
+
+**Done when:** the whole corpus lowers to IR and survives the transform pass with a tree identical
+to upstream's, on both language versions, and every target compiles.
 
 ### P3: Interpreter + core runtime
 
@@ -308,6 +399,11 @@ turns that into a test of its own by requiring both parsers to reject them.
 6. Context: `Context.java` (trimmed: no class shutters, no wrap factories, no security controllers), `ContextFactory` (minimal), `CompilerEnvirons` finalized.
 7. Natives wave 1: `NativeGlobal`, `NativeArray`, `NativeString`, `NativeNumber`, `NativeBoolean`, `NativeMath`, `json/` + `NativeJSON`, errors (`RhinoException` with own stack capture, `EcmaError`, `EvaluatorException`, `NativeError`, `ScriptStackElement`).
 8. `Interpreter.java` (5106): CallFrame machine, `ContinuationJump`, `ArrayLikeAbstractOperations` hooks, microtask hooks.
+9. Code generation, moved here from P2 when that phase was expanded: `ScriptOrFn`, `JSCode`,
+   `JSDescriptor`, `JSFunction`, `CodeGenUtils`, `InterpreterData`, `CodeGenerator` (1971) and
+   `ConstProperties`. They belong next to the interpreter because `CodeGenerator` is generic over
+   `ScriptOrFn<T>` and produces a `JSDescriptor<T>`, whose root type `JSFunction` extends
+   `BaseFunction`, and because it reads `Interpreter`'s exception-table constants directly.
 
 **Oracle:** `EvalOracleTest` (jvmTest): `org.mozilla.javascript.Context.enter().evaluateString(...)` vs `kitejs` eval on the same script, compare `ScriptRuntime.toString` of results plus thrown error names/messages. Corpus grows to a few hundred scripts.
 
