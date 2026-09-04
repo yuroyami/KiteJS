@@ -414,24 +414,134 @@ to upstream's, on both language versions, and every target compiles. **All green
 
 ### P3: Interpreter + core runtime
 
-**Upstream files (clusters, each its own task at expansion time):**
-1. Contracts: `Scriptable`, `SymbolScriptable`, `Callable`, `Constructable`, `Function`, `Evaluator`, `Script`, `RefCallable`, `IdFunctionCall`.
-2. Values: `Undefined`, `UniqueTag`, `ConsString`, `ScriptRuntime.java` (6189, the big one, minus java-interop paths), `AbstractEcmaObjectOperations`, `AbstractEcmaStringOperations`, `ArrayLikeAbstractOperations`, `CompoundOperationMap`, `EqualObjectGraphs`.
-3. Object model: `Slot`, `AccessorSlot`, `BuiltInSlot`, `LambdaSlot`, `EmbeddedSlotMap`, `HashSlotMap`, `SlotMapContainer` (single-thread variant only), `ScriptableObject.java` (3345), `NativeObject`, `TopLevel`, `LazilyLoadedCtor`.
-4. Functions: `BaseFunction`, `NativeFunction`, `Arguments`, `NativeCall`, `BoundFunction`, `LambdaFunction`, `LambdaConstructor`, `IdFunctionObject`, `IdScriptableObject`.
-5. Numbers to strings: `DToA.java`, `dtoa/`, `v8dtoa/` (BSD parts, LICENSE already covers).
-6. Context: `Context.java` (trimmed: no class shutters, no wrap factories, no security controllers), `ContextFactory` (minimal), `CompilerEnvirons` finalized.
-7. Natives wave 1: `NativeGlobal`, `NativeArray`, `NativeString`, `NativeNumber`, `NativeBoolean`, `NativeMath`, `json/` + `NativeJSON`, errors (`RhinoException` with own stack capture, `EcmaError`, `EvaluatorException`, `NativeError`, `ScriptStackElement`).
-8. `Interpreter.java` (5106): CallFrame machine, `ContinuationJump`, `ArrayLikeAbstractOperations` hooks, microtask hooks.
-9. Code generation, moved here from P2 when that phase was expanded: `ScriptOrFn`, `JSCode`,
-   `JSDescriptor`, `JSFunction`, `CodeGenUtils`, `InterpreterData`, `CodeGenerator` (1971) and
-   `ConstProperties`. They belong next to the interpreter because `CodeGenerator` is generic over
-   `ScriptOrFn<T>` and produces a `JSDescriptor<T>`, whose root type `JSFunction` extends
-   `BaseFunction`, and because it reads `Interpreter`'s exception-table constants directly.
+**Size.** Roughly 35000 upstream lines, the largest phase by a wide margin. The clusters below are
+ordered so each one compiles on top of the last.
 
-**Oracle:** `EvalOracleTest` (jvmTest): `org.mozilla.javascript.Context.enter().evaluateString(...)` vs `kitejs` eval on the same script, compare `ScriptRuntime.toString` of results plus thrown error names/messages. Corpus grows to a few hundred scripts.
+**The structural fact that shapes this phase.** P1 and P2 could each be checked end to end as soon
+as they landed, because the parser and the IR generator are self-contained. Nothing evaluates until
+almost all of P3 is in place: the interpreter needs the object model, the object model needs the
+runtime conversions, and the code generator needs the descriptor layer. So the eval oracle only
+becomes possible at P3.9. Until then every cluster is checked the strongest way it can be:
 
-**Done when:** eval corpus parity green on jvm; iOS/JS targets compile; smoke eval test runs in commonTest on every target.
+- Pure functions are compared against upstream directly (P3.1 does this for the whole conversion
+  surface, and it is a large surface).
+- Data structures are exercised through their own API and compared against the upstream class
+  (the slot maps, the property machinery).
+- Everything else gets structural tests, and the eval oracle at the end is what really proves it.
+
+That is worth stating plainly: between P3.2 and P3.8 the test suite gets weaker per line of code
+than it was in P1 and P2, and P3.9 is where the guarantee comes back.
+
+#### P3.1: Values and the conversion surface
+
+- [ ] Port `Undefined.kt` (151), `UniqueTag.kt` (73), `ConsString.kt` (107). Self-contained value
+      types with no dependency on the object model.
+- [ ] Grow `ScriptRuntime` with the conversion surface that needs no Scriptable: `toNumber(String)`
+      and its string-scanning helpers, `toInteger(double)`, `toInt32(double)`, `toUint32(double)`,
+      `toIndex`, plus the numeric predicates. 54 of upstream's static methods take only primitives
+      and strings, and they are the ones ported here.
+- [ ] `DToA.JS_dtobasestr` stays out: it needs arbitrary-precision integers and waits for P5 with
+      `KBigInt`, so `numberToString` keeps handling radix 10 only.
+- [ ] Test `jvmTest/ConversionOracleTest`: every ported conversion compared against upstream over a
+      wide sample, including the string-to-number edge cases (whitespace, signs, hex, octal, binary,
+      infinity, empty, trailing junk) and the full double range for the integer conversions
+- [ ] Test `commonTest/ConversionTest`: the same edge cases on every target
+- [ ] jvmTest green
+
+#### P3.2: Contracts
+
+- [ ] Port the interfaces the rest of the runtime is written against: `Scriptable.kt` (292),
+      `SymbolScriptable.kt`, `Callable.kt`, `Constructable.kt`, `Function.kt`, `Evaluator.kt`,
+      `Script.kt`, `RefCallable.kt`, `IdFunctionCall.kt`, `Ref.kt`, `ConstProperties.kt`
+      (moved here from P2), `Wrapper.kt` if the pin has one.
+- [ ] These are declarations, so the check is that they compile and that their member sets match
+      upstream. Test `jvmTest/ContractParityTest` compares each interface's method names and arity
+      against the upstream class by reflection.
+- [ ] jvmTest green
+
+#### P3.3: The property machinery
+
+- [ ] Port `Slot.kt` (145), `AccessorSlot.kt` (289), `BuiltInSlot.kt` (201), `LambdaSlot.kt` (74),
+      `SlotMap.kt` (94), `EmbeddedSlotMap.kt` (318), `HashSlotMap.kt` (100), `SlotMapOwner.kt` (375).
+      The thread-safe slot map variant is dropped under D-3.
+- [ ] Port `ScriptableObject.kt` (3345), the base of every JavaScript object.
+- [ ] Test `jvmTest/SlotMapOracleTest`: drive both the upstream slot maps and the ported ones through
+      the same long random sequence of put, get, remove, iterate and compaction, then compare the
+      resulting key order and contents. Slot maps switch representation as they grow, so the
+      sequence has to cross those thresholds.
+- [ ] Test `jvmTest/ScriptableObjectOracleTest`: define, redefine, delete, enumerate and seal
+      properties on both sides and compare the observable results, including attribute handling and
+      prototype chain lookup
+- [ ] jvmTest green
+
+#### P3.4: Function objects
+
+- [ ] Port `BaseFunction.kt` (828), `NativeFunction.kt` (128), `Arguments.kt` (369),
+      `NativeCall.kt` (154), `BoundFunction.kt` (113), `LambdaFunction.kt` (124),
+      `LambdaConstructor.kt` (473), `IdFunctionObject.kt` (133), `IdScriptableObject.kt` (1019).
+- [ ] Structural tests only at this point: the eval oracle in P3.9 is what really exercises them.
+- [ ] jvmTest green
+
+#### P3.5: Context
+
+- [ ] Port `Context.kt` (2865) properly, replacing the phase 0 shell, and `ContextFactory.kt` (532)
+      in its minimal form. Cut: class shutters, wrap factories, security controllers, the
+      `ClassLoader` and reflection paths, and the debugger surface beyond what the interpreter needs.
+- [ ] `Context.enter`/`exit` use a plain singleton slot rather than a `ThreadLocal`, under D-3.
+- [ ] This retires D-18: `Context.reportError` can route through a real error reporter again, and
+      `getSourcePositionFromStack` becomes implementable once the interpreter lands in P3.7.
+- [ ] jvmTest green
+
+#### P3.6: Code generation
+
+Moved here from P2, because `CodeGenerator` is generic over `ScriptOrFn<T>` and returns a
+`JSDescriptor<T>` whose root type `JSFunction` extends `BaseFunction`, and because it reads
+`Interpreter`'s exception-table constants directly.
+
+- [ ] Port the descriptor layer: `ScriptOrFn.kt` (21), `JSCode.kt` (31), `JSDescriptor.kt` (404),
+      `JSFunction.kt` (226), `CodeGenUtils.kt`, and whatever `JSCodeExec`/`JSCodeResume` turn out to
+      be at the pin.
+- [ ] Port `InterpreterData.kt` (177) and `CodeGenerator.kt` (1971).
+- [ ] Test `jvmTest/IcodeOracleTest`: generate icode for the whole corpus on both sides and compare
+      the byte arrays, the string and number pools, the exception tables and the nested-function
+      tables. This is the phase 2 promise finally kept, and it is a strong check: the icode array is
+      exactly what the interpreter executes.
+- [ ] jvmTest green
+
+#### P3.7: Interpreter
+
+- [ ] Port `Interpreter.kt` (5106): the call-frame machine, `ContinuationJump`, the generator
+      resumption path and the microtask hooks.
+- [ ] jvmTest green
+
+#### P3.8: Natives wave 1
+
+- [ ] Port the number formatting that phase 2 deferred: `dtoa/DecimalFormatter.kt` needs
+      `BigDecimal`, so `NativeNumber.toFixed`, `toExponential` and `toPrecision` either wait for P5
+      or get a hand-written decimal path; decide and record it in the ledger when the file is reached.
+- [ ] Port the errors: `RhinoException.kt` (387) properly, `EcmaError.kt`, `EvaluatorException.kt`,
+      `NativeError.kt` (459), `ScriptStackElement.kt`, `JavaScriptException.kt`.
+- [ ] Port `TopLevel.kt` (266), `LazilyLoadedCtor.kt` (174), `NativeObject.kt` (1085, replacing the
+      phase 2 stub), `NativeFunction` prototype wiring, `NativeGlobal.kt` (761), `NativeArray.kt`
+      (2573), `NativeString.kt` (1495), `NativeNumber.kt` (310), `NativeBoolean.kt` (90),
+      `NativeMath.kt` (621), `NativeJSON.kt` (601) with `json/JsonParser.kt` (414).
+- [ ] jvmTest green
+
+#### P3.9: Eval oracle
+
+- [ ] Build `kitejs/src/jvmTest/resources/eval/*.js`, a corpus of scripts whose last expression is
+      the result: arithmetic, string operations, object and array manipulation, function calls and
+      closures, control flow, exceptions, prototype chains, coercion corners, and the ECMAScript
+      edge cases that separate a correct engine from a plausible one
+- [ ] Test `jvmTest/EvalOracleTest`: run each script through `org.mozilla.javascript.Context` and
+      through the port, then compare the string form of the result and the name and message of any
+      thrown error
+- [ ] Test `commonTest/EvalSmokeTest`: a small slice of the same corpus, so evaluation is proven to
+      work on every target rather than only on the JVM
+- [ ] Cross-target check, update `PORTING_STATUS.md`, commit
+
+**Done when:** the eval corpus produces identical results and identical errors on both engines, on
+the JVM, and the smoke slice passes on every other target.
 
 ### P4: Language completeness wave
 
