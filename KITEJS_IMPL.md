@@ -45,7 +45,7 @@ Standing recipe; every port task below means exactly this:
 | `ResourceBundle` + `MessageFormat` (`Messages_*.properties`) | every error message via `ScriptRuntime.getMessage` | `Messages.kt`: Kotlin map of the English bundle, `{0}` substitution by hand. Keys ported on demand per phase (D-4) |
 | `java.math.BigInteger` | BigInt literals in the lexer, `NativeBigInt`, arithmetic | Phase 0 stores digits + radix in a stub `KBigInt`; Phase 5 gives it real arithmetic (D-5) |
 | `config/` `RhinoProperties` (system properties, env) | feature flags | ported `RhinoConfig` object resolves every flag to its compile-time default (D-6) |
-| `java.util.TimeZone`, `System.currentTimeMillis` | `NativeDate`, `Date.now` | `TimeZoneRules` interface on `Context` (UTC default, fixed offset in the core; system zone from the optional `kitejs-datetime` artifact over kotlinx-datetime) and an injectable clock with a stdlib `Clock.System` default (P4.5) |
+| `java.util.TimeZone`, `System.currentTimeMillis` | `NativeDate`, `Date.now` | `Context.timeZone` is a kotlinx-datetime `TimeZone` (default `currentSystemDefault()`, tests inject `TimeZone.of("UTC")` or a `FixedOffsetTimeZone`), plus an injectable clock with a stdlib `Clock.System` default (P4.5) |
 | `java.time` localized formatters, `Locale` | `Date.prototype.toLocale*` | fixed en-US patterns equal to upstream under `Locale.US`; other locales out of scope (P4.5) |
 | `java.util.regex`, `Character.UnicodeScript`, `Character.getType(int)`, `Character.toUpperCase` | `UnicodeProperties`, `NativeRegExp` case folding | Kotlin range tables generated from the Unicode Character Database 15.0 by a Gradle task kept in the repo (P4.4) |
 | `WeakHashMap` | `NativeWeakMap`, `NativeWeakSet`, the symbol registry | own weak-keyed map over KiteCore `WeakRef` (P5.3); the registry is a plain map |
@@ -190,11 +190,11 @@ Living list. Every entry is a known, deliberate behavior or structure difference
 | P1 | AST + Parser | DONE. `toSource()`, positions and error parity with upstream on the corpus (jvm oracle) |
 | P2 | IR generator | DONE. The corpus lowers to an IR tree identical to upstream's, before and after the transform pass. Code generation moved to P3, see that block |
 | P3 | Interpreter + core runtime | eval oracle: identical results vs upstream on the arithmetic/string/object/array/function/closure/control-flow/exception corpus |
-| P4 | Symbol, iterators and generators, Map and Set, RegExp with generated Unicode tables, Date with injectable time zone and clock, typed arrays, Promise, Proxy and Reflect | extended oracle green on the JVM, the slice green on JS and iOS, every deviation ledgered |
+| P4 | Symbol, iterators and generators, Map and Set, RegExp with generated Unicode tables, Date over kotlinx-datetime time zones with an injectable clock, typed arrays, Promise, Proxy and Reflect | extended oracle green on the JVM, the slice green on JS and iOS, every deviation ledgered |
 | P5 | Real BigInt (own arithmetic, no dependency), radix printing, BigInt typed views, WeakMap and WeakSet over KiteCore `WeakRef` | BigInt oracle against `java.math.BigInteger` green, weak semantics tests green |
-| P6 | test262 parity harness (both engines per test), generated cross-target slice, native tests executed, V8 differential report | zero unexplained parity differences; slice green on every target |
+| P6 | test262 parity harness (both engines per test), a common test262 runner over kotlinx-io for iOS and Node, native tests executed, V8 differential report | zero unexplained parity differences; the common runner green on every target |
 | P7 | The Java-shaped leftovers cleaned, `explicitApi()`, the Kotlin facade and host-binding DSL, console, `kitejs-coroutines`, EPUB-shaped demo | facade tests green on every target; coroutine artifact green on JVM, JS and iOS |
-| P8 | macOS and Wasm targets, `kitejs-datetime`, CI, docs site, README and POM to KITE.md, Maven Central, KiteVersions | artifacts resolve from Central on every target; site live; CI green |
+| P8 | macOS and Wasm targets, CI, docs site, README and POM to KITE.md, Maven Central, KiteVersions | artifacts resolve from Central on every target; site live; CI green |
 
 Rolling-wave rule: before starting a phase, expand its block below into per-file checkbox tasks sized like P0's (one cluster, one test cycle, one commit).
 
@@ -751,20 +751,24 @@ and add the rules below. They decide every "how" question that comes up from her
    each other and with Rhino; the JVM oracle and the cross-target slice only mean something when
    the same code produces the answer on JVM, JS, iOS and Wasm. `DecimalFormatter` (D-33) and
    `JavaNumbers` (D-39) are the pattern.
-2. **Platform seams are small Kotlin interfaces on `Context`, with pure defaults.** Time zone
-   rules (UTC by default), the clock (stdlib `Clock.System`), the console printer (`println`),
-   the random source (stdlib). A test injects a fixed clock and a fixed-offset zone. An
-   embedder injects the real system zone. Adapters that need a dependency live in separate
-   small artifacts, never in the core.
+2. **Platform seams are properties on `Context`, with sensible defaults.** The time zone is a
+   kotlinx-datetime `TimeZone` (default `currentSystemDefault()`), the clock a stdlib
+   `Clock.System`, the console printer `println`, the random source the stdlib one. A test
+   injects a fixed clock and `TimeZone.of("UTC")` or a fixed offset; an embedder injects
+   whatever zone it wants. Nothing in the engine reads the platform directly.
 3. **Unicode data comes from the Unicode Character Database, generated into Kotlin.** A Gradle
    task kept in the repo (`build-logic`) reads the UCD files and writes range tables into
    `commonMain`. The Unicode version is pinned to the one JDK 21 ships (15.0), so the JVM
    oracle stays exact and JS, Native and Wasm agree with it. `Char.category` and
    `uppercaseChar()` differ per platform; the tables do not.
-4. **The core artifact has zero third-party runtime dependencies.** Kotlin stdlib only. The one
-   planned exception is KiteCore for `WeakRef` in P5, which was decided earlier. Coroutines and
-   kotlinx-datetime integrations ship as separate artifacts (`kitejs-coroutines`,
-   `kitejs-datetime`) so a consumer who does not want them never sees them.
+4. **The core artifact depends on the Kotlin stdlib, kotlinx-datetime (time zones, from P4.5)
+   and KiteCore (`WeakRef`, from P5.3). Nothing else.** Every candidate library was weighed:
+   a regex library or the platform's own regex breaks parity, no multiplatform library carries
+   the Unicode data the regex engine needs, JSON is already ported and oracle-checked, and
+   arbitrary-precision integers are written here with an exhaustive oracle rather than taken
+   from a library whose rounding and bitwise corners would need checking anyway. Coroutines
+   ship as the separate `kitejs-coroutines` artifact so a consumer who does not want them
+   never sees them. kotlinx-io is a test-scope dependency only (P6).
 5. **Three checks per cluster, no exceptions.** The JVM oracle against the upstream jar, the
    cross-target slice with recorded upstream answers (JS on Node and the iOS simulator now,
    macOS and Wasm from P8), and a negative control that proves the test is live. From P6 on,
@@ -925,12 +929,15 @@ simple case mapping, which come from the generated tables (rule 3).
 
 #### P4.5: Date
 
-- [ ] `TimeZoneRules.kt`: a Kotlin interface on `Context` (`timeZone`) with
-      `rawOffsetMillis`, `isDaylightTime(utcMillis)` and `shortName(utcMillis)`, matching the
-      three questions upstream asks `java.util.TimeZone`. Two implementations in the core:
-      `Utc` (the default) and `FixedOffset(minutes)`. The real system zone is not in the core
-      (rule 2); `kitejs-datetime` in P8 provides it over kotlinx-datetime, and an embedder can
-      write its own in ten lines.
+- [ ] Add `kotlinx-datetime` to `commonMain` (version in `libs.versions.toml`, one that
+      supports wasmJs; on JS and Wasm it reads zone data from the host's `Intl`, on Apple from
+      Foundation, on the JVM from `java.time`). `Context.timeZone: TimeZone`, default
+      `TimeZone.currentSystemDefault()`, settable like upstream's `Context.setTimeZone`.
+      The three questions upstream asks `java.util.TimeZone` map onto it: the raw offset is
+      `offsetAt` in January and July taken as the smaller, daylight time is "the offset at this
+      instant differs from the raw offset", and the short zone name for the `zzz` pattern is the
+      zone id (kotlinx-datetime has no abbreviations; ledger entry, and the oracle runs with a
+      zone whose id equals its abbreviation, such as `UTC`, for the formats that print it).
 - [ ] `Context.clock`: a `() -> Double` of epoch milliseconds, default `Clock.System` from the
       stdlib (opt in if the API is still marked experimental at 2.4). `Date.now()`,
       `new Date()` and the tests use it; tests pin it.
@@ -943,16 +950,18 @@ simple case mapping, which come from the generated tables (rule 3).
       (ledger entry, listed in `PORTING_STATUS.md` as a limitation).
 - [ ] `NativeDate.init` in `initSafeStandardObjects`; `TopLevel.Builtins.Date`;
       `JSON.stringify` of a date through `toJSON`; `Date.prototype[Symbol.toPrimitive]`.
-- [ ] Oracle with the same fixed-offset zone injected on both sides (`cx.setTimeZone` upstream,
-      `cx.timeZone` here) and a fixed clock: constructors from millis, strings and components,
+- [ ] Oracle with the same zone on both sides (`cx.setTimeZone(TimeZone.getTimeZone(id))`
+      upstream, `cx.timeZone = TimeZone.of(id)` here; both read the same IANA database on the
+      JVM) and a fixed clock, for `UTC`, a fixed offset, `Europe/Berlin` and
+      `America/New_York`: constructors from millis, strings and components,
       `Date.UTC`, `Date.parse` on ISO 8601, RFC 2822 style and the loose formats upstream
       accepts, every getter and setter including the overflow rules, `toString`, `toUTCString`,
       `toISOString` (and its RangeError), `toDateString`, `toTimeString`, `toJSON`,
       `getTimezoneOffset`, `getYear` and `setYear`, invalid dates everywhere, the
       millisecond limits, leap years and the year-zero corners.
-- [ ] DST parity on the JVM: a jvmTest-only `TimeZoneRules` adapter over `java.util.TimeZone`
-      ("Europe/Berlin", "America/New_York") so the oracle also checks the daylight-saving
-      arithmetic exactly. Other targets only test fixed offsets.
+- [ ] The cross-target slice adds a Date program with `UTC` and with `Europe/Berlin` across a
+      daylight-saving switch, with upstream's recorded answers, so the JS, iOS and Wasm zone
+      data are checked against the JVM's, not assumed.
 - [ ] Green on all targets; commit.
 
 #### P4.6: Typed arrays, ArrayBuffer and DataView
@@ -1127,13 +1136,14 @@ port passes exactly when upstream passes. Every difference becomes a fix or a le
       branches; a developer runs it before a phase close-out.
 - [ ] Every parity difference gets a fix or a ledger entry with the test path; the ledger
       entry is the only acceptable way to leave a difference in place.
-- [ ] `generateTest262Slice`: a Gradle task that, when `reference/test262` exists, writes
-      generated `commonTest` sources embedding a curated subset (the `built-ins` folders for
-      Array, String, Number, Math, JSON, Object, Function, RegExp, Date, Map, Set, Promise,
-      Symbol, TypedArray and the `language` folders for expressions and statements, capped by
-      count and size) together with the harness and the outcome recorded on the JVM. The
-      generated files are not committed; `EvalCorpusSlice` is the model. That is what proves
-      conformance on JS, iOS and Wasm, not only on the JVM.
+- [ ] `commonTest/Test262Runner.kt` over `kotlinx-io` (test scope only): the same properties
+      parsing, front-matter parsing and harness loading as the JVM runner, reading the fetched
+      `reference/test262` tree from disk on the JVM, on the iOS simulator and on Node (the path
+      arrives through a generated constant or an environment variable). It compares the port's
+      outcome per test with the outcome the JVM parity run recorded into
+      `build/test262/expectations.json`, so every target runs the same files the JVM runs, not
+      a capped slice. Browser and Wasm-browser targets, which have no file system, skip it
+      with a visible message; Wasm on Node runs it. Nothing generated is committed.
 - [ ] Native tests actually run: `iosSimulatorArm64Test` joins the default check (today the
       iOS target only compiles), and `macosArm64Test` once P8 adds the target.
 - [ ] V8 differential report: when `jsNodeTest` runs, a reporter evaluates the eval corpus in
@@ -1142,9 +1152,9 @@ port passes exactly when upstream passes. Every difference becomes a fix or a le
       gate, but it shows the reader where the engine stands against a modern one.
 - [ ] Optional, after the above: upstream's 149 Mozilla `jstests` through the same runner.
 
-**Done when:** `test262Parity` reports zero unexplained differences, the generated slice is green
-on JS, iOS and (after P8) macOS and Wasm, and `PORTING_STATUS.md` states the pass count per
-folder, taken from the run, not typed by hand.
+**Done when:** `test262Parity` reports zero unexplained differences, the common runner matches
+the JVM's recorded outcomes on JS, iOS and (after P8) macOS and Wasm, and `PORTING_STATUS.md`
+states the pass count per folder, taken from the run, not typed by hand.
 
 ### P7: Kotlin-first API
 
@@ -1188,7 +1198,7 @@ expect/actual-free, and usable from Swift and JavaScript through the normal Kotl
 ```kotlin
 val js = KiteJs {
     languageVersion = LanguageVersion.ES6
-    timeZone = TimeZoneRules.FixedOffset(minutes = 120)
+    timeZone = TimeZone.of("Europe/Berlin")
     clock = { fixedMillis }
     console = ConsolePrinter.Stdout
     instructionBudget = 5_000_000
@@ -1271,9 +1281,6 @@ passes its tests on JVM, JS and iOS.
 - [ ] Targets: add `macosArm64` and `wasmJs` (browser and Node), matching KiteCore's set.
       Linux and Windows follow when KiteCore has them (P5.3). Run `macosArm64Test` and
       `wasmJsNodeTest` in the default check; the corpus slice and the smoke test decide.
-- [ ] `kitejs-datetime`: a small module over kotlinx-datetime that provides `TimeZoneRules`
-      for the system zone and any named zone, so `new Date()` prints local time for embedders
-      who opt in. The core stays dependency-free.
 - [ ] CI (`.github/workflows`, modelled on KiteCore's `ci.yml`, `docs.yml`, `release.yml`):
       the default check on every push (JVM, JS on Node, iOS simulator, macOS, Wasm), the
       nightly `test262Parity` after fetching test262, ABI validation (`abiValidation {}` like
@@ -1291,7 +1298,7 @@ passes its tests on JVM, JS and iOS.
       `POM_DESCRIPTION` rewritten to the same truth. The status paragraph and the links to
       `PORTING_STATUS.md` and `KITEJS_IMPL.md` are removed from the README; those two files stay
       as maintainer documents.
-- [ ] Publish `io.github.yuroyami:kitejs:0.1.0` (and the two optional artifacts) to Maven
+- [ ] Publish `io.github.yuroyami:kitejs:0.1.0` (and `kitejs-coroutines`) to Maven
       Central through vanniktech, with the shared POM values in `gradle.properties` and the
       MPL-2.0 licence and NOTICE attribution intact.
 - [ ] Register KiteJS in KiteVersions (`repos.txt`) so the shared versions sync into
