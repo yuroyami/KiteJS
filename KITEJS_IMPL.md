@@ -45,7 +45,13 @@ Standing recipe; every port task below means exactly this:
 | `ResourceBundle` + `MessageFormat` (`Messages_*.properties`) | every error message via `ScriptRuntime.getMessage` | `Messages.kt`: Kotlin map of the English bundle, `{0}` substitution by hand. Keys ported on demand per phase (D-4) |
 | `java.math.BigInteger` | BigInt literals in the lexer, `NativeBigInt`, arithmetic | Phase 0 stores digits + radix in a stub `KBigInt`; Phase 5 gives it real arithmetic (D-5) |
 | `config/` `RhinoProperties` (system properties, env) | feature flags | ported `RhinoConfig` object resolves every flag to its compile-time default (D-6) |
-| `java.util.TimeZone` | `NativeDate` | Phase 4 decision: kotlinx-datetime vs minimal own table. Leaning kotlinx-datetime (kotlinx tier is acceptable, same as KiteCore's coroutines) |
+| `java.util.TimeZone`, `System.currentTimeMillis` | `NativeDate`, `Date.now` | `TimeZoneRules` interface on `Context` (UTC default, fixed offset in the core; system zone from the optional `kitejs-datetime` artifact over kotlinx-datetime) and an injectable clock with a stdlib `Clock.System` default (P4.5) |
+| `java.time` localized formatters, `Locale` | `Date.prototype.toLocale*` | fixed en-US patterns equal to upstream under `Locale.US`; other locales out of scope (P4.5) |
+| `java.util.regex`, `Character.UnicodeScript`, `Character.getType(int)`, `Character.toUpperCase` | `UnicodeProperties`, `NativeRegExp` case folding | Kotlin range tables generated from the Unicode Character Database 15.0 by a Gradle task kept in the repo (P4.4) |
+| `WeakHashMap` | `NativeWeakMap`, `NativeWeakSet`, the symbol registry | own weak-keyed map over KiteCore `WeakRef` (P5.3); the registry is a plain map |
+| `java.util.List` and `RandomAccess` views, `java.lang.reflect.Array` | `NativeArray`, `NativeTypedArrayView` | dropped (D-36 and the same rule for the typed views, P4.6) |
+| `AtomicInteger`, `ConcurrentHashMap` | `NativeConsole` counters | plain fields under the single-thread contract (P7.2) |
+| `java.util.jar.Manifest` | `ImplementationVersion` | a constant (P7.1) |
 | `Double.doubleToLongBits` | dtoa, hashing | `Double.toBits()/toRawBits()`, exists in common |
 | `String.format`, `Locale` | misc formatting | manual formatting; locale-sensitive behavior is out of scope |
 | `Serializable`, `serialVersionUID`, `readObject` | almost every class | dropped |
@@ -184,11 +190,11 @@ Living list. Every entry is a known, deliberate behavior or structure difference
 | P1 | AST + Parser | DONE. `toSource()`, positions and error parity with upstream on the corpus (jvm oracle) |
 | P2 | IR generator | DONE. The corpus lowers to an IR tree identical to upstream's, before and after the transform pass. Code generation moved to P3, see that block |
 | P3 | Interpreter + core runtime | eval oracle: identical results vs upstream on the arithmetic/string/object/array/function/closure/control-flow/exception corpus |
-| P4 | RegExp, Date, collections, iterators, generators, typed arrays, Promise, template runtime | extended oracle corpus green |
-| P5 | WeakMap/WeakSet via KiteCore, real BigInt | weak semantics tests + BigInt oracle slice green |
-| P6 | test262 subset harness | parity with upstream's curated `test262.properties` pass list, deltas ledgered |
-| P7 | Kotlin embedding API | host objects and functions definable from Kotlin without reflection; EPUB-shaped demo (bind a fake `document`) |
-| P8 | Widen targets + publish | wasmJs/macOS/Linux/mingw enabled, docs site, Maven Central, KiteVersions registration |
+| P4 | Symbol, iterators and generators, Map and Set, RegExp with generated Unicode tables, Date with injectable time zone and clock, typed arrays, Promise, Proxy and Reflect | extended oracle green on the JVM, the slice green on JS and iOS, every deviation ledgered |
+| P5 | Real BigInt (own arithmetic, no dependency), radix printing, BigInt typed views, WeakMap and WeakSet over KiteCore `WeakRef` | BigInt oracle against `java.math.BigInteger` green, weak semantics tests green |
+| P6 | test262 parity harness (both engines per test), generated cross-target slice, native tests executed, V8 differential report | zero unexplained parity differences; slice green on every target |
+| P7 | The Java-shaped leftovers cleaned, `explicitApi()`, the Kotlin facade and host-binding DSL, console, `kitejs-coroutines`, EPUB-shaped demo | facade tests green on every target; coroutine artifact green on JVM, JS and iOS |
+| P8 | macOS and Wasm targets, `kitejs-datetime`, CI, docs site, README and POM to KITE.md, Maven Central, KiteVersions | artifacts resolve from Central on every target; site live; CI green |
 
 Rolling-wave rule: before starting a phase, expand its block below into per-file checkbox tasks sized like P0's (one cluster, one test cycle, one commit).
 
@@ -733,44 +739,567 @@ Part 2, the collections and text:
 **Done when:** the eval corpus produces identical results and identical errors on both engines, on
 the JVM, and the smoke slice passes on every other target.
 
+### Rules for the rest of the port: Kotlin first, multiplatform first
+
+P0 to P3 proved the method: port file by file, keep upstream's names, check every cluster
+against the upstream jar, run a slice on every target. The remaining phases keep that method
+and add the rules below. They decide every "how" question that comes up from here on.
+
+1. **One engine, every platform.** Regular expressions, dates, number printing and Unicode
+   classification are computed by KiteJS's own code. Nothing is delegated to the platform's
+   regex engine, `java.time`, `Foundation` or the host's `RegExp`. The platforms disagree with
+   each other and with Rhino; the JVM oracle and the cross-target slice only mean something when
+   the same code produces the answer on JVM, JS, iOS and Wasm. `DecimalFormatter` (D-33) and
+   `JavaNumbers` (D-39) are the pattern.
+2. **Platform seams are small Kotlin interfaces on `Context`, with pure defaults.** Time zone
+   rules (UTC by default), the clock (stdlib `Clock.System`), the console printer (`println`),
+   the random source (stdlib). A test injects a fixed clock and a fixed-offset zone. An
+   embedder injects the real system zone. Adapters that need a dependency live in separate
+   small artifacts, never in the core.
+3. **Unicode data comes from the Unicode Character Database, generated into Kotlin.** A Gradle
+   task kept in the repo (`build-logic`) reads the UCD files and writes range tables into
+   `commonMain`. The Unicode version is pinned to the one JDK 21 ships (15.0), so the JVM
+   oracle stays exact and JS, Native and Wasm agree with it. `Char.category` and
+   `uppercaseChar()` differ per platform; the tables do not.
+4. **The core artifact has zero third-party runtime dependencies.** Kotlin stdlib only. The one
+   planned exception is KiteCore for `WeakRef` in P5, which was decided earlier. Coroutines and
+   kotlinx-datetime integrations ship as separate artifacts (`kitejs-coroutines`,
+   `kitejs-datetime`) so a consumer who does not want them never sees them.
+5. **Three checks per cluster, no exceptions.** The JVM oracle against the upstream jar, the
+   cross-target slice with recorded upstream answers (JS on Node and the iOS simulator now,
+   macOS and Wasm from P8), and a negative control that proves the test is live. From P6 on,
+   test262 parity is the fourth.
+6. **Kotlin idioms at the surface, upstream shapes inside.** Engine internals keep Rhino's
+   class and method names: that is what makes a port task checkable against its source file.
+   The Kotlin shows in properties instead of accessors (D-7), explicit backing fields,
+   `Enum.entries`, `data object`, sealed hierarchies, value classes and context parameters at
+   the public API, and `explicitApi()` on the module. The embedding facade in P7 is where the
+   library feels like Kotlin.
+7. **Single-thread confinement stays, and becomes explicit.** One engine per thread (D-3).
+   The coroutine artifact provides a dedicated single-thread dispatcher; the core never
+   synchronises anything.
+8. **Every phase close-out updates `PORTING_STATUS.md` and the README status paragraph.** The
+   README claims only what the committed code does (KITE.md rule 5). The README is stale today
+   ("scaffold and lexer") and gets its first truthful rewrite at the P4 close-out, its full
+   rewrite in P8.
+
+What is left, by size. Everything else in the upstream tree is LiveConnect, security,
+thread-safe maps, continuations, E4X or the bytecode compiler, all excluded by the ledger.
+
+| Cluster | Upstream lines | Phase |
+|---|---|---|
+| `regexp/` (9 files) | 6396 | P4 |
+| `typedarrays/` (19 files, two of them BigInt views) | 4002 | P4, P5 |
+| `NativeDate` | 2038 | P4 |
+| `NativeProxy`, `NativeReflect` | 1770 | P4 |
+| `NativePromise`, `UnhandledRejectionTracker` | 1073 | P4 |
+| `Hashtable`, `NativeMap`, `NativeSet`, `NativeCollectionIterator` | 1443 | P4 |
+| `NativeSymbol`, `ES6Generator`, `NativeGenerator`, `NativeIterator` | 1134 | P4 |
+| `NativeWeakMap`, `NativeWeakSet` | 281 | P5 |
+| `NativeBigInt`, the BigInt half of `DToA`, `KBigInt` arithmetic | ~700 | P5 |
+| `NativeConsole` | 386 | P7 |
+| `Delegator`, `ImplementationVersion` | 349 | P7 |
+
 ### P4: Language completeness wave
 
-`regexp/` (9 files; `UnicodeProperties` is data-heavy, port verbatim), `NativeDate` (+timezone decision recorded in ledger), `Hashtable`, `NativeMap/Set` + iterators (`NativeMapIterator`, ...), `NativeSymbol`, `ES6Iterator`/`IteratorLikeIterable`/generator machinery (`ES6Generator`; legacy `NativeGenerator` only if the interpreter requires it), `typedarrays/`, `NativePromise` + `Context` microtask queue, template literal runtime, `NativeReflect`/`NativeProxy` if present at pin.
+Nine clusters, in dependency order. Each is one commit, checked the three ways above. The
+`ScriptRuntime.initSafeStandardObjects` registration order is upstream's; every cluster fills
+its own `TODO(P4)` slot there.
 
-**Done when:** extended oracle corpus green (regex semantics compared via `exec` result arrays, Date via fixed-offset zones injected in tests).
+#### P4.1: Symbol
 
-### P5: Weak collections + BigInt
+- [ ] Port `NativeSymbol.kt` (233): the constructor, `Symbol.for` and `Symbol.keyFor`, the
+      well-known symbols as constructor properties, `description`, `toString`, `valueOf`,
+      `Symbol.prototype[Symbol.toPrimitive]`, and the `typeof` answer. The global registry is a
+      plain `HashMap<String, SymbolKey>`; upstream's `WeakHashMap` on interned strings never
+      collected anything anyway (ledger entry when landed).
+- [ ] Fill the marked sites: `SymbolKey.equals` and `hashCode`, the two `IdScriptableObject`
+      lookups, `ScriptRuntime.isSymbol`, `ScriptRuntime.toObject` (a `SymbolKey` wraps into a
+      `NativeSymbol`), `ScriptRuntime.typeOf`.
+- [ ] `TopLevel.Builtins.Symbol` cached; `Symbol.iterator`, `Symbol.species`,
+      `Symbol.unscopables`, `Symbol.toStringTag` and `Symbol.hasInstance` become reachable from
+      script. The array and string one-liners removed in P3.8 for that reason return to the
+      oracle.
+- [ ] Oracle: symbol identity, registry round trips, symbols as property keys (define, get,
+      delete, `getOwnPropertySymbols`, `JSON.stringify` skipping them), coercion errors
+      (`+Symbol()`, template literal, `Symbol() == Symbol()`), the well-known symbols on the
+      objects that own them, `Object.prototype.toString` reading `Symbol.toStringTag`.
+- [ ] jvmTest, jsNodeTest, iOS compile green; commit.
 
-- Add `io.github.yuroyami:kitecore` dependency (first and only runtime dep besides stdlib; record the version in the toml with a comment).
-- `NativeWeakMap`, `NativeWeakSet` over KiteCore `WeakRef`.
-- `KBigInt` gets real arithmetic (add/sub/mul/divmod/pow/shift/compare/parse/toString radix). Port `java.math.BigInteger`'s algorithms or a minimal school-book + Karatsuba implementation; benchmark is irrelevant at this stage, correctness parity with upstream BigInt oracle slice is the bar.
+#### P4.2: Iterators and generators
+
+- [ ] Port `NativeIterator.kt` (245) as the real class: the legacy `__iterator__` protocol,
+      `StopIteration`, `Iterator()` constructor, `NativeIterator.init`. The shell object from
+      P3.7 goes away.
+- [ ] Port `NativeGenerator.kt` (235): the pre-ES6 generator object (`send`, `next`, `throw`,
+      `close`, `__iterator__`), `GeneratorClosedException` stays where P3.7 put it.
+- [ ] Port `ES6Generator.kt` (421): `next`, `return`, `throw`, the `yield*` delegation with
+      `YieldStarResult` from P3.7, the state machine and the prototype wiring through
+      `BaseFunction.initAsGeneratorFunction`.
+- [ ] Fill `Interpreter.generatorCreate`: an `ES6Generator` at `VERSION_ES6` and above, a
+      `NativeGenerator` below, exactly as upstream chooses.
+- [ ] Oracle: generator functions with `yield`, `yield*` over arrays, strings and other
+      generators, early `return` and `throw` into a suspended generator, `finally` on close,
+      `for...of` and spread over generators, destructuring from a generator, infinite generators
+      taken with a counter, generator methods in object literals, arguments and `this` inside
+      generators, `Symbol.iterator` returning `this`, custom iterables with `next` and `return`,
+      iterator closing on `break`, and the legacy protocol at `VERSION_1_8`.
+- [ ] Corpus programs: a lazy pipeline (map, filter, take over a generator), a tree walker that
+      yields in order, a fibonacci generator.
+- [ ] Green on all targets; commit.
+
+#### P4.3: Map and Set
+
+- [ ] Port `Hashtable.kt` (327): upstream's insertion-ordered table with the linked entry list
+      that keeps iteration correct while entries are added or deleted mid-loop. Kotlin's
+      `LinkedHashMap` cannot do that, so the class is ported, not replaced. Key normalisation:
+      `-0` becomes `+0`, `NaN` equals `NaN`, a `KBigInt` key compares by value (the BigInt
+      arithmetic arrives in P5; the hook is written now).
+- [ ] Port `NativeMap.kt` (278), `NativeSet.kt` (762, includes the set algebra methods:
+      `union`, `intersection`, `difference`, `symmetricDifference`, `isSubsetOf`,
+      `isSupersetOf`, `isDisjointFrom`) and `NativeCollectionIterator.kt` (76) for `keys`,
+      `values`, `entries` of both. `Map.groupBy` lands with them (the abstract operation from
+      P3.8 already takes `KEY_COERCION.COLLECTION`).
+- [ ] `ScriptRuntime.loadFromIterable` (P3.8) feeds the constructors; `Symbol.species` on both
+      constructors through `ScriptRuntimeES6.addSymbolSpecies`.
+- [ ] Oracle: insertion order, `size`, key coercion corners (`-0`, `NaN`, objects by identity,
+      strings vs numbers), deleting and adding during `forEach` and `for...of`, `Map` from an
+      iterable of pairs and the error on a bad entry, `Set` from a string, chaining `set`, the
+      set algebra against arrays and against set-like objects with `size`, `has` and `keys`,
+      `Object.prototype.toString` tags, `JSON.stringify(new Map())`.
+- [ ] Green on all targets; commit.
+
+#### P4.4: Regular expressions
+
+The largest cluster. Rhino's regex engine is a bytecode compiler plus a backtracking matcher
+written in plain Java with no `java.util.regex` inside, so it ports verbatim and gives the same
+semantics on every target (rule 1). The only platform pieces are Unicode classification and
+simple case mapping, which come from the generated tables (rule 3).
+
+- [ ] `build-logic/unicode`: a Gradle task `generateUnicodeTables` that reads pinned UCD 15.0.0
+      files checked into `build-logic/unicode/ucd/` (`UnicodeData.txt`, `Scripts.txt`,
+      `PropList.txt`, `DerivedCoreProperties.txt`, `PropertyValueAliases.txt`) and writes
+      `commonMain/.../regexp/UnicodeTables.kt`: general category ranges for all planes, script
+      ranges, the binary properties upstream supports (`Alphabetic`, `ASCII`, `Case_Ignorable`,
+      `ASCII_Hex_Digit`, `Hex_Digit`, `ID_Continue`, `ID_Start`, `Lowercase`, `Uppercase`,
+      `White_Space`), and the simple upper and lower case mappings. Sorted `IntArray` ranges
+      with binary search; the generated file is committed and has a header naming the UCD
+      version and the task that made it.
+- [ ] Port `UnicodeProperties.kt` (445) on top of the tables. `Character.UnicodeScript`,
+      `Character.getType(int)`, `Character.isAlphabetic` and `Character.digit` all become table
+      lookups. The property-name parser drops its `java.util.regex.Pattern` for a hand-written
+      scan of `name` or `name=value`.
+- [ ] Port `SubString.kt` (34), `RegExpImpl.kt` (784, the `RegExpProxy` implementation:
+      `match`, `search`, `replace`, `replaceAll`, `split`, the `$1`-style substitutions reusing
+      `AbstractEcmaStringOperations`), `NativeRegExpCtor.kt` (116, the constructor with the
+      legacy static properties `RegExp.$1`, `input`, `lastMatch`, `leftContext`,
+      `rightContext`), `NativeRegExpCallable.kt` (29), `NativeRegExpInstantiator.kt` (26),
+      `NativeRegExpStringIterator.kt` (101, for `matchAll`), and `RegExpLoaderImpl` as
+      `ScriptRuntime.registerRegExp`.
+- [ ] Port `NativeRegExp.kt` (4849) in three commits that each compile: the compiler
+      (`parseTerm`, `parseAlternative`, the emit pass and the `RENode` tree), the matcher
+      (`matchRegExp`, `executeREBytecode`, the backtrack stack, `simpleMatch`, the class-set
+      matching with `RECharSet`), and the object surface (`exec`, `test`, `compile`,
+      `toString`, `Symbol.match`, `Symbol.matchAll`, `Symbol.replace`, `Symbol.search`,
+      `Symbol.split`, the `flags`, `source`, `global`, `ignoreCase`, `multiline`, `sticky`,
+      `unicode` and `hasIndices` accessors, `lastIndex`). Case-insensitive matching uses the
+      generated simple case mapping instead of `Character.toUpperCase` (ledger entry).
+- [ ] `String.prototype.match`, `matchAll`, `search`, `replace`, `replaceAll` and `split` with a
+      pattern argument (P3.8 left them going through the proxy) come alive without changes.
+- [ ] Oracle, compared as rendered `exec` results (`index`, `input`, `groups`, every capture,
+      `lastIndex` before and after): literal and constructed patterns, every flag, sticky and
+      global iteration, named groups and `$<name>` replacement, backreferences, lookahead and
+      lookbehind, lazy and possessive quantifier corners, character classes and escapes, Unicode
+      escapes with and without `u`, surrogate pairs under `u`, `\p{...}` for every supported
+      property and the errors for unsupported ones, `split` with captures and limits, `replace`
+      with a function and with every `$` pattern, `Symbol.split` on a custom object, `RegExp`
+      called on a `RegExp`, `RegExp.prototype.toString` escaping, the legacy statics,
+      `String.raw` with regexps, and the syntax errors upstream throws.
+- [ ] Corpus programs: a tokenizer, a template engine, a CSV parser, a log parser, a URL
+      parser, an email validator table. The slice adds a regex program with recorded answers so
+      JS and iOS prove the same matcher.
+- [ ] Cross-target smoke for case folding: a list of the code points where platforms disagree
+      (`ſ`, `İ`, `ı`, `ẞ`, the Greek sigma forms, Cherokee), matched with
+      `i` on every target against upstream's recorded answers.
+- [ ] Green on all targets; commit.
+
+#### P4.5: Date
+
+- [ ] `TimeZoneRules.kt`: a Kotlin interface on `Context` (`timeZone`) with
+      `rawOffsetMillis`, `isDaylightTime(utcMillis)` and `shortName(utcMillis)`, matching the
+      three questions upstream asks `java.util.TimeZone`. Two implementations in the core:
+      `Utc` (the default) and `FixedOffset(minutes)`. The real system zone is not in the core
+      (rule 2); `kitejs-datetime` in P8 provides it over kotlinx-datetime, and an embedder can
+      write its own in ten lines.
+- [ ] `Context.clock`: a `() -> Double` of epoch milliseconds, default `Clock.System` from the
+      stdlib (opt in if the API is still marked experimental at 2.4). `Date.now()`,
+      `new Date()` and the tests use it; tests pin it.
+- [ ] Port `NativeDate.kt` (2038). The date arithmetic (`MakeDay`, `MakeTime`, `YearFromTime`,
+      `WeekDay`, the 64 static helpers) is pure and ports verbatim. `LocalTZA` and
+      `DaylightSavingTA` read `Context.timeZone`. `date_parseString` and `date_format` port
+      verbatim. The four `toLocale*` methods format with fixed en-US patterns that equal what
+      upstream produces under `Locale.US` (`MMMM d, yyyy h:mm:ss a z` below ES6, the short
+      localized forms at ES6 and above); other locales and the `Intl` object are out of scope
+      (ledger entry, listed in `PORTING_STATUS.md` as a limitation).
+- [ ] `NativeDate.init` in `initSafeStandardObjects`; `TopLevel.Builtins.Date`;
+      `JSON.stringify` of a date through `toJSON`; `Date.prototype[Symbol.toPrimitive]`.
+- [ ] Oracle with the same fixed-offset zone injected on both sides (`cx.setTimeZone` upstream,
+      `cx.timeZone` here) and a fixed clock: constructors from millis, strings and components,
+      `Date.UTC`, `Date.parse` on ISO 8601, RFC 2822 style and the loose formats upstream
+      accepts, every getter and setter including the overflow rules, `toString`, `toUTCString`,
+      `toISOString` (and its RangeError), `toDateString`, `toTimeString`, `toJSON`,
+      `getTimezoneOffset`, `getYear` and `setYear`, invalid dates everywhere, the
+      millisecond limits, leap years and the year-zero corners.
+- [ ] DST parity on the JVM: a jvmTest-only `TimeZoneRules` adapter over `java.util.TimeZone`
+      ("Europe/Berlin", "America/New_York") so the oracle also checks the daylight-saving
+      arithmetic exactly. Other targets only test fixed offsets.
+- [ ] Green on all targets; commit.
+
+#### P4.6: Typed arrays, ArrayBuffer and DataView
+
+- [ ] Port `ByteIo.kt` (184) and `Conversions.kt` (59): the little- and big-endian packing
+      over `ByteArray`, floats through `Float.toBits` and `Double.toBits`, the
+      `Uint8Clamped` rounding. Pure.
+- [ ] Port `NativeArrayBuffer.kt` (355), `NativeArrayBufferView.kt` (82),
+      `NativeTypedArrayIterator.kt` (83), then `NativeTypedArrayView.kt` (1567) without its
+      `java.util.List` and `RandomAccess` views (same reasoning as D-36) and without
+      `java.lang.reflect.Array`; keep `ExternalArrayData` (P3.3 already has it).
+- [ ] Port the nine numeric views (`Int8`, `Uint8`, `Uint8Clamped`, `Int16`, `Uint16`,
+      `Int32`, `Uint32`, `Float32`, `Float64`, about 110 lines each) and `NativeDataView.kt`
+      (422). `BigInt64Array` and `BigUint64Array` wait for P5.
+- [ ] `NativeArrayIterator.isDone` gets its detached-array check (the `TODO(P4)` from P3.8);
+      `ArrayLikeAbstractOperations.iterativeMethod` and `reduceMethodWithLength` serve the
+      typed views as upstream intends.
+- [ ] Register the lazy constructors in `initSafeStandardObjects` under the same version gate
+      as upstream (`VERSION_ES6`, or `VERSION_1_8` with `FEATURE_V8_EXTENSIONS`).
+- [ ] Oracle: buffers shared between views, offsets and lengths and their RangeErrors,
+      element conversion for every type including NaN, infinity, negative zero and clamping,
+      `set` from arrays and from overlapping views, `subarray` sharing memory, `slice` copying,
+      `copyWithin`, `fill`, `sort` with and without comparator, `indexOf` and `includes` on
+      NaN, `join`, `toString`, `from` and `of`, `Symbol.species`, iteration, `DataView`
+      get and set for every type in both endiannesses with byte offsets, `byteLength`,
+      `byteOffset`, `BYTES_PER_ELEMENT`, `Object.prototype.toString` tags, and the
+      `FEATURE_LITTLE_ENDIAN` default.
+- [ ] Green on all targets; commit.
+
+#### P4.7: Promise
+
+- [ ] Port `UnhandledRejectionTracker.kt` (77) and wire `Context.unhandledPromiseTracker`;
+      the identity-keyed map from P3 replaces `IdentityHashMap`.
+- [ ] Port `NativePromise.kt` (996): constructor, `then`, `catch`, `finally`, `resolve`,
+      `reject`, `all`, `allSettled`, `any` with `AggregateError` (P3.8 has it), `race`,
+      `withResolvers`, the thenable job, `Symbol.species`, and the microtask reactions through
+      `Context.enqueueMicrotask` (P3.5 has the queue; `doTopCall` already drains it).
+- [ ] Oracle, compared through log arrays written by the callbacks: ordering of `then` chains
+      against synchronous code, nested promises, thenables that call back twice, `resolve` with
+      itself, rejection with a non-error, `finally` pass-through, every combinator on empty,
+      mixed and rejecting inputs, unhandled rejections reported through the tracker, and the
+      `async` test262-style `$DONE` pattern. Note for readers: upstream has no `async`
+      functions, so `await` does not exist in either engine.
+- [ ] Corpus programs: a promise-based task queue, a retry-with-backoff simulation driven by a
+      manual clock, `Promise.all` over a fake fetch table.
+- [ ] Green on all targets; commit.
+
+#### P4.8: Proxy and Reflect
+
+- [ ] Open the `ScriptableObject` hooks a proxy overrides where they are still final:
+      `getTypeOf`, `getDeclarationScope`, the `Symbol` overloads of `get`, `put`, `has` and
+      `delete`, `preventExtensions`, `isExtensible`, `defineOwnProperty` and
+      `getOwnPropertyDescriptor` (the last two are already `internal open`).
+- [ ] Port `NativeProxy.kt` (1373) with `NativeProxyFunction`, every trap, the invariant checks
+      and their TypeErrors, `Proxy.revocable`, and the two `TODO(P4)` sites
+      (`AbstractEcmaObjectOperations.isConstructor`, `NativeArray.js_isArray`).
+- [ ] Port `NativeReflect.kt` (397): the thirteen static methods over the abstract operations
+      from P3.8 (`createListFromArrayLike` gains its proxy-aware callers).
+- [ ] Oracle: every trap called and not called, trap return values coerced, invariant
+      violations, proxies as prototypes, `in` and `delete` through proxies, `for...in` and
+      `Object.keys` through `ownKeys`, function and constructor proxies with `apply` and
+      `construct`, revocation, `Array.isArray(proxy)`, `typeof` of a proxied function, and
+      every `Reflect` method against plain objects and against proxies.
+- [ ] Green on all targets; commit.
+
+#### P4.9: Close-out
+
+- [ ] `initSafeStandardObjects` has no `TODO(P4)` left; `TopLevel.cacheBuiltins` finds every
+      builtin; `ScriptRuntime` has no `TODO("... phase 4")` left (grep is the check).
+- [ ] The corpus gains at least twelve programs that use the new builtins together (a
+      regex-driven tokenizer feeding a `Map`, a date-stamped event log through `JSON`, a typed
+      array image filter, a promise pipeline over generators). The slice takes six of them.
+- [ ] The eval smoke test on every target gets one line per new builtin.
+- [ ] `PORTING_STATUS.md` rows for each builtin; README status paragraph rewritten to the truth
+      ("evaluates ES5 and most of ES2015 minus classes and modules, on JVM, Android, iOS and
+      JS"); the P4 ledger entries reviewed against the code. Commit.
+
+**Done when:** the extended oracle is green on the JVM, the slice is green on JS and iOS, the
+smoke test covers every new builtin on every target, and every deviation is a ledger entry.
+
+### P5: BigInt and weak collections
+
+#### P5.1: KBigInt
+
+- [ ] Replace the stub with a real immutable arbitrary-precision integer in
+      `commonMain/.../KBigInt.kt`: sign and magnitude as an `IntArray` of base 2^32 limbs. Operations
+      in the order the engine needs them: `compareTo`, `add`, `subtract`, `multiply`
+      (schoolbook, Karatsuba above a threshold), `divideAndRemainder` (Knuth algorithm D),
+      `remainder`, `pow`, `shiftLeft`, `shiftRight`, `and`, `or`, `xor`, `not` (two's
+      complement semantics like `java.math.BigInteger`), `negate`, `abs`, `signum`,
+      `bitLength`, `toString(radix)`, `parse(text, radix)`, `toDouble` (correctly rounded),
+      `fromDouble`, `toLong` and `toInt` (low bits), `asIntN` and `asUintN`, `equals` and
+      `hashCode`. Zero third-party dependency (rule 4).
+- [ ] Test `jvmTest/KBigIntOracleTest`: every operation against `java.math.BigInteger` on a
+      seeded corpus of operands (small, limb-boundary, thousands of bits, negative, zero) and
+      every radix from 2 to 36; algebraic checks (`(a*b)/b == a`, `a - a == 0`, shifts against
+      multiplication) as negative controls. `commonTest/KBigIntTest` runs a slice on every
+      target.
+- [ ] Commit.
+
+#### P5.2: BigInt in the language
+
+- [ ] Port `NativeBigInt.kt` (151): the `BigInt` function, `asIntN`, `asUintN`, `toString`,
+      `toLocaleString`, `valueOf`, `Symbol.toStringTag`; `toObject` wraps a `KBigInt`.
+- [ ] Fill the `TODO(P5)` sites: `ScriptRuntime.toBigInt` from strings and numbers with the
+      RangeErrors, the mixed-type TypeErrors in the arithmetic (P3.7 already routes `KBigInt`
+      operands), `typeof`, equality and relational comparison between BigInt and Number and
+      String, `NativeJSON` (`msg.json.cant.serialize` and `toJSON`), `Hashtable` key
+      normalisation, unary minus and `**`, the lexer's `123n` literal path (`KBigInt.parse`
+      exists since P0), `Number(bigint)` and `parseInt(bigint)`.
+- [ ] Port the BigInt half of `DToA` (`JS_dtobasestr`, about 150 lines over `KBigInt`), so
+      `Number.prototype.toString(radix)` works for every radix. The radix one-liners removed
+      in P3.8 return to the oracle.
+- [ ] Port `NativeBigIntArrayView.kt` (19), `NativeBigInt64Array.kt` (123) and
+      `NativeBigUint64Array.kt` (130), and register them.
+- [ ] Oracle: literals, every operator on BigInt and the TypeErrors for mixing, comparisons
+      across types, `BigInt("0x10")` and the parsing rules, `asIntN` and `asUintN` wrapping,
+      `toString` in every radix, `JSON.stringify` error and `toJSON` escape, BigInt keys in
+      `Map` and `Set`, the typed views, `Number.prototype.toString(2)` and `(16)`,
+      `Object.is(0n, -0n)`, and `BigInt.prototype.toString.call(1)` errors.
+- [ ] Commit.
+
+#### P5.3: WeakMap and WeakSet
+
+- [ ] Add `io.github.yuroyami:kitecore` as an `implementation` dependency and confirm
+      `kotlinx-coroutines` does not become a transitive dependency of `kitejs`; if it does,
+      write a thirty-line `expect class WeakRef` inside KiteJS instead and record why. Either
+      way `-Xexpect-actual-classes` is needed and the target set becomes a subset of
+      KiteCore's (android, JVM, iOS, macOS Arm64, JS, Wasm; no Linux or Windows until KiteCore
+      has them).
+- [ ] `WeakKeyMap.kt`: a small weak-keyed map over `WeakRef`, keyed by identity hash, that
+      drops cleared entries when it grows or is walked. Upstream's `WeakHashMap` has no
+      multiplatform equivalent, so this is the port's own (ledger entry).
+- [ ] Port `NativeWeakMap.kt` (150) and `NativeWeakSet.kt` (131) on top of it, with the
+      non-object key TypeErrors.
+- [ ] Tests: functional semantics on every target; a jvmTest that holds keys, drops them, calls
+      `System.gc()` and shows the entries disappear (the only platform where collection can be
+      forced); on JS the `WeakRef.isWeakSupported` flag decides whether that check runs.
+- [ ] Commit.
+
+#### P5.4: Close-out
+
+- [ ] No `TODO(P5)` left; `PORTING_STATUS.md` rows for BigInt, WeakMap and WeakSet; the
+      README status paragraph updated. Commit.
+
+**Done when:** the BigInt oracle and the weak semantics tests are green, and the radix printer
+matches upstream on the P3.8 one-liners.
 
 ### P6: Conformance harness
 
-Port the harness idea from upstream `tests/`: run the test262 subset listed in upstream's `test262.properties` on jvm, three-way (upstream jar, KiteJS jvm, and later KiteJS native/js via generated expectations). Parity with upstream's own pass list is the goal; every delta becomes a ledger entry or a fix.
+The goal is not a pass rate. The goal is parity: for every test262 file upstream runs, the
+port passes exactly when upstream passes. Every difference becomes a fix or a ledger entry.
 
-### P7: Embedding API
+- [ ] `tools/fetch-test262.sh`: shallow-fetches `tc39/test262` at the commit upstream pins
+      (`3fd4ec27f1798ebecafc73b354a45dcdda9bde29`) into `reference/test262/` (gitignored, next
+      to the Rhino source). CI runs it before the conformance job.
+- [ ] `kitejs/src/jvmTest/resources/test262.properties`: a copy of upstream's file (6949
+      lines), unchanged, so the same skip list and expected-failure list apply.
+- [ ] `jvmTest/Test262ParityTest.kt`: a Kotlin port of the parts of upstream's
+      `Test262SuiteTest` that matter. It reads the properties file, parses each test's YAML
+      front matter (`includes`, `flags`, `features`, `negative`), loads the harness files
+      (`assert.js`, `sta.js`, `compareArray.js`, `propertyHelper.js`, `doneprintHandle.js` and
+      the rest of `harness/`), applies upstream's unsupported-feature list (`class`,
+      `async-functions`, `async-iteration`, `default-arg`, `new.target`, `object-rest`,
+      `regexp-dotall`, `regexp-unicode-property-escapes`, `Temporal` and the others), and runs
+      each test through both engines in interpreted mode at the language version upstream
+      uses. It asserts three things per test: the port's outcome equals upstream's outcome, an
+      expected failure in the properties file fails upstream (the copy is not stale), and a
+      test not listed passes upstream.
+- [ ] The run is a separate Gradle task (`test262Parity`), not part of `jvmTest`: two engines
+      over tens of thousands of files takes minutes. CI runs it nightly and on release
+      branches; a developer runs it before a phase close-out.
+- [ ] Every parity difference gets a fix or a ledger entry with the test path; the ledger
+      entry is the only acceptable way to leave a difference in place.
+- [ ] `generateTest262Slice`: a Gradle task that, when `reference/test262` exists, writes
+      generated `commonTest` sources embedding a curated subset (the `built-ins` folders for
+      Array, String, Number, Math, JSON, Object, Function, RegExp, Date, Map, Set, Promise,
+      Symbol, TypedArray and the `language` folders for expressions and statements, capped by
+      count and size) together with the harness and the outcome recorded on the JVM. The
+      generated files are not committed; `EvalCorpusSlice` is the model. That is what proves
+      conformance on JS, iOS and Wasm, not only on the JVM.
+- [ ] Native tests actually run: `iosSimulatorArm64Test` joins the default check (today the
+      iOS target only compiles), and `macosArm64Test` once P8 adds the target.
+- [ ] V8 differential report: when `jsNodeTest` runs, a reporter evaluates the eval corpus in
+      Node's own engine as well and prints where KiteJS and V8 disagree. Informational only:
+      upstream Rhino itself disagrees with V8 (no classes, no modules), so this cannot be a
+      gate, but it shows the reader where the engine stands against a modern one.
+- [ ] Optional, after the above: upstream's 149 Mozilla `jstests` through the same runner.
 
-Kotlin-first, reflection-free host binding on top of `LambdaFunction`/`LambdaConstructor` (upstream 1.9 already moved builtins to lambdas, which is exactly the KMP-friendly path):
+**Done when:** `test262Parity` reports zero unexplained differences, the generated slice is green
+on JS, iOS and (after P8) macOS and Wasm, and `PORTING_STATUS.md` states the pass count per
+folder, taken from the run, not typed by hand.
+
+### P7: Kotlin-first API
+
+Two halves. The first cleans the engine's Kotlin without changing behaviour. The second adds
+the facade an embedder actually uses. The engine classes stay public but are documented as the
+engine-level API; the facade is the recommended one.
+
+#### P7.1: The Java-shaped leftovers (behaviour unchanged)
+
+Measured today: 498 `getX()`/`setX()`/`isX()` functions, 863 `!!`, 308 raw `Array<Any?>`
+argument lists. The sweep applies the house Kotlin idioms where they fit, in one commit per
+package, with the full suite green after each.
+
+- [ ] Accessors that are not JavaScript operations become properties: `getArity()`,
+      `getLength()`, `getFunctionName()`, `getPrototypeProperty` and their setters on
+      `BaseFunction` and its subclasses, `getDefaultValue` stays (it is the `[[DefaultValue]]`
+      hook), `get(name, start)` and friends stay (they are the object protocol).
+- [ ] Explicit backing fields wherever P3 kept a `xField` plus an accessor pair
+      (`isExtensibleField`, `prototypePropertyAttributesField`, the `NewLiteralStorage` four).
+- [ ] `Enum.entries` everywhere, `data object` for the sentinel singletons (`UniqueTag`
+      instances, `Undefined`), guard conditions in `when`, and non-local `break` in the
+      interpreter loops where the labelled returns came from Java.
+- [ ] Nullability tightening: each `!!` either becomes a non-null type at the source or gets a
+      one-line comment saying which invariant guarantees it. The count is the metric; the
+      target is under a hundred, all commented.
+- [ ] `explicitApi()` on the module. Every public declaration is a decision: engine-level API
+      (kept public, documented in one line), or `internal`. The one-liner oracle and the
+      contract parity tests keep the internals honest.
+- [ ] The identifier classification in the lexer and `ScriptRuntime.isJavaIdentifierStart`
+      move onto the generated Unicode tables from P4.4, so every target classifies the same.
+- [ ] `ImplementationVersion` becomes a constant (`Context.implementationVersion`); `Delegator`
+      is ported (289) as the base for host wrappers.
+- [ ] Short KDoc on every public class and function, in the house style: one to three lines,
+      plain words, no history, no wave or ledger vocabulary.
+
+#### P7.2: The facade
+
+A new package `io.github.yuroyami.kitejs.api` with a handful of types. Reflection-free,
+expect/actual-free, and usable from Swift and JavaScript through the normal Kotlin exports.
 
 ```kotlin
-val engine = KiteJs { languageVersion = ES6 }
-engine.global.defineFunction("log") { args -> println(args.joinToString(" ")) }
-val doc = engine.global.defineObject("document") {
-    function("getElementById") { args -> hostLookup(args[0]) }
+val js = KiteJs {
+    languageVersion = LanguageVersion.ES6
+    timeZone = TimeZoneRules.FixedOffset(minutes = 120)
+    clock = { fixedMillis }
+    console = ConsolePrinter.Stdout
+    instructionBudget = 5_000_000
 }
-engine.evaluate("log(1 + 2)")
+
+js.global.function("log") { args -> println(args.joinToString(" ")) }
+js.global.function<Double, Double, Double>("hypot") { a, b -> sqrt(a * a + b * b) }
+js.global.obj("document") {
+    property("title", "Untitled")
+    getter("readyState") { "complete" }
+    function<String, JsValue>("getElementById") { id -> host.lookup(id) }
+}
+
+val result: JsValue = js.evaluate("document.title + ':' + hypot(3, 4)")
+println(result.asString())       // "Untitled:5"
+js.runMicrotasks()
+js.close()
 ```
 
-Exact DSL shape decided then; the constraint is zero reflection and zero expect/actual. EPUB demo: bind a minimal fake `document` + `navigator.epubReadingSystem` and run a real scripted-EPUB snippet. (The real DOM binding lives in KitePDF, not here.)
+- [ ] `KiteJs`: the engine handle. Builds a `Context` and a global scope from a `KiteJsConfig`
+      DSL; `evaluate`, `compile` (a reusable `JsScript`), `global`, `runMicrotasks`, `close`;
+      implements `AutoCloseable` so `use { }` works. One instance, one thread (rule 7).
+- [ ] `JsValue`: a value class over the engine's `Any?` with `isUndefined`, `isNull`,
+      `asBoolean()`, `asDouble()`, `asInt()`, `asString()`, `asObject()`, `asArray()`,
+      `asFunction()`, `toKotlin()` (deep conversion to `Map`, `List`, `Double`, `String`,
+      `Boolean`, `null`), and `typeOf`. Exhaustive handling through a `when` on `JsValue.kind`.
+- [ ] `JsObject`, `JsArray`, `JsFunction`: thin wrappers with `operator get` and `set`, `keys`,
+      `invoke`, `construct`, `bind`, and conversion to and from Kotlin collections. No new
+      object model; they wrap `ScriptableObject`, `NativeArray` and `Function`.
+- [ ] `Converters`: the fixed table Kotlin to JS (`Int`, `Long` within the safe range,
+      `Double`, `Boolean`, `String`, `CharSequence`, `List`, `Array`, `Map`, `Unit`, `null`,
+      `JsValue`) and back, plus a registry for user types. Typed `function<A, B, R>` overloads
+      resolve arguments through it at call time, without reflection.
+- [ ] Host binding DSL: `obj { }`, `function`, `property`, `getter`, `setter`, `constructor`,
+      `readonly`, `enumerable`, and a `bind(instance) { property(Kotlin::prop); method(...) }`
+      form built on callable references (`KProperty1.get` and `KFunction.invoke` need no
+      reflection library). Context parameters carry the engine into the DSL lambdas instead of
+      an explicit receiver chain.
+- [ ] `JsException` hierarchy (sealed): `JsError` (a thrown script value, with `value`,
+      `name`, `message` and `scriptStack: List<StackFrame>`), `JsSyntaxError` (with line and
+      column), `JsEngineError` (an internal failure). The engine's `RhinoException` family
+      stays underneath; the facade translates at the boundary.
+- [ ] Instruction budget: `Context.observeInstructionCount` from P3.5 backs
+      `KiteJsConfig.instructionBudget`; exceeding it throws `JsError` with a clear name. This
+      is how an embedder stops a runaway script on every target.
+- [ ] `NativeConsole.kt` (386) ported with a Kotlin `ConsolePrinter` interface, a `Level`
+      enum, the format specifiers (`%s`, `%d`, `%i`, `%f`, `%o`, `%O`, `%c`) formatted by hand,
+      and plain counters instead of `AtomicInteger` (rule 7). Installed by the facade when a
+      printer is configured.
+- [ ] Tests: `commonTest/FacadeTest` on every target for each DSL form, conversions in both
+      directions, exceptions, the budget; a jvmTest that the facade's answers equal
+      `evaluateString` on the engine (no semantic layer added).
 
-### P8: Widen + publish
+#### P7.3: The coroutine artifact
 
-- Enable `wasmJs`, `macosArm64/X64`, `linuxX64/Arm64`, `mingwX64` (pure code, expected zero blockers; KiteCore already ships these).
-- `_kite-docs/sync.sh`, mkdocs + dokka site, README rewritten per KITE.md against what the code actually does, `POM_DESCRIPTION` rewritten truthfully.
-- Publish `io.github.yuroyami:kitejs` to Central via vanniktech.
-- Register in KiteVersions.
-- Announce nothing the code cannot support.
+- [ ] A new Gradle module `kitejs-coroutines` depending on `kitejs` and
+      `kotlinx-coroutines-core`. It provides `KiteJs.asyncEngine()` (an engine owned by a
+      dedicated single-thread dispatcher), `suspend fun evaluateAsync`, `JsPromise.await()`,
+      `Deferred<T>.asJsPromise()`, host `suspendFunction { }` that returns a promise to the
+      script and resumes on the engine's dispatcher, and cancellation wired to the instruction
+      observer so `Job.cancel()` stops a running script.
+- [ ] Tests with `kotlinx-coroutines-test`: ordering, cancellation, a script awaiting a host
+      call, exceptions crossing both ways.
+
+#### P7.4: The EPUB-shaped demo
+
+- [ ] `kitejs/src/commonTest/.../EpubScriptingDemoTest`: a fake `document` with
+      `getElementById`, `querySelector`, `addEventListener` and an element with `textContent`
+      and `style`, plus `navigator.epubReadingSystem` with `name`, `version` and
+      `hasFeature`, bound through the facade; a real scripted-EPUB snippet runs and the test
+      asserts the DOM it touched. The real binding lives in KitePDF; this proves the facade is
+      enough for it.
+
+**Done when:** the facade tests are green on every target, the engine module compiles with
+`explicitApi()`, the `!!` count is under a hundred and commented, and the coroutine artifact
+passes its tests on JVM, JS and iOS.
+
+### P8: Widen and publish
+
+- [ ] Targets: add `macosArm64` and `wasmJs` (browser and Node), matching KiteCore's set.
+      Linux and Windows follow when KiteCore has them (P5.3). Run `macosArm64Test` and
+      `wasmJsNodeTest` in the default check; the corpus slice and the smoke test decide.
+- [ ] `kitejs-datetime`: a small module over kotlinx-datetime that provides `TimeZoneRules`
+      for the system zone and any named zone, so `new Date()` prints local time for embedders
+      who opt in. The core stays dependency-free.
+- [ ] CI (`.github/workflows`, modelled on KiteCore's `ci.yml`, `docs.yml`, `release.yml`):
+      the default check on every push (JVM, JS on Node, iOS simulator, macOS, Wasm), the
+      nightly `test262Parity` after fetching test262, ABI validation (`abiValidation {}` like
+      KiteCore), and the docs build.
+- [ ] JVM bytecode target 11 like KiteCore, compiled with the 21 toolchain; the upstream jar
+      stays a test-only dependency.
+- [ ] Documentation site through `_kite-docs/sync.sh`: mkdocs pages (getting started,
+      evaluating scripts, binding host objects, promises and coroutines, dates and time zones,
+      limits, and a single page of differences from browsers' engines written as limitations
+      the reader will hit), Dokka for the API. Written to KITE.md: short sentences, no
+      history, no wave or ledger vocabulary, no em dashes, British or American spelling chosen
+      once for the repository.
+- [ ] README rewritten to KITE.md: what it does, targets, a compiling quickstart, the docs link
+      in the first screen, provenance once in the opening sentence and once under License.
+      `POM_DESCRIPTION` rewritten to the same truth. The status paragraph and the links to
+      `PORTING_STATUS.md` and `KITEJS_IMPL.md` are removed from the README; those two files stay
+      as maintainer documents.
+- [ ] Publish `io.github.yuroyami:kitejs:0.1.0` (and the two optional artifacts) to Maven
+      Central through vanniktech, with the shared POM values in `gradle.properties` and the
+      MPL-2.0 licence and NOTICE attribution intact.
+- [ ] Register KiteJS in KiteVersions (`repos.txt`) so the shared versions sync into
+      `gradle/libs.versions.toml`.
+- [ ] Announce nothing the code cannot support.
+
+**Done when:** the artifacts resolve from Maven Central in a fresh project on every declared
+target, the site is live and linked from the README, and CI is green on the default check.
 
 ## Self-review notes (kept with the plan)
 
