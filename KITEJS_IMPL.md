@@ -283,6 +283,14 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   leaves it writable and fails that test. This is the rare parity difference where the port is the
   more correct of the two; `Test262ParityTest` pins it, so if upstream ever fixes it the entry goes
   stale and the run says so.
+- D-57: identifiers may start with any character the spec's `ID_Start` allows. Upstream asks the
+  JDK's `Character.isJavaIdentifierStart`, which is Java's rule rather than JavaScript's, so it
+  rejects characters test262 says are valid. The port uses its own generated tables (D-43) and
+  passes the seven `language/identifiers/start-unicode-*` files upstream fails.
+- D-58: eight test262 files that upstream fails and the port passes, mostly `Proxy` construct
+  arguments and the BigInt typed array constructors. Nothing to do about them beyond recording
+  them: `Test262ParityTest` asserts each still differs, so an upstream fix shows up as a stale
+  entry rather than as silence.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -1243,7 +1251,7 @@ port passes exactly when upstream passes. Every difference becomes a fix or a le
 - [x] The run is a separate Gradle task (`test262Parity`), not part of `jvmTest`: two engines
       over tens of thousands of files takes minutes. CI runs it nightly and on release
       branches; a developer runs it before a phase close-out.
-- [ ] Every parity difference gets a fix or a ledger entry with the test path; the ledger
+- [x] Every parity difference gets a fix or a ledger entry with the test path; the ledger
       entry is the only acceptable way to leave a difference in place.
 - [ ] `commonTest/Test262Runner.kt` over `kotlinx-io` (test scope only): the same properties
       parsing, front-matter parsing and harness loading as the JVM runner, reading the fetched

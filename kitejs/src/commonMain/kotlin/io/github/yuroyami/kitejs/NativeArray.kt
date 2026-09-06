@@ -683,8 +683,11 @@ class NativeArray : ScriptableObject {
         }
 
         private fun checkLength(value: Any?): Long {
+            // Both conversions run on the value itself, as upstream does. Passing `d` to the
+            // second would be one coercion, and the spec has two: a valueOf that watches is
+            // entitled to be called twice.
             val d = ScriptRuntime.toNumber(value)
-            val longVal = ScriptRuntime.toUint32(d)
+            val longVal = ScriptRuntime.toUint32(value)
             if (longVal.toDouble() != d) {
                 val msg = ScriptRuntime.getMessageById("msg.arraylength.bad")
                 throw ScriptRuntime.rangeError(msg)

@@ -57,6 +57,29 @@ plan, read [KITEJS_IMPL.md](KITEJS_IMPL.md).
 | LiveConnect (Java interop) | 🚫 | Reflection-based JVM interop has no meaning in common Kotlin; Phase 7 replaces it with a Kotlin DSL |
 | Intl | 🚫 | Upstream barely supports it; would need ICU-scale data |
 
+## Conformance
+
+KiteJS is checked against test262 by parity, not by pass rate: every file the suite has runs
+through upstream Rhino and through this port, and the two outcomes have to match. A test both
+engines fail is expected, since upstream has no classes and no modules either. A test where they
+disagree is a bug to fix or a ledger entry.
+
+From the last full run (`./gradlew test262Parity`, suite pinned at the commit upstream uses):
+
+- 52,802 cases run, 22,255 files skipped as upstream skips them
+- 42,955 pass on both engines
+- 9,802 fail on both
+- **0 unexplained differences**
+
+25 files do differ, and each one is listed in the runner with its reason. Seventeen of them are
+places where upstream fails and the port passes: identifiers using characters upstream rejects
+because it asks Java's identifier rule rather than JavaScript's, a `Proxy` trap that crashes
+upstream, and the BigInt typed array constructors. Four are the port's own gaps, all of them for
+want of Unicode data that common Kotlin does not carry: `String.prototype.normalize` returns its
+input, and `localeCompare` falls back to code unit order.
+
+The per-folder table is written to `kitejs/build/test262/summary.md` by the run itself.
+
 ## Language level
 
 Upstream Rhino 1.9.1 implements complete ES5.1 plus a large part of ES2015+

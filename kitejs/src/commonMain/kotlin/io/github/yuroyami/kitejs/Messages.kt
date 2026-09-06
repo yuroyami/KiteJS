@@ -257,6 +257,7 @@ internal object Messages {
         "msg.primitive.expected" to "Primitive type expected (had {0} instead)",
         "msg.cant.convert.to.number" to "Cannot convert {0} to a number",
         "msg.promise.capability.state" to "Invalid promise capability state",
+        "msg.typed.array.type.mismatch" to "Typed arrays content type does not match",
         "msg.not.a.number" to "The object is not a number",
         "msg.only.from.new" to "\"Constructor {0}\" may only be invoked from a \"new\" expression.",
         "msg.null.to.object" to "Cannot convert null to an object.",

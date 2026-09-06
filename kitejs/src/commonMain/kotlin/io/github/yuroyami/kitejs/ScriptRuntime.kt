@@ -1540,7 +1540,7 @@ object ScriptRuntime {
             if (radix != -1) {
                 val body = s.substring(start + 2, end + 1)
                 if (body.isEmpty() || body.any { it.digitToIntOrNull(radix) == null }) throw syntaxErrorById("msg.bigint.bad.form")
-                return KBigInt.parse(body, radix)
+                return parseBigIntOrThrow(body, radix)
             }
         }
         val sub = s.substring(start, end + 1)
@@ -1550,8 +1550,19 @@ object ScriptRuntime {
             if (c in '0'..'9') continue
             throw syntaxErrorById("msg.bigint.bad.form")
         }
-        return KBigInt.parse(sub)
+        return parseBigIntOrThrow(sub, 10)
     }
+
+    /**
+     * StringToBigInt owes the caller a JavaScript error, never a Kotlin one. The checks above miss
+     * a string that is only a sign, so anything [KBigInt.parse] rejects is reported the same way.
+     */
+    private fun parseBigIntOrThrow(text: String, radix: Int): KBigInt =
+        try {
+            KBigInt.parse(text, radix)
+        } catch (e: ArithmeticException) {
+            throw syntaxErrorById("msg.bigint.bad.form")
+        }
 
     fun syntaxError(message: String): EcmaError = constructError("SyntaxError", message)
 

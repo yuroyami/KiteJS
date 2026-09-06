@@ -45,11 +45,59 @@ class Test262ParityTest {
      * entry, and each is asserted to still differ: if upstream changes, the entry goes stale and
      * this test says so rather than quietly passing.
      */
-    private val knownDifferences = mapOf(
-        "built-ins/Date/prototype/Symbol.toPrimitive/prop-desc.js" to
-            "D-56: the port makes Date.prototype[Symbol.toPrimitive] non-writable, as the spec asks. " +
-            "Upstream leaves it writable.",
-    )
+    private val knownDifferences = buildMap {
+        // The port accepts identifier characters upstream rejects. Upstream asks the JDK's
+        // Character.isJavaIdentifierStart, which is Java's rule and not JavaScript's; the port
+        // uses its own generated ID_Start tables (D-43, D-57). The port is the correct one.
+        for (version in listOf("5.2.0", "6.1.0", "7.0.0", "8.0.0", "11.0.0", "13.0.0", "15.0.0")) {
+            put("language/identifiers/start-unicode-$version.js", "D-57: the port follows ID_Start, upstream follows Java identifiers")
+        }
+
+        // Tests upstream fails and the port passes. Nothing to fix here, but they are pinned so
+        // that an upstream fix shows up as a stale entry rather than as silence (D-58).
+        for (path in listOf(
+            "built-ins/Proxy/construct/call-parameters.js",
+            "built-ins/TypedArray/prototype/set/BigInt/bigint-tobiguint64.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/object-arg/bigint-tobiguint64.js",
+            "built-ins/TypedArrayConstructors/from/nan-conversion.js",
+            "built-ins/TypedArrayConstructors/from/new-instance-from-sparse-array.js",
+            "built-ins/TypedArrayConstructors/internals/Set/BigInt/bigint-tobiguint64.js",
+            "built-ins/Proxy/construct/arguments-realm.js",
+            "language/destructuring/binding/keyed-destructuring-property-reference-target-evaluation-order-with-bindings.js",
+        )) {
+            put(path, "D-58: upstream fails this and the port passes it")
+        }
+
+        // Upstream's getOwnPropertyDescriptor trap reads the target descriptor without a null
+        // check and throws a NullPointerException. The port answers undefined (D-50).
+        for (path in listOf(
+            "built-ins/Object/getOwnPropertyDescriptors/proxy-undefined-descriptor.js",
+            "built-ins/Proxy/getOwnPropertyDescriptor/result-is-undefined-targetdesc-is-undefined.js",
+            "built-ins/Proxy/getOwnPropertyDescriptor/trap-is-null-target-is-proxy.js",
+        )) {
+            put(path, "D-50: upstream crashes where the port answers undefined")
+        }
+
+        // Date.prototype[Symbol.toPrimitive] is non-writable here and writable upstream (D-56).
+        put(
+            "built-ins/Date/prototype/Symbol.toPrimitive/prop-desc.js",
+            "D-56: the port makes the property non-writable, as the spec asks",
+        )
+
+        // The two places the port is the weaker one, both for want of Unicode data that common
+        // Kotlin has none of: there is no normalizer (D-38) and no collation (D-37).
+        for (path in listOf(
+            "built-ins/String/prototype/normalize/return-normalized-string.js",
+            "built-ins/String/prototype/normalize/return-normalized-string-from-coerced-form.js",
+            "built-ins/String/prototype/normalize/return-normalized-string-using-default-parameter.js",
+        )) {
+            put(path, "D-38: there is no Unicode normalizer in common Kotlin, so normalize returns its input")
+        }
+        put(
+            "built-ins/String/prototype/localeCompare/15.5.4.9_CE.js",
+            "D-37: there is no collation data, so localeCompare falls back to code unit order",
+        )
+    }
 
     private val upstreamHarness = HashMap<String, UScript>()
     private val portedHarness = HashMap<String, Script>()
@@ -73,6 +121,7 @@ class Test262ParityTest {
         // run where the harness quietly does nothing both report zero differences otherwise.
         var passed = 0
         var failedBoth = 0
+        val perFolder = HashMap<String, IntArray>()
 
         for (file in testRoot.walkTopDown().filter { it.isFile && it.name.endsWith(".js") }.sorted()) {
             val relative = file.relativeTo(testRoot).path.replace('\\', '/')
@@ -110,6 +159,10 @@ class Test262ParityTest {
                 } else {
                     failedBoth++
                 }
+                val folder = relative.split('/').take(2).joinToString("/")
+                val tally = perFolder.getOrPut(folder) { IntArray(2) }
+                if (upstream == PASS && ported == PASS) tally[0]++
+                tally[1]++
                 if (!strict && relative in properties.expectedToFail && upstream == PASS) {
                     staleExpectations.add(relative)
                 }
@@ -151,6 +204,21 @@ class Test262ParityTest {
                 .forEach { println("  ${it.value.toString().padStart(6)}  ${it.key}") }
         }
         assertTrue(ran > 0, "no test262 cases ran; is the filter '$filter' right?")
+
+        // A summary PORTING_STATUS can quote, so the numbers there come from a run.
+        val summary = File("build/test262/summary.md")
+        summary.parentFile.mkdirs()
+        summary.writeText(
+            buildString {
+                appendLine("| Folder | Both pass | Cases |")
+                appendLine("|---|---:|---:|")
+                perFolder.entries.sortedBy { it.key }.forEach {
+                    appendLine("| ${it.key} | ${it.value[0]} | ${it.value[1]} |")
+                }
+                appendLine()
+                appendLine("Total: $passed of $ran cases pass on both engines, $failedBoth fail on both.")
+            },
+        )
 
         if (staleExpectations.isNotEmpty()) {
             println("${staleExpectations.size} files are marked as failing but upstream passes them:")

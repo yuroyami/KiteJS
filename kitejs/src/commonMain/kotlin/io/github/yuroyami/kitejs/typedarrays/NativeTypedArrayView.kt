@@ -151,6 +151,12 @@ abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
         if (dbloff > targetLength) throw ScriptRuntime.rangeErrorById("msg.typed.array.bad.offset", dbloff)
         if (srcLength + dbloff > targetLength) throw ScriptRuntime.rangeErrorById("msg.typed.array.bad.source.array")
 
+        // A bigint view and a number view hold different kinds of element and cannot be copied
+        // between, however well the lengths line up.
+        if ((this is NativeBigIntArrayView) != (source is NativeBigIntArrayView)) {
+            throw ScriptRuntime.typeErrorById("msg.typed.array.type.mismatch")
+        }
+
         val targetOffset = dbloff.toInt()
         if (source.arrayBuffer === arrayBuffer) {
             // Overlapping views share bytes, so the source is read out in full first.
