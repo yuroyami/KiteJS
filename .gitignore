@@ -5,7 +5,11 @@ build/
 local.properties
 .kotlin/
 .DS_Store
-kotlin-js-store/
+
+# The Kotlin/JS lock file is committed on purpose. The engine's Date reads its zone rules through
+# an npm package on that target, and which version resolves decides whether named zones work at
+# all, so the lock is part of the build being reproducible.
+!kotlin-js-store/
 
 # Reference source tree, for porting and study only. It is the full Rhino clone
 # (about 40 MB) pinned at the release the port mirrors. It never gets committed;
