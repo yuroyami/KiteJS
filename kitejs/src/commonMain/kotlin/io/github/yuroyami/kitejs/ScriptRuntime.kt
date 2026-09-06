@@ -1408,9 +1408,8 @@ object ScriptRuntime {
             LazilyLoadedCtor(scope, "Proxy", sealed, Initializable { icx, s, sld -> NativeProxy.init(icx, s, sld) })
             LazilyLoadedCtor(scope, "Reflect", sealed, Initializable { icx, s, sld -> NativeReflect.init(icx, s, sld) })
             LazilyLoadedCtor(scope, "BigInt", sealed, Initializable { icx, s, sld -> NativeBigInt.init(icx, s, sld) })
-            // Upstream's registration order here is Map, Promise, Set, WeakMap, WeakSet, BigInt,
-            // Proxy, Reflect. Each one goes in its own slot as it lands.
-            // TODO(P5): WeakMap and WeakSet.
+            LazilyLoadedCtor(scope, "WeakMap", sealed, Initializable { icx, s, sld -> NativeWeakMap.init(icx, s, sld) })
+            LazilyLoadedCtor(scope, "WeakSet", sealed, Initializable { icx, s, sld -> NativeWeakSet.init(icx, s, sld) })
         }
 
         if (scope is TopLevel) scope.cacheBuiltins(scope, sealed)

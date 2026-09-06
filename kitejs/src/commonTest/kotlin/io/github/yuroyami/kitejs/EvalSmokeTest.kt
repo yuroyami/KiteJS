@@ -475,4 +475,27 @@ class EvalSmokeTest {
         assertEquals("2", eval("String(new BigInt64Array(2).length)"))
         assertEquals("16", eval("String(new BigInt64Array(2).byteLength)"))
     }
+
+    @Test
+    fun weakCollections() {
+        assertEquals("1", eval("var k = {}; var m = new WeakMap(); m.set(k, 1); String(m.get(k))"))
+        assertEquals("true", eval("var k = {}; var m = new WeakMap(); m.set(k, 1); m.has(k)"))
+        assertEquals("false", eval("var m = new WeakMap(); m.has({})"))
+        assertEquals("undefined", eval("var k = {}; var m = new WeakMap(); String(m.get(k))"))
+        assertEquals("true", eval("var k = {}; var m = new WeakMap(); m.set(k, 1); m.delete(k)"))
+        assertEquals("false", eval("var k = {}; var m = new WeakMap(); m.set(k, 1); m.delete(k); m.has(k)"))
+        assertEquals("2", eval("var k = {}; var m = new WeakMap(); m.set(k, 1); m.set(k, 2); String(m.get(k))"))
+        assertEquals("7", eval("var k = {}; var m = new WeakMap([[k, 7]]); String(m.get(k))"))
+        // Keys are matched by identity, so two objects that look alike are two keys.
+        assertEquals("undefined", eval("var m = new WeakMap(); m.set({a:1}, 'x'); String(m.get({a:1}))"))
+        assertEquals("TypeError", eval("var m = new WeakMap(); try { m.set(1, 1) } catch(e) { e.name }"))
+        assertEquals("true", eval("var k = {}; var s = new WeakSet(); s.add(k); s.has(k)"))
+        assertEquals("false", eval("var s = new WeakSet(); s.has({})"))
+        assertEquals("true", eval("var k = {}; var s = new WeakSet(); s.add(k); s.delete(k)"))
+        assertEquals("true", eval("var k = {}; var s = new WeakSet([k]); s.has(k)"))
+        assertEquals("TypeError", eval("var s = new WeakSet(); try { s.add(1) } catch(e) { e.name }"))
+        assertEquals("true", eval("var sym = Symbol('x'); var m = new WeakMap(); m.set(sym, 1); m.has(sym)"))
+        assertEquals("[object WeakMap]", eval("Object.prototype.toString.call(new WeakMap())"))
+        assertEquals("[object WeakSet]", eval("Object.prototype.toString.call(new WeakSet())"))
+    }
 }

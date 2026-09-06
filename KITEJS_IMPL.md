@@ -272,6 +272,11 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   `Any?` rather than `Number`, `toNumeric` answers `Any`, and `numericToDouble` replaces the
   `Number.doubleValue()` calls that used to cover both. The one comparison overload that took two
   numbers is now `compareNumeric`, since both overloads would otherwise have the same signature.
+- D-55: `WeakKeyMap` replaces `java.util.WeakHashMap`, which common Kotlin has no equivalent of.
+  Keys are matched by identity rather than by `equals`, which is what JavaScript asks for and what
+  `WeakHashMap` happened to give upstream because the key types never override it. `hashCode` only
+  picks a bucket. There is no reference queue in common Kotlin, so collected entries are swept out
+  as the map grows and whenever it is asked its size, rather than the moment the key dies.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -1189,19 +1194,19 @@ smoke test covers every new builtin on every target, and every deviation is a le
       consumer's classpath, which rule 4 exists to prevent, and would cap KiteJS's targets at
       KiteCore's. The expect class and its four actuals were written here instead, along with
       `WeakRefTest` on every target and `WeakRefGcTest` on the JVM (D-52).
-- [ ] `WeakKeyMap.kt`: a small weak-keyed map over `WeakRef`, keyed by identity hash, that
-      drops cleared entries when it grows or is walked. Upstream's `WeakHashMap` has no
-      multiplatform equivalent, so this is the port's own (ledger entry).
-- [ ] Port `NativeWeakMap.kt` (150) and `NativeWeakSet.kt` (131) on top of it, with the
+- [x] `WeakKeyMap.kt`: a small weak-keyed map over `WeakRef`, keyed by identity hash, that
+      drops cleared entries when it grows or is asked its size. Upstream's `WeakHashMap` has no
+      multiplatform equivalent, so this is the port's own (D-55).
+- [x] Port `NativeWeakMap.kt` (150) and `NativeWeakSet.kt` (131) on top of it, with the
       non-object key TypeErrors.
-- [ ] Tests: functional semantics on every target; a jvmTest that holds keys, drops them, calls
-      `System.gc()` and shows the entries disappear (the only platform where collection can be
-      forced); on JS the `WeakRef.isWeakSupported` flag decides whether that check runs.
-- [ ] Commit.
+- [x] Tests: functional semantics on every target, plus about 50 oracle scripts; `WeakKeyMapGcTest`
+      on the JVM holds keys, drops them, forces a collection and shows the entries go, which is the
+      only place the weakness can be tested at all.
+- [x] Commit.
 
 #### P5.4: Close-out
 
-- [ ] No `TODO(P5)` left; `PORTING_STATUS.md` rows for BigInt, WeakMap and WeakSet; the
+- [x] No `TODO(P5)` left; `PORTING_STATUS.md` rows for BigInt, WeakMap and WeakSet; the
       README status paragraph updated. Commit.
 
 **Done when:** the BigInt oracle and the weak semantics tests are green, and the radix printer
