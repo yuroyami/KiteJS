@@ -202,6 +202,11 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   the JDK makes the oracle exact by construction, and `UnicodeTablesOracleTest` walks all 1114112
   code points on every run to keep it that way. The Unicode version is still pinned: whatever JDK 21
   ships, which is 15.0.
+- D-44: the regexp engine is constructed directly instead of being discovered through a service
+  loader. Upstream uses `RegExpLoader` so a build can leave the regexp package out; there is one
+  implementation here and no service loader in common Kotlin. The debug disassembler
+  (`prettyPrintRE`, about 250 lines behind a system property) is not ported either, since common
+  Kotlin has no system properties.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -902,7 +907,7 @@ written in plain Java with no `java.util.regex` inside, so it ports verbatim and
 semantics on every target (rule 1). The only platform pieces are Unicode classification and
 simple case mapping, which come from the generated tables (rule 3).
 
-- [ ] `build-logic/unicode`: a Gradle task `generateUnicodeTables` that reads pinned UCD 15.0.0
+- [x] `build-logic/unicode`: a Gradle task `generateUnicodeTables` that reads pinned UCD 15.0.0
       files checked into `build-logic/unicode/ucd/` (`UnicodeData.txt`, `Scripts.txt`,
       `PropList.txt`, `DerivedCoreProperties.txt`, `PropertyValueAliases.txt`) and writes
       `commonMain/.../regexp/UnicodeTables.kt`: general category ranges for all planes, script
@@ -911,18 +916,18 @@ simple case mapping, which come from the generated tables (rule 3).
       `White_Space`), and the simple upper and lower case mappings. Sorted `IntArray` ranges
       with binary search; the generated file is committed and has a header naming the UCD
       version and the task that made it.
-- [ ] Port `UnicodeProperties.kt` (445) on top of the tables. `Character.UnicodeScript`,
+- [x] Port `UnicodeProperties.kt` (445) on top of the tables. `Character.UnicodeScript`,
       `Character.getType(int)`, `Character.isAlphabetic` and `Character.digit` all become table
       lookups. The property-name parser drops its `java.util.regex.Pattern` for a hand-written
       scan of `name` or `name=value`.
-- [ ] Port `SubString.kt` (34), `RegExpImpl.kt` (784, the `RegExpProxy` implementation:
+- [x] Port `SubString.kt` (34), `RegExpImpl.kt` (784, the `RegExpProxy` implementation:
       `match`, `search`, `replace`, `replaceAll`, `split`, the `$1`-style substitutions reusing
       `AbstractEcmaStringOperations`), `NativeRegExpCtor.kt` (116, the constructor with the
       legacy static properties `RegExp.$1`, `input`, `lastMatch`, `leftContext`,
       `rightContext`), `NativeRegExpCallable.kt` (29), `NativeRegExpInstantiator.kt` (26),
       `NativeRegExpStringIterator.kt` (101, for `matchAll`), and `RegExpLoaderImpl` as
       `ScriptRuntime.registerRegExp`.
-- [ ] Port `NativeRegExp.kt` (4849) in three commits that each compile: the compiler
+- [x] Port `NativeRegExp.kt` (4849) in three commits that each compile: the compiler
       (`parseTerm`, `parseAlternative`, the emit pass and the `RENode` tree), the matcher
       (`matchRegExp`, `executeREBytecode`, the backtrack stack, `simpleMatch`, the class-set
       matching with `RECharSet`), and the object surface (`exec`, `test`, `compile`,
@@ -930,9 +935,9 @@ simple case mapping, which come from the generated tables (rule 3).
       `Symbol.split`, the `flags`, `source`, `global`, `ignoreCase`, `multiline`, `sticky`,
       `unicode` and `hasIndices` accessors, `lastIndex`). Case-insensitive matching uses the
       generated simple case mapping instead of `Character.toUpperCase` (ledger entry).
-- [ ] `String.prototype.match`, `matchAll`, `search`, `replace`, `replaceAll` and `split` with a
+- [x] `String.prototype.match`, `matchAll`, `search`, `replace`, `replaceAll` and `split` with a
       pattern argument (P3.8 left them going through the proxy) come alive without changes.
-- [ ] Oracle, compared as rendered `exec` results (`index`, `input`, `groups`, every capture,
+- [x] Oracle, compared as rendered `exec` results (`index`, `input`, `groups`, every capture,
       `lastIndex` before and after): literal and constructed patterns, every flag, sticky and
       global iteration, named groups and `$<name>` replacement, backreferences, lookahead and
       lookbehind, lazy and possessive quantifier corners, character classes and escapes, Unicode
@@ -941,13 +946,13 @@ simple case mapping, which come from the generated tables (rule 3).
       with a function and with every `$` pattern, `Symbol.split` on a custom object, `RegExp`
       called on a `RegExp`, `RegExp.prototype.toString` escaping, the legacy statics,
       `String.raw` with regexps, and the syntax errors upstream throws.
-- [ ] Corpus programs: a tokenizer, a template engine, a CSV parser, a log parser, a URL
+- [x] Corpus programs: a tokenizer, a template engine, a CSV parser, a log parser, a URL
       parser, an email validator table. The slice adds a regex program with recorded answers so
       JS and iOS prove the same matcher.
-- [ ] Cross-target smoke for case folding: a list of the code points where platforms disagree
+- [x] Cross-target smoke for case folding: a list of the code points where platforms disagree
       (`ſ`, `İ`, `ı`, `ẞ`, the Greek sigma forms, Cherokee), matched with
       `i` on every target against upstream's recorded answers.
-- [ ] Green on all targets; commit.
+- [x] Green on all targets; commit.
 
 #### P4.5: Date
 

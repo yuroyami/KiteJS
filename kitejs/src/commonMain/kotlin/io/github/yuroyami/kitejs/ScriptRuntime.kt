@@ -226,6 +226,8 @@ object ScriptRuntime {
 
     fun toUint32(d: Double): Long = DoubleConversion.doubleToInt32(d).toLong() and 0xffffffffL
 
+    fun toUint32(value: Any?): Long = toUint32(toNumber(value))
+
     /** ECMAScript ToInteger: truncates toward zero, and maps NaN to positive zero. */
     fun toInteger(d: Double): Double {
         if (d.isNaN()) return +0.0
@@ -977,6 +979,27 @@ object ScriptRuntime {
     fun undefCallError(obj: Any?, id: Any?): RuntimeException =
         typeErrorById("msg.undef.method.call", toString(obj), toString(id))
 
+    /**
+     * The next index to try after an empty match. In unicode mode a surrogate pair counts as one
+     * step, so an empty match never lands between the two halves.
+     */
+    fun advanceStringIndex(string: String, index: Long, unicode: Boolean): Long {
+        if (index > NativeNumber.MAX_SAFE_INTEGER) Kit.codeBug()
+        if (!unicode) return index + 1
+        if (index + 1 > string.length) return index + 1
+        val cp = Characters.codePointAt(string, index.toInt())
+        return index + Characters.charCount(cp)
+    }
+
+    /** Adds to the instruction budget and tells the context when the threshold is crossed. */
+    fun addInstructionCount(cx: Context, instructionsToAdd: Int) {
+        cx.instructionCount += instructionsToAdd
+        if (cx.instructionCount > cx.instructionThreshold) {
+            cx.observeInstructionCountInternal(cx.instructionCount)
+            cx.instructionCount = 0
+        }
+    }
+
     /** True when an iterator result object says the iteration is over. */
     fun isIteratorDone(cx: Context, result: Any?): Boolean {
         if (result !is Scriptable) return false
@@ -1328,7 +1351,7 @@ object ScriptRuntime {
         NativeArrayIterator.init(scope, sealed)
         NativeStringIterator.init(scope, sealed)
 
-        // TODO(P4): registerRegExp(cx, scope, sealed)
+        registerRegExp(cx, scope, sealed)
         // NativeJavaObject, NativeJavaMap, Continuation and E4X are out of scope.
         // TODO(P4): the typed arrays, ArrayBuffer and DataView.
 
@@ -1350,7 +1373,23 @@ object ScriptRuntime {
 
     // ---- Regular expressions -------------------------------------------------------------------
 
-    fun getRegExpProxy(cx: Context): RegExpProxy? = cx.regExpProxy
+    /**
+     * The regexp engine, built on first use. Upstream discovers it through a service loader so the
+     * regexp package can be left out of a build; there is one implementation here and no service
+     * loader in common Kotlin, so it is simply constructed (D-44).
+     */
+    fun getRegExpProxy(cx: Context): RegExpProxy? {
+        var proxy = cx.regExpProxy
+        if (proxy == null) {
+            proxy = io.github.yuroyami.kitejs.regexp.RegExpImpl()
+            cx.regExpProxy = proxy
+        }
+        return proxy
+    }
+
+    private fun registerRegExp(cx: Context, scope: ScriptableObject, sealed: Boolean) {
+        getRegExpProxy(cx)?.register(scope, sealed)
+    }
 
     fun setRegExpProxy(cx: Context, proxy: RegExpProxy?) {
         cx.regExpProxy = proxy

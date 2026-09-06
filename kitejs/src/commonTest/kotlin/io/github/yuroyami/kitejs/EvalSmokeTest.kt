@@ -268,6 +268,32 @@ class EvalSmokeTest {
     }
 
     @Test
+    fun regularExpressions() {
+        assertEquals("abc", eval("/abc/.source"))
+        assertEquals("/a+b/", eval("String(/a+b/)"))
+        assertEquals("gi", eval("/abc/gi.flags"))
+        assertEquals("true", eval("/a+/.test('caaat')"))
+        assertEquals("aaa", eval("/a+/.exec('caaat')[0]"))
+        assertEquals("1", eval("/a+/.exec('caaat').index"))
+        assertEquals("a#b#", eval("'a1b2'.replace(/\\d/g, '#')"))
+        assertEquals("1,2", eval("'a1b2'.match(/\\d/g).join()"))
+        assertEquals("a|b|c", eval("'a,b;c'.split(/[,;]/).join('|')"))
+        assertEquals("2", eval("'hello'.search(/l/)"))
+        assertEquals("42", eval("/(?<x>\\d+)/.exec('n42').groups.x"))
+        assertEquals("02/01/2024", eval("'2024-01-02'.replace(/(\\d+)-(\\d+)-(\\d+)/, '\$3/\$2/\$1')"))
+        assertEquals("2", eval("[...'aXbXc'.matchAll(/X/g)].length"))
+        assertEquals("true", eval("/^\\p{Lu}$/u.test('A')"))
+        assertEquals("false", eval("/^\\p{Ll}$/u.test('A')"))
+        assertEquals("true", eval("/a/i.test('A')"))
+        assertEquals("true", eval("/./s.test('\\n')"))
+        assertEquals("1", eval("var r = /a/g; r.exec('aa'); r.lastIndex"))
+        assertEquals("aa", eval("/(a)\\1/.exec('aa')[0]"))
+        assertEquals("b", eval("/(?<=a)b/.exec('ab')[0]"))
+        assertEquals("123", eval("/(\\d+)/.exec('a123b'); RegExp.\$1"))
+        assertEquals("throws SyntaxError: Unterminated parenthetical ", eval("new RegExp('(')"))
+    }
+
+    @Test
     fun objectsAndPrototypes() {
         assertEquals("deep", eval("var o = { a: { b: { c: 'deep' } } }; o.a.b.c"))
         assertEquals("42", eval("var o = { get x() { return 42 } }; o.x"))

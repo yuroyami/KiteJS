@@ -6,6 +6,7 @@ package io.github.yuroyami.kitejs
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import io.github.yuroyami.kitejs.Characters
 import kotlin.test.assertTrue
 
 /**
@@ -99,6 +100,25 @@ class UnicodeTablesOracleTest {
         // And every script the JDK has needs a name in the table.
         for (script in scripts) {
             assertTrue(UnicodeTables.SCRIPT_NAMES.containsValue(script.ordinal), "no name for ${script.name}")
+        }
+    }
+
+    @Test
+    fun scriptLookupMatchesForName() {
+        val scripts = Character.UnicodeScript.entries.toTypedArray()
+        // Names the JDK accepts, in every casing, plus names it rejects.
+        val candidates = buildList {
+            for (script in scripts) {
+                add(script.name)
+                add(script.name.lowercase())
+                add(script.name.replaceFirstChar { it.uppercase() }.lowercase().replaceFirstChar { it.uppercase() })
+            }
+            addAll(UnicodeTables.SCRIPT_NAMES.keys)
+            addAll(listOf("Latn", "latn", "LATN", "NotAScript", "", "Old_North_Arabian", "OldNorthArabian", "Latin_", "_Latin"))
+        }
+        for (name in candidates) {
+            val expected = try { scripts.indexOf(Character.UnicodeScript.forName(name)) } catch (e: IllegalArgumentException) { -1 }
+            assertEquals(expected, Characters.scriptForName(name), "scriptForName(\"$name\")")
         }
     }
 }

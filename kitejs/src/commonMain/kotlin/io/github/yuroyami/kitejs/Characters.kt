@@ -93,15 +93,13 @@ internal object Characters {
     }
 
     /**
-     * The index of a script named [name], or -1. Matches `Character.UnicodeScript.forName`: case
-     * and the separators `_`, `-` and space are ignored, and the four-letter aliases work.
+     * The index of a script named [name], or -1. Matches `Character.UnicodeScript.forName`, which
+     * upper-cases the name and then looks it up among the enum names and the four-letter aliases.
+     * Separators are not stripped, so `Old_North_Arabian` works and `OldNorthArabian` does not.
      */
     fun scriptForName(name: String): Int {
         val sb = StringBuilder(name.length)
-        for (c in name) {
-            if (c == '_' || c == '-' || c == ' ') continue
-            sb.append(if (c in 'a'..'z') c - 32 else c)
-        }
+        for (c in name) sb.append(if (c in 'a'..'z') c - 32 else c)
         return UnicodeTables.SCRIPT_NAMES[sb.toString()] ?: -1
     }
 

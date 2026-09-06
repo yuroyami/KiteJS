@@ -11,7 +11,7 @@ import io.github.yuroyami.kitejs.ScriptableObject.DescriptorInfo
  * The JavaScript `String` wrapper object and the `String.prototype` methods.
  *
  * The regular-expression methods (`match`, `search`, `replace` with a pattern, `split` with a
- * pattern, `matchAll`) go through the [RegExpProxy], which phase 4 installs.
+ * pattern, `matchAll`) go through the [RegExpProxy], which the regexp engine installs.
  */
 class NativeString internal constructor(private val string: CharSequence) : ScriptableObject() {
 

@@ -15,912 +15,148 @@ object EvalCorpusSlice {
     val programs: List<Program> = listOf(
         Program(
             "closures_counter",
-            """// Independent counters, each with its own captured state.
-function makeCounter(start) {
-  var count = start;
-  return {
-    inc: function () { return ++count; },
-    dec: function () { return --count; },
-    get: function () { return count; }
-  };
-}
-var a = makeCounter(10), b = makeCounter(100);
-a.inc(); a.inc(); b.dec();
-var log = [];
-log.push(a.get(), b.get(), a.inc() + b.inc());
-var adders = [];
-for (var i = 0; i < 3; i++) {
-  adders.push((function (n) { return function (x) { return x + n; }; })(i));
-}
-log.push(adders[0](10), adders[1](10), adders[2](10));
-log.join(',');
-""",
-            """12,99,113,10,11,12""",
+            "// Independent counters, each with its own captured state.\nfunction makeCounter(start) {\n  var count = start;\n  return {\n    inc: function () { return ++count; },\n    dec: function () { return --count; },\n    get: function () { return count; }\n  };\n}\nvar a = makeCounter(10), b = makeCounter(100);\na.inc(); a.inc(); b.dec();\nvar log = [];\nlog.push(a.get(), b.get(), a.inc() + b.inc());\nvar adders = [];\nfor (var i = 0; i < 3; i++) {\n  adders.push((function (n) { return function (x) { return x + n; }; })(i));\n}\nlog.push(adders[0](10), adders[1](10), adders[2](10));\nlog.join(',');\n",
+            "12,99,113,10,11,12",
         ),
         Program(
             "recursion",
-            """function fact(n) { return n <= 1 ? 1 : n * fact(n - 1); }
-var memo = {};
-function fib(n) {
-  if (n < 2) return n;
-  if (memo[n] !== undefined) return memo[n];
-  return memo[n] = fib(n - 1) + fib(n - 2);
-}
-function ack(m, n) {
-  if (m === 0) return n + 1;
-  if (n === 0) return ack(m - 1, 1);
-  return ack(m - 1, ack(m, n - 1));
-}
-function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
-function hanoi(n, from, to, via, moves) {
-  if (n === 0) return moves;
-  hanoi(n - 1, from, via, to, moves);
-  moves.push(from + '>' + to);
-  return hanoi(n - 1, via, to, from, moves);
-}
-function sumDigits(n) { return n < 10 ? n : (n % 10) + sumDigits(Math.floor(n / 10)); }
-[fact(10), fib(40), ack(2, 3), gcd(1071, 462), hanoi(3, 'A', 'C', 'B', []).join(' '), sumDigits(987654321)].join('|');
-""",
-            """3628800|102334155|9|21|A>C A>B C>B A>C B>A B>C A>C|45""",
+            "function fact(n) { return n <= 1 ? 1 : n * fact(n - 1); }\nvar memo = {};\nfunction fib(n) {\n  if (n < 2) return n;\n  if (memo[n] !== undefined) return memo[n];\n  return memo[n] = fib(n - 1) + fib(n - 2);\n}\nfunction ack(m, n) {\n  if (m === 0) return n + 1;\n  if (n === 0) return ack(m - 1, 1);\n  return ack(m - 1, ack(m, n - 1));\n}\nfunction gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }\nfunction hanoi(n, from, to, via, moves) {\n  if (n === 0) return moves;\n  hanoi(n - 1, from, via, to, moves);\n  moves.push(from + '>' + to);\n  return hanoi(n - 1, via, to, from, moves);\n}\nfunction sumDigits(n) { return n < 10 ? n : (n % 10) + sumDigits(Math.floor(n / 10)); }\n[fact(10), fib(40), ack(2, 3), gcd(1071, 462), hanoi(3, 'A', 'C', 'B', []).join(' '), sumDigits(987654321)].join('|');\n",
+            "3628800|102334155|9|21|A>C A>B C>B A>C B>A B>C A>C|45",
         ),
         Program(
             "sorting_algorithms",
-            """var input = [33, 7, -2, 19, 7, 0, 100, -50, 42, 3, 8, 8, 1];
-function bubble(a) {
-  a = a.slice();
-  for (var i = 0; i < a.length; i++)
-    for (var j = 0; j < a.length - i - 1; j++)
-      if (a[j] > a[j + 1]) { var t = a[j]; a[j] = a[j + 1]; a[j + 1] = t; }
-  return a;
-}
-function insertion(a) {
-  a = a.slice();
-  for (var i = 1; i < a.length; i++) {
-    var v = a[i], j = i - 1;
-    while (j >= 0 && a[j] > v) { a[j + 1] = a[j]; j--; }
-    a[j + 1] = v;
-  }
-  return a;
-}
-function quick(a) {
-  if (a.length <= 1) return a;
-  var pivot = a[0], left = [], right = [];
-  for (var i = 1; i < a.length; i++) (a[i] < pivot ? left : right).push(a[i]);
-  return quick(left).concat([pivot], quick(right));
-}
-function merge(a) {
-  if (a.length <= 1) return a;
-  var mid = a.length >> 1;
-  var l = merge(a.slice(0, mid)), r = merge(a.slice(mid)), out = [];
-  while (l.length && r.length) out.push(l[0] <= r[0] ? l.shift() : r.shift());
-  return out.concat(l, r);
-}
-var builtin = input.slice().sort(function (x, y) { return x - y; });
-var lexical = input.slice().sort();
-var all = [bubble(input), insertion(input), quick(input), merge(input)];
-var agree = all.every(function (a) { return a.join() === builtin.join(); });
-[builtin.join(' '), lexical.join(' '), agree, input.join(' ')].join('|');
-""",
-            """-50 -2 0 1 3 7 7 8 8 19 33 42 100|-2 -50 0 1 100 19 3 33 42 7 7 8 8|true|33 7 -2 19 7 0 100 -50 42 3 8 8 1""",
+            "var input = [33, 7, -2, 19, 7, 0, 100, -50, 42, 3, 8, 8, 1];\nfunction bubble(a) {\n  a = a.slice();\n  for (var i = 0; i < a.length; i++)\n    for (var j = 0; j < a.length - i - 1; j++)\n      if (a[j] > a[j + 1]) { var t = a[j]; a[j] = a[j + 1]; a[j + 1] = t; }\n  return a;\n}\nfunction insertion(a) {\n  a = a.slice();\n  for (var i = 1; i < a.length; i++) {\n    var v = a[i], j = i - 1;\n    while (j >= 0 && a[j] > v) { a[j + 1] = a[j]; j--; }\n    a[j + 1] = v;\n  }\n  return a;\n}\nfunction quick(a) {\n  if (a.length <= 1) return a;\n  var pivot = a[0], left = [], right = [];\n  for (var i = 1; i < a.length; i++) (a[i] < pivot ? left : right).push(a[i]);\n  return quick(left).concat([pivot], quick(right));\n}\nfunction merge(a) {\n  if (a.length <= 1) return a;\n  var mid = a.length >> 1;\n  var l = merge(a.slice(0, mid)), r = merge(a.slice(mid)), out = [];\n  while (l.length && r.length) out.push(l[0] <= r[0] ? l.shift() : r.shift());\n  return out.concat(l, r);\n}\nvar builtin = input.slice().sort(function (x, y) { return x - y; });\nvar lexical = input.slice().sort();\nvar all = [bubble(input), insertion(input), quick(input), merge(input)];\nvar agree = all.every(function (a) { return a.join() === builtin.join(); });\n[builtin.join(' '), lexical.join(' '), agree, input.join(' ')].join('|');\n",
+            "-50 -2 0 1 3 7 7 8 8 19 33 42 100|-2 -50 0 1 100 19 3 33 42 7 7 8 8|true|33 7 -2 19 7 0 100 -50 42 3 8 8 1",
         ),
         Program(
             "string_processing",
-            """function reverseWords(s) { return s.split(' ').reverse().join(' '); }
-function isPalindrome(s) {
-  var t = s.toLowerCase().split('').filter(function (c) { return c >= 'a' && c <= 'z'; }).join('');
-  return t === t.split('').reverse().join('');
-}
-function caesar(s, k) {
-  var out = '';
-  for (var i = 0; i < s.length; i++) {
-    var c = s.charCodeAt(i);
-    if (c >= 65 && c <= 90) out += String.fromCharCode((c - 65 + k) % 26 + 65);
-    else if (c >= 97 && c <= 122) out += String.fromCharCode((c - 97 + k) % 26 + 97);
-    else out += s[i];
-  }
-  return out;
-}
-function capitalize(s) {
-  return s.split(' ').map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); }).join(' ');
-}
-function frequency(s) {
-  var f = {};
-  for (var i = 0; i < s.length; i++) f[s[i]] = (f[s[i]] || 0) + 1;
-  return Object.keys(f).sort().map(function (k) { return k + '=' + f[k]; }).join(',');
-}
-function vowels(s) { return s.split('').filter(function (c) { return 'aeiou'.indexOf(c.toLowerCase()) >= 0; }).length; }
-[
-  reverseWords('the quick brown fox'),
-  isPalindrome('A man, a plan, a canal: Panama'),
-  isPalindrome('not one'),
-  caesar('Hello, World!', 3),
-  caesar(caesar('Hello, World!', 3), 23),
-  capitalize('hELLO wORLD from kiteJS'),
-  frequency('mississippi'),
-  vowels('Programming Languages'),
-  'abc'.padStart(6, '-') + 'abc'.padEnd(6, '+'),
-  '  trim me  '.trim().length
-].join('|');
-""",
-            """fox brown quick the|true|false|Khoor, Zruog!|Hello, World!|Hello World From Kitejs|i=4,m=1,p=2,s=4|7|---abcabc+++|7""",
+            "function reverseWords(s) { return s.split(' ').reverse().join(' '); }\nfunction isPalindrome(s) {\n  var t = s.toLowerCase().split('').filter(function (c) { return c >= 'a' && c <= 'z'; }).join('');\n  return t === t.split('').reverse().join('');\n}\nfunction caesar(s, k) {\n  var out = '';\n  for (var i = 0; i < s.length; i++) {\n    var c = s.charCodeAt(i);\n    if (c >= 65 && c <= 90) out += String.fromCharCode((c - 65 + k) % 26 + 65);\n    else if (c >= 97 && c <= 122) out += String.fromCharCode((c - 97 + k) % 26 + 97);\n    else out += s[i];\n  }\n  return out;\n}\nfunction capitalize(s) {\n  return s.split(' ').map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); }).join(' ');\n}\nfunction frequency(s) {\n  var f = {};\n  for (var i = 0; i < s.length; i++) f[s[i]] = (f[s[i]] || 0) + 1;\n  return Object.keys(f).sort().map(function (k) { return k + '=' + f[k]; }).join(',');\n}\nfunction vowels(s) { return s.split('').filter(function (c) { return 'aeiou'.indexOf(c.toLowerCase()) >= 0; }).length; }\n[\n  reverseWords('the quick brown fox'),\n  isPalindrome('A man, a plan, a canal: Panama'),\n  isPalindrome('not one'),\n  caesar('Hello, World!', 3),\n  caesar(caesar('Hello, World!', 3), 23),\n  capitalize('hELLO wORLD from kiteJS'),\n  frequency('mississippi'),\n  vowels('Programming Languages'),\n  'abc'.padStart(6, '-') + 'abc'.padEnd(6, '+'),\n  '  trim me  '.trim().length\n].join('|');\n",
+            "fox brown quick the|true|false|Khoor, Zruog!|Hello, World!|Hello World From Kitejs|i=4,m=1,p=2,s=4|7|---abcabc+++|7",
         ),
         Program(
             "objects_and_prototypes",
-            """function Animal(name) { this.name = name; }
-Animal.prototype.speak = function () { return this.name + ' makes a sound'; };
-Animal.prototype.kind = 'animal';
-function Dog(name) { Animal.call(this, name); }
-Dog.prototype = Object.create(Animal.prototype);
-Dog.prototype.constructor = Dog;
-Dog.prototype.speak = function () { return Animal.prototype.speak.call(this) + ': woof'; };
-var d = new Dog('Rex');
-var base = { greet: function () { return 'hi ' + this.who; } };
-var derived = Object.create(base, { who: { value: 'there', enumerable: true } });
-var chain = [];
-for (var o = d; o; o = Object.getPrototypeOf(o)) chain.push(o.constructor.name || '?');
-var out = [
-  d.speak(),
-  d instanceof Dog, d instanceof Animal, d instanceof Object,
-  d.hasOwnProperty('name'), d.hasOwnProperty('speak'), 'speak' in d, 'kind' in d,
-  d.kind, Object.keys(d).join(), chain.join('>'),
-  derived.greet(), Object.getPrototypeOf(derived) === base,
-  Dog.prototype.isPrototypeOf(d), Animal.prototype.isPrototypeOf(d),
-  Object.getOwnPropertyNames(Dog.prototype).sort().join()
-];
-d.kind = 'pet';
-out.push(d.kind, Animal.prototype.kind, delete d.kind, d.kind);
-out.join('|');
-""",
-            """Rex makes a sound: woof|true|true|true|true|false|true|true|animal|name|Dog>Dog>Animal>Object|hi there|true|true|true|constructor,speak|pet|animal|true|animal""",
+            "function Animal(name) { this.name = name; }\nAnimal.prototype.speak = function () { return this.name + ' makes a sound'; };\nAnimal.prototype.kind = 'animal';\nfunction Dog(name) { Animal.call(this, name); }\nDog.prototype = Object.create(Animal.prototype);\nDog.prototype.constructor = Dog;\nDog.prototype.speak = function () { return Animal.prototype.speak.call(this) + ': woof'; };\nvar d = new Dog('Rex');\nvar base = { greet: function () { return 'hi ' + this.who; } };\nvar derived = Object.create(base, { who: { value: 'there', enumerable: true } });\nvar chain = [];\nfor (var o = d; o; o = Object.getPrototypeOf(o)) chain.push(o.constructor.name || '?');\nvar out = [\n  d.speak(),\n  d instanceof Dog, d instanceof Animal, d instanceof Object,\n  d.hasOwnProperty('name'), d.hasOwnProperty('speak'), 'speak' in d, 'kind' in d,\n  d.kind, Object.keys(d).join(), chain.join('>'),\n  derived.greet(), Object.getPrototypeOf(derived) === base,\n  Dog.prototype.isPrototypeOf(d), Animal.prototype.isPrototypeOf(d),\n  Object.getOwnPropertyNames(Dog.prototype).sort().join()\n];\nd.kind = 'pet';\nout.push(d.kind, Animal.prototype.kind, delete d.kind, d.kind);\nout.join('|');\n",
+            "Rex makes a sound: woof|true|true|true|true|false|true|true|animal|name|Dog>Dog>Animal>Object|hi there|true|true|true|constructor,speak|pet|animal|true|animal",
         ),
         Program(
             "control_flow",
-            """var out = [];
-outer: for (var i = 0; i < 4; i++) {
-  for (var j = 0; j < 4; j++) {
-    if (j === 2) continue outer;
-    if (i === 3) break outer;
-    out.push(i + '' + j);
-  }
-}
-function sw(x) {
-  var r = '';
-  switch (x) {
-    case 1: r += 'one';
-    case 2: r += 'two'; break;
-    case 'a': case 'b': r += 'ab'; break;
-    default: r += 'def';
-    case 3: r += 'three';
-  }
-  return r;
-}
-out.push(sw(1), sw(2), sw('a'), sw(9), sw(3));
-var k = 0;
-do { k += 3; } while (k < 10);
-out.push(k);
-var w = 5, steps = '';
-while (w--) steps += w;
-out.push(steps);
-var obj = { b: 1, a: 2, 10: 'x', 2: 'y' }, keys = '';
-for (var key in obj) keys += key + ';';
-out.push(keys);
-var s = '';
-for (var ch of 'hey') s += ch.toUpperCase();
-out.push(s);
-var x = (1, 2, 3);
-out.push(x, 5 > 3 ? 'yes' : 'no', 0 || 'or', 1 && 'and', null ?? 'nullish', 0 ?? 'zero');
-var counter = 0;
-function tick() { return ++counter; }
-if (false && tick()) {}
-if (true || tick()) {}
-out.push(counter);
-block: { out.push('in'); break block; out.push('never'); }
-out.join('|');
-""",
-            """00|01|10|11|20|21|onetwo|two|ab|defthree|three|12|43210|2;10;b;a;|HEY|3|yes|or|and|nullish|0|0|in""",
+            "var out = [];\nouter: for (var i = 0; i < 4; i++) {\n  for (var j = 0; j < 4; j++) {\n    if (j === 2) continue outer;\n    if (i === 3) break outer;\n    out.push(i + '' + j);\n  }\n}\nfunction sw(x) {\n  var r = '';\n  switch (x) {\n    case 1: r += 'one';\n    case 2: r += 'two'; break;\n    case 'a': case 'b': r += 'ab'; break;\n    default: r += 'def';\n    case 3: r += 'three';\n  }\n  return r;\n}\nout.push(sw(1), sw(2), sw('a'), sw(9), sw(3));\nvar k = 0;\ndo { k += 3; } while (k < 10);\nout.push(k);\nvar w = 5, steps = '';\nwhile (w--) steps += w;\nout.push(steps);\nvar obj = { b: 1, a: 2, 10: 'x', 2: 'y' }, keys = '';\nfor (var key in obj) keys += key + ';';\nout.push(keys);\nvar s = '';\nfor (var ch of 'hey') s += ch.toUpperCase();\nout.push(s);\nvar x = (1, 2, 3);\nout.push(x, 5 > 3 ? 'yes' : 'no', 0 || 'or', 1 && 'and', null ?? 'nullish', 0 ?? 'zero');\nvar counter = 0;\nfunction tick() { return ++counter; }\nif (false && tick()) {}\nif (true || tick()) {}\nout.push(counter);\nblock: { out.push('in'); break block; out.push('never'); }\nout.join('|');\n",
+            "00|01|10|11|20|21|onetwo|two|ab|defthree|three|12|43210|2;10;b;a;|HEY|3|yes|or|and|nullish|0|0|in",
         ),
         Program(
             "exceptions",
-            """var log = [];
-function CustomError(message, code) {
-  this.name = 'CustomError';
-  this.message = message;
-  this.code = code;
-}
-CustomError.prototype = Object.create(Error.prototype);
-CustomError.prototype.constructor = CustomError;
-function ValidationError(field) {
-  var e = Error.call(this, 'bad ' + field);
-  this.message = e.message;
-  this.name = 'ValidationError';
-  this.field = field;
-}
-ValidationError.prototype = Object.create(Error.prototype);
-ValidationError.prototype.constructor = ValidationError;
-function order() {
-  try { log.push('try'); throw new Error('boom'); }
-  catch (e) { log.push('catch:' + e.message); return 'from catch'; }
-  finally { log.push('finally'); }
-}
-function override() { try { return 'try'; } finally { return 'finally'; } }
-function nested() {
-  try {
-    try { throw new CustomError('inner', 42); }
-    finally { log.push('inner finally'); }
-  } catch (e) { return e.name + ':' + e.code + ':' + (e instanceof Error) + ':' + (e instanceof CustomError); }
-}
-function rethrow() {
-  try { try { throw 'first'; } catch (e) { throw e + '+second'; } } catch (e) { return e; }
-}
-function loopFinally() {
-  var r = '';
-  for (var i = 0; i < 3; i++) { try { if (i === 1) continue; if (i === 2) break; r += i; } finally { r += 'f'; } }
-  return r;
-}
-var out = [order(), log.join(), override(), nested(), rethrow(), loopFinally()];
-try { throw new ValidationError('email'); } catch (e) { out.push(e.name, e.message, e.field, e instanceof ValidationError, e instanceof Error, '' + e); }
-try { null.x; } catch (e) { out.push(e.name, e instanceof TypeError); }
-try { undefinedFunction(); } catch (e) { out.push(e.name, e.message); }
-try { throw { custom: true }; } catch (e) { out.push(typeof e, e.custom); }
-try { throw 42; } catch (e) { out.push(e + 1); }
-var caught = 0;
-try { try { throw 1; } finally { caught++; } } catch (e) { caught += 10; }
-out.push(caught);
-out.push((function () { try { throw new RangeError('r'); } catch ({ name, message }) { return name + '/' + message; } })());
-var err = new Error('with props', { cause: 'root' });
-out.push(err.cause, Object.keys(err).join(), err.propertyIsEnumerable('message'), JSON.stringify(err));
-out.join('|');
-""",
-            """from catch|try,catch:boom,finally|finally|CustomError:42:true:true|first+second|0fff|ValidationError|bad email|email|true|true|ValidationError: bad email|TypeError|true|ReferenceError|"undefinedFunction" is not defined.|object|true|43|11|RangeError/r|root||false|{}""",
+            "var log = [];\nfunction CustomError(message, code) {\n  this.name = 'CustomError';\n  this.message = message;\n  this.code = code;\n}\nCustomError.prototype = Object.create(Error.prototype);\nCustomError.prototype.constructor = CustomError;\nfunction ValidationError(field) {\n  var e = Error.call(this, 'bad ' + field);\n  this.message = e.message;\n  this.name = 'ValidationError';\n  this.field = field;\n}\nValidationError.prototype = Object.create(Error.prototype);\nValidationError.prototype.constructor = ValidationError;\nfunction order() {\n  try { log.push('try'); throw new Error('boom'); }\n  catch (e) { log.push('catch:' + e.message); return 'from catch'; }\n  finally { log.push('finally'); }\n}\nfunction override() { try { return 'try'; } finally { return 'finally'; } }\nfunction nested() {\n  try {\n    try { throw new CustomError('inner', 42); }\n    finally { log.push('inner finally'); }\n  } catch (e) { return e.name + ':' + e.code + ':' + (e instanceof Error) + ':' + (e instanceof CustomError); }\n}\nfunction rethrow() {\n  try { try { throw 'first'; } catch (e) { throw e + '+second'; } } catch (e) { return e; }\n}\nfunction loopFinally() {\n  var r = '';\n  for (var i = 0; i < 3; i++) { try { if (i === 1) continue; if (i === 2) break; r += i; } finally { r += 'f'; } }\n  return r;\n}\nvar out = [order(), log.join(), override(), nested(), rethrow(), loopFinally()];\ntry { throw new ValidationError('email'); } catch (e) { out.push(e.name, e.message, e.field, e instanceof ValidationError, e instanceof Error, '' + e); }\ntry { null.x; } catch (e) { out.push(e.name, e instanceof TypeError); }\ntry { undefinedFunction(); } catch (e) { out.push(e.name, e.message); }\ntry { throw { custom: true }; } catch (e) { out.push(typeof e, e.custom); }\ntry { throw 42; } catch (e) { out.push(e + 1); }\nvar caught = 0;\ntry { try { throw 1; } finally { caught++; } } catch (e) { caught += 10; }\nout.push(caught);\nout.push((function () { try { throw new RangeError('r'); } catch ({ name, message }) { return name + '/' + message; } })());\nvar err = new Error('with props', { cause: 'root' });\nout.push(err.cause, Object.keys(err).join(), err.propertyIsEnumerable('message'), JSON.stringify(err));\nout.join('|');\n",
+            "from catch|try,catch:boom,finally|finally|CustomError:42:true:true|first+second|0fff|ValidationError|bad email|email|true|true|ValidationError: bad email|TypeError|true|ReferenceError|\"undefinedFunction\" is not defined.|object|true|43|11|RangeError/r|root||false|{}",
         ),
         Program(
             "higher_order_functions",
-            """function compose() { var fns = Array.prototype.slice.call(arguments); return function (x) { return fns.reduceRight(function (acc, f) { return f(acc); }, x); }; }
-function pipe() { var fns = Array.prototype.slice.call(arguments); return function (x) { return fns.reduce(function (acc, f) { return f(acc); }, x); }; }
-function curry(fn) {
-  return function curried() {
-    var args = Array.prototype.slice.call(arguments);
-    if (args.length >= fn.length) return fn.apply(this, args);
-    return function () { return curried.apply(this, args.concat(Array.prototype.slice.call(arguments))); };
-  };
-}
-function memoize(fn) { var cache = {}, calls = 0; var m = function (x) { if (!(x in cache)) { calls++; cache[x] = fn(x); } return cache[x]; }; m.calls = function () { return calls; }; return m; }
-function partial(fn) { var preset = Array.prototype.slice.call(arguments, 1); return function () { return fn.apply(this, preset.concat(Array.prototype.slice.call(arguments))); }; }
-function debounceLike(fn) { var last; return function (x) { if (x === last) return 'skip'; last = x; return fn(x); }; }
-var inc = function (x) { return x + 1; }, dbl = function (x) { return x * 2; }, sq = function (x) { return x * x; };
-var add3 = curry(function (a, b, c) { return a + b + c; });
-var slowSquare = memoize(function (x) { return x * x; });
-slowSquare(4); slowSquare(4); slowSquare(5);
-var greet = partial(function (greeting, name, punct) { return greeting + ', ' + name + punct; }, 'Hello');
-var d = debounceLike(function (x) { return 'ran:' + x; });
-[compose(inc, dbl)(5), pipe(inc, dbl)(5), compose(sq, inc, dbl)(2), add3(1)(2)(3), add3(1, 2)(3), add3(1)(2, 3), add3(1, 2, 3), slowSquare(4), slowSquare.calls(), greet('Kite', '!'), d(1), d(1), d(2),
-  [1, 2, 3, 4].map(sq).filter(function (x) { return x % 2; }).reduce(function (a, b) { return a + b; }), ['a', 'b'].map(function (c, i) { return c + i; }).join(), typeof compose()].join('|');
-""",
-            """11|12|25|6|6|6|6|16|2|Hello, Kite!|ran:1|skip|ran:2|10|a0,b1|function""",
+            "function compose() { var fns = Array.prototype.slice.call(arguments); return function (x) { return fns.reduceRight(function (acc, f) { return f(acc); }, x); }; }\nfunction pipe() { var fns = Array.prototype.slice.call(arguments); return function (x) { return fns.reduce(function (acc, f) { return f(acc); }, x); }; }\nfunction curry(fn) {\n  return function curried() {\n    var args = Array.prototype.slice.call(arguments);\n    if (args.length >= fn.length) return fn.apply(this, args);\n    return function () { return curried.apply(this, args.concat(Array.prototype.slice.call(arguments))); };\n  };\n}\nfunction memoize(fn) { var cache = {}, calls = 0; var m = function (x) { if (!(x in cache)) { calls++; cache[x] = fn(x); } return cache[x]; }; m.calls = function () { return calls; }; return m; }\nfunction partial(fn) { var preset = Array.prototype.slice.call(arguments, 1); return function () { return fn.apply(this, preset.concat(Array.prototype.slice.call(arguments))); }; }\nfunction debounceLike(fn) { var last; return function (x) { if (x === last) return 'skip'; last = x; return fn(x); }; }\nvar inc = function (x) { return x + 1; }, dbl = function (x) { return x * 2; }, sq = function (x) { return x * x; };\nvar add3 = curry(function (a, b, c) { return a + b + c; });\nvar slowSquare = memoize(function (x) { return x * x; });\nslowSquare(4); slowSquare(4); slowSquare(5);\nvar greet = partial(function (greeting, name, punct) { return greeting + ', ' + name + punct; }, 'Hello');\nvar d = debounceLike(function (x) { return 'ran:' + x; });\n[compose(inc, dbl)(5), pipe(inc, dbl)(5), compose(sq, inc, dbl)(2), add3(1)(2)(3), add3(1, 2)(3), add3(1)(2, 3), add3(1, 2, 3), slowSquare(4), slowSquare.calls(), greet('Kite', '!'), d(1), d(1), d(2),\n  [1, 2, 3, 4].map(sq).filter(function (x) { return x % 2; }).reduce(function (a, b) { return a + b; }), ['a', 'b'].map(function (c, i) { return c + i; }).join(), typeof compose()].join('|');\n",
+            "11|12|25|6|6|6|6|16|2|Hello, Kite!|ran:1|skip|ran:2|10|a0,b1|function",
         ),
         Program(
             "linked_list",
-            """function Node(value, next) { this.value = value; this.next = next || null; }
-function LinkedList() { this.head = null; this.size = 0; }
-LinkedList.prototype.push = function (v) {
-  var node = new Node(v);
-  if (!this.head) this.head = node;
-  else { var cur = this.head; while (cur.next) cur = cur.next; cur.next = node; }
-  this.size++;
-  return this;
-};
-LinkedList.prototype.toArray = function () { var out = []; for (var c = this.head; c; c = c.next) out.push(c.value); return out; };
-LinkedList.prototype.reverse = function () { var prev = null, cur = this.head; while (cur) { var next = cur.next; cur.next = prev; prev = cur; cur = next; } this.head = prev; return this; };
-LinkedList.prototype.remove = function (v) { if (!this.head) return false; if (this.head.value === v) { this.head = this.head.next; this.size--; return true; } for (var c = this.head; c.next; c = c.next) if (c.next.value === v) { c.next = c.next.next; this.size--; return true; } return false; };
-LinkedList.prototype.find = function (pred) { for (var c = this.head; c; c = c.next) if (pred(c.value)) return c.value; return undefined; };
-LinkedList.prototype.map = function (f) { var l = new LinkedList(); for (var c = this.head; c; c = c.next) l.push(f(c.value)); return l; };
-var l = new LinkedList().push(1).push(2).push(3).push(4);
-var out = [l.toArray().join(), l.size, l.reverse().toArray().join(), l.remove(3), l.remove(99), l.toArray().join(), l.size, l.find(function (v) { return v % 2 === 0; }), l.map(function (v) { return v * 10; }).toArray().join()];
-var middle = (function (list) { var slow = list.head, fast = list.head; while (fast && fast.next) { slow = slow.next; fast = fast.next.next; } return slow.value; })(new LinkedList().push('a').push('b').push('c').push('d').push('e'));
-out.push(middle);
-out.join('|');
-""",
-            """1,2,3,4|4|4,3,2,1|true|false|4,2,1|3|4|40,20,10|c""",
+            "function Node(value, next) { this.value = value; this.next = next || null; }\nfunction LinkedList() { this.head = null; this.size = 0; }\nLinkedList.prototype.push = function (v) {\n  var node = new Node(v);\n  if (!this.head) this.head = node;\n  else { var cur = this.head; while (cur.next) cur = cur.next; cur.next = node; }\n  this.size++;\n  return this;\n};\nLinkedList.prototype.toArray = function () { var out = []; for (var c = this.head; c; c = c.next) out.push(c.value); return out; };\nLinkedList.prototype.reverse = function () { var prev = null, cur = this.head; while (cur) { var next = cur.next; cur.next = prev; prev = cur; cur = next; } this.head = prev; return this; };\nLinkedList.prototype.remove = function (v) { if (!this.head) return false; if (this.head.value === v) { this.head = this.head.next; this.size--; return true; } for (var c = this.head; c.next; c = c.next) if (c.next.value === v) { c.next = c.next.next; this.size--; return true; } return false; };\nLinkedList.prototype.find = function (pred) { for (var c = this.head; c; c = c.next) if (pred(c.value)) return c.value; return undefined; };\nLinkedList.prototype.map = function (f) { var l = new LinkedList(); for (var c = this.head; c; c = c.next) l.push(f(c.value)); return l; };\nvar l = new LinkedList().push(1).push(2).push(3).push(4);\nvar out = [l.toArray().join(), l.size, l.reverse().toArray().join(), l.remove(3), l.remove(99), l.toArray().join(), l.size, l.find(function (v) { return v % 2 === 0; }), l.map(function (v) { return v * 10; }).toArray().join()];\nvar middle = (function (list) { var slow = list.head, fast = list.head; while (fast && fast.next) { slow = slow.next; fast = fast.next.next; } return slow.value; })(new LinkedList().push('a').push('b').push('c').push('d').push('e'));\nout.push(middle);\nout.join('|');\n",
+            "1,2,3,4|4|4,3,2,1|true|false|4,2,1|3|4|40,20,10|c",
         ),
         Program(
             "binary_tree",
-            """function TreeNode(v) { this.v = v; this.left = null; this.right = null; }
-function BST() { this.root = null; this.count = 0; }
-BST.prototype.insert = function (v) {
-  var node = new TreeNode(v);
-  this.count++;
-  if (!this.root) { this.root = node; return this; }
-  var cur = this.root;
-  while (true) {
-    if (v < cur.v) { if (!cur.left) { cur.left = node; break; } cur = cur.left; }
-    else { if (!cur.right) { cur.right = node; break; } cur = cur.right; }
-  }
-  return this;
-};
-BST.prototype.inorder = function (node, out) {
-  if (arguments.length === 0) { node = this.root; out = []; }
-  if (node) { this.inorder(node.left, out); out.push(node.v); this.inorder(node.right, out); }
-  return out;
-};
-BST.prototype.preorder = function (node = this.root, out = []) { if (node) { out.push(node.v); this.preorder(node.left, out); this.preorder(node.right, out); } return out; };
-BST.prototype.height = function (node = this.root) { return node ? 1 + Math.max(this.height(node.left), this.height(node.right)) : 0; };
-BST.prototype.contains = function (v) { var c = this.root; while (c) { if (v === c.v) return true; c = v < c.v ? c.left : c.right; } return false; };
-BST.prototype.min = function () { var c = this.root; while (c.left) c = c.left; return c.v; };
-BST.prototype.max = function () { var c = this.root; while (c.right) c = c.right; return c.v; };
-BST.prototype.levels = function () {
-  var out = [], q = this.root ? [this.root] : [];
-  while (q.length) {
-    var next = [], vals = [];
-    q.forEach(function (n) { vals.push(n.v); if (n.left) next.push(n.left); if (n.right) next.push(n.right); });
-    out.push(vals.join(','));
-    q = next;
-  }
-  return out.join(' / ');
-};
-var t = new BST();
-[50, 30, 70, 20, 40, 60, 80, 35, 45, 65].forEach(function (v) { t.insert(v); });
-[t.inorder().join(), t.preorder().join(), t.height(), t.contains(45), t.contains(55), t.min(), t.max(), t.count, t.levels()].join('|');
-""",
-            """20,30,35,40,45,50,60,65,70,80|50,30,20,40,35,45,70,60,65,80|4|true|false|20|80|10|50 / 30,70 / 20,40,60,80 / 35,45,65""",
+            "function TreeNode(v) { this.v = v; this.left = null; this.right = null; }\nfunction BST() { this.root = null; this.count = 0; }\nBST.prototype.insert = function (v) {\n  var node = new TreeNode(v);\n  this.count++;\n  if (!this.root) { this.root = node; return this; }\n  var cur = this.root;\n  while (true) {\n    if (v < cur.v) { if (!cur.left) { cur.left = node; break; } cur = cur.left; }\n    else { if (!cur.right) { cur.right = node; break; } cur = cur.right; }\n  }\n  return this;\n};\nBST.prototype.inorder = function (node, out) {\n  if (arguments.length === 0) { node = this.root; out = []; }\n  if (node) { this.inorder(node.left, out); out.push(node.v); this.inorder(node.right, out); }\n  return out;\n};\nBST.prototype.preorder = function (node = this.root, out = []) { if (node) { out.push(node.v); this.preorder(node.left, out); this.preorder(node.right, out); } return out; };\nBST.prototype.height = function (node = this.root) { return node ? 1 + Math.max(this.height(node.left), this.height(node.right)) : 0; };\nBST.prototype.contains = function (v) { var c = this.root; while (c) { if (v === c.v) return true; c = v < c.v ? c.left : c.right; } return false; };\nBST.prototype.min = function () { var c = this.root; while (c.left) c = c.left; return c.v; };\nBST.prototype.max = function () { var c = this.root; while (c.right) c = c.right; return c.v; };\nBST.prototype.levels = function () {\n  var out = [], q = this.root ? [this.root] : [];\n  while (q.length) {\n    var next = [], vals = [];\n    q.forEach(function (n) { vals.push(n.v); if (n.left) next.push(n.left); if (n.right) next.push(n.right); });\n    out.push(vals.join(','));\n    q = next;\n  }\n  return out.join(' / ');\n};\nvar t = new BST();\n[50, 30, 70, 20, 40, 60, 80, 35, 45, 65].forEach(function (v) { t.insert(v); });\n[t.inorder().join(), t.preorder().join(), t.height(), t.contains(45), t.contains(55), t.min(), t.max(), t.count, t.levels()].join('|');\n",
+            "20,30,35,40,45,50,60,65,70,80|50,30,20,40,35,45,70,60,65,80|4|true|false|20|80|10|50 / 30,70 / 20,40,60,80 / 35,45,65",
         ),
         Program(
             "stack_queue",
-            """function Stack() { this.items = []; }
-Stack.prototype.push = function (x) { this.items.push(x); return this; };
-Stack.prototype.pop = function () { return this.items.pop(); };
-Stack.prototype.peek = function () { return this.items[this.items.length - 1]; };
-Stack.prototype.isEmpty = function () { return this.items.length === 0; };
-function Queue() { this.items = []; }
-Queue.prototype.enqueue = function (x) { this.items.push(x); return this; };
-Queue.prototype.dequeue = function () { return this.items.shift(); };
-function balanced(s) {
-  var st = new Stack(), pairs = { ')': '(', ']': '[', '}': '{' };
-  for (var i = 0; i < s.length; i++) {
-    var c = s[i];
-    if ('([{'.indexOf(c) >= 0) st.push(c);
-    else if (c in pairs) { if (st.pop() !== pairs[c]) return false; }
-  }
-  return st.isEmpty();
-}
-function rpn(expr) {
-  var st = new Stack();
-  expr.split(' ').forEach(function (tok) {
-    if (!isNaN(tok)) st.push(Number(tok));
-    else { var b = st.pop(), a = st.pop(); st.push(tok === '+' ? a + b : tok === '-' ? a - b : tok === '*' ? a * b : a / b); }
-  });
-  return st.pop();
-}
-var q = new Queue().enqueue('a').enqueue('b').enqueue('c');
-var order = [q.dequeue(), q.dequeue(), q.enqueue('d').dequeue(), q.dequeue(), q.dequeue()].join();
-[balanced('([]{})'), balanced('([)]'), balanced('(('), balanced(''), rpn('3 4 + 2 *'), rpn('5 1 2 + 4 * + 3 -'), order, new Stack().push(1).push(2).peek()].join('|');
-""",
-            """true|false|false|true|14|14|a,b,c,d,|2""",
+            "function Stack() { this.items = []; }\nStack.prototype.push = function (x) { this.items.push(x); return this; };\nStack.prototype.pop = function () { return this.items.pop(); };\nStack.prototype.peek = function () { return this.items[this.items.length - 1]; };\nStack.prototype.isEmpty = function () { return this.items.length === 0; };\nfunction Queue() { this.items = []; }\nQueue.prototype.enqueue = function (x) { this.items.push(x); return this; };\nQueue.prototype.dequeue = function () { return this.items.shift(); };\nfunction balanced(s) {\n  var st = new Stack(), pairs = { ')': '(', ']': '[', '}': '{' };\n  for (var i = 0; i < s.length; i++) {\n    var c = s[i];\n    if ('([{'.indexOf(c) >= 0) st.push(c);\n    else if (c in pairs) { if (st.pop() !== pairs[c]) return false; }\n  }\n  return st.isEmpty();\n}\nfunction rpn(expr) {\n  var st = new Stack();\n  expr.split(' ').forEach(function (tok) {\n    if (!isNaN(tok)) st.push(Number(tok));\n    else { var b = st.pop(), a = st.pop(); st.push(tok === '+' ? a + b : tok === '-' ? a - b : tok === '*' ? a * b : a / b); }\n  });\n  return st.pop();\n}\nvar q = new Queue().enqueue('a').enqueue('b').enqueue('c');\nvar order = [q.dequeue(), q.dequeue(), q.enqueue('d').dequeue(), q.dequeue(), q.dequeue()].join();\n[balanced('([]{})'), balanced('([)]'), balanced('(('), balanced(''), rpn('3 4 + 2 *'), rpn('5 1 2 + 4 * + 3 -'), order, new Stack().push(1).push(2).peek()].join('|');\n",
+            "true|false|false|true|14|14|a,b,c,d,|2",
         ),
         Program(
             "prime_sieve",
-            """function sieve(n) {
-  var flags = new Array(n + 1).fill(true), primes = [];
-  flags[0] = flags[1] = false;
-  for (var i = 2; i <= n; i++) {
-    if (!flags[i]) continue;
-    primes.push(i);
-    for (var j = i * i; j <= n; j += i) flags[j] = false;
-  }
-  return primes;
-}
-function fizzbuzz(n) {
-  var out = [];
-  for (var i = 1; i <= n; i++) out.push(i % 15 === 0 ? 'FizzBuzz' : i % 3 === 0 ? 'Fizz' : i % 5 === 0 ? 'Buzz' : String(i));
-  return out;
-}
-function collatz(n) { var steps = 0; while (n !== 1) { n = n % 2 ? 3 * n + 1 : n / 2; steps++; } return steps; }
-function isPerfect(n) { var s = 0; for (var i = 1; i < n; i++) if (n % i === 0) s += i; return s === n; }
-function digitsReversed(n) { return Number(String(n).split('').reverse().join('')); }
-var perfect = [];
-for (var i = 2; i < 10000; i++) if (isPerfect(i)) perfect.push(i);
-[sieve(100).join(), sieve(100).length, fizzbuzz(15).join(), collatz(27), collatz(97), perfect.join(), digitsReversed(12345), sieve(2).join(), sieve(1).length].join('|');
-""",
-            """2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97|25|1,2,Fizz,4,Buzz,Fizz,7,8,Fizz,Buzz,11,Fizz,13,14,FizzBuzz|111|118|6,28,496,8128|54321|2|0""",
+            "function sieve(n) {\n  var flags = new Array(n + 1).fill(true), primes = [];\n  flags[0] = flags[1] = false;\n  for (var i = 2; i <= n; i++) {\n    if (!flags[i]) continue;\n    primes.push(i);\n    for (var j = i * i; j <= n; j += i) flags[j] = false;\n  }\n  return primes;\n}\nfunction fizzbuzz(n) {\n  var out = [];\n  for (var i = 1; i <= n; i++) out.push(i % 15 === 0 ? 'FizzBuzz' : i % 3 === 0 ? 'Fizz' : i % 5 === 0 ? 'Buzz' : String(i));\n  return out;\n}\nfunction collatz(n) { var steps = 0; while (n !== 1) { n = n % 2 ? 3 * n + 1 : n / 2; steps++; } return steps; }\nfunction isPerfect(n) { var s = 0; for (var i = 1; i < n; i++) if (n % i === 0) s += i; return s === n; }\nfunction digitsReversed(n) { return Number(String(n).split('').reverse().join('')); }\nvar perfect = [];\nfor (var i = 2; i < 10000; i++) if (isPerfect(i)) perfect.push(i);\n[sieve(100).join(), sieve(100).length, fizzbuzz(15).join(), collatz(27), collatz(97), perfect.join(), digitsReversed(12345), sieve(2).join(), sieve(1).length].join('|');\n",
+            "2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97|25|1,2,Fizz,4,Buzz,Fizz,7,8,Fizz,Buzz,11,Fizz,13,14,FizzBuzz|111|118|6,28,496,8128|54321|2|0",
         ),
         Program(
             "deep_equal",
-            """function deepEqual(a, b) {
-  if (a === b) return true;
-  if (typeof a !== typeof b) return false;
-  if (typeof a === 'number' && isNaN(a) && isNaN(b)) return true;
-  if (a === null || b === null || typeof a !== 'object') return false;
-  if (Array.isArray(a) !== Array.isArray(b)) return false;
-  var ka = Object.keys(a), kb = Object.keys(b);
-  if (ka.length !== kb.length) return false;
-  return ka.every(function (k) { return kb.indexOf(k) >= 0 && deepEqual(a[k], b[k]); });
-}
-var cases = [
-  [1, 1], [1, '1'], [NaN, NaN], [null, undefined], [null, null], [[1, 2], [1, 2]], [[1, 2], [2, 1]], [{ a: 1, b: [1, { c: 2 }] }, { b: [1, { c: 2 }], a: 1 }],
-  [{ a: 1 }, { a: 1, b: undefined }], [[], {}], [{ a: [] }, { a: {} }], ['x', 'x'], [function () {}, function () {}], [{ a: { b: { c: 1 } } }, { a: { b: { c: 2 } } }]
-];
-cases.map(function (c) { return deepEqual(c[0], c[1]) ? 1 : 0; }).join('');
-""",
-            """10101101000100""",
+            "function deepEqual(a, b) {\n  if (a === b) return true;\n  if (typeof a !== typeof b) return false;\n  if (typeof a === 'number' && isNaN(a) && isNaN(b)) return true;\n  if (a === null || b === null || typeof a !== 'object') return false;\n  if (Array.isArray(a) !== Array.isArray(b)) return false;\n  var ka = Object.keys(a), kb = Object.keys(b);\n  if (ka.length !== kb.length) return false;\n  return ka.every(function (k) { return kb.indexOf(k) >= 0 && deepEqual(a[k], b[k]); });\n}\nvar cases = [\n  [1, 1], [1, '1'], [NaN, NaN], [null, undefined], [null, null], [[1, 2], [1, 2]], [[1, 2], [2, 1]], [{ a: 1, b: [1, { c: 2 }] }, { b: [1, { c: 2 }], a: 1 }],\n  [{ a: 1 }, { a: 1, b: undefined }], [[], {}], [{ a: [] }, { a: {} }], ['x', 'x'], [function () {}, function () {}], [{ a: { b: { c: 1 } } }, { a: { b: { c: 2 } } }]\n];\ncases.map(function (c) { return deepEqual(c[0], c[1]) ? 1 : 0; }).join('');\n",
+            "10101101000100",
         ),
         Program(
             "coercion_matrix",
-            """var values = [0, 1, -1, '', '0', '1', 'a', ' ', true, false, null, undefined, NaN, [], [0], [1], [1, 2], {}, Infinity];
-function show(v) {
-  if (v === undefined) return 'undefined';
-  if (v === null) return 'null';
-  if (typeof v === 'string') return JSON.stringify(v);
-  if (Array.isArray(v)) return '[' + v.join(',') + ']';
-  if (typeof v === 'object') return '{}';
-  return String(v);
-}
-var rows = [];
-for (var i = 0; i < values.length; i++) {
-  var row = show(values[i]) + ':';
-  for (var j = 0; j < values.length; j++) row += (values[i] == values[j] ? '1' : '0');
-  rows.push(row);
-}
-var plus = values.map(function (v) { return show(v + 1); }).join(',');
-var minus = values.map(function (v) { return show(v - 1); }).join(',');
-var bool = values.map(function (v) { return !!v ? 't' : 'f'; }).join('');
-var types = values.map(function (v) { return typeof v; }).join(',');
-var nums = values.map(function (v) { return show(Number(v)); }).join(',');
-var strs = values.map(function (v) { return String(v); }).join('|');
-[rows.join('\n'), plus, minus, bool, types, nums, strs, null < 1, undefined < 1, NaN == NaN, [1] == 1, [1, 2] == '1,2', {} + '', '' + {}, [] + [], [] + {}, 1 + '2' - 1, '3' * '4', true + true, [] == ![], null == false, undefined == null].join('\n');
-""",
-            """0:1001100101000110000
-1:0100010010000001000
--1:0010000000000000000
-"":1001000001000100000
-"0":1000100001000010000
-"1":0100010010000001000
-"a":0000001000000000000
-" ":1000000101000000000
-true:0100010010000001000
-false:1001100101000110000
-null:0000000000110000000
-undefined:0000000000110000000
-NaN:0000000000000000000
-[]:1001000001000100000
-[0]:1000100001000010000
-[1]:0100010010000001000
-[1,2]:0000000000000000100
-{}:0000000000000000010
-Infinity:0000000000000000001
-1,2,0,"1","01","11","a1"," 1",2,1,1,NaN,NaN,"1","01","11","1,21","[object Object]1",Infinity
--1,0,-2,-1,-1,0,NaN,-1,0,-1,-1,NaN,NaN,-1,-1,0,NaN,NaN,Infinity
-fttftttttfffftttttt
-number,number,number,string,string,string,string,string,boolean,boolean,object,undefined,number,object,object,object,object,object,number
-0,1,-1,0,0,1,NaN,0,1,0,0,NaN,NaN,0,0,1,NaN,NaN,Infinity
-0|1|-1||0|1|a| |true|false|null|undefined|NaN||0|1|1,2|[object Object]|Infinity
-true
-false
-false
-true
-true
-[object Object]
-[object Object]
-
-[object Object]
-11
-12
-2
-true
-false
-true""",
+            "var values = [0, 1, -1, '', '0', '1', 'a', ' ', true, false, null, undefined, NaN, [], [0], [1], [1, 2], {}, Infinity];\nfunction show(v) {\n  if (v === undefined) return 'undefined';\n  if (v === null) return 'null';\n  if (typeof v === 'string') return JSON.stringify(v);\n  if (Array.isArray(v)) return '[' + v.join(',') + ']';\n  if (typeof v === 'object') return '{}';\n  return String(v);\n}\nvar rows = [];\nfor (var i = 0; i < values.length; i++) {\n  var row = show(values[i]) + ':';\n  for (var j = 0; j < values.length; j++) row += (values[i] == values[j] ? '1' : '0');\n  rows.push(row);\n}\nvar plus = values.map(function (v) { return show(v + 1); }).join(',');\nvar minus = values.map(function (v) { return show(v - 1); }).join(',');\nvar bool = values.map(function (v) { return !!v ? 't' : 'f'; }).join('');\nvar types = values.map(function (v) { return typeof v; }).join(',');\nvar nums = values.map(function (v) { return show(Number(v)); }).join(',');\nvar strs = values.map(function (v) { return String(v); }).join('|');\n[rows.join('\\n'), plus, minus, bool, types, nums, strs, null < 1, undefined < 1, NaN == NaN, [1] == 1, [1, 2] == '1,2', {} + '', '' + {}, [] + [], [] + {}, 1 + '2' - 1, '3' * '4', true + true, [] == ![], null == false, undefined == null].join('\\n');\n",
+            "0:1001100101000110000\n1:0100010010000001000\n-1:0010000000000000000\n\"\":1001000001000100000\n\"0\":1000100001000010000\n\"1\":0100010010000001000\n\"a\":0000001000000000000\n\" \":1000000101000000000\ntrue:0100010010000001000\nfalse:1001100101000110000\nnull:0000000000110000000\nundefined:0000000000110000000\nNaN:0000000000000000000\n[]:1001000001000100000\n[0]:1000100001000010000\n[1]:0100010010000001000\n[1,2]:0000000000000000100\n{}:0000000000000000010\nInfinity:0000000000000000001\n1,2,0,\"1\",\"01\",\"11\",\"a1\",\" 1\",2,1,1,NaN,NaN,\"1\",\"01\",\"11\",\"1,21\",\"[object Object]1\",Infinity\n-1,0,-2,-1,-1,0,NaN,-1,0,-1,-1,NaN,NaN,-1,-1,0,NaN,NaN,Infinity\nfttftttttfffftttttt\nnumber,number,number,string,string,string,string,string,boolean,boolean,object,undefined,number,object,object,object,object,object,number\n0,1,-1,0,0,1,NaN,0,1,0,0,NaN,NaN,0,0,1,NaN,NaN,Infinity\n0|1|-1||0|1|a| |true|false|null|undefined|NaN||0|1|1,2|[object Object]|Infinity\ntrue\nfalse\nfalse\ntrue\ntrue\n[object Object]\n[object Object]\n\n[object Object]\n11\n12\n2\ntrue\nfalse\ntrue",
         ),
         Program(
             "array_holes_and_length",
-            """var a = [1, , 3];
-var out = [a.length, 1 in a, a[1], a.hasOwnProperty(1), a.indexOf(undefined), a.includes(undefined), a.join('-'), String(a)];
-var visited = [];
-a.forEach(function (v, i) { visited.push(i); });
-out.push(visited.join(), a.map(function (x) { return x * 2; }).length, a.filter(function () { return true; }).length, Object.keys(a).join());
-var b = [1, 2, 3, 4, 5];
-b.length = 2;
-out.push(b.join(), b[3]);
-b.length = 4;
-out.push(b.length, b.join('-'), 3 in b);
-b[10] = 'far';
-out.push(b.length, Object.keys(b).join());
-delete b[0];
-out.push(b.length, 0 in b, b.join('|'));
-var c = new Array(3);
-out.push(c.length, c.join('x'), c.fill(0).join(), Array(3).fill().map(function (_, i) { return i; }).join(), [, ,].length, [1, 2, ,].length);
-var d = [];
-d[2] = 'c';
-d.unshift('a');
-out.push(d.length, d.join(), d.shift(), d.length, d.pop(), d.length);
-out.push([NaN].indexOf(NaN), [NaN].includes(NaN), [1, 2, 3].indexOf('2'), [1, 2, 3].lastIndexOf(3, -2), [0].includes(-0), [-0].indexOf(0));
-var sparse = [];
-sparse[4294967294] = 'max';
-out.push(sparse.length);
-try { sparse.length = 4294967296; } catch (e) { out.push(e.name); }
-out.join('|');
-""",
-            """3|false||false|-1|true|1--3|1,,3|0,2|3|2|0,2|1,2||4|1-2--|false|11|0,1,10|11|false||2|||||||||far|3|xx|0,0,0|0,1,2|2|3|4|a,,,c|a|3|c|2|-1|true|-1|-1|true|0|4294967295|RangeError""",
+            "var a = [1, , 3];\nvar out = [a.length, 1 in a, a[1], a.hasOwnProperty(1), a.indexOf(undefined), a.includes(undefined), a.join('-'), String(a)];\nvar visited = [];\na.forEach(function (v, i) { visited.push(i); });\nout.push(visited.join(), a.map(function (x) { return x * 2; }).length, a.filter(function () { return true; }).length, Object.keys(a).join());\nvar b = [1, 2, 3, 4, 5];\nb.length = 2;\nout.push(b.join(), b[3]);\nb.length = 4;\nout.push(b.length, b.join('-'), 3 in b);\nb[10] = 'far';\nout.push(b.length, Object.keys(b).join());\ndelete b[0];\nout.push(b.length, 0 in b, b.join('|'));\nvar c = new Array(3);\nout.push(c.length, c.join('x'), c.fill(0).join(), Array(3).fill().map(function (_, i) { return i; }).join(), [, ,].length, [1, 2, ,].length);\nvar d = [];\nd[2] = 'c';\nd.unshift('a');\nout.push(d.length, d.join(), d.shift(), d.length, d.pop(), d.length);\nout.push([NaN].indexOf(NaN), [NaN].includes(NaN), [1, 2, 3].indexOf('2'), [1, 2, 3].lastIndexOf(3, -2), [0].includes(-0), [-0].indexOf(0));\nvar sparse = [];\nsparse[4294967294] = 'max';\nout.push(sparse.length);\ntry { sparse.length = 4294967296; } catch (e) { out.push(e.name); }\nout.join('|');\n",
+            "3|false||false|-1|true|1--3|1,,3|0,2|3|2|0,2|1,2||4|1-2--|false|11|0,1,10|11|false||2|||||||||far|3|xx|0,0,0|0,1,2|2|3|4|a,,,c|a|3|c|2|-1|true|-1|-1|true|0|4294967295|RangeError",
         ),
         Program(
             "json_roundtrip",
-            """var data = {
-  name: 'Kite', version: 1.5, tags: ['js', 'kmp'], nested: { deep: { deeper: [1, { x: null }] } },
-  empty: {}, emptyArr: [], flag: true, nothing: null, skipped: undefined, fn: function () {},
-  unicode: 'café 😀', ctrl: 'a\tb\nc"d\\e'
-};
-var text = JSON.stringify(data);
-var back = JSON.parse(text);
-var same = JSON.stringify(back) === text;
-var pretty = JSON.stringify({ a: [1, { b: 2 }], c: 'x' }, null, 2);
-var tabbed = JSON.stringify({ a: [1] }, null, '\t');
-var filtered = JSON.stringify(data, ['name', 'tags', 'version']);
-var replaced = JSON.stringify(data, function (k, v) { return typeof v === 'number' ? v * 2 : v; });
-var revived = JSON.parse('{"n":1,"o":{"n":2},"a":[{"n":3}]}', function (k, v) { return k === 'n' ? v * 10 : v; });
-var dropped = JSON.parse('{"keep":1,"drop":2}', function (k, v) { return k === 'drop' ? undefined : v; });
-var custom = JSON.stringify({ when: { toJSON: function (key) { return 'json:' + key; } }, list: [{ toJSON: function () { return 1; } }] });
-var edge = JSON.stringify([NaN, Infinity, -0, 1e21, new Number(2), new String('s'), new Boolean(false), undefined, function () {}]);
-var order = JSON.stringify({ b: 1, a: 2, 2: 'two', 1: 'one' });
-var errors = [];
-['{', '[1,]', "{'a':1}", '01', 'undefined', '{"a":1,}', '"\\x41"', '', ' '].forEach(function (s) { try { JSON.parse(s); errors.push('ok'); } catch (e) { errors.push(e.name); } });
-var cyc = {}; cyc.self = cyc;
-try { JSON.stringify(cyc); } catch (e) { errors.push(e.name); }
-[text, same, pretty, tabbed, filtered, replaced, JSON.stringify(revived), JSON.stringify(dropped), custom, edge, order, errors.join(), typeof back.nested.deep.deeper[1].x, back.unicode.length, Object.keys(back).join()].join('\n');
-""",
-            """{"name":"Kite","version":1.5,"tags":["js","kmp"],"nested":{"deep":{"deeper":[1,{"x":null}]}},"empty":{},"emptyArr":[],"flag":true,"nothing":null,"unicode":"café 😀","ctrl":"a\tb\nc\"d\\e"}
-true
-{
-  "a": [
-    1,
-    {
-      "b": 2
-    }
-  ],
-  "c": "x"
-}
-{
-	"a": [
-		1
-	]
-}
-{"name":"Kite","tags":["js","kmp"],"version":1.5}
-{"name":"Kite","version":3,"tags":["js","kmp"],"nested":{"deep":{"deeper":[2,{"x":null}]}},"empty":{},"emptyArr":[],"flag":true,"nothing":null,"unicode":"café 😀","ctrl":"a\tb\nc\"d\\e"}
-{"n":10,"o":{"n":20},"a":[{"n":30}]}
-{"keep":1}
-{"when":"json:when","list":[1]}
-[null,null,0,1e+21,2,"s",false,null,null]
-{"1":"one","2":"two","b":1,"a":2}
-SyntaxError,SyntaxError,SyntaxError,SyntaxError,SyntaxError,SyntaxError,SyntaxError,SyntaxError,SyntaxError,TypeError
-object
-7
-name,version,tags,nested,empty,emptyArr,flag,nothing,unicode,ctrl""",
+            "var data = {\n  name: 'Kite', version: 1.5, tags: ['js', 'kmp'], nested: { deep: { deeper: [1, { x: null }] } },\n  empty: {}, emptyArr: [], flag: true, nothing: null, skipped: undefined, fn: function () {},\n  unicode: 'café 😀', ctrl: 'a\\tb\\nc\"d\\\\e'\n};\nvar text = JSON.stringify(data);\nvar back = JSON.parse(text);\nvar same = JSON.stringify(back) === text;\nvar pretty = JSON.stringify({ a: [1, { b: 2 }], c: 'x' }, null, 2);\nvar tabbed = JSON.stringify({ a: [1] }, null, '\\t');\nvar filtered = JSON.stringify(data, ['name', 'tags', 'version']);\nvar replaced = JSON.stringify(data, function (k, v) { return typeof v === 'number' ? v * 2 : v; });\nvar revived = JSON.parse('{\"n\":1,\"o\":{\"n\":2},\"a\":[{\"n\":3}]}', function (k, v) { return k === 'n' ? v * 10 : v; });\nvar dropped = JSON.parse('{\"keep\":1,\"drop\":2}', function (k, v) { return k === 'drop' ? undefined : v; });\nvar custom = JSON.stringify({ when: { toJSON: function (key) { return 'json:' + key; } }, list: [{ toJSON: function () { return 1; } }] });\nvar edge = JSON.stringify([NaN, Infinity, -0, 1e21, new Number(2), new String('s'), new Boolean(false), undefined, function () {}]);\nvar order = JSON.stringify({ b: 1, a: 2, 2: 'two', 1: 'one' });\nvar errors = [];\n['{', '[1,]', \"{'a':1}\", '01', 'undefined', '{\"a\":1,}', '\"\\\\x41\"', '', ' '].forEach(function (s) { try { JSON.parse(s); errors.push('ok'); } catch (e) { errors.push(e.name); } });\nvar cyc = {}; cyc.self = cyc;\ntry { JSON.stringify(cyc); } catch (e) { errors.push(e.name); }\n[text, same, pretty, tabbed, filtered, replaced, JSON.stringify(revived), JSON.stringify(dropped), custom, edge, order, errors.join(), typeof back.nested.deep.deeper[1].x, back.unicode.length, Object.keys(back).join()].join('\\n');\n",
+            "{\"name\":\"Kite\",\"version\":1.5,\"tags\":[\"js\",\"kmp\"],\"nested\":{\"deep\":{\"deeper\":[1,{\"x\":null}]}},\"empty\":{},\"emptyArr\":[],\"flag\":true,\"nothing\":null,\"unicode\":\"café 😀\",\"ctrl\":\"a\\tb\\nc\\\"d\\\\e\"}\ntrue\n{\n  \"a\": [\n    1,\n    {\n      \"b\": 2\n    }\n  ],\n  \"c\": \"x\"\n}\n{\n\t\"a\": [\n\t\t1\n\t]\n}\n{\"name\":\"Kite\",\"tags\":[\"js\",\"kmp\"],\"version\":1.5}\n{\"name\":\"Kite\",\"version\":3,\"tags\":[\"js\",\"kmp\"],\"nested\":{\"deep\":{\"deeper\":[2,{\"x\":null}]}},\"empty\":{},\"emptyArr\":[],\"flag\":true,\"nothing\":null,\"unicode\":\"café 😀\",\"ctrl\":\"a\\tb\\nc\\\"d\\\\e\"}\n{\"n\":10,\"o\":{\"n\":20},\"a\":[{\"n\":30}]}\n{\"keep\":1}\n{\"when\":\"json:when\",\"list\":[1]}\n[null,null,0,1e+21,2,\"s\",false,null,null]\n{\"1\":\"one\",\"2\":\"two\",\"b\":1,\"a\":2}\nSyntaxError,SyntaxError,SyntaxError,SyntaxError,SyntaxError,SyntaxError,SyntaxError,SyntaxError,SyntaxError,TypeError\nobject\n7\nname,version,tags,nested,empty,emptyArr,flag,nothing,unicode,ctrl",
         ),
         Program(
             "getters_setters_defineproperty",
-            """var temp = { _c: 25, get f() { return this._c * 9 / 5 + 32; }, set f(v) { this._c = (v - 32) * 5 / 9; } };
-temp.f = 212;
-var o = {};
-Object.defineProperty(o, 'ro', { value: 1, writable: false, enumerable: true, configurable: false });
-Object.defineProperty(o, 'hidden', { value: 2, enumerable: false });
-Object.defineProperty(o, 'acc', { get: function () { return 'got'; }, enumerable: true, configurable: true });
-Object.defineProperties(o, { p: { value: 'p', enumerable: true }, q: { value: 'q' } });
-o.ro = 99;
-delete o.ro;
-var d = Object.getOwnPropertyDescriptor(o, 'ro');
-var out = [temp._c, temp.f, Object.keys(temp).join(), o.ro, o.hidden, o.acc, Object.keys(o).join(), Object.getOwnPropertyNames(o).join(), JSON.stringify(d), JSON.stringify(Object.getOwnPropertyDescriptor(o, 'acc').get === undefined)];
-var errors = [];
-(function () {
-  'use strict';
-  try { o.ro = 5; } catch (e) { errors.push(e.name); }
-  try { delete o.ro; } catch (e) { errors.push(e.name); }
-  try { o.acc = 1; } catch (e) { errors.push(e.name); }
-  try { Object.defineProperty(o, 'ro', { value: 3 }); } catch (e) { errors.push(e.name); }
-  var frozen = Object.freeze({ a: 1 });
-  try { frozen.a = 2; } catch (e) { errors.push(e.name); }
-  try { frozen.b = 2; } catch (e) { errors.push(e.name); }
-  var sealed = Object.seal({ a: 1 });
-  sealed.a = 2;
-  try { sealed.b = 1; } catch (e) { errors.push(e.name); }
-  errors.push(sealed.a);
-})();
-out.push(errors.join());
-var counter = { count: 0 };
-Object.defineProperty(counter, 'next', { get: function () { return ++this.count; } });
-out.push(counter.next, counter.next, counter.count, JSON.stringify(counter));
-out.join('|');
-""",
-            """100|212|_c,f|1|2|got|ro,acc,p|ro,hidden,acc,p,q|{"value":1,"writable":false,"enumerable":true,"configurable":false}|false|TypeError,TypeError,TypeError,TypeError,TypeError,TypeError,TypeError,2|1|2|2|{"count":2}""",
+            "var temp = { _c: 25, get f() { return this._c * 9 / 5 + 32; }, set f(v) { this._c = (v - 32) * 5 / 9; } };\ntemp.f = 212;\nvar o = {};\nObject.defineProperty(o, 'ro', { value: 1, writable: false, enumerable: true, configurable: false });\nObject.defineProperty(o, 'hidden', { value: 2, enumerable: false });\nObject.defineProperty(o, 'acc', { get: function () { return 'got'; }, enumerable: true, configurable: true });\nObject.defineProperties(o, { p: { value: 'p', enumerable: true }, q: { value: 'q' } });\no.ro = 99;\ndelete o.ro;\nvar d = Object.getOwnPropertyDescriptor(o, 'ro');\nvar out = [temp._c, temp.f, Object.keys(temp).join(), o.ro, o.hidden, o.acc, Object.keys(o).join(), Object.getOwnPropertyNames(o).join(), JSON.stringify(d), JSON.stringify(Object.getOwnPropertyDescriptor(o, 'acc').get === undefined)];\nvar errors = [];\n(function () {\n  'use strict';\n  try { o.ro = 5; } catch (e) { errors.push(e.name); }\n  try { delete o.ro; } catch (e) { errors.push(e.name); }\n  try { o.acc = 1; } catch (e) { errors.push(e.name); }\n  try { Object.defineProperty(o, 'ro', { value: 3 }); } catch (e) { errors.push(e.name); }\n  var frozen = Object.freeze({ a: 1 });\n  try { frozen.a = 2; } catch (e) { errors.push(e.name); }\n  try { frozen.b = 2; } catch (e) { errors.push(e.name); }\n  var sealed = Object.seal({ a: 1 });\n  sealed.a = 2;\n  try { sealed.b = 1; } catch (e) { errors.push(e.name); }\n  errors.push(sealed.a);\n})();\nout.push(errors.join());\nvar counter = { count: 0 };\nObject.defineProperty(counter, 'next', { get: function () { return ++this.count; } });\nout.push(counter.next, counter.next, counter.count, JSON.stringify(counter));\nout.join('|');\n",
+            "100|212|_c,f|1|2|got|ro,acc,p|ro,hidden,acc,p,q|{\"value\":1,\"writable\":false,\"enumerable\":true,\"configurable\":false}|false|TypeError,TypeError,TypeError,TypeError,TypeError,TypeError,TypeError,2|1|2|2|{\"count\":2}",
         ),
         Program(
             "error_messages",
-            """var attempts = [
-  function () { return null.prop; },
-  function () { return undefined.prop; },
-  function () { var o = {}; return o.missing.deeper; },
-  function () { var o = {}; return o.notAFunction(); },
-  function () { return notDefinedAnywhere; },
-  function () { notDefinedAnywhere = 1; },
-  function () { 'use strict'; notDefinedStrict = 1; },
-  function () { return new Array(-1); },
-  function () { return [].length = -1; },
-  function () { return (1).toFixed(200); },
-  function () { return 'abc'.repeat(-1); },
-  function () { return new (function () {})().x.y; },
-  function () { return JSON.parse('{bad'); },
-  function () { const c = 1; c = 2; },
-  function () { return Object.defineProperty(1, 'x', {}); },
-  function () { var o = Object.freeze({}); 'use strict'; o.x = 1; return o.x; },
-  function () { 'use strict'; var o = Object.freeze({}); o.x = 1; },
-  function () { return decodeURIComponent('%'); },
-  function () { throw new TypeError('custom type'); },
-  function () { return [1, 2].reduce(function () {}, undefined) + [].reduce(function () {}); },
-  function () { return new 5.5; },
-  function () { return 1 in 1; },
-  function () { return {} instanceof 1; },
-  function () { return Object.create(5); },
-  function () { return 'x'.charAt.call(null); },
-  function () { return Array.prototype.join.call(undefined); }
-];
-attempts.map(function (f, i) {
-  try { var r = f(); return i + ':ok:' + r; }
-  catch (e) { return i + ':' + (e && e.name) + ':' + (e && e.message); }
-}).join('\n');
-""",
-            """0:TypeError:Cannot read property "prop" from null
-1:TypeError:Cannot read property "prop" from undefined
-2:TypeError:Cannot read property "deeper" from undefined
-3:TypeError:Cannot find function notAFunction.
-4:ReferenceError:"notDefinedAnywhere" is not defined.
-5:ok:undefined
-6:ReferenceError:Assignment to undefined "notDefinedStrict" in strict mode
-7:RangeError:Inappropriate array length.
-8:RangeError:Inappropriate array length.
-9:RangeError:Precision 200 out of range.
-10:RangeError:Invalid count value
-11:TypeError:Cannot read property "y" from undefined
-12:SyntaxError:Unexpected token in object literal
-13:ok:undefined
-14:TypeError:Expected argument of type object, but instead had type number
-15:ok:undefined
-16:TypeError:Cannot add properties to this object because extensible is false.
-17:URIError:Malformed URI sequence.
-18:TypeError:custom type
-19:TypeError:Reduce of empty array with no initial value
-20:TypeError:5.5 is not a function, it is number.
-21:TypeError:Can't use 'in' on a non-object.
-22:TypeError:Can't use 'instanceof' on a non-object.
-23:TypeError:Expected argument of type object, but instead had type number
-24:TypeError:String.prototype.charAt method called on null or undefined
-25:TypeError:Cannot convert undefined to an object.""",
+            "var attempts = [\n  function () { return null.prop; },\n  function () { return undefined.prop; },\n  function () { var o = {}; return o.missing.deeper; },\n  function () { var o = {}; return o.notAFunction(); },\n  function () { return notDefinedAnywhere; },\n  function () { notDefinedAnywhere = 1; },\n  function () { 'use strict'; notDefinedStrict = 1; },\n  function () { return new Array(-1); },\n  function () { return [].length = -1; },\n  function () { return (1).toFixed(200); },\n  function () { return 'abc'.repeat(-1); },\n  function () { return new (function () {})().x.y; },\n  function () { return JSON.parse('{bad'); },\n  function () { const c = 1; c = 2; },\n  function () { return Object.defineProperty(1, 'x', {}); },\n  function () { var o = Object.freeze({}); 'use strict'; o.x = 1; return o.x; },\n  function () { 'use strict'; var o = Object.freeze({}); o.x = 1; },\n  function () { return decodeURIComponent('%'); },\n  function () { throw new TypeError('custom type'); },\n  function () { return [1, 2].reduce(function () {}, undefined) + [].reduce(function () {}); },\n  function () { return new 5.5; },\n  function () { return 1 in 1; },\n  function () { return {} instanceof 1; },\n  function () { return Object.create(5); },\n  function () { return 'x'.charAt.call(null); },\n  function () { return Array.prototype.join.call(undefined); }\n];\nattempts.map(function (f, i) {\n  try { var r = f(); return i + ':ok:' + r; }\n  catch (e) { return i + ':' + (e && e.name) + ':' + (e && e.message); }\n}).join('\\n');\n",
+            "0:TypeError:Cannot read property \"prop\" from null\n1:TypeError:Cannot read property \"prop\" from undefined\n2:TypeError:Cannot read property \"deeper\" from undefined\n3:TypeError:Cannot find function notAFunction.\n4:ReferenceError:\"notDefinedAnywhere\" is not defined.\n5:ok:undefined\n6:ReferenceError:Assignment to undefined \"notDefinedStrict\" in strict mode\n7:RangeError:Inappropriate array length.\n8:RangeError:Inappropriate array length.\n9:RangeError:Precision 200 out of range.\n10:RangeError:Invalid count value\n11:TypeError:Cannot read property \"y\" from undefined\n12:SyntaxError:Unexpected token in object literal\n13:ok:undefined\n14:TypeError:Expected argument of type object, but instead had type number\n15:ok:undefined\n16:TypeError:Cannot add properties to this object because extensible is false.\n17:URIError:Malformed URI sequence.\n18:TypeError:custom type\n19:TypeError:Reduce of empty array with no initial value\n20:TypeError:5.5 is not a function, it is number.\n21:TypeError:Can't use 'in' on a non-object.\n22:TypeError:Can't use 'instanceof' on a non-object.\n23:TypeError:Expected argument of type object, but instead had type number\n24:TypeError:String.prototype.charAt method called on null or undefined\n25:TypeError:Cannot convert undefined to an object.",
         ),
         Program(
             "wrapper_objects",
-            """var n = new Number(5), s = new String('str'), b = new Boolean(false);
-var prim = 5;
-prim.prop = 'lost';
-var out = [typeof n, typeof s, typeof b, n + 1, s + '!', b ? 'truthy' : 'falsy', n == 5, n === 5, s == 'str', s === 'str', b == false, b === false, !b, !!b,
-  n.valueOf() === 5, s.valueOf() === 'str', b.valueOf() === false, n instanceof Number, (5) instanceof Number, Object(5) instanceof Number, typeof Object('x'), Object(true).valueOf(),
-  prim.prop, s.length, s[0], s.charAt(1), Object.keys(s).join(), JSON.stringify([n, s, b]), n.toFixed(1), new Number(1) + new Number(2), new String('a') + new String('b'), new Boolean(false) + 1,
-  Number(new Number(3)) === 3, String(new String('x')) === 'x', new Number(NaN) == NaN, [new Number(1)].indexOf(1), [1].indexOf(new Number(1)), new String('ab') == new String('ab'), Object.prototype.toString.call(n), Object.prototype.toString.call(s), Object.prototype.toString.call(b),
-  (function () { 'use strict'; return typeof this; }).call(5), (function () { return typeof this; }).call(5), (function () { return this instanceof Number; }).call(5)];
-out.join('|');
-""",
-            """object|object|object|6|str!|truthy|true|false|true|false|true|false|false|true|true|true|true|true|false|true|object|true||3|s|t|0,1,2|[5,"str",false]|5.0|3|ab|1|true|true|false|-1|-1|false|[object Number]|[object String]|[object Boolean]|object|object|true""",
+            "var n = new Number(5), s = new String('str'), b = new Boolean(false);\nvar prim = 5;\nprim.prop = 'lost';\nvar out = [typeof n, typeof s, typeof b, n + 1, s + '!', b ? 'truthy' : 'falsy', n == 5, n === 5, s == 'str', s === 'str', b == false, b === false, !b, !!b,\n  n.valueOf() === 5, s.valueOf() === 'str', b.valueOf() === false, n instanceof Number, (5) instanceof Number, Object(5) instanceof Number, typeof Object('x'), Object(true).valueOf(),\n  prim.prop, s.length, s[0], s.charAt(1), Object.keys(s).join(), JSON.stringify([n, s, b]), n.toFixed(1), new Number(1) + new Number(2), new String('a') + new String('b'), new Boolean(false) + 1,\n  Number(new Number(3)) === 3, String(new String('x')) === 'x', new Number(NaN) == NaN, [new Number(1)].indexOf(1), [1].indexOf(new Number(1)), new String('ab') == new String('ab'), Object.prototype.toString.call(n), Object.prototype.toString.call(s), Object.prototype.toString.call(b),\n  (function () { 'use strict'; return typeof this; }).call(5), (function () { return typeof this; }).call(5), (function () { return this instanceof Number; }).call(5)];\nout.join('|');\n",
+            "object|object|object|6|str!|truthy|true|false|true|false|true|false|false|true|true|true|true|true|false|true|object|true||3|s|t|0,1,2|[5,\"str\",false]|5.0|3|ab|1|true|true|false|-1|-1|false|[object Number]|[object String]|[object Boolean]|object|object|true",
         ),
         Program(
             "optional_chaining_nullish",
-            """var data = { user: { name: 'k', tags: ['a'], greet: function () { return 'hi ' + this.name; }, zero: 0, empty: '', f: false }, list: null };
-var out = [
-  data.user?.name, data.missing?.name, data.list?.[0], data.user?.tags?.[0], data.user?.tags?.[5], data.user.greet?.(), data.user.nope?.(), data?.user?.['name'],
-  data.user.zero ?? 'default', data.user.empty ?? 'default', data.user.f ?? 'default', data.user.undef ?? 'default', data.list ?? 'default', null ?? undefined ?? 'last',
-  data.user.zero || 'fallback', data.user.empty || 'fallback', (data.user.zero ?? 5) + 1, data.missing?.deep.deeper.deepest, typeof data.missing?.(),
-  (null)?.x, (undefined)?.[1], data.user?.tags.length, data.user.greet?.call({ name: 'other' })
-];
-var count = 0;
-function side() { count++; return { v: 1 }; }
-var r = null?.[side()];
-out.push(count, r, side()?.v, count);
-out.push(typeof data.user?.greet, delete data.user?.zero, 'zero' in data.user);
-out.join('|');
-""",
-            """k|||a||hi k||k|0||false|default|default|last|fallback|fallback|1||undefined|||1|hi other|0||1|1|function|true|false""",
+            "var data = { user: { name: 'k', tags: ['a'], greet: function () { return 'hi ' + this.name; }, zero: 0, empty: '', f: false }, list: null };\nvar out = [\n  data.user?.name, data.missing?.name, data.list?.[0], data.user?.tags?.[0], data.user?.tags?.[5], data.user.greet?.(), data.user.nope?.(), data?.user?.['name'],\n  data.user.zero ?? 'default', data.user.empty ?? 'default', data.user.f ?? 'default', data.user.undef ?? 'default', data.list ?? 'default', null ?? undefined ?? 'last',\n  data.user.zero || 'fallback', data.user.empty || 'fallback', (data.user.zero ?? 5) + 1, data.missing?.deep.deeper.deepest, typeof data.missing?.(),\n  (null)?.x, (undefined)?.[1], data.user?.tags.length, data.user.greet?.call({ name: 'other' })\n];\nvar count = 0;\nfunction side() { count++; return { v: 1 }; }\nvar r = null?.[side()];\nout.push(count, r, side()?.v, count);\nout.push(typeof data.user?.greet, delete data.user?.zero, 'zero' in data.user);\nout.join('|');\n",
+            "k|||a||hi k||k|0||false|default|default|last|fallback|fallback|1||undefined|||1|hi other|0||1|1|function|true|false",
         ),
         Program(
             "lazy_pipeline",
-            """// A pull-based pipeline: nothing runs until the consumer asks for the next value.
-function* range(start, end, step) {
-  for (var i = start; i < end; i += (step || 1)) yield i;
-}
-function* map(it, f) {
-  for (var v of it) yield f(v);
-}
-function* filter(it, pred) {
-  for (var v of it) if (pred(v)) yield v;
-}
-function* take(it, n) {
-  var i = 0;
-  for (var v of it) {
-    if (i++ >= n) return;
-    yield v;
-  }
-}
-function* zip(a, b) {
-  var ia = a[Symbol.iterator]();
-  var ib = b[Symbol.iterator]();
-  while (true) {
-    var ra = ia.next();
-    var rb = ib.next();
-    if (ra.done || rb.done) return;
-    yield [ra.value, rb.value];
-  }
-}
-function drain(it) {
-  var out = [];
-  for (var v of it) out.push(v);
-  return out;
-}
-
-var calls = 0;
-function counted(x) { calls++; return x * x; }
-
-var squares = take(map(range(1, 1000), counted), 5);
-var first = drain(squares).join();
-var lazily = calls;
-
-var evens = drain(take(filter(range(0, 100), function (n) { return n % 2 === 0; }), 6)).join();
-var pairs = drain(zip(range(0, 4), 'abcd')).map(function (p) { return p.join(':'); }).join();
-var spread = [...take(range(10, 100, 10), 4)].join();
-var summed = drain(map(range(1, 6), function (n) { return n; })).reduce(function (a, b) { return a + b; }, 0);
-
-// Rhino does not close a generator when a for-of loop breaks, so this finally never runs.
-// The value stays at its starting point, which is what both engines have to agree on.
-var closedAt = -1;
-function* watched() {
-  try {
-    var i = 0;
-    while (true) yield i++;
-  } finally {
-    closedAt = i;
-  }
-}
-for (var v of watched()) if (v === 3) break;
-
-// Delegation keeps the same laziness.
-function* concat(a, b) { yield* a; yield* b; }
-var joined = drain(concat(range(0, 3), range(10, 13))).join();
-
-[first, lazily, evens, pairs, spread, summed, closedAt, joined].join('|');
-""",
-            """1,4,9,16,25|6|0,2,4,6,8,10|0:a,1:b,2:c,3:d|10,20,30,40|15|-1|0,1,2,10,11,12""",
+            "// A pull-based pipeline: nothing runs until the consumer asks for the next value.\nfunction* range(start, end, step) {\n  for (var i = start; i < end; i += (step || 1)) yield i;\n}\nfunction* map(it, f) {\n  for (var v of it) yield f(v);\n}\nfunction* filter(it, pred) {\n  for (var v of it) if (pred(v)) yield v;\n}\nfunction* take(it, n) {\n  var i = 0;\n  for (var v of it) {\n    if (i++ >= n) return;\n    yield v;\n  }\n}\nfunction* zip(a, b) {\n  var ia = a[Symbol.iterator]();\n  var ib = b[Symbol.iterator]();\n  while (true) {\n    var ra = ia.next();\n    var rb = ib.next();\n    if (ra.done || rb.done) return;\n    yield [ra.value, rb.value];\n  }\n}\nfunction drain(it) {\n  var out = [];\n  for (var v of it) out.push(v);\n  return out;\n}\n\nvar calls = 0;\nfunction counted(x) { calls++; return x * x; }\n\nvar squares = take(map(range(1, 1000), counted), 5);\nvar first = drain(squares).join();\nvar lazily = calls;\n\nvar evens = drain(take(filter(range(0, 100), function (n) { return n % 2 === 0; }), 6)).join();\nvar pairs = drain(zip(range(0, 4), 'abcd')).map(function (p) { return p.join(':'); }).join();\nvar spread = [...take(range(10, 100, 10), 4)].join();\nvar summed = drain(map(range(1, 6), function (n) { return n; })).reduce(function (a, b) { return a + b; }, 0);\n\n// Rhino does not close a generator when a for-of loop breaks, so this finally never runs.\n// The value stays at its starting point, which is what both engines have to agree on.\nvar closedAt = -1;\nfunction* watched() {\n  try {\n    var i = 0;\n    while (true) yield i++;\n  } finally {\n    closedAt = i;\n  }\n}\nfor (var v of watched()) if (v === 3) break;\n\n// Delegation keeps the same laziness.\nfunction* concat(a, b) { yield* a; yield* b; }\nvar joined = drain(concat(range(0, 3), range(10, 13))).join();\n\n[first, lazily, evens, pairs, spread, summed, closedAt, joined].join('|');\n",
+            "1,4,9,16,25|6|0,2,4,6,8,10|0:a,1:b,2:c,3:d|10,20,30,40|15|-1|0,1,2,10,11,12",
         ),
         Program(
             "tree_walker",
-            """// An in-order walk written as a generator, plus the same walk done eagerly for comparison.
-function Node(value, left, right) {
-  this.value = value;
-  this.left = left || null;
-  this.right = right || null;
-}
-function insert(node, value) {
-  if (node === null) return new Node(value);
-  if (value < node.value) node.left = insert(node.left, value);
-  else if (value > node.value) node.right = insert(node.right, value);
-  return node;
-}
-var root = null;
-var input = [50, 30, 70, 20, 40, 60, 80, 35, 45, 75];
-for (var i = 0; i < input.length; i++) root = insert(root, input[i]);
-
-function* inOrder(node) {
-  if (node === null) return;
-  yield* inOrder(node.left);
-  yield node.value;
-  yield* inOrder(node.right);
-}
-function* preOrder(node) {
-  if (node === null) return;
-  yield node.value;
-  yield* preOrder(node.left);
-  yield* preOrder(node.right);
-}
-function* leaves(node) {
-  if (node === null) return;
-  if (node.left === null && node.right === null) { yield node.value; return; }
-  yield* leaves(node.left);
-  yield* leaves(node.right);
-}
-
-var sortedOut = [...inOrder(root)].join();
-var pre = [...preOrder(root)].join();
-var leafList = [...leaves(root)].join();
-
-// The generator is lazy: stop as soon as the answer is known.
-function firstAbove(node, limit) {
-  for (var v of inOrder(node)) if (v > limit) return v;
-  return null;
-}
-var above = firstAbove(root, 44);
-
-// Depth without a generator, to check the tree itself.
-function depth(node) {
-  if (node === null) return 0;
-  var l = depth(node.left);
-  var r = depth(node.right);
-  return 1 + (l > r ? l : r);
-}
-
-// A generator can be restarted only by calling the function again.
-var it = inOrder(root);
-var firstThree = [it.next().value, it.next().value, it.next().value].join();
-it.return(0);
-var afterReturn = it.next().done;
-
-[sortedOut, pre, leafList, above, depth(root), firstThree, afterReturn].join('|');
-""",
-            """20,30,35,40,45,50,60,70,75,80|50,30,20,40,35,45,70,60,80,75|20,35,45,60,75|45|4|20,30,35|true""",
+            "// An in-order walk written as a generator, plus the same walk done eagerly for comparison.\nfunction Node(value, left, right) {\n  this.value = value;\n  this.left = left || null;\n  this.right = right || null;\n}\nfunction insert(node, value) {\n  if (node === null) return new Node(value);\n  if (value < node.value) node.left = insert(node.left, value);\n  else if (value > node.value) node.right = insert(node.right, value);\n  return node;\n}\nvar root = null;\nvar input = [50, 30, 70, 20, 40, 60, 80, 35, 45, 75];\nfor (var i = 0; i < input.length; i++) root = insert(root, input[i]);\n\nfunction* inOrder(node) {\n  if (node === null) return;\n  yield* inOrder(node.left);\n  yield node.value;\n  yield* inOrder(node.right);\n}\nfunction* preOrder(node) {\n  if (node === null) return;\n  yield node.value;\n  yield* preOrder(node.left);\n  yield* preOrder(node.right);\n}\nfunction* leaves(node) {\n  if (node === null) return;\n  if (node.left === null && node.right === null) { yield node.value; return; }\n  yield* leaves(node.left);\n  yield* leaves(node.right);\n}\n\nvar sortedOut = [...inOrder(root)].join();\nvar pre = [...preOrder(root)].join();\nvar leafList = [...leaves(root)].join();\n\n// The generator is lazy: stop as soon as the answer is known.\nfunction firstAbove(node, limit) {\n  for (var v of inOrder(node)) if (v > limit) return v;\n  return null;\n}\nvar above = firstAbove(root, 44);\n\n// Depth without a generator, to check the tree itself.\nfunction depth(node) {\n  if (node === null) return 0;\n  var l = depth(node.left);\n  var r = depth(node.right);\n  return 1 + (l > r ? l : r);\n}\n\n// A generator can be restarted only by calling the function again.\nvar it = inOrder(root);\nvar firstThree = [it.next().value, it.next().value, it.next().value].join();\nit.return(0);\nvar afterReturn = it.next().done;\n\n[sortedOut, pre, leafList, above, depth(root), firstThree, afterReturn].join('|');\n",
+            "20,30,35,40,45,50,60,70,75,80|50,30,20,40,35,45,70,60,80,75|20,35,45,60,75|45|4|20,30,35|true",
         ),
         Program(
             "fibonacci_generator",
-            """// Several ways to produce the same sequence, so the generator can be checked against them.
-function* fib() {
-  var a = 0, b = 1;
-  while (true) {
-    yield a;
-    var next = a + b;
-    a = b;
-    b = next;
-  }
-}
-function fibArray(n) {
-  var out = [0, 1];
-  while (out.length < n) out.push(out[out.length - 1] + out[out.length - 2]);
-  return out.slice(0, n);
-}
-function fibRecursive(n) {
-  return n < 2 ? n : fibRecursive(n - 1) + fibRecursive(n - 2);
-}
-
-function takeN(it, n) {
-  var out = [];
-  for (var v of it) {
-    if (out.length >= n) break;
-    out.push(v);
-  }
-  return out;
-}
-
-var fromGenerator = takeN(fib(), 15);
-var fromArray = fibArray(15);
-var same = fromGenerator.join() === fromArray.join();
-var recursiveMatch = fromGenerator.slice(0, 12).every(function (v, i) { return v === fibRecursive(i); });
-
-// Two iterators over the same generator function are independent.
-var a = fib();
-var b = fib();
-a.next(); a.next(); a.next();
-var independent = a.next().value + ':' + b.next().value;
-
-// Sending a value in restarts the sequence.
-function* resettable() {
-  var a = 0, b = 1;
-  while (true) {
-    var reset = yield a;
-    if (reset !== undefined) { a = reset; b = 1; continue; }
-    var next = a + b;
-    a = b;
-    b = next;
-  }
-}
-var r = resettable();
-var before = [r.next().value, r.next().value, r.next().value, r.next().value].join();
-var afterReset = r.next(100).value;
-var thenOn = [r.next().value, r.next().value].join();
-
-// Big values stay exact until doubles run out of integer precision.
-var big = takeN(fib(), 79);
-var last = big[big.length - 1];
-var exact = last === 14472334024676221;
-
-[fromGenerator.join(), same, recursiveMatch, independent, before, afterReset, thenOn, big.length, last, exact].join('|');
-""",
-            """0,1,1,2,3,5,8,13,21,34,55,89,144,233,377|true|true|2:0|0,1,1,2|100|1,101|79|8944394323791464|false""",
+            "// Several ways to produce the same sequence, so the generator can be checked against them.\nfunction* fib() {\n  var a = 0, b = 1;\n  while (true) {\n    yield a;\n    var next = a + b;\n    a = b;\n    b = next;\n  }\n}\nfunction fibArray(n) {\n  var out = [0, 1];\n  while (out.length < n) out.push(out[out.length - 1] + out[out.length - 2]);\n  return out.slice(0, n);\n}\nfunction fibRecursive(n) {\n  return n < 2 ? n : fibRecursive(n - 1) + fibRecursive(n - 2);\n}\n\nfunction takeN(it, n) {\n  var out = [];\n  for (var v of it) {\n    if (out.length >= n) break;\n    out.push(v);\n  }\n  return out;\n}\n\nvar fromGenerator = takeN(fib(), 15);\nvar fromArray = fibArray(15);\nvar same = fromGenerator.join() === fromArray.join();\nvar recursiveMatch = fromGenerator.slice(0, 12).every(function (v, i) { return v === fibRecursive(i); });\n\n// Two iterators over the same generator function are independent.\nvar a = fib();\nvar b = fib();\na.next(); a.next(); a.next();\nvar independent = a.next().value + ':' + b.next().value;\n\n// Sending a value in restarts the sequence.\nfunction* resettable() {\n  var a = 0, b = 1;\n  while (true) {\n    var reset = yield a;\n    if (reset !== undefined) { a = reset; b = 1; continue; }\n    var next = a + b;\n    a = b;\n    b = next;\n  }\n}\nvar r = resettable();\nvar before = [r.next().value, r.next().value, r.next().value, r.next().value].join();\nvar afterReset = r.next(100).value;\nvar thenOn = [r.next().value, r.next().value].join();\n\n// Big values stay exact until doubles run out of integer precision.\nvar big = takeN(fib(), 79);\nvar last = big[big.length - 1];\nvar exact = last === 14472334024676221;\n\n[fromGenerator.join(), same, recursiveMatch, independent, before, afterReset, thenOn, big.length, last, exact].join('|');\n",
+            "0,1,1,2,3,5,8,13,21,34,55,89,144,233,377|true|true|2:0|0,1,1,2|100|1,101|79|8944394323791464|false",
+        ),
+        Program(
+            "regex_tokenizer",
+            "// A tokenizer built from one sticky pattern per token kind.\nvar SPEC = [\n  ['ws', /\\s+/y],\n  ['number', /\\d+(?:\\.\\d+)?/y],\n  ['string', /\"(?:[^\"\\\\]|\\\\.)*\"/y],\n  ['ident', /[A-Za-z_\$][A-Za-z0-9_\$]*/y],\n  ['op', /[+\\-*\\/=<>!]=?|&&|\\|\\||[(){};,]/y]\n];\nfunction tokenize(src) {\n  var out = [], pos = 0;\n  outer: while (pos < src.length) {\n    for (var i = 0; i < SPEC.length; i++) {\n      var name = SPEC[i][0], re = SPEC[i][1];\n      re.lastIndex = pos;\n      var m = re.exec(src);\n      if (m && m.index === pos) {\n        if (name !== 'ws') out.push(name + ':' + m[0]);\n        pos = re.lastIndex;\n        continue outer;\n      }\n    }\n    out.push('bad:' + src.charAt(pos));\n    pos++;\n  }\n  return out;\n}\nvar tokens = tokenize('var x1 = 3.5 + count(a, \"he\\\\\"llo\") && b <= 10;');\n\n// The same source split a second way, to cross-check the count.\nvar byGlobal = 'var x1 = 3.5 + count(a, \"he\\\\\"llo\") && b <= 10;'.match(/[A-Za-z_\$][A-Za-z0-9_\$]*/g);\n\n// A tiny expression evaluator over the token stream.\nfunction sumNumbers(src) {\n  var total = 0, re = /\\d+(?:\\.\\d+)?/g, m;\n  while ((m = re.exec(src)) !== null) total += Number(m[0]);\n  return total;\n}\n\n// Named groups pulled out of a key=value list.\nvar pairs = [];\nvar kv = /(?<key>\\w+)=(?<value>[^;]+)/g, hit;\nwhile ((hit = kv.exec('a=1;bb=two;ccc=3 3')) !== null) pairs.push(hit.groups.key + '->' + hit.groups.value);\n\n[tokens.join(' '), tokens.length, byGlobal.join(), sumNumbers('a1 b22 c3.5'), pairs.join(' ')].join('|');\n",
+            "ident:var ident:x1 op:= number:3.5 op:+ ident:count op:( ident:a op:, string:\"he\\\"llo\" op:) op:&& ident:b op:<= number:10 op:;|16|var,x1,count,a,he,llo,b|26.5|a->1 bb->two ccc->3 3",
+        ),
+        Program(
+            "regex_template_engine",
+            "// A small template engine: {{name}}, {{#each}}...{{/each}} and {{!comment}}.\nfunction render(tpl, data) {\n  return tpl\n    .replace(/\\{\\{!.*?\\}\\}/g, '')\n    .replace(/\\{\\{#each (\\w+)\\}\\}([\\s\\S]*?)\\{\\{\\/each\\}\\}/g, function (all, key, body) {\n      var list = data[key] || [];\n      var out = '';\n      for (var i = 0; i < list.length; i++) {\n        out += body.replace(/\\{\\{this\\}\\}/g, String(list[i])).replace(/\\{\\{@index\\}\\}/g, String(i));\n      }\n      return out;\n    })\n    .replace(/\\{\\{(\\w+(?:\\.\\w+)*)\\}\\}/g, function (all, path) {\n      var parts = path.split('.'), value = data;\n      for (var i = 0; i < parts.length; i++) {\n        if (value === undefined || value === null) return '';\n        value = value[parts[i]];\n      }\n      return value === undefined ? '' : String(value);\n    });\n}\nvar data = { title: 'Report', user: { name: 'Ann' }, items: ['a', 'b', 'c'], missing: undefined };\nvar tpl = '{{!ignored}}<h1>{{title}}</h1> by {{user.name}} ({{user.email}}) {{#each items}}[{{@index}}:{{this}}]{{/each}} {{nope}}!';\nvar out = render(tpl, data);\n\n// Escaping with a replacement string rather than a function.\nvar escaped = '<a href=\"x\">&</a>'.replace(/[<>&\"]/g, function (c) {\n  return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '\"': '&quot;' }[c];\n});\n\n// \$-patterns in a plain replacement string.\nvar swapped = 'first last'.replace(/(\\w+) (\\w+)/, '\$2, \$1');\nvar doubled = 'abc'.replace(/b/, '\$&\$&');\nvar around = 'abc'.replace(/b/, \"[\$`|\$']\");\n\n[out, escaped, swapped, doubled, around].join('|');\n",
+            "<h1>Report</h1> by Ann () [0:a][1:b][2:c] !|&lt;a href=&quot;x&quot;&gt;&amp;&lt;/a&gt;|last, first|abbc|a[a|c]c",
+        ),
+        Program(
+            "regex_csv_parser",
+            "// A CSV reader that handles quoted fields, embedded commas, quotes and newlines.\nfunction parseCSV(text) {\n  var rows = [], row = [], field = '', i = 0, inQuotes = false;\n  while (i < text.length) {\n    var c = text.charAt(i);\n    if (inQuotes) {\n      if (c === '\"') {\n        if (text.charAt(i + 1) === '\"') { field += '\"'; i += 2; continue; }\n        inQuotes = false; i++; continue;\n      }\n      field += c; i++; continue;\n    }\n    if (c === '\"') { inQuotes = true; i++; continue; }\n    if (c === ',') { row.push(field); field = ''; i++; continue; }\n    if (c === '\\n') { row.push(field); rows.push(row); row = []; field = ''; i++; continue; }\n    field += c; i++;\n  }\n  row.push(field);\n  rows.push(row);\n  return rows;\n}\nvar text = 'name,age,note\\n\"Doe, Jane\",31,\"said \"\"hi\"\"\"\\nBob,25,plain\\n\"multi\\nline\",1,x';\nvar rows = parseCSV(text);\n\n// The same job done with a single regex, to compare on the simple rows.\nvar simpleRe = /(?:^|,)(?:\"([^\"]*)\"|([^\",]*))/g;\nfunction parseSimpleRow(line) {\n  var out = [], m;\n  simpleRe.lastIndex = 0;\n  while ((m = simpleRe.exec(line)) !== null) {\n    out.push(m[1] !== undefined ? m[1] : m[2]);\n    if (simpleRe.lastIndex === line.length) break;\n  }\n  return out;\n}\nvar simple = parseSimpleRow('a,b,\"c,d\",e');\n\n// Splitting on a pattern that keeps its delimiter.\nvar kept = 'a1b22c333d'.split(/(\\d+)/);\n\n[rows.length, rows[1].join('|'), rows[3].join('|'), simple.join('|'), kept.join('~'), JSON.stringify(rows[0])].join('#');\n",
+            "4#Doe, Jane|31|said \"hi\"#multi\nline|1|x#a|b|c,d|e#a~1~b~22~c~333~d#[\"name\",\"age\",\"note\"]",
+        ),
+        Program(
+            "regex_log_parser",
+            "// Parses a small access log and rolls it up.\nvar LINE = /^(?<ip>\\d+\\.\\d+\\.\\d+\\.\\d+) - (?<user>\\S+) \\[(?<when>[^\\]]+)\\] \"(?<method>[A-Z]+) (?<path>\\S+) HTTP\\/(?<ver>[\\d.]+)\" (?<status>\\d{3}) (?<bytes>\\d+|-)\$/;\nvar lines = [\n  '10.0.0.1 - alice [2024-01-02T03:04:05] \"GET /index.html HTTP/1.1\" 200 1234',\n  '10.0.0.2 - - [2024-01-02T03:04:06] \"POST /api/items HTTP/1.1\" 201 87',\n  'garbage line',\n  '10.0.0.1 - alice [2024-01-02T03:04:07] \"GET /missing HTTP/1.0\" 404 -',\n  '10.0.0.3 - bob [2024-01-02T03:04:08] \"DELETE /api/items/7 HTTP/1.1\" 500 0'\n];\nvar parsed = [], bad = 0;\nfor (var i = 0; i < lines.length; i++) {\n  var m = LINE.exec(lines[i]);\n  if (m === null) { bad++; continue; }\n  parsed.push(m.groups);\n}\nvar byStatus = {};\nfor (var j = 0; j < parsed.length; j++) {\n  var s = parsed[j].status.charAt(0) + 'xx';\n  byStatus[s] = (byStatus[s] || 0) + 1;\n}\nvar totalBytes = parsed.reduce(function (sum, r) { return sum + (r.bytes === '-' ? 0 : Number(r.bytes)); }, 0);\nvar ips = parsed.map(function (r) { return r.ip; }).filter(function (v, i, a) { return a.indexOf(v) === i; });\nvar paths = parsed.map(function (r) { return r.path; });\n\n// Redacting the addresses with a replacement callback.\nvar redacted = lines[0].replace(/\\d+\\.\\d+\\.\\d+\\.\\d+/, function (ip) { return ip.split('.').slice(0, 2).join('.') + '.x.x'; });\n\n// A case-insensitive scan for a word anywhere in the log.\nvar hits = lines.filter(function (l) { return /alice/i.test(l); }).length;\n\n[parsed.length, bad, JSON.stringify(byStatus), totalBytes, ips.join(), paths.join(), redacted, hits].join('|');\n",
+            "4|1|{\"2xx\":2,\"4xx\":1,\"5xx\":1}|1321|10.0.0.1,10.0.0.2,10.0.0.3|/index.html,/api/items,/missing,/api/items/7|10.0.x.x - alice [2024-01-02T03:04:05] \"GET /index.html HTTP/1.1\" 200 1234|2",
+        ),
+        Program(
+            "regex_url_parser",
+            "// Splits a URL into its parts, then puts a few back together.\nvar URL_RE = /^(?<scheme>[a-z][a-z0-9+.-]*):\\/\\/(?:(?<user>[^:@\\/]+)(?::(?<pass>[^@\\/]*))?@)?(?<host>[^:\\/?#]+)(?::(?<port>\\d+))?(?<path>\\/[^?#]*)?(?:\\?(?<query>[^#]*))?(?:#(?<hash>.*))?\$/;\nfunction parse(url) {\n  var m = URL_RE.exec(url);\n  if (m === null) return null;\n  var g = m.groups;\n  var out = [];\n  var keys = ['scheme', 'user', 'pass', 'host', 'port', 'path', 'query', 'hash'];\n  for (var i = 0; i < keys.length; i++) out.push(keys[i] + '=' + (g[keys[i]] === undefined ? '' : g[keys[i]]));\n  return out.join(' ');\n}\nvar a = parse('https://ann:secret@example.com:8443/a/b?x=1&y=2#frag');\nvar b = parse('http://example.com');\nvar c = parse('not a url');\n\nfunction parseQuery(q) {\n  var out = {}, re = /([^&=]+)=([^&]*)/g, m;\n  while ((m = re.exec(q)) !== null) out[decodeURIComponent(m[1])] = decodeURIComponent(m[2]);\n  return out;\n}\nvar q = parseQuery('a=1&b=two&c=%20sp%20&a=again');\n\n// Normalising a path by folding away . and .. segments.\nfunction normalize(path) {\n  var parts = path.split('/'), out = [];\n  for (var i = 0; i < parts.length; i++) {\n    if (parts[i] === '' || parts[i] === '.') continue;\n    if (parts[i] === '..') { out.pop(); continue; }\n    out.push(parts[i]);\n  }\n  return '/' + out.join('/');\n}\n\n[a, b, c, JSON.stringify(q), normalize('/a/b/../c/./d//e'), 'a/b'.replace(/\\//g, '::')].join('|');\n",
+            "scheme=https user=ann pass=secret host=example.com port=8443 path=/a/b query=x=1&y=2 hash=frag|scheme=http user= pass= host=example.com port= path= query= hash=||{\"a\":\"again\",\"b\":\"two\",\"c\":\" sp \"}|/a/c/d/e|a::b",
+        ),
+        Program(
+            "regex_validation_table",
+            "// Runs a table of inputs through a table of patterns, so every cell is compared.\nvar PATTERNS = {\n  email: /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\$/,\n  hex: /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})\$/,\n  ipv4: /^(?:(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\$/,\n  isoDate: /^\\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\\d|3[01])\$/,\n  slug: /^[a-z0-9]+(?:-[a-z0-9]+)*\$/,\n  time24: /^(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?\$/,\n  identifier: /^[A-Za-z_\$][A-Za-z0-9_\$]*\$/,\n  quoted: /^\"(?:[^\"\\\\]|\\\\.)*\"\$/\n};\nvar INPUTS = [\n  'a@b.co', 'a@b', '@b.co', 'a b@c.de',\n  '#fff', '#ffffff', '#ff', '#gggggg',\n  '0.0.0.0', '255.255.255.255', '256.1.1.1', '1.2.3',\n  '2024-02-29', '2024-13-01', '2024-1-1',\n  'hello-world', 'Hello-World', 'a--b', 'a-b-c',\n  '00:00', '23:59:59', '24:00', '9:00',\n  '_x1', '1x', '\$a', 'a-b',\n  '\"ok\"', '\"esc\\\\\"\"', '\"bad', 'plain'\n];\nvar rows = [];\nvar names = Object.keys(PATTERNS).sort();\nfor (var i = 0; i < names.length; i++) {\n  var re = PATTERNS[names[i]];\n  var marks = '';\n  for (var j = 0; j < INPUTS.length; j++) marks += re.test(INPUTS[j]) ? '1' : '0';\n  rows.push(names[i] + ':' + marks);\n}\n\n// The same patterns used to extract rather than to test.\nvar found = 'mail me at a@b.co or c.d@e.fr today'.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}/g);\n\n// Anchors and multiline over a block of text.\nvar block = 'one\\ntwo\\nthree';\nvar starts = block.match(/^\\w+/gm);\nvar ends = block.match(/\\w+\$/gm);\n\nrows.join('|') + '#' + found.join() + '#' + starts.join() + '#' + ends.join();\n",
+            "email:1000000000000000000000000000000|hex:0000110000000000000000000000000|identifier:0000000000000000000000010100001|ipv4:0000000011000000000000000000000|isoDate:0000000000001000000000000000000|quoted:0000000000000000000000000001100|slug:0000000000001111001000001010001|time24:0000000000000000000110000000000#a@b.co,c.d@e.fr#one,two,three#one,two,three",
         ),
     )
 }
