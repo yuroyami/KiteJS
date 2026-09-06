@@ -87,3 +87,32 @@ kotlin {
         }
     }
 }
+
+/*
+ * The test262 parity run: every file the suite has, through upstream Rhino and through this port,
+ * comparing outcomes. It takes minutes and needs `tools/fetch-test262.sh` to have run, so it is
+ * its own task rather than part of `check`.
+ *
+ * `./gradlew test262Parity` runs it all; add `-Dtest262.filter=built-ins/Array` to narrow it.
+ */
+val test262Parity = tasks.register<Test>("test262Parity") {
+    group = "verification"
+    description = "Runs test262 through both engines and reports where they disagree."
+
+    val jvmTest = tasks.named<Test>("jvmTest")
+    dependsOn(jvmTest.map { it.dependsOn })
+    testClassesDirs = files(jvmTest.map { it.testClassesDirs })
+    classpath = files(jvmTest.map { it.classpath })
+
+    filter { includeTestsMatching("io.github.yuroyami.kitejs.Test262ParityTest") }
+    systemProperty("test262.filter", providers.systemProperty("test262.filter").getOrElse(""))
+    maxHeapSize = "4g"
+    // Tens of thousands of files through two engines produces a lot of output otherwise.
+    testLogging { showStandardStreams = true }
+    outputs.upToDateWhen { false }
+}
+
+// The normal suite stays quick: the parity run is opt in.
+tasks.named<Test>("jvmTest") {
+    exclude("**/Test262ParityTest.class")
+}

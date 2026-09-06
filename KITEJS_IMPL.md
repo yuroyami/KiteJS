@@ -278,6 +278,11 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   `WeakHashMap` happened to give upstream because the key types never override it. `hashCode` only
   picks a bucket. There is no reference queue in common Kotlin, so collected entries are swept out
   as the map grows and whenever it is asked its size, rather than the moment the key dies.
+- D-56: `Date.prototype[Symbol.toPrimitive]` is non-writable in the port, which is what the spec
+  asks for and what `built-ins/Date/prototype/Symbol.toPrimitive/prop-desc.js` checks. Upstream
+  leaves it writable and fails that test. This is the rare parity difference where the port is the
+  more correct of the two; `Test262ParityTest` pins it, so if upstream ever fixes it the entry goes
+  stale and the run says so.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -1219,12 +1224,12 @@ matches upstream on the P3.8 one-liners.
 The goal is not a pass rate. The goal is parity: for every test262 file upstream runs, the
 port passes exactly when upstream passes. Every difference becomes a fix or a ledger entry.
 
-- [ ] `tools/fetch-test262.sh`: shallow-fetches `tc39/test262` at the commit upstream pins
+- [x] `tools/fetch-test262.sh`: shallow-fetches `tc39/test262` at the commit upstream pins
       (`3fd4ec27f1798ebecafc73b354a45dcdda9bde29`) into `reference/test262/` (gitignored, next
       to the Rhino source). CI runs it before the conformance job.
-- [ ] `kitejs/src/jvmTest/resources/test262.properties`: a copy of upstream's file (6949
+- [x] `kitejs/src/jvmTest/resources/test262.properties`: a copy of upstream's file (6949
       lines), unchanged, so the same skip list and expected-failure list apply.
-- [ ] `jvmTest/Test262ParityTest.kt`: a Kotlin port of the parts of upstream's
+- [x] `jvmTest/Test262ParityTest.kt`: a Kotlin port of the parts of upstream's
       `Test262SuiteTest` that matter. It reads the properties file, parses each test's YAML
       front matter (`includes`, `flags`, `features`, `negative`), loads the harness files
       (`assert.js`, `sta.js`, `compareArray.js`, `propertyHelper.js`, `doneprintHandle.js` and
@@ -1235,7 +1240,7 @@ port passes exactly when upstream passes. Every difference becomes a fix or a le
       uses. It asserts three things per test: the port's outcome equals upstream's outcome, an
       expected failure in the properties file fails upstream (the copy is not stale), and a
       test not listed passes upstream.
-- [ ] The run is a separate Gradle task (`test262Parity`), not part of `jvmTest`: two engines
+- [x] The run is a separate Gradle task (`test262Parity`), not part of `jvmTest`: two engines
       over tens of thousands of files takes minutes. CI runs it nightly and on release
       branches; a developer runs it before a phase close-out.
 - [ ] Every parity difference gets a fix or a ledger entry with the test path; the ledger

@@ -505,11 +505,28 @@ internal class NativeDate private constructor() : IdScriptableObject() {
             return raw
         }
 
+        private fun offsetMsAt(cx: Context, t: Double): Int {
+            val millis = t.coerceIn(-8.64e15, 8.64e15).toLong()
+            return cx.timeZone.offsetAt(Instant.fromEpochMilliseconds(millis)).totalSeconds * 1000
+        }
+
+        /**
+         * Whether the zone is on daylight time at [t].
+         *
+         * Comparing against the zone's offset today would be wrong: a zone that has changed its
+         * standard offset since would then look permanently on daylight time. Africa/Algiers is the
+         * example that found this, being UTC+0 in 1970 and UTC+1 now. So the standard offset is
+         * taken from [t]'s own year, as the smaller of its January and July offsets, and daylight
+         * time is when [t] sits above it. That reads correctly in the southern hemisphere too,
+         * where the January offset is the larger one.
+         */
         private fun inDaylightTime(cx: Context, t: Double): Boolean {
             if (t.isNaN() || t.isInfinite()) return false
-            val millis = t.coerceIn(-8.64e15, 8.64e15).toLong()
-            val offset = cx.timeZone.offsetAt(Instant.fromEpochMilliseconds(millis)).totalSeconds * 1000
-            return offset != rawOffset(cx)
+            val year = YearFromTime(t).toDouble()
+            val january = offsetMsAt(cx, MakeDate(MakeDay(year, 0.0, 1.0), 0.0))
+            val july = offsetMsAt(cx, MakeDate(MakeDay(year, 6.0, 1.0), 0.0))
+            val standard = if (january <= july) january else july
+            return offsetMsAt(cx, t) > standard
         }
 
         /**
@@ -601,7 +618,9 @@ internal class NativeDate private constructor() : IdScriptableObject() {
             if (d.isNaN() || d == Double.POSITIVE_INFINITY || d == Double.NEGATIVE_INFINITY || abs(d) > HalfTimeDomain) {
                 return ScriptRuntime.NaN
             }
-            return if (d > 0.0) floor(d) else ceil(d)
+            // Adding zero is not redundant: it turns -0.0 into +0.0, which is what TimeClip owes
+            // the caller. `new Date(-0).getTime()` has to be +0.
+            return if (d > 0.0) floor(d + 0.0) else ceil(d + 0.0)
         }
 
         /** UTC milliseconds for the given parts, with no 1900 correction. */
