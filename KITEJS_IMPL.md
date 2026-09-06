@@ -256,7 +256,8 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   and the common standard library has no weak reference at all, so `WeakMap` and `WeakSet`
   cannot be built without one. The class and its four actuals live in the engine rather than in
   a shared library: the obvious candidate exposed a coroutines dependency to every consumer and
-  would have fixed the target list to its own. `WeakRefTest` covers the contract on every
+  would have fixed the target list to its own. The files came from KiteCore and keep their Apache
+  2.0 header, which `NOTICE` records. `WeakRefTest` covers the contract on every
   target and `WeakRefGcTest` proves the reference is really weak on the JVM, the only target
   where a test can ask for a collection.
 - D-53: `BigUint64Array` reads back the value that was written. Upstream masks with
@@ -1192,8 +1193,9 @@ smoke test covers every new builtin on every target, and every deviation is a le
 - [x] `WeakRef` lives in the engine, not in a dependency. KiteCore exposes
       `kotlinx-coroutines-core` with `api`, so depending on it would put coroutines in every
       consumer's classpath, which rule 4 exists to prevent, and would cap KiteJS's targets at
-      KiteCore's. The expect class and its four actuals were written here instead, along with
-      `WeakRefTest` on every target and `WeakRefGcTest` on the JVM (D-52).
+      KiteCore's. The expect class and its four actuals were copied in instead, keeping their
+      Apache 2.0 header, along with `WeakRefTest` on every target and `WeakRefGcTest` on the
+      JVM (D-52).
 - [x] `WeakKeyMap.kt`: a small weak-keyed map over `WeakRef`, keyed by identity hash, that
       drops cleared entries when it grows or is asked its size. Upstream's `WeakHashMap` has no
       multiplatform equivalent, so this is the port's own (D-55).

@@ -22,6 +22,20 @@ it and which keeps its own license:
   Copyright 2011 the V8 project authors, three-clause BSD license. The file
   carries the full text in its header.
 
+KiteJS also carries one small piece of code that did not come from Rhino, and
+which keeps its own license:
+
+  io/github/yuroyami/kitejs/WeakRef.kt and its four platform actuals
+  (jvmMain, androidMain, nativeMain, jsMain), plus WeakRefTest
+  Copyright 2026 yuroyami, Apache License, Version 2.0. Written for KiteCore
+  (https://github.com/yuroyami/KiteCore) and copied here rather than taken as a
+  dependency, because KiteCore exposes kotlinx-coroutines to everything that
+  depends on it and KiteJS ships coroutines as a separate artifact. Each file
+  carries the Apache boilerplate; the full text is in LICENSE-APACHE-2.0.
+
+  Rhino uses java.util.WeakHashMap for WeakMap and WeakSet, which common Kotlin
+  has no equivalent of. WeakRef is what KiteJS builds its own weak-keyed map on.
+
 The interpreter path is ported; Rhino's JVM bytecode compiler, E4X/XML support,
 Java interop (LiveConnect) and tooling are out of scope and contain no KiteJS
 code.
