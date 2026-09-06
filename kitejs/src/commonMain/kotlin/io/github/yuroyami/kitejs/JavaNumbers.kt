@@ -73,11 +73,11 @@ internal object JavaNumbers {
      * `MessageFormat`'s default number format: thousands separators, at most three fraction
      * digits rounded half-even on the shortest digits, no `.0` on a whole number.
      */
-    fun messageFormat(n: Number): String {
+    fun messageFormat(n: Any): String {
         if (n is KBigInt) return n.toString()
         if (n is Long) return group(n.toString())
         if (ScriptRuntime.isInt(n)) return group((n as Int).toString())
-        val d = n.toDouble()
+        val d = ScriptRuntime.numericToDouble(n)
         if (d.isNaN()) return "NaN"
         if (d.isInfinite()) return if (d > 0) "∞" else "-∞"
         if (d == 0.0) return if (1 / d < 0) "-0" else "0"

@@ -170,6 +170,11 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   HALF_UP the way `MathContext` and `setScale` do. `DecimalFormatterOracleTest` compares it with
   upstream over a fixed corpus and 350 seeded random doubles for every digit count the
   JavaScript methods accept.
+- D-33b: `Number.prototype.toString(radix)` for radixes other than 10 is upstream's
+  `DToA.JS_dtobasestr`, moved to `dtoa/RadixFormatter` because the rest of `DToA` was replaced by
+  `DecimalFormatter` (D-33). The algorithm is upstream's: it stops emitting digits as soon as what
+  it has already printed reads back as the same double. It runs over `KBigInt`, which is why it
+  waited for phase 5.
 - D-34: `NativeObject` no longer implements `java.util.Map`; the `keySet`, `values`, `entrySet`
   and `containsKey` views are gone. They were a Java host convenience, not JavaScript behaviour.
   The global `isXMLName` is registered for parity but throws "XML is not available", since E4X is
@@ -254,6 +259,19 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   would have fixed the target list to its own. `WeakRefTest` covers the contract on every
   target and `WeakRefGcTest` proves the reference is really weak on the JVM, the only target
   where a test can ask for a collection.
+- D-53: `BigUint64Array` reads back the value that was written. Upstream masks with
+  `0xffffffff`, a Java int literal that sign-extends once it is promoted to a long, so every
+  element with its top bit set comes back wrong: writing `-1n` reads as `-4294967297n` instead of
+  2^64 - 1. The branch is wrong for every value it exists to handle.
+  `EvalOracleTest.bigUint64ArrayReadsBackWhatWasWritten` pins both halves.
+- D-54: `KBigInt` does not extend `Number`, though upstream's `BigInteger` does. On Kotlin/JS
+  `Number` is the JS primitive number type, so a class extending it fails `is Number` and throws
+  on `as Number`; every bigint operation went down the mixed-operand path and raised a TypeError.
+  The JVM and iOS never showed it, which is what the cross-target slice is for. So the runtime
+  tells a bigint apart with `is KBigInt`, the binary numeric operators in `ScriptRuntime` take
+  `Any?` rather than `Number`, `toNumeric` answers `Any`, and `numericToDouble` replaces the
+  `Number.doubleValue()` calls that used to cover both. The one comparison overload that took two
+  numbers is now `compareNumeric`, since both overloads would otherwise have the same signature.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -1142,25 +1160,27 @@ smoke test covers every new builtin on every target, and every deviation is a le
 
 #### P5.2: BigInt in the language
 
-- [ ] Port `NativeBigInt.kt` (151): the `BigInt` function, `asIntN`, `asUintN`, `toString`,
+- [x] Port `NativeBigInt.kt` (151): the `BigInt` function, `asIntN`, `asUintN`, `toString`,
       `toLocaleString`, `valueOf`, `Symbol.toStringTag`; `toObject` wraps a `KBigInt`.
-- [ ] Fill the `TODO(P5)` sites: `ScriptRuntime.toBigInt` from strings and numbers with the
+- [x] Fill the `TODO(P5)` sites: `ScriptRuntime.toBigInt` from strings and numbers with the
       RangeErrors, the mixed-type TypeErrors in the arithmetic (P3.7 already routes `KBigInt`
       operands), `typeof`, equality and relational comparison between BigInt and Number and
       String, `NativeJSON` (`msg.json.cant.serialize` and `toJSON`), `Hashtable` key
       normalisation, unary minus and `**`, the lexer's `123n` literal path (`KBigInt.parse`
       exists since P0), `Number(bigint)` and `parseInt(bigint)`.
-- [ ] Port the BigInt half of `DToA` (`JS_dtobasestr`, about 150 lines over `KBigInt`), so
-      `Number.prototype.toString(radix)` works for every radix. The radix one-liners removed
-      in P3.8 return to the oracle.
-- [ ] Port `NativeBigIntArrayView.kt` (19), `NativeBigInt64Array.kt` (123) and
-      `NativeBigUint64Array.kt` (130), and register them.
-- [ ] Oracle: literals, every operator on BigInt and the TypeErrors for mixing, comparisons
+- [x] Port the BigInt half of `DToA` (`JS_dtobasestr`, about 150 lines over `KBigInt`), so
+      `Number.prototype.toString(radix)` works for every radix, as `dtoa/RadixFormatter`
+      (D-33b). The radix one-liners removed in P3.8 return to the oracle, plus a sweep of every
+      radix against a spread of fractions, which is what reaches the last-digit tie-break.
+- [x] Port `NativeBigIntArrayView.kt` (19), `NativeBigInt64Array.kt` (123) and
+      `NativeBigUint64Array.kt` (130), and register them. All three live in one
+      `typedarrays/BigIntViews.kt`, the way the other views share `NumericViews.kt`.
+- [x] Oracle: literals, every operator on BigInt and the TypeErrors for mixing, comparisons
       across types, `BigInt("0x10")` and the parsing rules, `asIntN` and `asUintN` wrapping,
       `toString` in every radix, `JSON.stringify` error and `toJSON` escape, BigInt keys in
       `Map` and `Set`, the typed views, `Number.prototype.toString(2)` and `(16)`,
       `Object.is(0n, -0n)`, and `BigInt.prototype.toString.call(1)` errors.
-- [ ] Commit.
+- [x] Commit.
 
 #### P5.3: WeakMap and WeakSet
 

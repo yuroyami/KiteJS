@@ -215,16 +215,18 @@ class NativeJSON private constructor() : ScriptableObject() {
                 value = ScriptRuntime.toString(value)
             } else if (value is NativeBoolean) {
                 value = value.getDefaultValue(ScriptRuntime.BooleanClass)
+            } else if (state.cx.languageVersion >= Context.VERSION_ES6 && value is NativeBigInt) {
+                value = value.getDefaultValue(ScriptRuntime.BigIntegerClass)
             }
-            // TODO(P5): a NativeBigInt unwraps to its KBigInt here.
             if (value == null) return "null"
             if (value == true) return "true"
             if (value == false) return "false"
             if (value is CharSequence) return quote(value.toString())
+            // A bigint is checked on its own, because it is not a Number here (D-54).
+            if (value is KBigInt) {
+                throw ScriptRuntime.typeErrorById("msg.json.cant.serialize", "BigInt")
+            }
             if (value is Number) {
-                if (value is KBigInt) {
-                    throw ScriptRuntime.typeErrorById("msg.json.cant.serialize", "BigInt")
-                }
                 val d = value.toDouble()
                 if (!d.isNaN() && d != Double.POSITIVE_INFINITY && d != Double.NEGATIVE_INFINITY) {
                     return ScriptRuntime.toString(value)

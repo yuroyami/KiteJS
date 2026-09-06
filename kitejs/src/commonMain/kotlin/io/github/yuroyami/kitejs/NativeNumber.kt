@@ -62,12 +62,12 @@ class NativeNumber internal constructor(private val doubleValue: Double) : Scrip
         }
 
         private fun js_constructor(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable {
-            val v = if (args.isNotEmpty()) ScriptRuntime.toNumeric(args[0]).toDouble() else 0.0
+            val v = if (args.isNotEmpty()) ScriptRuntime.numericToDouble(ScriptRuntime.toNumeric(args[0])) else 0.0
             return NativeNumber(v)
         }
 
         private fun js_constructorFunc(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
-            if (args.isNotEmpty()) ScriptRuntime.toNumeric(args[0]).toDouble() else 0.0
+            if (args.isNotEmpty()) ScriptRuntime.numericToDouble(ScriptRuntime.toNumeric(args[0])) else 0.0
 
         private fun js_valueOf(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
             toSelf(thisObj).doubleValue

@@ -50,6 +50,8 @@ class EvalOracleTest {
         v == null -> "null"
         v === org.mozilla.javascript.Undefined.instance || v === Undefined.instance -> "undefined"
         v is Boolean -> v.toString()
+        v is java.math.BigInteger -> v.toString() + "n"
+        v is KBigInt -> v.toString() + "n"
         v is Int -> v.toString()
         v is Number -> ScriptRuntime.numberToString(v.toDouble(), 10)
         v is CharSequence -> "\"" + v.toString() + "\""
@@ -1897,5 +1899,157 @@ class EvalOracleTest {
             " (new p(7, 8)).out"
         assertTrue(upstream(script).startsWith("\"false,"), "upstream: " + upstream(script))
         assertEquals("\"true,2,7\"", ported(script))
+    }
+
+    @Test
+    fun bigIntLiteralsAndArithmetic() = check(listOf(
+        "1n", "0n", "-1n", "123456789012345678901234567890n", "0x10n", "0o17n", "0b1011n",
+        "typeof 1n", "typeof BigInt(1)", "typeof Object(1n)",
+        "1n + 2n", "10n - 3n", "6n * 7n", "7n / 2n", "-7n / 2n", "7n % 2n", "-7n % 2n", "2n ** 64n",
+        "(2n ** 64n).toString()", "(-2n) ** 3n", "0n - 1n", "1n / 1n",
+        "-(5n)", "-(0n)", "+'1'",
+        "1n & 3n", "-1n & 3n", "-2n | 1n", "5n ^ 3n", "~5n", "~-1n", "~0n",
+        "1n << 64n", "(-5n) >> 1n", "5n >> 1n", "(-1n) >> 100n", "1n << 0n",
+        "1n == 1", "1n === 1", "1n == '1'", "1n === 1n", "0n == false", "0n == ''",
+        "1n < 2", "2n > 1.5", "1n <= 1", "2n >= 3", "1n < NaN", "1n < Infinity", "1n > -Infinity",
+        "9007199254740993n > 9007199254740992", "9007199254740993n == 9007199254740992",
+        "Object.is(0n, -0n)", "Object.is(1n, 1n)", "Object.is(1n, 1)",
+        "String(1n)", "`\${1n}`", "'' + 1n", "[1n, 2n].join(',')",
+        "Boolean(0n)", "Boolean(1n)", "0n ? 'y' : 'n'", "1n ? 'y' : 'n'",
+        "var x = 1n; x++; x", "var x = 1n; ++x", "var x = 1n; x--; x", "var x = 1n; x += 2n; x",
+        "(1n).constructor === BigInt", "BigInt.prototype.constructor === BigInt",
+        "Object.prototype.toString.call(1n)", "Object.prototype.toString.call(Object(1n))",
+    ))
+
+    @Test
+    fun bigIntMixingThrows() = check(listOf(
+        "try { 1n + 1 } catch(e) { e.name + ': ' + e.message }",
+        "try { 1n - 1 } catch(e) { e.name }",
+        "try { 1n * 1 } catch(e) { e.name }",
+        "try { 1n / 1 } catch(e) { e.name }",
+        "try { 1n % 1 } catch(e) { e.name }",
+        "try { 1n ** 1 } catch(e) { e.name }",
+        "try { 1n & 1 } catch(e) { e.name }",
+        "try { 1n | 1 } catch(e) { e.name }",
+        "try { 1n ^ 1 } catch(e) { e.name }",
+        "try { 1n << 1 } catch(e) { e.name }",
+        "try { 1 + 1n } catch(e) { e.name }",
+        "1n + 'x'", "'x' + 1n",
+        "try { Math.max(1n) } catch(e) { e.name }",
+        "try { Number.parseInt(1n) } catch(e) { e.name + ':' + e.message }",
+        "try { +1n } catch(e) { e.name + ': ' + e.message }",
+        "try { Number(1n) } catch(e) { e.name }",
+        "Number(1n) === 1",
+        "try { 2n ** -1n } catch(e) { e.name + ': ' + e.message }",
+        "try { 1n / 0n } catch(e) { e.name + ': ' + e.message }",
+        "try { 1n % 0n } catch(e) { e.name }",
+        "try { new BigInt(1) } catch(e) { e.name + ': ' + e.message }",
+        "try { BigInt(1.5) } catch(e) { e.name + ': ' + e.message }",
+        "try { BigInt(NaN) } catch(e) { e.name }",
+        "try { BigInt(Infinity) } catch(e) { e.name }",
+        "try { BigInt(null) } catch(e) { e.name }",
+        "try { BigInt(undefined) } catch(e) { e.name }",
+        "try { BigInt(Symbol()) } catch(e) { e.name }",
+        "try { BigInt('nope') } catch(e) { e.name }",
+        "try { BigInt('') } catch(e) { e.name + ':' + String(BigInt('')) }",
+        "try { BigInt.prototype.toString.call(1) } catch(e) { e.name }",
+        "try { BigInt.prototype.valueOf.call('x') } catch(e) { e.name }",
+        "try { JSON.stringify(1n) } catch(e) { e.name + ': ' + e.message }",
+        "try { JSON.stringify({a: 1n}) } catch(e) { e.name }",
+    ))
+
+    @Test
+    fun bigIntConversionAndFormatting() = check(listOf(
+        "BigInt(1)", "BigInt(0)", "BigInt(-1)", "BigInt(true)", "BigInt(false)", "BigInt('10')",
+        "BigInt('0x10')", "BigInt('0o17')", "BigInt('0b101')", "BigInt('  12  ')", "BigInt('-12')",
+        "BigInt(9007199254740992)", "BigInt('9007199254740993')", "BigInt()",
+        "(255n).toString(16)", "(255n).toString(2)", "(255n).toString(36)", "(-255n).toString(16)",
+        "(0n).toString(2)", "(123456789012345678901234567890n).toString(36)",
+        "try { (1n).toString(1) } catch(e) { e.name }",
+        "try { (1n).toString(37) } catch(e) { e.name }",
+        "(1n).toLocaleString()", "(1n).valueOf()", "typeof (1n).valueOf()",
+        "BigInt.asIntN(8, 255n)", "BigInt.asIntN(8, 256n)", "BigInt.asIntN(8, 127n)", "BigInt.asIntN(8, -129n)",
+        "BigInt.asUintN(8, 255n)", "BigInt.asUintN(8, 256n)", "BigInt.asUintN(8, -1n)",
+        "BigInt.asIntN(0, 5n)", "BigInt.asUintN(0, 5n)",
+        "BigInt.asIntN(64, 2n ** 63n)", "BigInt.asUintN(64, -1n)",
+        "BigInt.asIntN(1, 1n)", "BigInt.asIntN(1, 0n)",
+        "JSON.stringify({a: 1})", "JSON.stringify({ a: { toJSON: function () { return 5 } } })",
+        "JSON.stringify(Object(1n), function (k, v) { return typeof v })",
+        "var m = new Map(); m.set(1n, 'a'); m.get(1n)",
+        "var m = new Map(); m.set(1n, 'a'); String(m.get(1))",
+        "var s = new Set([1n, 1n, 2n]); s.size",
+        "var s = new Set([1n, 1]); s.size",
+        "[3n, 1n, 2n].sort().join(',')",
+        "[1n, 2n].map(function (v) { return v * 2n }).join(',')",
+        "Array.from(new Set([1n])).length",
+    ))
+
+    @Test
+    fun numberToStringInEveryRadix() = check(listOf(
+        "(255).toString(16)", "(255).toString(2)", "(255).toString(8)", "(255).toString(36)",
+        "(-255).toString(16)", "(0).toString(2)", "(1).toString(2)", "(0.5).toString(2)",
+        "(0.1).toString(2)", "(0.1).toString(3)", "(1/3).toString(3)", "(0.25).toString(4)",
+        "(3.5).toString(3)", "(1e21).toString(16)", "(1e-7).toString(16)", "(123.456).toString(7)",
+        "(1e300).toString(36)", "(Number.MAX_SAFE_INTEGER).toString(2)",
+        "(Number.MIN_VALUE).toString(2)", "(Number.MAX_VALUE).toString(16)",
+        "(-0).toString(2)", "(NaN).toString(2)", "(Infinity).toString(2)", "(-Infinity).toString(8)",
+        "(2147483648).toString(16)", "(4294967295).toString(16)", "(9007199254740993).toString(16)",
+        "try { (1).toString(1) } catch(e) { e.name }",
+        "try { (1).toString(37) } catch(e) { e.name }",
+        "(12345.6789).toString(30)", "(-12345.6789).toString(30)", "(1.0000000000000002).toString(16)",
+    ))
+
+    @Test
+    fun bigIntTypedArrays() = check(listOf(
+        "new BigInt64Array(2).length", "BigInt64Array.BYTES_PER_ELEMENT", "BigUint64Array.BYTES_PER_ELEMENT",
+        "var a = new BigInt64Array(2); a[0] = 5n; a[0]",
+        "var a = new BigInt64Array(2); a[0] = -5n; a[0]",
+        "var a = new BigInt64Array(1); a[0] = 2n ** 63n; a[0]",
+        "var a = new BigInt64Array([1n, 2n, 3n]); a.join(',')",
+        "var a = new BigInt64Array([1n, 2n, 3n]); a.length",
+        "Object.prototype.toString.call(new BigInt64Array(1))",
+        "try { var a = new BigInt64Array(1); a[0] = 1; a[0] } catch(e) { e.name }",
+        "var a = new BigInt64Array(1); String(a[5])",
+        "new BigInt64Array(2).byteLength",
+        "var b = new ArrayBuffer(16); var a = new BigInt64Array(b); a.length",
+        "var b = new ArrayBuffer(16); var a = new BigUint64Array(b, 8); a.length",
+    ))
+
+    /**
+     * Upstream's `BigUint64Array` reader masks with `0xffffffff`, a Java int literal, which
+     * sign-extends to all ones once it is promoted to a long. Every value with its top bit set
+     * therefore reads back as garbage: -1 comes out as -4294967297 rather than 2^64 - 1. The port
+     * returns the value that was written (D-53). Both halves are pinned so a change on either
+     * side shows.
+     */
+    @Test
+    fun bigUint64ArrayReadsBackWhatWasWritten() {
+        val cases = listOf(
+            "var a = new BigUint64Array(1); a[0] = 2n ** 63n; a[0]" to "9223372036854775808n",
+            "var a = new BigUint64Array(1); a[0] = -1n; a[0]" to "18446744073709551615n",
+            "var a = new BigUint64Array(1); a[0] = 2n ** 64n - 1n; a[0]" to "18446744073709551615n",
+        )
+        val upstreamAnswers = listOf("-18446744073709551616n", "-4294967297n", "-4294967297n")
+        for ((i, case) in cases.withIndex()) {
+            assertEquals(upstreamAnswers[i], upstream(case.first), "upstream drifted: " + case.first)
+            assertEquals(case.second, ported(case.first), case.first)
+        }
+    }
+
+    /**
+     * Every radix against a spread of fractions. The listed cases above miss the branch that picks
+     * between two digits that would both round back correctly, and that branch is the whole reason
+     * upstream's algorithm is here rather than something simpler.
+     */
+    @Test
+    fun numberToStringSweepsEveryRadix() {
+        val values = listOf(
+            "0.1", "0.2", "0.3", "0.7", "1.1", "2.5", "3.5", "0.05", "123.456", "1e-5", "1e5",
+            "0.9999999999999999", "1/3", "2/7", "5/11", "1e-300", "1e300", "0.125", "1023.99609375",
+            "1e-320", "1.7976931348623157e308", "5e-324",
+        )
+        val scripts = mutableListOf<String>()
+        for (radix in 2..36) for (v in values) scripts.add("($v).toString($radix)")
+        check(scripts)
     }
 }

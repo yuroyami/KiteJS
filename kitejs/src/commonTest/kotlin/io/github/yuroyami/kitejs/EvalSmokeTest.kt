@@ -413,4 +413,66 @@ class EvalSmokeTest {
         assertEquals("[object Reflect]", eval("Object.prototype.toString.call(Reflect)"))
         assertEquals("1", eval("var p = new Proxy({a:1},{get:function(t,k,r){return Reflect.get(t,k,r);}}); p.a"))
     }
+
+    @Test
+    fun bigInts() {
+        assertEquals("bigint", eval("typeof 1n"))
+        assertEquals("3", eval("String(1n + 2n)"))
+        assertEquals("3", eval("String(7n / 2n)"))
+        assertEquals("-3", eval("String(-7n / 2n)"))
+        assertEquals("1", eval("String(7n % 2n)"))
+        assertEquals("18446744073709551616", eval("String(2n ** 64n)"))
+        assertEquals("18446744073709551616", eval("String(1n << 64n)"))
+        assertEquals(
+            "121932631137021795226185032733622923332237463801111263526900",
+            eval("String(123456789012345678901234567890n * 987654321098765432109876543210n)"),
+        )
+        // Two's complement, which is where a general-purpose big integer would give other answers.
+        assertEquals("3", eval("String(-1n & 3n)"))
+        assertEquals("-1", eval("String(-2n | 1n)"))
+        assertEquals("-6", eval("String(~5n)"))
+        assertEquals("-3", eval("String((-5n) >> 1n)"))
+        assertEquals("ff", eval("(255n).toString(16)"))
+        assertEquals("11111111", eval("(255n).toString(2)"))
+        assertEquals("16", eval("String(BigInt('0x10'))"))
+        assertEquals("1", eval("String(BigInt(true))"))
+        assertEquals("9007199254740993", eval("String(BigInt('9007199254740993'))"))
+        assertEquals("-1", eval("String(BigInt.asIntN(8, 255n))"))
+        assertEquals("255", eval("String(BigInt.asUintN(8, -1n))"))
+        assertEquals("18446744073709551615", eval("String(BigInt.asUintN(64, -1n))"))
+        assertEquals("true", eval("1n == 1"))
+        assertEquals("false", eval("1n === 1"))
+        // The comparison is exact, so the bigint wins even though the double cannot hold it.
+        assertEquals("true", eval("9007199254740993n > 9007199254740992"))
+        assertEquals("true", eval("Object.is(0n, -0n)"))
+        assertEquals("TypeError", eval("try { 1n + 1 } catch(e) { e.name }"))
+        assertEquals("1", eval("String(Number(1n))"))
+        assertEquals("TypeError", eval("try { JSON.stringify(1n) } catch(e) { e.name }"))
+        assertEquals("a", eval("var m = new Map(); m.set(1n, 'a'); m.get(1n)"))
+        assertEquals("2", eval("String(new Set([1n, 1n, 2n]).size)"))
+        assertEquals("[object BigInt]", eval("Object.prototype.toString.call(1n)"))
+    }
+
+    @Test
+    fun numbersInOtherRadixes() {
+        assertEquals("ff", eval("(255).toString(16)"))
+        assertEquals("0.0001100110011001100110011001100110011001100110011001101", eval("(0.1).toString(2)"))
+        assertEquals("0.0022002200220022002200220022002201", eval("(0.1).toString(3)"))
+        assertEquals("10.111111111111111111111111111111111", eval("(3.5).toString(3)"))
+        assertEquals("0.6666666666666666666", eval("(0.9999999999999999).toString(7)"))
+        assertEquals("NaN", eval("(NaN).toString(2)"))
+        assertEquals("Infinity", eval("(Infinity).toString(2)"))
+        assertEquals("0", eval("(0).toString(2)"))
+        assertEquals("RangeError", eval("try { (1).toString(37) } catch(e) { e.name }"))
+    }
+
+    @Test
+    fun bigIntTypedArrays() {
+        assertEquals("-5", eval("var a = new BigInt64Array(2); a[0] = -5n; String(a[0])"))
+        assertEquals("18446744073709551615", eval("var a = new BigUint64Array(1); a[0] = -1n; String(a[0])"))
+        assertEquals("1,2,3", eval("var a = new BigInt64Array([1n,2n,3n]); a.join(',')"))
+        assertEquals("8", eval("String(BigInt64Array.BYTES_PER_ELEMENT)"))
+        assertEquals("2", eval("String(new BigInt64Array(2).length)"))
+        assertEquals("16", eval("String(new BigInt64Array(2).byteLength)"))
+    }
 }

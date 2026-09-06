@@ -403,12 +403,7 @@ object ScriptRuntime {
         return toString(d)
     }
 
-    /**
-     * Converts a number to its ECMAScript string form.
-     *
-     * Only radix 10 is ported so far. The other radixes go through `DToA.JS_dtobasestr`, which
-     * needs arbitrary-precision integers, so they arrive with real BigInt support in phase 5.
-     */
+    /** Converts a number to its ECMAScript string form. */
     fun numberToString(d: Double, base: Int): String {
         if (base == 10) {
             // The common case. DoubleFormatter identifies the non-finite values efficiently, so
@@ -422,7 +417,13 @@ object ScriptRuntime {
         if (d == Double.POSITIVE_INFINITY) return "Infinity"
         if (d == Double.NEGATIVE_INFINITY) return "-Infinity"
         if (d == 0.0) return "0"
-        throw UnsupportedOperationException("radix $base needs BigInt, which arrives in phase 5")
+        return io.github.yuroyami.kitejs.dtoa.RadixFormatter.toBaseString(base, d)
+    }
+
+    /** A bigint printed in [base], which is just what [KBigInt] already does. */
+    fun bigIntToString(n: KBigInt, base: Int): String {
+        if (base < 2 || base > 36) throw rangeErrorById("msg.bad.radix", base.toString())
+        return n.toString(base)
     }
 
     fun toString(d: Double): String = numberToString(d, 10)
@@ -1053,8 +1054,9 @@ object ScriptRuntime {
             return result
         }
         if (cx.languageVersion >= Context.VERSION_ES6 && value is KBigInt) {
-            // TODO(P5): NativeBigInt wraps a big integer.
-            TODO("NativeBigInt lands in phase 5")
+            val result = NativeBigInt(value)
+            setBuiltinProtoAndParent(result, scope, TopLevel.Builtins.BigInt)
+            return result
         }
         if (value is Number) {
             val result = NativeNumber(value.toDouble())
@@ -1389,7 +1391,8 @@ object ScriptRuntime {
             LazilyLoadedCtor(scope, "Uint16Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.typedarrays.NativeUint16Array.init(icx, s, sld) })
             LazilyLoadedCtor(scope, "Int32Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.typedarrays.NativeInt32Array.init(icx, s, sld) })
             LazilyLoadedCtor(scope, "Uint32Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.typedarrays.NativeUint32Array.init(icx, s, sld) })
-            // TODO(P5): BigInt64Array and BigUint64Array need the BigInt type.
+            LazilyLoadedCtor(scope, "BigInt64Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.typedarrays.NativeBigInt64Array.init(icx, s, sld) })
+            LazilyLoadedCtor(scope, "BigUint64Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.typedarrays.NativeBigUint64Array.init(icx, s, sld) })
             LazilyLoadedCtor(scope, "Float32Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.typedarrays.NativeFloat32Array.init(icx, s, sld) })
             LazilyLoadedCtor(scope, "Float64Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.typedarrays.NativeFloat64Array.init(icx, s, sld) })
             LazilyLoadedCtor(scope, "DataView", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.typedarrays.NativeDataView.init(icx, s, sld) })
@@ -1404,9 +1407,10 @@ object ScriptRuntime {
             LazilyLoadedCtor(scope, "Set", sealed, Initializable { icx, s, sld -> NativeSet.init(icx, s, sld) })
             LazilyLoadedCtor(scope, "Proxy", sealed, Initializable { icx, s, sld -> NativeProxy.init(icx, s, sld) })
             LazilyLoadedCtor(scope, "Reflect", sealed, Initializable { icx, s, sld -> NativeReflect.init(icx, s, sld) })
+            LazilyLoadedCtor(scope, "BigInt", sealed, Initializable { icx, s, sld -> NativeBigInt.init(icx, s, sld) })
             // Upstream's registration order here is Map, Promise, Set, WeakMap, WeakSet, BigInt,
             // Proxy, Reflect. Each one goes in its own slot as it lands.
-            // TODO(P5): WeakMap, WeakSet and BigInt.
+            // TODO(P5): WeakMap and WeakSet.
         }
 
         if (scope is TopLevel) scope.cacheBuiltins(scope, sealed)
@@ -1472,10 +1476,22 @@ object ScriptRuntime {
 
     private val NEGATIVE_ZERO_BITS = (-0.0).toRawBits()
 
-    /** ToNumeric: a number or a bigint. */
-    fun toNumeric(value: Any?): Number {
+    /**
+     * A number or a bigint, read as a double. This is what upstream got for free from
+     * `Number.doubleValue()` before bigints stopped being [Number] (D-54).
+     */
+    fun numericToDouble(value: Any?): Double = when (value) {
+        is Double -> value
+        is Int -> value.toDouble()
+        is KBigInt -> value.toDouble()
+        is Number -> value.toDouble()
+        else -> toNumber(value)
+    }
+
+    /** ToNumeric: a number or a bigint. Not `Number`, because a bigint is not one (D-54). */
+    fun toNumeric(value: Any?): Any {
         val v = toPrimitive(value, NumberClass)
-        if (v is Number) return v
+        if (v is Number || v is KBigInt) return v
         return toNumber(v)
     }
 
@@ -1568,7 +1584,7 @@ object ScriptRuntime {
         val rnum = toNumeric(rprim)
         if (lnum is KBigInt && rnum is KBigInt) return lnum.add(rnum)
         if (lnum is KBigInt || rnum is KBigInt) throw bigIntOperand()
-        return lnum.toDouble() + rnum.toDouble()
+        return numericToDouble(lnum) + numericToDouble(rnum)
     }
 
     fun add(val1: CharSequence, val2: Any?): CharSequence = ConsString(val1, toCharSequence(val2))
@@ -1591,106 +1607,106 @@ object ScriptRuntime {
         return if (r >= Int.MIN_VALUE && r <= Int.MAX_VALUE) r.toInt() else r.toDouble()
     }
 
-    fun subtract(val1: Number, val2: Number): Number = when {
+    fun subtract(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> val1.subtract(val2)
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
         isInt(val1) && isInt(val2) -> subtract(val1 as Int, val2 as Int)
-        else -> val1.toDouble() - val2.toDouble()
+        else -> numericToDouble(val1) - numericToDouble(val2)
     }
 
-    fun multiply(val1: Number, val2: Number): Number = when {
+    fun multiply(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> val1.multiply(val2)
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
         isInt(val1) && isInt(val2) -> multiply(val1 as Int, val2 as Int)
-        else -> val1.toDouble() * val2.toDouble()
+        else -> numericToDouble(val1) * numericToDouble(val2)
     }
 
-    fun divide(val1: Number, val2: Number): Number = when {
+    fun divide(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> {
             if (val2.isZero()) throw rangeErrorById("msg.division.zero")
             val1.divide(val2)
         }
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
-        else -> val1.toDouble() / val2.toDouble()
+        else -> numericToDouble(val1) / numericToDouble(val2)
     }
 
-    fun remainder(val1: Number, val2: Number): Number = when {
+    fun remainder(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> {
             if (val2.isZero()) throw rangeErrorById("msg.division.zero")
             val1.remainder(val2)
         }
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
-        else -> val1.toDouble().rem(val2.toDouble())
+        else -> numericToDouble(val1).rem(numericToDouble(val2))
     }
 
-    fun exponentiate(val1: Number, val2: Number): Number = when {
+    fun exponentiate(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> {
             if (val2.signum() == -1) throw rangeErrorById("msg.bigint.negative.exponent")
             val1.pow(val2.intValueExact())
         }
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
-        else -> val1.toDouble().pow(val2.toDouble())
+        else -> numericToDouble(val1).pow(numericToDouble(val2))
     }
 
     fun bitwiseAND(val1: Double, val2: Double): Double = (toInt32(val1) and toInt32(val2)).toDouble()
 
-    fun bitwiseAND(val1: Number, val2: Number): Number = when {
+    fun bitwiseAND(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> val1.and(val2)
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
         isInt(val1) && isInt(val2) -> (val1 as Int) and (val2 as Int)
-        else -> (toInt32(val1.toDouble()) and toInt32(val2.toDouble())).toDouble()
+        else -> (toInt32(numericToDouble(val1)) and toInt32(numericToDouble(val2))).toDouble()
     }
 
     fun bitwiseOR(val1: Double, val2: Double): Double = (toInt32(val1) or toInt32(val2)).toDouble()
 
-    fun bitwiseOR(val1: Number, val2: Number): Number = when {
+    fun bitwiseOR(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> val1.or(val2)
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
         isInt(val1) && isInt(val2) -> (val1 as Int) or (val2 as Int)
-        else -> (toInt32(val1.toDouble()) or toInt32(val2.toDouble())).toDouble()
+        else -> (toInt32(numericToDouble(val1)) or toInt32(numericToDouble(val2))).toDouble()
     }
 
     fun bitwiseXOR(val1: Double, val2: Double): Double = (toInt32(val1) xor toInt32(val2)).toDouble()
 
-    fun bitwiseXOR(val1: Number, val2: Number): Number = when {
+    fun bitwiseXOR(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> val1.xor(val2)
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
         isInt(val1) && isInt(val2) -> (val1 as Int) xor (val2 as Int)
-        else -> (toInt32(val1.toDouble()) xor toInt32(val2.toDouble())).toDouble()
+        else -> (toInt32(numericToDouble(val1)) xor toInt32(numericToDouble(val2))).toDouble()
     }
 
     fun leftShift(val1: Double, val2: Double): Double = (toInt32(val1) shl toInt32(val2)).toDouble()
 
-    fun leftShift(val1: Number, val2: Number): Number = when {
+    fun leftShift(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> val1.shiftLeft(val2.intValueExact())
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
         isInt(val1) && isInt(val2) -> (val1 as Int) shl (val2 as Int)
-        else -> (toInt32(val1.toDouble()) shl toInt32(val2.toDouble())).toDouble()
+        else -> (toInt32(numericToDouble(val1)) shl toInt32(numericToDouble(val2))).toDouble()
     }
 
     fun signedRightShift(val1: Double, val2: Double): Double = (toInt32(val1) shr toInt32(val2)).toDouble()
 
-    fun signedRightShift(val1: Number, val2: Number): Number = when {
+    fun signedRightShift(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> val1.shiftRight(val2.intValueExact())
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
         isInt(val1) && isInt(val2) -> (val1 as Int) shr (val2 as Int)
-        else -> (toInt32(val1.toDouble()) shr toInt32(val2.toDouble())).toDouble()
+        else -> (toInt32(numericToDouble(val1)) shr toInt32(numericToDouble(val2))).toDouble()
     }
 
-    fun bitwiseNOT(value: Number): Number = when {
+    fun bitwiseNOT(value: Any?): Any = when {
         value is KBigInt -> value.not()
         isInt(value) -> (value as Int).inv()
-        else -> toInt32(value.toDouble()).inv().toDouble()
+        else -> toInt32(numericToDouble(value)).inv().toDouble()
     }
 
-    fun negate(value: Number): Number {
+    fun negate(value: Any?): Any {
         if (value is KBigInt) return value.negate()
         if (isInt(value)) {
             val i = value as Int
             if (i == 0) return negativeZeroObj
             if (i > Int.MIN_VALUE && i < Int.MAX_VALUE) return -i
         }
-        return -value.toDouble()
+        return -numericToDouble(value)
     }
 
     // ---- Comparison ----------------------------------------------------------------------------
@@ -1852,7 +1868,7 @@ object ScriptRuntime {
 
     /** The relational operators, [op] being one of GE, LE, GT and LT. */
     fun compare(val1: Any?, val2: Any?, op: Int): Boolean {
-        if (val1 is Number && val2 is Number) return compare(val1, val2, op)
+        if (val1 is Number && val2 is Number) return compareNumeric(val1, val2, op)
         if (isSymbol(val1) || isSymbol(val2)) throw typeErrorById("msg.compare.symbol")
         val v1 = toPrimitive(val1, NumberClass)
         val v2 = toPrimitive(val2, NumberClass)
@@ -1865,27 +1881,28 @@ object ScriptRuntime {
         if (v1 is KBigInt && v2 is CharSequence) {
             return try { compareTo(v1.compareTo(toBigInt(v2.toString())), op) } catch (e: EcmaError) { false }
         }
-        return compare(toNumeric(v1), toNumeric(v2), op)
+        return compareNumeric(toNumeric(v1), toNumeric(v2), op)
     }
 
-    fun compare(val1: Number, val2: Number, op: Int): Boolean {
+    /** The numeric half, where each side is already a number or a bigint. */
+    fun compareNumeric(val1: Any?, val2: Any?, op: Int): Boolean {
         if (val1 is KBigInt && val2 is KBigInt) return compareTo(val1.compareTo(val2), op)
         if (val1 is KBigInt || val2 is KBigInt) {
             // A bigint against a double, with the infinities settled first.
             if (val1 is KBigInt) {
-                val d = val2.toDouble()
+                val d = numericToDouble(val2)
                 if (d.isNaN()) return false
                 if (d == Double.POSITIVE_INFINITY) return op == Token.LE || op == Token.LT
                 if (d == Double.NEGATIVE_INFINITY) return op == Token.GE || op == Token.GT
                 return compareTo(val1.compareToDouble(d), op)
             }
-            val d = val1.toDouble()
+            val d = numericToDouble(val1)
             if (d.isNaN()) return false
             if (d == Double.POSITIVE_INFINITY) return op == Token.GE || op == Token.GT
             if (d == Double.NEGATIVE_INFINITY) return op == Token.LE || op == Token.LT
             return compareTo(-(val2 as KBigInt).compareToDouble(d), op)
         }
-        return compareTo(val1.toDouble(), val2.toDouble(), op)
+        return compareTo(numericToDouble(val1), numericToDouble(val2), op)
     }
 
     private fun compareTo(val1: String, val2: String, op: Int): Boolean = compareTo(val1.compareTo(val2), op)
@@ -2584,15 +2601,15 @@ object ScriptRuntime {
         return NaNobj
     }
 
-    private fun incrDecrResult(number: Number, incrDecrMask: Int): Number = when {
+    private fun incrDecrResult(number: Any?, incrDecrMask: Int): Any = when {
         number is KBigInt -> if ((incrDecrMask and Node.DECR_FLAG) == 0) number.add(KBigInt.ONE) else number.subtract(KBigInt.ONE)
         isInt(number) -> if ((incrDecrMask and Node.DECR_FLAG) == 0) (number as Int) + 1 else (number as Int) - 1
-        else -> if ((incrDecrMask and Node.DECR_FLAG) == 0) number.toDouble() + 1.0 else number.toDouble() - 1.0
+        else -> if ((incrDecrMask and Node.DECR_FLAG) == 0) toNumber(number) + 1.0 else toNumber(number) - 1.0
     }
 
     private fun doScriptableIncrDecr(target: Scriptable, id: String, protoChainStart: Scriptable, value: Any?, incrDecrMask: Int): Any? {
         val post = (incrDecrMask and Node.POST_FLAG) != 0
-        val number = if (value is Number) value else toNumeric(value)
+        val number = if (value is Number || value is KBigInt) value else toNumeric(value)
         val result = incrDecrResult(number, incrDecrMask)
         target.put(id, protoChainStart, result)
         return if (post) number else result
@@ -2603,7 +2620,7 @@ object ScriptRuntime {
     fun elemIncrDecr(obj: Any?, index: Any?, cx: Context, scope: Scriptable, incrDecrMask: Int): Any? {
         val value = getObjectElem(obj, index, cx, scope)
         val post = (incrDecrMask and Node.POST_FLAG) != 0
-        val number = if (value is Number) value else toNumeric(value)
+        val number = if (value is Number || value is KBigInt) value else toNumeric(value)
         val result = incrDecrResult(number, incrDecrMask)
         setObjectElem(obj, index, result, cx, scope)
         return if (post) number else result
@@ -2614,7 +2631,7 @@ object ScriptRuntime {
     fun refIncrDecr(ref: Ref, cx: Context, scope: Scriptable, incrDecrMask: Int): Any? {
         val value = ref.get(cx)
         val post = (incrDecrMask and Node.POST_FLAG) != 0
-        val number = if (value is Number) value else toNumeric(value)
+        val number = if (value is Number || value is KBigInt) value else toNumeric(value)
         val result = incrDecrResult(number, incrDecrMask)
         ref.set(cx, scope, result)
         return if (post) number else result

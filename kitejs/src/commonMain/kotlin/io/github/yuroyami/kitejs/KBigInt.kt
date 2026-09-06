@@ -17,13 +17,14 @@ import kotlin.math.absoluteValue
  * The bitwise operations follow the JavaScript rule: two's complement over an infinitely long bit
  * string, so `-1n and 3n` is `3n` and `not(5n)` is `-6n`. `shiftRight` floors, matching `>>`.
  *
- * It extends [Number] because the runtime keeps bigints in the same slots as other numbers and
- * tells them apart with `is KBigInt`.
+ * It deliberately does NOT extend [Number], even though upstream's `BigInteger` does: on
+ * Kotlin/JS `Number` is the JS primitive number type, so a class extending it fails `is Number`
+ * and throws on `as Number`. The runtime tells a bigint apart with `is KBigInt` instead (D-54).
  */
 class KBigInt private constructor(
     private val sign: Int,
     private val mag: IntArray,
-) : Number(), Comparable<KBigInt> {
+) : Comparable<KBigInt> {
 
     /** Parses [digits] in [radix]. This is the shape the lexer builds a `123n` literal with. */
     constructor(digits: String, radix: Int) : this(parse(digits, radix))
@@ -209,10 +210,10 @@ class KBigInt private constructor(
     }
 
     /** The low 32 bits, wrapping the way a cast does. */
-    override fun toInt(): Int = toLong().toInt()
+    fun toInt(): Int = toLong().toInt()
 
     /** The low 64 bits, wrapping the way a cast does. */
-    override fun toLong(): Long {
+    fun toLong(): Long {
         val low = twosLimb(0).toLong() and 0xFFFFFFFFL
         val high = twosLimb(1).toLong() and 0xFFFFFFFFL
         return (high shl 32) or low
@@ -231,7 +232,7 @@ class KBigInt private constructor(
     }
 
     /** The nearest double, rounded to even, and infinite once past the double range. */
-    override fun toDouble(): Double {
+    fun toDouble(): Double {
         if (sign == 0) return 0.0
         val bits = magBitLength(mag)
         if (bits > 1024) return if (sign > 0) Double.POSITIVE_INFINITY else Double.NEGATIVE_INFINITY
@@ -258,9 +259,9 @@ class KBigInt private constructor(
         return Double.fromBits(raw)
     }
 
-    override fun toFloat(): Float = toDouble().toFloat()
-    override fun toShort(): Short = toInt().toShort()
-    override fun toByte(): Byte = toInt().toByte()
+    fun toFloat(): Float = toDouble().toFloat()
+    fun toShort(): Short = toInt().toShort()
+    fun toByte(): Byte = toInt().toByte()
 
     // ---- Two's complement view -----------------------------------------------------------------
 

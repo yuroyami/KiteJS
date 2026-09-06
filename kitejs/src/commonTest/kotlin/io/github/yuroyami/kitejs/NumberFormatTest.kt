@@ -81,12 +81,16 @@ class NumberFormatTest {
     }
 
     @Test
-    fun nonDecimalRadixesWaitForBigInt() {
-        // Non-finite and zero short-circuit before the unsupported path.
+    fun nonDecimalRadixesPrintTheShortestRoundTrip() {
+        // Non-finite and zero short-circuit before any digit work.
         assertEquals("NaN", ScriptRuntime.numberToString(Double.NaN, 16))
+        assertEquals("Infinity", ScriptRuntime.numberToString(Double.POSITIVE_INFINITY, 16))
         assertEquals("0", ScriptRuntime.numberToString(0.0, 16))
-        assertFailsWith<UnsupportedOperationException> {
-            ScriptRuntime.numberToString(255.0, 16)
-        }
+        assertEquals("ff", ScriptRuntime.numberToString(255.0, 16))
+        assertEquals("11111111", ScriptRuntime.numberToString(255.0, 2))
+        assertEquals("-ff", ScriptRuntime.numberToString(-255.0, 16))
+        // A fraction stops as soon as the digits already read back as the same double.
+        assertEquals("0.1", ScriptRuntime.numberToString(0.5, 2))
+        assertEquals("10.111111111111111111111111111111111", ScriptRuntime.numberToString(3.5, 3))
     }
 }

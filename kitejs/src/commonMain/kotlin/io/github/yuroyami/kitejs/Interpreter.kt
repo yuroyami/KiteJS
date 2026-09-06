@@ -759,9 +759,9 @@ class Interpreter : Evaluator {
                     if (lhs === DBL_MRK && rhs === DBL_MRK) {
                         valBln = ScriptRuntime.compareTo(sDbl[state.stackTop], sDbl[state.stackTop + 1], op)
                     } else if (rhs === DBL_MRK) {
-                        valBln = ScriptRuntime.compare(stackNumeric(frame, state.stackTop), sDbl[state.stackTop + 1], op)
+                        valBln = ScriptRuntime.compareNumeric(stackNumeric(frame, state.stackTop), sDbl[state.stackTop + 1], op)
                     } else if (lhs === DBL_MRK) {
-                        valBln = ScriptRuntime.compare(sDbl[state.stackTop], ScriptRuntime.toNumeric(rhs), op)
+                        valBln = ScriptRuntime.compareNumeric(sDbl[state.stackTop], ScriptRuntime.toNumeric(rhs), op)
                     } else {
                         valBln = ScriptRuntime.compare(lhs, rhs, op)
                     }
@@ -1569,12 +1569,12 @@ class Interpreter : Evaluator {
             }
         }
 
-        private fun putNumber(stack: Array<Any?>, sDbl: DoubleArray, top: Int, result: Number) {
+        private fun putNumber(stack: Array<Any?>, sDbl: DoubleArray, top: Int, result: Any) {
             if (result is KBigInt) {
                 stack[top] = result
             } else {
                 stack[top] = DBL_MRK
-                sDbl[top] = result.toDouble()
+                sDbl[top] = ScriptRuntime.numericToDouble(result)
             }
         }
 
@@ -1634,15 +1634,15 @@ class Interpreter : Evaluator {
                 } else if (rhs is CharSequence) {
                     stack[state.stackTop] = ConsString(ScriptRuntime.toCharSequence(lhs), rhs)
                 } else {
-                    val lNum = if (lhs is Number) lhs else ScriptRuntime.toNumeric(lhs)
-                    val rNum = if (rhs is Number) rhs else ScriptRuntime.toNumeric(rhs)
+                    val lNum = if (lhs is Number || lhs is KBigInt) lhs else ScriptRuntime.toNumeric(lhs)
+                    val rNum = if (rhs is Number || rhs is KBigInt) rhs else ScriptRuntime.toNumeric(rhs)
                     if (lNum is KBigInt && rNum is KBigInt) {
                         stack[state.stackTop] = lNum.add(rNum)
                     } else if (lNum is KBigInt || rNum is KBigInt) {
                         throw ScriptRuntime.typeErrorById("msg.cant.convert.to.number", "BigInt")
                     } else {
                         stack[state.stackTop] = DBL_MRK
-                        sDbl[state.stackTop] = lNum.toDouble() + rNum.toDouble()
+                        sDbl[state.stackTop] = ScriptRuntime.numericToDouble(lNum) + ScriptRuntime.numericToDouble(rNum)
                     }
                 }
                 return
@@ -1659,10 +1659,10 @@ class Interpreter : Evaluator {
                 val rstr: CharSequence = ScriptRuntime.numberToString(d, 10)
                 stack[state.stackTop] = if (leftRightOrder) ConsString(lhs, rstr) else ConsString(rstr, lhs)
             } else {
-                val lNum = if (lhs is Number) lhs else ScriptRuntime.toNumeric(lhs)
+                val lNum = if (lhs is Number || lhs is KBigInt) lhs else ScriptRuntime.toNumeric(lhs)
                 if (lNum is KBigInt) throw ScriptRuntime.typeErrorById("msg.cant.convert.to.number", "BigInt")
                 stack[state.stackTop] = DBL_MRK
-                sDbl[state.stackTop] = lNum.toDouble() + d
+                sDbl[state.stackTop] = ScriptRuntime.numericToDouble(lNum) + d
             }
         }
 
@@ -1679,7 +1679,7 @@ class Interpreter : Evaluator {
                 d = varDbls[state.indexReg]
             } else {
                 val num = ScriptRuntime.toNumeric(varValue)
-                if (num is KBigInt) bi = num else d = num.toDouble()
+                if (num is KBigInt) bi = num else d = ScriptRuntime.numericToDouble(num)
             }
             val post = (incrDecrMask and Node.POST_FLAG) != 0
             val readonly = (varAttributes[state.indexReg].toInt() and ScriptableObject.READONLY) != 0
@@ -2003,7 +2003,7 @@ class Interpreter : Evaluator {
             return if (x !== DBL_MRK) ScriptRuntime.toNumber(x) else frame.sDbl[i]
         }
 
-        private fun stackNumeric(frame: CallFrame, i: Int): Number {
+        private fun stackNumeric(frame: CallFrame, i: Int): Any {
             val x = frame.stack[i]
             return if (x !== DBL_MRK) ScriptRuntime.toNumeric(x) else frame.sDbl[i]
         }

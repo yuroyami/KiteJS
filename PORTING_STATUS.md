@@ -49,7 +49,7 @@ plan, read [KITEJS_IMPL.md](KITEJS_IMPL.md).
 | Proxy | ✅ | All thirteen traps, the invariant checks that keep a handler from contradicting its target, `Proxy.revocable`, and function and constructor proxies. A proxy answers for its target where the engine asks about identity, so `Array.isArray` and `typeof` see through it. About 100 oracle scripts match upstream, plus seven whole programs that also run on JS and iOS. Two places where upstream cannot be matched are pinned as tests: a `getOwnPropertyDescriptor` trap answering undefined crashes upstream, and upstream hands the `construct` trap a raw Java array |
 | Reflect | ✅ | All thirteen methods, including `Reflect.construct` with a separate new.target. About 55 oracle scripts match upstream |
 | WeakMap, WeakSet | ⛔ | Phase 5, over the engine's own `WeakRef` |
-| BigInt | ⛔ | Phase 5, needs a big-integer implementation |
+| BigInt | ✅ | Literals, every operator with the TypeErrors for mixing a bigint with a number, comparisons that stay exact across the two, `BigInt`, `asIntN` and `asUintN`, `toString` in every radix, and `BigInt64Array` and `BigUint64Array`. The arithmetic is the port's own `KBigInt`, checked operation by operation against `java.math.BigInteger`. `Number.prototype.toString(radix)` came back with it, since the shortest-round-trip printer needs big integers. One gap upstream has and the port does not: upstream's `BigUint64Array` returns garbage for any element with its top bit set |
 | test262 conformance harness | ⛔ | Phase 6 |
 | Kotlin embedding API (host objects without reflection) | ⛔ | Phase 7 |
 | JVM bytecode compiler | 🚫 | JIT and runtime codegen are impossible on iOS and pointless for this port; upstream's interpreted mode is the model |

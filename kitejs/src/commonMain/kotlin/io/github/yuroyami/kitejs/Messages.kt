@@ -82,7 +82,7 @@ internal object Messages {
         val index = pattern.substring(start + 1, j).toInt()
         if (index < args.size) {
             val arg = args[index]
-            out.append(if (arg is Number) JavaNumbers.messageFormat(arg) else arg?.toString() ?: "null")
+            out.append(if (arg is Number || arg is KBigInt) JavaNumbers.messageFormat(arg) else arg?.toString() ?: "null")
         } else {
             // MessageFormat leaves a slot with no argument exactly as it was written.
             out.append(pattern, start, j + 1)
