@@ -496,8 +496,14 @@ object ScriptRuntime {
 
     /** True for a symbol, either a well-known [SymbolKey] or a script-made one. */
     internal fun isSymbol(obj: Any?): Boolean =
-        // TODO(P3.4): NativeSymbol lands later; upstream also accepts one whose isSymbol() is true.
-        obj is SymbolKey
+        (obj is NativeSymbol && obj.isSymbol()) || obj is SymbolKey
+
+    /** True for a symbol the constructor or the spec made, but not one `Symbol.for` registered. */
+    internal fun isUnregisteredSymbol(obj: Any?): Boolean = when (obj) {
+        is NativeSymbol -> obj.isSymbol() && obj.kind != Symbol.Kind.REGISTERED
+        is Symbol -> obj.kind != Symbol.Kind.REGISTERED
+        else -> false
+    }
 
     /** True for what the spec calls an Object: everything except the primitives. */
     fun isObject(value: Any?): Boolean {
@@ -605,6 +611,14 @@ object ScriptRuntime {
     ): EcmaError = EcmaError(error, message, sourceName, lineNumber, lineSource, columnNumber)
 
     fun typeError(message: String): EcmaError = constructError("TypeError", message)
+
+    /** Throws an error of a named constructor found in [scope], the way a builtin would build it. */
+    fun throwCustomError(cx: Context, scope: Scriptable, constructorName: String, message: String): JavaScriptException {
+        val linep = intArrayOf(0)
+        val filename = Context.getSourcePositionFromStack(linep)
+        val error = cx.newObject(scope, constructorName, arrayOf<Any?>(message, filename, linep[0]))
+        return JavaScriptException(error, filename, linep[0])
+    }
 
     fun typeErrorById(messageId: String, vararg args: Any?): EcmaError =
         typeError(getMessageById(messageId, *args))
@@ -975,8 +989,9 @@ object ScriptRuntime {
         if (value == null) throw typeErrorById("msg.null.to.object")
         if (Undefined.isUndefined(value)) throw typeErrorById("msg.undef.to.object")
         if (value is SymbolKey) {
-            // TODO(P4): NativeSymbol wraps a symbol key.
-            TODO("NativeSymbol lands in phase 4")
+            val result = NativeSymbol(value)
+            setBuiltinProtoAndParent(result, scope, TopLevel.Builtins.Symbol)
+            return result
         }
         if (value is Scriptable) return value
         if (value is CharSequence) {
@@ -1324,8 +1339,12 @@ object ScriptRuntime {
         // TODO(P4): registerRegExp(cx, scope, sealed)
         // NativeJavaObject, NativeJavaMap, Continuation and E4X are out of scope.
         // TODO(P4): the typed arrays, ArrayBuffer and DataView.
-        // TODO(P4): NativeSymbol, the collection iterators, Map, Set, WeakMap, WeakSet, Promise,
-        // Proxy and Reflect. TODO(P5): BigInt.
+
+        if (cx.languageVersion >= Context.VERSION_ES6) {
+            NativeSymbol.init(cx, scope, sealed)
+            // TODO(P4): the collection iterators, Map, Set, Promise, Proxy and Reflect.
+            // TODO(P5): BigInt, WeakMap and WeakSet.
+        }
 
         if (scope is TopLevel) scope.cacheBuiltins(scope, sealed)
         return scope

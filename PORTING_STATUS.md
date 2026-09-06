@@ -39,6 +39,7 @@ plan, read [KITEJS_IMPL.md](KITEJS_IMPL.md).
 | String | ✅ | The wrapper object, indexing, every `String.prototype` method and the statics. About 190 oracle scripts match upstream. Two gaps: `localeCompare` is code-unit order, not collation, and `normalize` returns its input unchanged (common Kotlin has neither a collator nor normalization tables). `match`, `search`, `matchAll` and the regexp forms of `split` and `replace` wait for the phase 4 regexp engine |
 | Eval oracle corpus | ✅ | 47 whole programs under `jvmTest/resources/eval` run on both engines with the same answers; twenty of them, with upstream's recorded answers, run on JVM, JS and iOS |
 | JSON | ✅ | `JSON.parse` with reviver and `JSON.stringify` with replacer and indentation. About 130 oracle scripts match upstream |
+| Symbol | ✅ | The constructor, the registry (`Symbol.for`, `Symbol.keyFor`), `description`, the wrapper object `Object(sym)` makes, and all thirteen well-known symbols. About 110 oracle scripts match upstream, including symbols as property keys and every coercion error |
 | RegExp engine | ⛔ | Phase 4 |
 | Date | ⛔ | Phase 4, needs a timezone decision |
 | Map, Set, Symbol, iterators, generators, typed arrays, Promise | ⛔ | Phase 4 |

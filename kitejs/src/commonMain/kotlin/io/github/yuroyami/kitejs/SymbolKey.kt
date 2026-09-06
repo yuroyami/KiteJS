@@ -24,8 +24,7 @@ class SymbolKey(private val nameOrNull: String?, override val kind: Symbol.Kind)
     // the default gives, and equals stays asymmetric with NativeSymbol exactly as upstream has it.
     override fun equals(other: Any?): Boolean {
         if (other is SymbolKey) return other === this
-        // TODO(P3.4): NativeSymbol does not exist yet. Upstream also returns true when other is a
-        // NativeSymbol whose key is this one.
+        if (other is NativeSymbol) return other.key === this
         return false
     }
 

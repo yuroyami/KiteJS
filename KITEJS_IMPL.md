@@ -180,6 +180,10 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   Upstream uses `java.text.Normalizer`; common Kotlin has no normalization tables. Combining
   sequences therefore stay as written. This is a real gap and stays listed in
   `PORTING_STATUS.md` until it is closed.
+- D-40: the `Symbol.for` registry is a plain `HashMap<String, SymbolKey>`. Upstream uses a
+  synchronized `WeakHashMap`, but the map holds the description strings itself, so no entry was
+  ever collected and the two behave the same. The port is single-thread confined (D-3), so the
+  synchronization has nothing to protect.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -812,23 +816,23 @@ its own `TODO(P4)` slot there.
 
 #### P4.1: Symbol
 
-- [ ] Port `NativeSymbol.kt` (233): the constructor, `Symbol.for` and `Symbol.keyFor`, the
+- [x] Port `NativeSymbol.kt` (233): the constructor, `Symbol.for` and `Symbol.keyFor`, the
       well-known symbols as constructor properties, `description`, `toString`, `valueOf`,
       `Symbol.prototype[Symbol.toPrimitive]`, and the `typeof` answer. The global registry is a
       plain `HashMap<String, SymbolKey>`; upstream's `WeakHashMap` on interned strings never
       collected anything anyway (ledger entry when landed).
-- [ ] Fill the marked sites: `SymbolKey.equals` and `hashCode`, the two `IdScriptableObject`
+- [x] Fill the marked sites: `SymbolKey.equals` and `hashCode`, the two `IdScriptableObject`
       lookups, `ScriptRuntime.isSymbol`, `ScriptRuntime.toObject` (a `SymbolKey` wraps into a
       `NativeSymbol`), `ScriptRuntime.typeOf`.
-- [ ] `TopLevel.Builtins.Symbol` cached; `Symbol.iterator`, `Symbol.species`,
+- [x] `TopLevel.Builtins.Symbol` cached; `Symbol.iterator`, `Symbol.species`,
       `Symbol.unscopables`, `Symbol.toStringTag` and `Symbol.hasInstance` become reachable from
       script. The array and string one-liners removed in P3.8 for that reason return to the
       oracle.
-- [ ] Oracle: symbol identity, registry round trips, symbols as property keys (define, get,
+- [x] Oracle: symbol identity, registry round trips, symbols as property keys (define, get,
       delete, `getOwnPropertySymbols`, `JSON.stringify` skipping them), coercion errors
       (`+Symbol()`, template literal, `Symbol() == Symbol()`), the well-known symbols on the
       objects that own them, `Object.prototype.toString` reading `Symbol.toStringTag`.
-- [ ] jvmTest, jsNodeTest, iOS compile green; commit.
+- [x] jvmTest, jsNodeTest, iOS compile green; commit.
 
 #### P4.2: Iterators and generators
 

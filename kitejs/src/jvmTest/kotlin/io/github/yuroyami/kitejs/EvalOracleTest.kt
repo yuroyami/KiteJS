@@ -395,10 +395,87 @@ class EvalOracleTest {
         "'' + Math", "Object.prototype.toString.call(Math)", "typeof Math", "Math.abs()", "Math.max('1', '2')",
     ))
 
-    // Number.prototype.toString with a radix other than 10 waits for the phase 5 BigInt. The array
-    // and string scripts that look at Symbol.iterator, Symbol.unscopables and Symbol.species join
-    // in phase 4, as do match, search, matchAll and the regexp forms of split and replace. Rhino
-    // 1.9.1 has no class syntax at all, so nothing here uses it.
+    // Number.prototype.toString with a radix other than 10 waits for the phase 5 BigInt. match,
+    // search, matchAll and the regexp forms of split and replace wait for the phase 4 regexp
+    // engine. Rhino 1.9.1 has no class syntax at all, so nothing here uses it.
+
+    @Test
+    fun symbols() = check(listOf(
+        // The constructor and the primitive it makes.
+        "typeof Symbol()", "typeof Symbol('a')", "typeof Symbol", "Symbol.length", "Symbol.name",
+        "Symbol('a').toString()", "Symbol().toString()", "Symbol(undefined).toString()", "Symbol(null).toString()",
+        "Symbol(1).toString()", "Symbol({}).toString()", "String(Symbol('a'))", "String(Symbol())",
+        "Symbol('a').description", "Symbol().description", "Symbol('').description", "Symbol(0).description",
+        "Symbol('a') === Symbol('a')", "Symbol() == Symbol()", "var s = Symbol('a'); s === s",
+        "new Symbol()", "new Symbol('a')",
+        "Symbol.prototype.toString.call(1)", "Symbol.prototype.valueOf.call('x')",
+        "Object.prototype.toString.call(Symbol())", "Object.getPrototypeOf(Symbol('a')) === Symbol.prototype",
+        "Object.prototype.toString.call(Symbol.prototype)",
+
+        // The wrapper object Object() makes.
+        "typeof Object(Symbol('a'))", "Object(Symbol('a')).toString()", "Object(Symbol('a')).description",
+        "Object(Symbol('a')).valueOf() === Object(Symbol('a')).valueOf()",
+        "var s = Symbol('a'); Object(s).valueOf() === s", "Object(Symbol('a')) == Object(Symbol('a'))",
+        "var s = Symbol('a'); var o = Object(s); o.x = 1; o.x",
+
+        // The registry.
+        "Symbol.for('k') === Symbol.for('k')", "Symbol.for('k') === Symbol('k')",
+        "Symbol.for('k').toString()", "Symbol.for('k').description", "Symbol.for().toString()",
+        "Symbol.keyFor(Symbol.for('k'))", "Symbol.keyFor(Symbol('k'))", "Symbol.keyFor(Symbol.iterator)",
+        "Symbol.keyFor(Object(Symbol.for('k2')))", "Symbol.keyFor(1)", "Symbol.keyFor()", "Symbol.keyFor('k')",
+        "Symbol.for.length", "Symbol.keyFor.length",
+
+        // Coercions, every one of which is an error except the string ones above.
+        "+Symbol()", "-Symbol()", "Symbol() + 1", "1 + Symbol()", "'' + Symbol()", "`\${Symbol()}`",
+        "Symbol() * 2", "Symbol() < Symbol()", "Number(Symbol())", "Symbol() | 0", "~Symbol()",
+        "!Symbol()", "Symbol() ? 1 : 2", "Boolean(Symbol())", "Symbol() ?? 1",
+        "var o = {}; o[Symbol()] = 1; JSON.stringify(o)",
+
+        // Symbols as property keys.
+        "var s = Symbol('k'); var o = {}; o[s] = 7; o[s]",
+        "var s = Symbol('k'); var o = {}; o[s] = 7; o[Symbol('k')]",
+        "var s = Symbol('k'); var o = {}; o[s] = 7; s in o",
+        "var s = Symbol('k'); var o = {}; o[s] = 7; delete o[s]; o[s]",
+        "var s = Symbol('k'); var o = {}; o[s] = 7; Object.keys(o).length",
+        "var s = Symbol('k'); var o = {}; o[s] = 7; Object.getOwnPropertyNames(o).length",
+        "var s = Symbol('k'); var o = {}; o[s] = 7; Object.getOwnPropertySymbols(o).length",
+        "var s = Symbol('k'); var o = {}; o[s] = 7; Object.getOwnPropertySymbols(o)[0] === s",
+        "var s = Symbol('k'); var o = {}; o[s] = 7; Object.getOwnPropertySymbols(o)[0].toString()",
+        "var s = Symbol('k'); var o = {}; o[s] = 7; JSON.stringify(o)",
+        "var s = Symbol('k'); var o = {}; o[s] = 7; var n = 0; for (var k in o) n++; n",
+        "var s = Symbol('k'); var o = {}; Object.defineProperty(o, s, { value: 3 }); o[s]",
+        "var s = Symbol('k'); var o = {}; Object.defineProperty(o, s, { value: 3 }); Object.getOwnPropertyDescriptor(o, s).writable",
+        "var s = Symbol('k'); var o = {}; o[s] = 7; Object.getOwnPropertyDescriptor(o, s).value",
+        "var s = Symbol('k'); var o = { get [s]() { return 9 } }; o[s]",
+        "var s = Symbol('k'); var o = {}; o[s] = 7; var c = Object.assign({}, o); c[s]",
+        "var s = Symbol('k'); var o = {}; o[s] = 7; o.propertyIsEnumerable(s)",
+        "var s = Symbol('k'); var o = {}; o[s] = 7; o.hasOwnProperty(s)",
+        "var o = {}; o[Symbol.for('r')] = 1; o[Symbol.for('r')]",
+
+        // The well-known symbols, and where they are already read.
+        "typeof Symbol.iterator", "Symbol.iterator.toString()", "Symbol.iterator === Symbol.iterator",
+        "Symbol.species.toString()", "Symbol.toStringTag.toString()", "Symbol.hasInstance.toString()",
+        "Symbol.isConcatSpreadable.toString()", "Symbol.toPrimitive.toString()", "Symbol.match.toString()",
+        "Symbol.matchAll.toString()", "Symbol.replace.toString()", "Symbol.search.toString()",
+        "Symbol.split.toString()", "Symbol.unscopables.toString()", "Symbol.isRegExp.toString()",
+        "Object.getOwnPropertyDescriptor(Symbol, 'iterator').writable",
+        "Object.getOwnPropertyDescriptor(Symbol, 'iterator').enumerable",
+        "typeof [][Symbol.iterator]", "typeof ''[Symbol.iterator]",
+        "[][Symbol.iterator].name", "Array[Symbol.species] === Array",
+        "typeof Array.prototype[Symbol.unscopables]", "Array.prototype[Symbol.unscopables].flat",
+        "Object.prototype.toString.call(Math)", "Object.prototype.toString.call(JSON)",
+        "var o = {}; o[Symbol.toStringTag] = 'Thing'; Object.prototype.toString.call(o)",
+        "var o = {}; o[Symbol.toStringTag] = 5; Object.prototype.toString.call(o)",
+        "var o = { [Symbol.toPrimitive]: function () { return 42 } }; +o",
+        "var o = { [Symbol.toPrimitive]: function (h) { return h } }; '' + o",
+        "var o = { [Symbol.toPrimitive]: 1 }; +o",
+        "var a = [1, 2]; var b = { length: 2, 0: 3, 1: 4 }; b[Symbol.isConcatSpreadable] = true; a.concat(b).length",
+        "var it = [1, 2][Symbol.iterator](); it.next().value",
+        "var o = {}; o[Symbol.iterator] = function () { var n = 0; return { next: function () { return { value: n, done: n++ > 2 } } } }; [...o].join()",
+        "Symbol.prototype[Symbol.toStringTag]",
+        "typeof Symbol.prototype[Symbol.toPrimitive]",
+        "var s = Symbol('a'); s[Symbol.toPrimitive]() === s",
+    ))
 
     @Test
     fun stringBuiltin() = check(listOf(

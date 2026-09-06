@@ -313,5 +313,6 @@ internal object Messages {
         "msg.json.cant.serialize" to "Do not know how to serialize a {0}",
         "msg.str.match.all.no.global.flag" to "String.prototype.matchAll called with a non-global RegExp argument",
         "msg.str.replace.all.no.global.flag" to "replaceAll must be called with a global RegExp",
+        "msg.no.assign.symbol.strict" to "Symbol objects may not be assigned properties in strict mode",
     )
 }

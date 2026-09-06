@@ -626,7 +626,7 @@ abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
         if (desc == null) {
             if (id is String) return getBuiltInDataDescriptor(id)
             if (ScriptRuntime.isSymbol(id)) {
-                // TODO(P4): a NativeSymbol resolves to its key here.
+                if (id is NativeSymbol) return getBuiltInDataDescriptor(id.key)
                 if (id is SymbolKey) return getBuiltInDataDescriptor(id)
             }
         }
@@ -638,7 +638,7 @@ abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
         if (slot == null) {
             if (id is String) return getBuiltInSlot(id)
             if (ScriptRuntime.isSymbol(id)) {
-                // TODO(P4): a NativeSymbol resolves to its key here.
+                if (id is NativeSymbol) return getBuiltInSlot(id.key)
                 if (id is SymbolKey) return getBuiltInSlot(id)
             }
         }

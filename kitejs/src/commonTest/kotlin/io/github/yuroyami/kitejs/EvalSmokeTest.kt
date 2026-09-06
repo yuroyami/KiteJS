@@ -212,6 +212,23 @@ class EvalSmokeTest {
     }
 
     @Test
+    fun symbols() {
+        assertEquals("symbol", eval("typeof Symbol('a')"))
+        assertEquals("Symbol(a)", eval("Symbol('a').toString()"))
+        assertEquals("a", eval("Symbol('a').description"))
+        assertEquals("false", eval("Symbol('a') === Symbol('a')"))
+        assertEquals("true", eval("Symbol.for('k') === Symbol.for('k')"))
+        assertEquals("k", eval("Symbol.keyFor(Symbol.for('k'))"))
+        assertEquals("7", eval("var s = Symbol('k'); var o = {}; o[s] = 7; o[s]"))
+        assertEquals("1", eval("var s = Symbol('k'); var o = {}; o[s] = 7; Object.getOwnPropertySymbols(o).length"))
+        assertEquals("{}", eval("var s = Symbol('k'); var o = {}; o[s] = 7; JSON.stringify(o)"))
+        assertEquals("[object Thing]", eval("var o = {}; o[Symbol.toStringTag] = 'Thing'; Object.prototype.toString.call(o)"))
+        assertEquals("function", eval("typeof [][Symbol.iterator]"))
+        assertEquals("true", eval("Array[Symbol.species] === Array"))
+        assertEquals("throws TypeError: The object is not a number", eval("+Symbol()"))
+    }
+
+    @Test
     fun objectsAndPrototypes() {
         assertEquals("deep", eval("var o = { a: { b: { c: 'deep' } } }; o.a.b.c"))
         assertEquals("42", eval("var o = { get x() { return 42 } }; o.x"))
