@@ -248,6 +248,26 @@ class EvalSmokeTest {
     }
 
     @Test
+    fun mapAndSet() {
+        assertEquals("2", eval("new Map([['a', 1], ['b', 2]]).size"))
+        assertEquals("1", eval("var m = new Map(); m.set('a', 1); m.get('a')"))
+        assertEquals("undefined", eval("new Map().get('missing')"))
+        assertEquals("b,a,c", eval("var m = new Map(); m.set('b', 1); m.set('a', 2); m.set('c', 3); [...m.keys()].join()"))
+        assertEquals("1:true", eval("var m = new Map(); m.set(NaN, 1); m.get(NaN) + ':' + m.has(NaN)"))
+        assertEquals("1", eval("var m = new Map(); m.set(0, 'a'); m.set(-0, 'b'); m.size"))
+        assertEquals("a=1,b=2", eval("var m = new Map([['a', 1], ['b', 2]]); var r = []; m.forEach(function (v, k) { r.push(k + '=' + v) }); r.join()"))
+        assertEquals("{}", eval("JSON.stringify(new Map([['a', 1]]))"))
+        assertEquals("3", eval("new Set([1, 1, 2, 3]).size"))
+        assertEquals("h,e,l,o", eval("[...new Set('hello')].join()"))
+        assertEquals("true:1", eval("var s = new Set(); s.add(1); s.has(1) + ':' + s.size"))
+        assertEquals("1,2,3,4", eval("[...new Set([1, 2, 3]).union(new Set([3, 4]))].join()"))
+        assertEquals("2,3", eval("[...new Set([1, 2, 3]).intersection(new Set([2, 3, 4]))].join()"))
+        assertEquals("true", eval("new Set([1, 2]).isSubsetOf(new Set([1, 2, 3]))"))
+        assertEquals("odd,even", eval("var g = Map.groupBy([1, 2, 3, 4], function (n) { return n % 2 ? 'odd' : 'even' }); [...g.keys()].join()"))
+        assertEquals("a,c", eval("var m = new Map([['a', 1], ['b', 2]]); var r = []; m.forEach(function (v, k) { r.push(k); if (k === 'a') m.delete('b'); if (k === 'a') m.set('c', 3) }); r.join()"))
+    }
+
+    @Test
     fun objectsAndPrototypes() {
         assertEquals("deep", eval("var o = { a: { b: { c: 'deep' } } }; o.a.b.c"))
         assertEquals("42", eval("var o = { get x() { return 42 } }; o.x"))

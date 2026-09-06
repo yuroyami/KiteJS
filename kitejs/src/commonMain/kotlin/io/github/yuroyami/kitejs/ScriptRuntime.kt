@@ -1349,8 +1349,14 @@ object ScriptRuntime {
 
         if (cx.languageVersion >= Context.VERSION_ES6) {
             NativeSymbol.init(cx, scope, sealed)
-            // TODO(P4): the collection iterators, Map, Set, Promise, Proxy and Reflect.
-            // TODO(P5): BigInt, WeakMap and WeakSet.
+            NativeCollectionIterator.init(scope, NativeSet.ITERATOR_TAG, sealed)
+            NativeCollectionIterator.init(scope, NativeMap.ITERATOR_TAG, sealed)
+            LazilyLoadedCtor(scope, "Map", sealed, Initializable { icx, s, sld -> NativeMap.init(icx, s, sld) })
+            LazilyLoadedCtor(scope, "Set", sealed, Initializable { icx, s, sld -> NativeSet.init(icx, s, sld) })
+            // Upstream's registration order here is Map, Promise, Set, WeakMap, WeakSet, BigInt,
+            // Proxy, Reflect. Each one goes in its own slot as it lands.
+            // TODO(P4): Promise (between Map and Set), Proxy and Reflect.
+            // TODO(P5): WeakMap, WeakSet and BigInt.
         }
 
         if (scope is TopLevel) scope.cacheBuiltins(scope, sealed)

@@ -862,24 +862,24 @@ its own `TODO(P4)` slot there.
 
 #### P4.3: Map and Set
 
-- [ ] Port `Hashtable.kt` (327): upstream's insertion-ordered table with the linked entry list
+- [x] Port `Hashtable.kt` (327): upstream's insertion-ordered table with the linked entry list
       that keeps iteration correct while entries are added or deleted mid-loop. Kotlin's
       `LinkedHashMap` cannot do that, so the class is ported, not replaced. Key normalisation:
       `-0` becomes `+0`, `NaN` equals `NaN`, a `KBigInt` key compares by value (the BigInt
       arithmetic arrives in P5; the hook is written now).
-- [ ] Port `NativeMap.kt` (278), `NativeSet.kt` (762, includes the set algebra methods:
+- [x] Port `NativeMap.kt` (278), `NativeSet.kt` (762, includes the set algebra methods:
       `union`, `intersection`, `difference`, `symmetricDifference`, `isSubsetOf`,
       `isSupersetOf`, `isDisjointFrom`) and `NativeCollectionIterator.kt` (76) for `keys`,
       `values`, `entries` of both. `Map.groupBy` lands with them (the abstract operation from
       P3.8 already takes `KEY_COERCION.COLLECTION`).
-- [ ] `ScriptRuntime.loadFromIterable` (P3.8) feeds the constructors; `Symbol.species` on both
+- [x] `ScriptRuntime.loadFromIterable` (P3.8) feeds the constructors; `Symbol.species` on both
       constructors through `ScriptRuntimeES6.addSymbolSpecies`.
-- [ ] Oracle: insertion order, `size`, key coercion corners (`-0`, `NaN`, objects by identity,
+- [x] Oracle: insertion order, `size`, key coercion corners (`-0`, `NaN`, objects by identity,
       strings vs numbers), deleting and adding during `forEach` and `for...of`, `Map` from an
       iterable of pairs and the error on a bad entry, `Set` from a string, chaining `set`, the
       set algebra against arrays and against set-like objects with `size`, `has` and `keys`,
       `Object.prototype.toString` tags, `JSON.stringify(new Map())`.
-- [ ] Green on all targets; commit.
+- [x] Green on all targets; commit.
 
 #### P4.4: Regular expressions
 
