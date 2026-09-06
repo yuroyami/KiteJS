@@ -48,7 +48,7 @@ plan, read [KITEJS_IMPL.md](KITEJS_IMPL.md).
 | Promise | ✅ | The constructor, `then`, `catch`, `finally`, `resolve`, `reject`, `all`, `allSettled`, `race`, `any`, `withResolvers` and `try`, plus the unhandled-rejection tracker. Reactions run on the Context's microtask queue, which drains when a top call returns, so the ordering rules hold without a thread anywhere. About 110 oracle scripts match upstream, every one of them comparing the order things actually happened in, plus three whole programs on JVM, JS and iOS. Upstream has no `async` functions, so neither does this |
 | Proxy | ✅ | All thirteen traps, the invariant checks that keep a handler from contradicting its target, `Proxy.revocable`, and function and constructor proxies. A proxy answers for its target where the engine asks about identity, so `Array.isArray` and `typeof` see through it. About 100 oracle scripts match upstream, plus seven whole programs that also run on JS and iOS. Two places where upstream cannot be matched are pinned as tests: a `getOwnPropertyDescriptor` trap answering undefined crashes upstream, and upstream hands the `construct` trap a raw Java array |
 | Reflect | ✅ | All thirteen methods, including `Reflect.construct` with a separate new.target. About 55 oracle scripts match upstream |
-| WeakMap, WeakSet | ⛔ | Phase 5, via KiteCore WeakRef |
+| WeakMap, WeakSet | ⛔ | Phase 5, over the engine's own `WeakRef` |
 | BigInt | ⛔ | Phase 5, needs a big-integer implementation |
 | test262 conformance harness | ⛔ | Phase 6 |
 | Kotlin embedding API (host objects without reflection) | ⛔ | Phase 7 |

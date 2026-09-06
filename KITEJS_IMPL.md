@@ -14,7 +14,7 @@
 
 - Everything engine lives in `kitejs/src/commonMain/kotlin/io/github/yuroyami/kitejs/`. Package mirrors upstream: `org.mozilla.javascript` maps to `io.github.yuroyami.kitejs`, subpackages `ast`, `regexp`, `json`, `typedarrays`, `dtoa`, `v8dtoa` keep their names.
 - File mapping is 1:1 by name: `TokenStream.java` becomes `TokenStream.kt`. Same class names, method names and behavior. Deviations only where a JVM-ism forces one, via the substitution table below, and each deviation gets a row in the divergence ledger.
-- Zero expect/actual until Phase 5 (KiteCore's `WeakRef` hides the only one we need inside its own artifact).
+- One expect/actual in the whole engine: `WeakRef`, needed by `WeakMap` and `WeakSet` from Phase 5. There is no weak reference in the common standard library, so it cannot be avoided (D-52).
 - `:kitejs` runtime classpath = kotlin-stdlib. Nothing else. `jvmTest` additionally carries `org.mozilla:rhino:1.9.1` as the differential-testing oracle; it never ships.
 - Never ported: `optimizer/` (bytecode codegen), `xml/` + the 9 `ast/Xml*` files (E4X), `lc/` + `annotations/` + `FunctionObject` reflection binding (LiveConnect), `serialize/`, `commonjs/` (revisit after Phase 7), `debug/` beyond the interfaces the interpreter needs, Intl.
 - Every ported file starts with the 3-line MPL header (same header upstream uses). License MPL-2.0, NOTICE credits Mozilla.
@@ -48,7 +48,7 @@ Standing recipe; every port task below means exactly this:
 | `java.util.TimeZone`, `System.currentTimeMillis` | `NativeDate`, `Date.now` | `Context.timeZone` is a kotlinx-datetime `TimeZone` (default `currentSystemDefault()`, tests inject `TimeZone.of("UTC")` or a `FixedOffsetTimeZone`), plus an injectable clock with a stdlib `Clock.System` default (P4.5) |
 | `java.time` localized formatters, `Locale` | `Date.prototype.toLocale*` | fixed en-US patterns equal to upstream under `Locale.US`; other locales out of scope (P4.5) |
 | `java.util.regex`, `Character.UnicodeScript`, `Character.getType(int)`, `Character.toUpperCase` | `UnicodeProperties`, `NativeRegExp` case folding | Kotlin range tables generated from the Unicode Character Database 15.0 by a Gradle task kept in the repo (P4.4) |
-| `WeakHashMap` | `NativeWeakMap`, `NativeWeakSet`, the symbol registry | own weak-keyed map over KiteCore `WeakRef` (P5.3); the registry is a plain map |
+| `WeakHashMap` | `NativeWeakMap`, `NativeWeakSet`, the symbol registry | own weak-keyed map over the port's own `WeakRef` (P5.3); the registry is a plain map |
 | `java.util.List` and `RandomAccess` views, `java.lang.reflect.Array` | `NativeArray`, `NativeTypedArrayView` | dropped (D-36 and the same rule for the typed views, P4.6) |
 | `AtomicInteger`, `ConcurrentHashMap` | `NativeConsole` counters | plain fields under the single-thread contract (P7.2) |
 | `java.util.jar.Manifest` | `ImplementationVersion` | a constant (P7.1) |
@@ -241,6 +241,13 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   does not have, so the raw array would simply fail to be a value script can hold. The `apply`
   trap already built a proper array upstream, so the two now agree.
   `EvalOracleTest.constructTrapGetsARealArray` pins both halves.
+- D-52: `WeakRef` is the engine's one expect/actual. Upstream uses `java.util.WeakHashMap`,
+  and the common standard library has no weak reference at all, so `WeakMap` and `WeakSet`
+  cannot be built without one. The class and its four actuals live in the engine rather than in
+  a shared library: the obvious candidate exposed a coroutines dependency to every consumer and
+  would have fixed the target list to its own. `WeakRefTest` covers the contract on every
+  target and `WeakRefGcTest` proves the reference is really weak on the JVM, the only target
+  where a test can ask for a collection.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -252,7 +259,7 @@ Living list. Every entry is a known, deliberate behavior or structure difference
 | P2 | IR generator | DONE. The corpus lowers to an IR tree identical to upstream's, before and after the transform pass. Code generation moved to P3, see that block |
 | P3 | Interpreter + core runtime | eval oracle: identical results vs upstream on the arithmetic/string/object/array/function/closure/control-flow/exception corpus |
 | P4 | Symbol, iterators and generators, Map and Set, RegExp with generated Unicode tables, Date over kotlinx-datetime time zones with an injectable clock, typed arrays, Promise, Proxy and Reflect | extended oracle green on the JVM, the slice green on JS and iOS, every deviation ledgered |
-| P5 | Real BigInt (own arithmetic, no dependency), radix printing, BigInt typed views, WeakMap and WeakSet over KiteCore `WeakRef` | BigInt oracle against `java.math.BigInteger` green, weak semantics tests green |
+| P5 | Real BigInt (own arithmetic, no dependency), radix printing, BigInt typed views, WeakMap and WeakSet over the port's own `WeakRef` | BigInt oracle against `java.math.BigInteger` green, weak semantics tests green |
 | P6 | test262 parity harness (both engines per test), a common test262 runner over kotlinx-io for iOS and Node, native tests executed, V8 differential report | zero unexplained parity differences; the common runner green on every target |
 | P7 | The Java-shaped leftovers cleaned, `explicitApi()`, the Kotlin facade and host-binding DSL, console, `kitejs-coroutines`, EPUB-shaped demo | facade tests green on every target; coroutine artifact green on JVM, JS and iOS |
 | P8 | macOS and Wasm targets, CI, docs site, README and POM to KITE.md, Maven Central, KiteVersions | artifacts resolve from Central on every target; site live; CI green |
@@ -822,8 +829,8 @@ and add the rules below. They decide every "how" question that comes up from her
    `commonMain`. The Unicode version is pinned to the one JDK 21 ships (15.0), so the JVM
    oracle stays exact and JS, Native and Wasm agree with it. `Char.category` and
    `uppercaseChar()` differ per platform; the tables do not.
-4. **The core artifact depends on the Kotlin stdlib, kotlinx-datetime (time zones, from P4.5)
-   and KiteCore (`WeakRef`, from P5.3). Nothing else.** Every candidate library was weighed:
+4. **The core artifact depends on the Kotlin stdlib and kotlinx-datetime (time zones, from
+   P4.5). Nothing else.** Every candidate library was weighed:
    a regex library or the platform's own regex breaks parity, no multiplatform library carries
    the Unicode data the regex engine needs, JSON is already ported and oracle-checked, and
    arbitrary-precision integers are written here with an exhaustive oracle rather than taken
@@ -1149,12 +1156,11 @@ smoke test covers every new builtin on every target, and every deviation is a le
 
 #### P5.3: WeakMap and WeakSet
 
-- [ ] Add `io.github.yuroyami:kitecore` as an `implementation` dependency and confirm
-      `kotlinx-coroutines` does not become a transitive dependency of `kitejs`; if it does,
-      write a thirty-line `expect class WeakRef` inside KiteJS instead and record why. Either
-      way `-Xexpect-actual-classes` is needed and the target set becomes a subset of
-      KiteCore's (android, JVM, iOS, macOS Arm64, JS, Wasm; no Linux or Windows until KiteCore
-      has them).
+- [x] `WeakRef` lives in the engine, not in a dependency. KiteCore exposes
+      `kotlinx-coroutines-core` with `api`, so depending on it would put coroutines in every
+      consumer's classpath, which rule 4 exists to prevent, and would cap KiteJS's targets at
+      KiteCore's. The expect class and its four actuals were written here instead, along with
+      `WeakRefTest` on every target and `WeakRefGcTest` on the JVM (D-52).
 - [ ] `WeakKeyMap.kt`: a small weak-keyed map over `WeakRef`, keyed by identity hash, that
       drops cleared entries when it grows or is walked. Upstream's `WeakHashMap` has no
       multiplatform equivalent, so this is the port's own (ledger entry).
@@ -1341,9 +1347,11 @@ passes its tests on JVM, JS and iOS.
 
 ### P8: Widen and publish
 
-- [ ] Targets: add `macosArm64` and `wasmJs` (browser and Node), matching KiteCore's set.
-      Linux and Windows follow when KiteCore has them (P5.3). Run `macosArm64Test` and
-      `wasmJsNodeTest` in the default check; the corpus slice and the smoke test decide.
+- [ ] Targets: add `macosArm64` and `wasmJs` (browser and Node), then Linux and Windows. The
+      engine depends on nothing that limits the list, so each new target needs a `WeakRef`
+      actual (D-52) and nothing else. Wasm has no weak primitive, so its actual holds strongly
+      and reports `isWeakSupported` as false. Run `macosArm64Test` and `wasmJsNodeTest` in the
+      default check; the corpus slice and the smoke test decide.
 - [ ] CI (`.github/workflows`, modelled on KiteCore's `ci.yml`, `docs.yml`, `release.yml`):
       the default check on every push (JVM, JS on Node, iOS simulator, macOS, Wasm), the
       nightly `test262Parity` after fetching test262, ABI validation (`abiValidation {}` like

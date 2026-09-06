@@ -21,6 +21,12 @@ plugins {
 kotlin {
     jvmToolchain(21)
 
+    // WeakRef is an expect class, which the compiler still calls beta. It is the engine's only
+    // expect/actual and there is no weak reference in the common standard library.
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
+
     android {
         namespace = "io.github.yuroyami.kitejs"
         compileSdk = 36
