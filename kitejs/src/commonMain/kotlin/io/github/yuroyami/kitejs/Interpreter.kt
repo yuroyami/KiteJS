@@ -1330,6 +1330,19 @@ class Interpreter : Evaluator {
                     stack[++state.stackTop] = undefined
                     return null
                 }
+                else -> return executeCold(cx, frame, state, op)
+            }
+        }
+
+        /**
+         * The second half of the dispatch. The two exist because HotSpot refuses to JIT-compile a
+         * method over 8000 bytecodes, and one `when` over every opcode lands well past that, which
+         * leaves the whole interpreter running interpreted (D-42).
+         */
+        private fun executeCold(cx: Context, frame: CallFrame, state: InterpreterState, op: Int): NewState? {
+            val stack = frame.stack
+            val sDbl = frame.sDbl
+            when (op) {
                 Token.ENTERWITH -> {
                     var lhs = stack[state.stackTop]
                     if (lhs === DBL_MRK) lhs = ScriptRuntime.wrapNumber(sDbl[state.stackTop])

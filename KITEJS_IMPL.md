@@ -63,7 +63,8 @@ Standing recipe; every port task below means exactly this:
 
 Living list. Every entry is a known, deliberate behavior or structure difference vs upstream.
 
-- D-1: identifier start/part classification approximates the JVM's `isJavaIdentifier*` with `Char.category`. Exotic identifiers may differ; the oracle corpus includes unicode identifier cases to measure this.
+- D-1: CLOSED by D-43. Identifier classification used to approximate the JVM with `Char.category`;
+  it now reads the generated tables, so every target answers exactly what upstream answers.
 - D-2: no `Reader`-based source input. String in, that is all.
 - D-3: engine instances are single-thread confined. No shared-context multithreading.
 - D-4: error messages exist in English only, and only the keys the ported code uses.
@@ -188,6 +189,19 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   `java.util.Iterator` or `Iterable` through the wrap factory, which is LiveConnect. `new
   Iterator(x)` on a script object behaves exactly as upstream. `NativeGenerator.resume` also drops
   upstream's reentrancy lock, since the port is single-thread confined (D-3).
+- D-42: `Interpreter.execute` is split into `execute` and `executeCold`. One `when` over every
+  opcode compiles to about 9000 bytecodes, and HotSpot silently refuses to JIT-compile any method
+  over 8000, so the whole engine ran inside the JVM's own bytecode interpreter. Measured on a tight
+  numeric loop: 10238ms before the split, 517ms after, against upstream's 375ms. Which opcodes sit
+  in which half does not matter, only that both halves are under the limit. Behaviour is unchanged.
+- D-43: the Unicode data the lexer and the regexp engine need is generated from JDK 21's own
+  `java.lang.Character` by `tools/unicode/UnicodeTablesGenerator.java`, not parsed from the UCD
+  files. Rhino asks `Character` these exact questions, and `Character` has its own answers that the
+  UCD does not give directly (its `isWhitespace` is not Unicode White_Space, `digit(cp, 16)` accepts
+  more than Hex_Digit, and unassigned code points are handled its own way). Reading the tables from
+  the JDK makes the oracle exact by construction, and `UnicodeTablesOracleTest` walks all 1114112
+  code points on every run to keep it that way. The Unicode version is still pinned: whatever JDK 21
+  ships, which is 15.0.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

@@ -1115,26 +1115,11 @@ object ScriptRuntime {
     internal fun isValidIdentifierName(s: String, cx: Context, isStrict: Boolean): Boolean {
         val l = s.length
         if (l == 0) return false
-        if (!isJavaIdentifierStart(s[0])) return false
+        if (!Characters.isJavaIdentifierStart(s[0].code)) return false
         for (i in 1 until l) {
-            if (!isJavaIdentifierPart(s[i])) return false
+            if (!Characters.isJavaIdentifierPart(s[i].code)) return false
         }
         return !TokenStream.isKeyword(s, cx.languageVersion, isStrict)
-    }
-
-    // Character.isJavaIdentifierStart / isJavaIdentifierPart, from the Java definitions.
-    private fun isJavaIdentifierStart(c: Char): Boolean =
-        c.isLetter() ||
-            c.category == CharCategory.LETTER_NUMBER ||
-            c.category == CharCategory.CURRENCY_SYMBOL ||
-            c.category == CharCategory.CONNECTOR_PUNCTUATION
-
-    private fun isJavaIdentifierPart(c: Char): Boolean {
-        if (isJavaIdentifierStart(c) || c.isDigit()) return true
-        return when (c.category) {
-            CharCategory.COMBINING_SPACING_MARK, CharCategory.NON_SPACING_MARK, CharCategory.FORMAT -> true
-            else -> c.code in 0..8 || c.code in 0xE..0x1B || c.code in 0x7F..0x9F
-        }
     }
 
     /** `uneval`: source text that rebuilds [value]. */
