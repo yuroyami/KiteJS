@@ -238,7 +238,9 @@ object AbstractEcmaObjectOperations {
     fun isConstructor(cx: Context, argument: Any?): Boolean {
         if (argument is LambdaConstructor) return true
         if (argument is LambdaFunction) return false
-        // TODO(P4): a revocable NativeProxy function asks its target.
+        if (argument is NativeProxy.NativeProxyFunction) {
+            return isConstructor(cx, argument.getTargetThrowIfRevoked())
+        }
         return argument is Constructable
     }
 

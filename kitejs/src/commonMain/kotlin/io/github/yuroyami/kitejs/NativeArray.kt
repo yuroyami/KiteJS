@@ -1665,7 +1665,7 @@ class NativeArray : ScriptableObject {
 
         private fun js_isArray(o: Any?): Boolean {
             if (o !is Scriptable) return false
-            // TODO(P4): a NativeProxy answers for its target.
+            if (o is NativeProxy) return js_isArray(o.getTargetThrowIfRevoked())
             return "Array" == o.className
         }
 

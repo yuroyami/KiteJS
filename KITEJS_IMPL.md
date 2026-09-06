@@ -231,6 +231,16 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   its own wording. `MessageParityTest` pins that upstream still lacks them, so the port takes their
   text the moment upstream defines it. The second one also replaces a placeholder message upstream
   never meant to ship.
+- D-50: a `getOwnPropertyDescriptor` trap may answer `undefined` for a property the target does
+  not have. Upstream reads the target's descriptor without checking for null first and throws a
+  `NullPointerException`; the port returns `undefined`, which is what the spec asks for and what
+  every other engine does. `EvalOracleTest.getOwnPropertyDescriptorTrapMayReturnUndefined` pins
+  both halves, so the port follows the moment upstream fixes it.
+- D-51: the `construct` trap is handed a real JavaScript array of the arguments. Upstream passes
+  the raw Java array and relies on Java interop to wrap it on the way into script, which this port
+  does not have, so the raw array would simply fail to be a value script can hold. The `apply`
+  trap already built a proper array upstream, so the two now agree.
+  `EvalOracleTest.constructTrapGetsARealArray` pins both halves.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -1062,31 +1072,33 @@ simple case mapping, which come from the generated tables (rule 3).
 
 #### P4.8: Proxy and Reflect
 
-- [ ] Open the `ScriptableObject` hooks a proxy overrides where they are still final:
+- [x] Open the `ScriptableObject` hooks a proxy overrides where they are still final:
       `getTypeOf`, `getDeclarationScope`, the `Symbol` overloads of `get`, `put`, `has` and
       `delete`, `preventExtensions`, `isExtensible`, `defineOwnProperty` and
-      `getOwnPropertyDescriptor` (the last two are already `internal open`).
-- [ ] Port `NativeProxy.kt` (1373) with `NativeProxyFunction`, every trap, the invariant checks
+      `getOwnPropertyDescriptor`. All of them were already open, so nothing had to change.
+- [x] Port `NativeProxy.kt` (1373) with `NativeProxyFunction`, every trap, the invariant checks
       and their TypeErrors, `Proxy.revocable`, and the two `TODO(P4)` sites
       (`AbstractEcmaObjectOperations.isConstructor`, `NativeArray.js_isArray`).
-- [ ] Port `NativeReflect.kt` (397): the thirteen static methods over the abstract operations
+- [x] Port `NativeReflect.kt` (397): the thirteen static methods over the abstract operations
       from P3.8 (`createListFromArrayLike` gains its proxy-aware callers).
-- [ ] Oracle: every trap called and not called, trap return values coerced, invariant
+- [x] Oracle: every trap called and not called, trap return values coerced, invariant
       violations, proxies as prototypes, `in` and `delete` through proxies, `for...in` and
       `Object.keys` through `ownKeys`, function and constructor proxies with `apply` and
       `construct`, revocation, `Array.isArray(proxy)`, `typeof` of a proxied function, and
-      every `Reflect` method against plain objects and against proxies.
-- [ ] Green on all targets; commit.
+      every `Reflect` method against plain objects and against proxies. Two places where
+      upstream cannot be matched are pinned as tests instead (D-50, D-51).
+- [x] Green on all targets; commit.
 
 #### P4.9: Close-out
 
-- [ ] `initSafeStandardObjects` has no `TODO(P4)` left; `TopLevel.cacheBuiltins` finds every
-      builtin; `ScriptRuntime` has no `TODO("... phase 4")` left (grep is the check).
-- [ ] The corpus gains at least twelve programs that use the new builtins together (a
-      regex-driven tokenizer feeding a `Map`, a date-stamped event log through `JSON`, a typed
-      array image filter, a promise pipeline over generators). The slice takes six of them.
-- [ ] The eval smoke test on every target gets one line per new builtin.
-- [ ] `PORTING_STATUS.md` rows for each builtin; README status paragraph rewritten to the truth
+- [x] `initSafeStandardObjects` has no `TODO(P4)` left; `TopLevel.cacheBuiltins` finds every
+      builtin; `ScriptRuntime` has no `TODO("... phase 4")` left (grep is the check). The last
+      one was the detached typed array check in `NativeArrayIterator`.
+- [x] The corpus gains at least twelve programs that use the new builtins together. Thirteen
+      landed, all of them proxy or reflection driven and all of them leaning on the earlier
+      phases (regexps, generators, `Map` and `Set`, `JSON`, symbols). The slice takes six.
+- [x] The eval smoke test on every target gets one line per new builtin.
+- [x] `PORTING_STATUS.md` rows for each builtin; README status paragraph rewritten to the truth
       ("evaluates ES5 and most of ES2015 minus classes and modules, on JVM, Android, iOS and
       JS"); the P4 ledger entries reviewed against the code. Commit.
 

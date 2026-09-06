@@ -7,9 +7,16 @@ Full guide: [docs/](docs/) (placeholder for now).
 
 ## Status
 
-Pre-alpha. The project scaffold and the lexer exist. Nothing here evaluates
-JavaScript yet. [PORTING_STATUS.md](PORTING_STATUS.md) tracks what works,
-[KITEJS_IMPL.md](KITEJS_IMPL.md) is the implementation plan.
+Pre-alpha, but it runs. KiteJS evaluates ES5 and most of ES2015 (minus classes and
+modules) on the JVM, Android, iOS and JS. That includes regular expressions, dates,
+typed arrays, promises, generators, `Map` and `Set`, symbols, `Proxy` and `Reflect`.
+Everything is checked against upstream Rhino: the same script runs on both engines and
+the answers have to match, and a slice of whole programs runs on every target so the
+answers cannot quietly differ off the JVM.
+
+Still missing: `BigInt`, `WeakMap` and `WeakSet`, the test262 harness, and a Kotlin API
+for handing your own objects to script. [PORTING_STATUS.md](PORTING_STATUS.md) tracks
+what works, [KITEJS_IMPL.md](KITEJS_IMPL.md) is the implementation plan.
 
 ## License
 

@@ -4,6 +4,8 @@
 
 package io.github.yuroyami.kitejs
 
+import io.github.yuroyami.kitejs.typedarrays.NativeTypedArrayView
+
 /** The iterator behind `array.keys()`, `entries()` and `values()`, and `for (x of array)`. */
 class NativeArrayIterator : ES6Iterator {
 
@@ -25,7 +27,10 @@ class NativeArrayIterator : ES6Iterator {
         get() = "Array Iterator"
 
     override fun isDone(cx: Context, scope: Scriptable): Boolean {
-        // TODO(P4): a detached typed array throws "msg.typed.array.out.of.bounds" here.
+        val typedArray = arrayLike
+        if (typedArray is NativeTypedArrayView && typedArray.isTypedArrayOutOfBounds()) {
+            throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
+        }
         return index >= NativeArray.getLengthProperty(cx, arrayLike!!)
     }
 

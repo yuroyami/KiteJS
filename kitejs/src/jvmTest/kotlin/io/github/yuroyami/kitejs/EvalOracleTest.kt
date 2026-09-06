@@ -8,6 +8,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import org.mozilla.javascript.Context as UContext
 
@@ -1090,6 +1091,10 @@ class EvalOracleTest {
 
     @Test
     fun typedArrays() = check(listOf(
+        "var ta = new Uint8Array(4); ta.buffer.transfer(); try { for (var v of ta) {} 'no throw' } catch(e) { e.name + ': ' + e.message }",
+        "var ta = new Uint8Array(4); ta.buffer.transfer(); try { ta.keys().next() } catch(e) { e.name + ': ' + e.message }",
+        "var ta = new Uint8Array([1,2,3]); var out=[]; for (var v of ta) out.push(v); out.join(',')",
+        "var ta = new Uint8Array([1,2,3]); ta.buffer.transfer(); try { Array.from(ta).join(',') } catch(e) { e.name }",
         // The constructors and their shape.
         "typeof ArrayBuffer", "typeof Int8Array", "typeof DataView",
         "Int8Array.BYTES_PER_ELEMENT", "Int16Array.BYTES_PER_ELEMENT", "Int32Array.BYTES_PER_ELEMENT",
@@ -1713,4 +1718,184 @@ class EvalOracleTest {
         "JSON.parse('[1 2]')", "JSON.parse('{\"a\":1 \"b\":2}')", "JSON.parse('fals')", "JSON.parse('\"\\\\\"')",
         "JSON.stringify({ toJSON: 1 }, 5, 5)", "JSON.stringify({ get a() { throw 'boom' } })",
     ))
+
+    @Test
+    fun proxyTraps() = check(listOf(
+        "var p = new Proxy({a:1}, {}); p.a",
+        "var p = new Proxy({a:1}, {get:function(t,k){return k === 'a' ? 42 : t[k];}}); p.a",
+        "var p = new Proxy({a:1}, {get:function(t,k){return 'g:' + String(k);}}); p.zzz",
+        "var log=[]; var p = new Proxy({a:1,b:2}, {get:function(t,k,r){log.push('get ' + String(k)); return t[k];}}); p.a; p.b; log.join('|')",
+        "var p = new Proxy({}, {get:function(t,k,r){return r === p;}}); p.anything",
+        "var p = new Proxy([10,20,30], {}); p[1]",
+        "var p = new Proxy([10,20,30], {get:function(t,k){return k === '1' ? 99 : t[k];}}); p[1]",
+        "var p = new Proxy({}, {set:function(t,k,v){t[k] = v * 2; return true;}}); p.x = 5; p.x",
+        "var t={}; var p = new Proxy(t, {set:function(){return false;}}); p.x = 5; String(t.x)",
+        "var t={}; var p = new Proxy(t, {}); p.x = 5; t.x",
+        "var log=[]; var p = new Proxy({}, {set:function(t,k,v){log.push(String(k) + '=' + v); t[k]=v; return true;}}); p.a=1; p.b=2; log.join(',')",
+        "var p = new Proxy({a:1}, {has:function(t,k){return k === 'b';}}); [('a' in p), ('b' in p)].join(',')",
+        "var p = new Proxy({a:1}, {}); ('a' in p) + ',' + ('b' in p)",
+        "var t={a:1}; var p=new Proxy(t,{deleteProperty:function(tt,k){delete tt[k]; return true;}}); delete p.a; String(t.a)",
+        "var t={a:1}; var p=new Proxy(t,{deleteProperty:function(){return false;}}); delete p.a; t.a",
+        "var t={a:1}; var p=new Proxy(t,{}); delete p.a; String(t.a)",
+        "var p = new Proxy({a:1,b:2}, {}); Object.keys(p).join(',')",
+        "var p = new Proxy({a:1,b:2}, {ownKeys:function(t){return ['a','b'];}}); Object.keys(p).join(',')",
+        "var p = new Proxy({a:1,b:2}, {ownKeys:function(){return ['b'];}}); Object.keys(p).join(',')",
+        "var p = new Proxy({a:1,b:2}, {}); var out=[]; for (var k in p) out.push(k); out.join(',')",
+        "var p = new Proxy({a:1},{getOwnPropertyDescriptor:function(t,k){return {value:7, writable:true, enumerable:true, configurable:true};}}); JSON.stringify(Object.getOwnPropertyDescriptor(p,'a'))",
+        "var p = new Proxy({a:1},{}); JSON.stringify(Object.getOwnPropertyDescriptor(p,'a'))",
+        "var p = new Proxy({a:1},{getOwnPropertyDescriptor:function(){return undefined;}}); String(Object.getOwnPropertyDescriptor(p,'a'))",
+        "var p = new Proxy({a:1,b:2},{}); Object.getOwnPropertyNames(p).join(',')",
+        "var p = new Proxy({a:1},{getOwnPropertyDescriptor:function(t,k){return {value:1,enumerable:false,configurable:true};}}); Object.keys(p).join(',') + '|' + Object.getOwnPropertyNames(p).join(',')",
+        "var t={}; var p=new Proxy(t,{defineProperty:function(tt,k,d){tt[k]=d.value; return true;}}); Object.defineProperty(p,'x',{value:9,configurable:true}); t.x",
+        "var t={}; var p=new Proxy(t,{}); Object.defineProperty(p,'x',{value:9,configurable:true}); t.x",
+        "var proto={z:1}; var p=new Proxy({},{getPrototypeOf:function(){return proto;}}); Object.getPrototypeOf(p) === proto",
+        "var p=new Proxy({},{}); Object.getPrototypeOf(p) === Object.prototype",
+        "var log=[]; var p=new Proxy({},{setPrototypeOf:function(t,pr){log.push('spo'); return true;}}); Object.setPrototypeOf(p,{}); log.join(',')",
+        "var p = new Proxy({}, {isExtensible:function(t){return Object.isExtensible(t);}}); Object.isExtensible(p)",
+        "var p = new Proxy({}, {}); Object.isExtensible(p)",
+        "var t={}; var p = new Proxy(t, {preventExtensions:function(tt){Object.preventExtensions(tt); return true;}}); Object.preventExtensions(p); Object.isExtensible(t)",
+        "var p = new Proxy(function(a,b){return a+b;}, {}); p(1,2)",
+        "var p = new Proxy(function(a,b){return a+b;}, {apply:function(t,th,args){return t.apply(th,args) * 10;}}); p(1,2)",
+        "var p = new Proxy(function(){return this.v;}, {}); p.call({v:7})",
+        "function F(x){this.x=x;} var p = new Proxy(F, {}); (new p(5)).x",
+        "function F(x){this.x=x;} var p = new Proxy(F, {construct:function(t,args){return {x: 3};}}); (new p(5)).x",
+        "typeof new Proxy(function(){}, {})",
+        "typeof new Proxy({}, {})",
+        "Array.isArray(new Proxy([], {}))",
+        "Array.isArray(new Proxy({}, {}))",
+        "var p = new Proxy({a:1},{}); var o = Object.create(p); o.a",
+        "var p = new Proxy({},{get:function(t,k){return 'from proxy ' + String(k);}}); var o = Object.create(p); o.q",
+        "var r = Proxy.revocable({a:1},{}); var v = r.proxy.a; r.revoke(); try { r.proxy.a } catch(e) { v + ':' + e.name }",
+        "var r = Proxy.revocable({a:1},{}); r.revoke(); r.revoke(); 'ok'",
+        "var r = Proxy.revocable({a:1},{}); typeof r.revoke",
+        "var r = Proxy.revocable({a:1},{}); typeof r.proxy",
+        "var s = Symbol('s'); var o = {}; o[s] = 1; var p = new Proxy(o, {}); p[s]",
+        "var s = Symbol('s'); var p = new Proxy({}, {get:function(t,k){return typeof k;}}); p[s]",
+        "var s = Symbol('s'); var o = {}; o[s] = 1; var p = new Proxy(o, {has:function(){return false;}}); s in p",
+        "var p = new Proxy({}, {}); p.toString()",
+        "var p = new Proxy({}, {}); Object.prototype.toString.call(p)",
+        "var p = new Proxy([1,2,3], {}); p.length",
+        "var p = new Proxy([1,2,3], {}); p.join('-')",
+        "var p = new Proxy({a:1}, {}); JSON.stringify(p)",
+    ))
+
+    @Test
+    fun proxyInvariants() = check(listOf(
+        "var t = Object.freeze({a:1}); var p = new Proxy(t, {get:function(){return 2;}}); try { p.a } catch(e) { e.name + ': ' + e.message }",
+        "var t = Object.freeze({a:1}); var p = new Proxy(t, {get:function(){return 1;}}); p.a",
+        "var t = {}; Object.defineProperty(t,'a',{value:1,configurable:false}); Object.preventExtensions(t); var p = new Proxy(t,{has:function(){return false;}}); try { 'a' in p } catch(e) { e.name }",
+        "var t = Object.preventExtensions({a:1}); var p = new Proxy(t,{ownKeys:function(){return [];}}); try { Object.keys(p).join(',') } catch(e) { e.name }",
+        "var p = new Proxy({},{ownKeys:function(){return ['a','a'];}}); try { Object.keys(p).join(',') } catch(e) { e.name + ': ' + e.message }",
+        "var p = new Proxy({},{ownKeys:function(){return 'nope';}}); try { Object.keys(p).join(',') } catch(e) { e.name }",
+        "var p = new Proxy({},{ownKeys:function(){return [1];}}); try { Object.keys(p).join(',') } catch(e) { e.name }",
+        "var t = Object.preventExtensions({}); var p = new Proxy(t,{preventExtensions:function(){return true;}}); Object.preventExtensions(p); 'ok'",
+        "var p = new Proxy({},{preventExtensions:function(){return true;}}); try { Object.preventExtensions(p) } catch(e) { e.name + ': ' + e.message }",
+        "var p = new Proxy({}, {isExtensible:function(){return false;}}); try { Object.isExtensible(p) } catch(e) { e.name + ': ' + e.message }",
+        "var p = new Proxy({},{getOwnPropertyDescriptor:function(){return 1;}}); try { Object.getOwnPropertyDescriptor(p,'a') } catch(e) { e.name }",
+        "var t = Object.freeze({a:1}); var p = new Proxy(t,{getOwnPropertyDescriptor:function(){return undefined;}}); try { Object.getOwnPropertyDescriptor(p,'a') } catch(e) { e.name + ': ' + e.message }",
+        "var p = new Proxy(function(){}, {construct:function(){return 1;}}); try { new p() } catch(e) { e.name + ': ' + e.message }",
+        "var t = Object.freeze({a:1}); var p = new Proxy(t, {set:function(){return true;}}); try { p.a = 5; 'no throw' } catch(e) { e.name + ': ' + e.message }",
+        "var t = Object.freeze({a:1}); var p = new Proxy(t, {deleteProperty:function(){return true;}}); try { delete p.a; 'no throw' } catch(e) { e.name }",
+        "var t = {}; Object.preventExtensions(t); var p = new Proxy(t, {defineProperty:function(){return true;}}); try { Object.defineProperty(p,'x',{value:1}); 'no throw' } catch(e) { e.name + ': ' + e.message }",
+        "var t = {}; var p = new Proxy(t, {getPrototypeOf:function(){return 1;}}); try { Object.getPrototypeOf(p) } catch(e) { e.name }",
+        "var t = Object.preventExtensions({}); var p = new Proxy(t, {getPrototypeOf:function(){return {};}}); try { Object.getPrototypeOf(p) } catch(e) { e.name + ': ' + e.message }",
+        "try { new Proxy() } catch(e) { e.name + ': ' + e.message }",
+        "try { new Proxy({}) } catch(e) { e.name + ': ' + e.message }",
+        "try { new Proxy(1, {}) } catch(e) { e.name }",
+        "try { new Proxy({}, 1) } catch(e) { e.name }",
+        "try { Proxy({}, {}) } catch(e) { e.name }",
+        "try { new Proxy({}, {get: 1}); 'made' } catch(e) { e.name }",
+        "try { var p = new Proxy({}, {get: 1}); p.a } catch(e) { e.name }",
+        "try { new Proxy(Symbol('s'), {}) } catch(e) { e.name }",
+        "var r = Proxy.revocable({a:1},{}); r.revoke(); try { 'a' in r.proxy } catch(e) { e.name + ': ' + e.message }",
+        "var r = Proxy.revocable({a:1},{}); r.revoke(); try { Object.keys(r.proxy) } catch(e) { e.name }",
+        "var r = Proxy.revocable(function(){},{}); r.revoke(); try { r.proxy() } catch(e) { e.name }",
+        "var r = Proxy.revocable({a:1},{}); r.revoke(); try { r.proxy.a = 1 } catch(e) { e.name }",
+    ))
+
+    @Test
+    fun reflectMethods() = check(listOf(
+        "typeof Reflect",
+        "Object.prototype.toString.call(Reflect)",
+        "Reflect.get({a:1},'a')",
+        "String(Reflect.get({a:1},'b'))",
+        "Reflect.get([10,20],1)",
+        "Reflect.get([10,20],'1')",
+        "var s = Symbol('s'); var o = {}; o[s] = 4; Reflect.get(o, s)",
+        "Reflect.set({}, 'x', 5)",
+        "var o={}; Reflect.set(o,'x',5); o.x",
+        "var o=[]; Reflect.set(o,0,5); o[0]",
+        "var o={}; var r={}; Reflect.set(o,'x',5,r); String(o.x) + ',' + r.x",
+        "Reflect.has({a:1},'a')",
+        "Reflect.has({a:1},'b')",
+        "Reflect.has({},'toString')",
+        "var s = Symbol('s'); var o = {}; o[s] = 1; Reflect.has(o, s)",
+        "var o={a:1}; Reflect.deleteProperty(o,'a'); String(o.a)",
+        "Reflect.deleteProperty(Object.freeze({a:1}),'a')",
+        "Reflect.ownKeys({a:1,b:2}).join(',')",
+        "Reflect.ownKeys([1,2]).join(',')",
+        "var s = Symbol('s'); var o = {a:1}; o[s]=2; Reflect.ownKeys(o).length",
+        "Reflect.isExtensible({})",
+        "var o={}; Reflect.preventExtensions(o); Reflect.isExtensible(o)",
+        "Reflect.getPrototypeOf({}) === Object.prototype",
+        "Reflect.getPrototypeOf([]) === Array.prototype",
+        "var o={}; Reflect.setPrototypeOf(o, null); String(Reflect.getPrototypeOf(o))",
+        "var proto={}; var o={}; Reflect.setPrototypeOf(o, proto); Reflect.getPrototypeOf(o) === proto",
+        "var o={}; Reflect.setPrototypeOf(o, Object.getPrototypeOf(o))",
+        "var a={}; var b=Object.create(a); Reflect.setPrototypeOf(a, b)",
+        "Reflect.setPrototypeOf(Object.preventExtensions({}), {})",
+        "JSON.stringify(Reflect.getOwnPropertyDescriptor({a:1},'a'))",
+        "String(Reflect.getOwnPropertyDescriptor({},'a'))",
+        "var o={}; Reflect.defineProperty(o,'x',{value:3}); o.x",
+        "var o={}; Reflect.defineProperty(o,'x',{value:3})",
+        "Reflect.defineProperty(Object.freeze({}),'x',{value:3})",
+        "Reflect.apply(function(a,b){return a+b;}, null, [1,2])",
+        "Reflect.apply(function(){return this.v;}, {v:9}, [])",
+        "Reflect.apply(Math.max, null, [1,5,2])",
+        "function F(a){this.a=a;} Reflect.construct(F,[7]).a",
+        "function F(){this.a=1;} function G(){} Reflect.construct(F,[],G) instanceof G",
+        "function F(){this.a=1;} function G(){} Reflect.construct(F,[],G).a",
+        "Reflect.construct(Array,[3]).length",
+        "try { Reflect.get() } catch(e) { e.name }",
+        "try { Reflect.get(1,'a') } catch(e) { e.name }",
+        "try { Reflect.get(undefined,'a') } catch(e) { e.name }",
+        "try { Reflect.apply(function(){}) } catch(e) { e.name + ': ' + e.message }",
+        "try { Reflect.construct(1,[]) } catch(e) { e.name }",
+        "try { Reflect.construct() } catch(e) { e.name + ': ' + e.message }",
+        "try { Reflect.defineProperty({}) } catch(e) { e.name + ': ' + e.message }",
+        "try { Reflect.setPrototypeOf({}) } catch(e) { e.name + ': ' + e.message }",
+        "try { Reflect.get(Symbol('s'),'a') } catch(e) { e.name }",
+        "var p = new Proxy({a:1},{get:function(t,k,r){return Reflect.get(t,k,r);}}); p.a",
+        "var p = new Proxy({a:1},{ownKeys:function(t){return Reflect.ownKeys(t);}}); Object.keys(p).join(',')",
+        "var p = new Proxy({a:1},{has:function(t,k){return Reflect.has(t,k);}}); 'a' in p",
+    ))
+
+    /**
+     * Upstream 1.9.1 throws a NullPointerException when a `getOwnPropertyDescriptor` trap answers
+     * undefined for a property the target does not have: it reads the target's descriptor without
+     * checking for null first. The port returns undefined, which is what the spec asks for and what
+     * every other engine does (D-50). Both halves are pinned here so a change on either side shows.
+     */
+    @Test
+    fun getOwnPropertyDescriptorTrapMayReturnUndefined() {
+        val script = "var p = new Proxy({}, {getOwnPropertyDescriptor:function(){return undefined;}});" +
+            " String(Object.getOwnPropertyDescriptor(p, 'zzz'))"
+        assertFailsWith<NullPointerException> { ucx.evaluateString(uscope, script, "test.js", 1, null) }
+        assertEquals("\"undefined\"", ported(script))
+    }
+
+    /**
+     * Upstream hands the `construct` trap the raw Java argument array, which script can only read
+     * because Java interop wraps it on the way in. There is no interop here, so the trap gets a
+     * real JavaScript array, matching what the `apply` trap already did and what the spec says
+     * (D-51). Both halves are pinned so a change on either side shows.
+     */
+    @Test
+    fun constructTrapGetsARealArray() {
+        val script = "var p = new Proxy(function (x) { this.x = x }, {construct:function(t,args){" +
+            " return { out: Array.isArray(args) + ',' + args.length + ',' + args[0] }; }});" +
+            " (new p(7, 8)).out"
+        assertTrue(upstream(script).startsWith("\"false,"), "upstream: " + upstream(script))
+        assertEquals("\"true,2,7\"", ported(script))
+    }
 }

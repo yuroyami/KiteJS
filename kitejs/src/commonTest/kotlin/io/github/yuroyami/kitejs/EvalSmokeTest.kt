@@ -375,4 +375,42 @@ class EvalSmokeTest {
         assertEquals("2", eval("var o = { x: 1 }; with (o) { x = 2 } o.x"))
         assertEquals("false", eval("var o = { a: 1 }; delete o.a; 'a' in o"))
     }
+
+    @Test
+    fun proxies() {
+        assertEquals("1", eval("var p = new Proxy({a:1}, {}); p.a"))
+        assertEquals("42", eval("var p = new Proxy({a:1}, {get:function(t,k){return k === 'a' ? 42 : t[k];}}); p.a"))
+        assertEquals("10", eval("var p = new Proxy({}, {set:function(t,k,v){t[k]=v*2; return true;}}); p.x = 5; p.x"))
+        assertEquals("false,true", eval("var p = new Proxy({a:1}, {has:function(t,k){return k==='b';}}); ('a' in p) + ',' + ('b' in p)"))
+        assertEquals("undefined", eval("var t={a:1}; var p=new Proxy(t,{deleteProperty:function(tt,k){delete tt[k]; return true;}}); delete p.a; String(t.a)"))
+        assertEquals("b", eval("var p = new Proxy({a:1,b:2}, {ownKeys:function(){return ['b'];}}); Object.keys(p).join(',')"))
+        assertEquals("a,b", eval("var p = new Proxy({a:1,b:2},{}); var out=[]; for (var k in p) out.push(k); out.join(',')"))
+        assertEquals("30", eval("var p = new Proxy(function(a,b){return a+b;}, {apply:function(t,th,args){return t.apply(th,args)*10;}}); p(1,2)"))
+        assertEquals("3", eval("function F(x){this.x=x;} var p = new Proxy(F, {construct:function(t,args){return {x:3};}}); (new p(5)).x"))
+        // The construct trap gets a real array, not the raw argument list (D-51).
+        assertEquals("true,2,7", eval("var p = new Proxy(function(x){this.x=x;}, {construct:function(t,args){return {out: Array.isArray(args) + ',' + args.length + ',' + args[0]};}}); (new p(7,8)).out"))
+        assertEquals("function", eval("typeof new Proxy(function(){}, {})"))
+        assertEquals("true", eval("Array.isArray(new Proxy([], {}))"))
+        assertEquals("true", eval("var proto={z:1}; var p=new Proxy({},{getPrototypeOf:function(){return proto;}}); Object.getPrototypeOf(p) === proto"))
+        assertEquals("1:TypeError", eval("var r = Proxy.revocable({a:1},{}); var v = r.proxy.a; r.revoke(); try { r.proxy.a } catch(e) { v + ':' + e.name }"))
+        assertEquals("TypeError", eval("var t = Object.freeze({a:1}); var p = new Proxy(t, {get:function(){return 2;}}); try { p.a } catch(e) { e.name }"))
+        // Upstream crashes on this one; the port answers undefined, as the spec says (D-50).
+        assertEquals("undefined", eval("var p = new Proxy({}, {getOwnPropertyDescriptor:function(){return undefined;}}); String(Object.getOwnPropertyDescriptor(p,'zzz'))"))
+    }
+
+    @Test
+    fun reflection() {
+        assertEquals("1", eval("Reflect.get({a:1},'a')"))
+        assertEquals("a,b", eval("Reflect.ownKeys({a:1,b:2}).join(',')"))
+        assertEquals("false", eval("Reflect.has({a:1},'b')"))
+        assertEquals("5", eval("var o={}; Reflect.set(o,'x',5); o.x"))
+        assertEquals("3", eval("var o={}; Reflect.defineProperty(o,'x',{value:3}); o.x"))
+        assertEquals("7", eval("function F(a){this.a=a;} Reflect.construct(F,[7]).a"))
+        assertEquals("true", eval("function F(){this.a=1;} function G(){} Reflect.construct(F,[],G) instanceof G"))
+        assertEquals("5", eval("Reflect.apply(Math.max,null,[1,5,2])"))
+        assertEquals("true", eval("Reflect.isExtensible({})"))
+        assertEquals("false", eval("var o={}; Reflect.preventExtensions(o); Reflect.isExtensible(o)"))
+        assertEquals("[object Reflect]", eval("Object.prototype.toString.call(Reflect)"))
+        assertEquals("1", eval("var p = new Proxy({a:1},{get:function(t,k,r){return Reflect.get(t,k,r);}}); p.a"))
+    }
 }
