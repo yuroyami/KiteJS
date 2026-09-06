@@ -184,6 +184,10 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   synchronized `WeakHashMap`, but the map holds the description strings itself, so no entry was
   ever collected and the two behave the same. The port is single-thread confined (D-3), so the
   synchronization has nothing to protect.
+- D-41: `NativeIterator` drops `WrappedJavaIterator` and the `getJavaIterator` path. They wrap a
+  `java.util.Iterator` or `Iterable` through the wrap factory, which is LiveConnect. `new
+  Iterator(x)` on a script object behaves exactly as upstream. `NativeGenerator.resume` also drops
+  upstream's reentrancy lock, since the port is single-thread confined (D-3).
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -836,25 +840,25 @@ its own `TODO(P4)` slot there.
 
 #### P4.2: Iterators and generators
 
-- [ ] Port `NativeIterator.kt` (245) as the real class: the legacy `__iterator__` protocol,
+- [x] Port `NativeIterator.kt` (245) as the real class: the legacy `__iterator__` protocol,
       `StopIteration`, `Iterator()` constructor, `NativeIterator.init`. The shell object from
       P3.7 goes away.
-- [ ] Port `NativeGenerator.kt` (235): the pre-ES6 generator object (`send`, `next`, `throw`,
+- [x] Port `NativeGenerator.kt` (235): the pre-ES6 generator object (`send`, `next`, `throw`,
       `close`, `__iterator__`), `GeneratorClosedException` stays where P3.7 put it.
-- [ ] Port `ES6Generator.kt` (421): `next`, `return`, `throw`, the `yield*` delegation with
+- [x] Port `ES6Generator.kt` (421): `next`, `return`, `throw`, the `yield*` delegation with
       `YieldStarResult` from P3.7, the state machine and the prototype wiring through
       `BaseFunction.initAsGeneratorFunction`.
-- [ ] Fill `Interpreter.generatorCreate`: an `ES6Generator` at `VERSION_ES6` and above, a
+- [x] Fill `Interpreter.generatorCreate`: an `ES6Generator` at `VERSION_ES6` and above, a
       `NativeGenerator` below, exactly as upstream chooses.
-- [ ] Oracle: generator functions with `yield`, `yield*` over arrays, strings and other
+- [x] Oracle: generator functions with `yield`, `yield*` over arrays, strings and other
       generators, early `return` and `throw` into a suspended generator, `finally` on close,
       `for...of` and spread over generators, destructuring from a generator, infinite generators
       taken with a counter, generator methods in object literals, arguments and `this` inside
       generators, `Symbol.iterator` returning `this`, custom iterables with `next` and `return`,
       iterator closing on `break`, and the legacy protocol at `VERSION_1_8`.
-- [ ] Corpus programs: a lazy pipeline (map, filter, take over a generator), a tree walker that
+- [x] Corpus programs: a lazy pipeline (map, filter, take over a generator), a tree walker that
       yields in order, a fibonacci generator.
-- [ ] Green on all targets; commit.
+- [x] Green on all targets; commit.
 
 #### P4.3: Map and Set
 

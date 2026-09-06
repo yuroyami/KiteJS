@@ -1862,8 +1862,12 @@ class Interpreter : Evaluator {
             frame.pc--
             val generatorFrame = captureFrameForGenerator(frame)
             generatorFrame.frozen = true
-            // TODO(P4): the generator objects (ES6Generator, NativeGenerator) land with the natives.
-            TODO("generator objects land in phase 4")
+            val fn = generatorFrame.fnOrScript as JSFunction
+            frame.result = if (cx.languageVersion >= Context.VERSION_ES6) {
+                ES6Generator(frame.scope!!, fn, generatorFrame)
+            } else {
+                NativeGenerator(frame.scope!!, fn, generatorFrame)
+            }
         }
 
         private fun captureFrameForGenerator(frame: CallFrame): CallFrame {

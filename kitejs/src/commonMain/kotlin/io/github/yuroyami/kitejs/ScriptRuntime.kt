@@ -977,6 +977,12 @@ object ScriptRuntime {
     fun undefCallError(obj: Any?, id: Any?): RuntimeException =
         typeErrorById("msg.undef.method.call", toString(obj), toString(id))
 
+    /** True when an iterator result object says the iteration is over. */
+    fun isIteratorDone(cx: Context, result: Any?): Boolean {
+        if (result !is Scriptable) return false
+        return toBoolean(getObjectProp(result, ES6Iterator.DONE_PROPERTY, cx))
+    }
+
     // ---- ToObject ------------------------------------------------------------------------------
 
     fun toObject(scope: Scriptable, value: Any?): Scriptable {
@@ -1332,7 +1338,8 @@ object ScriptRuntime {
         NativeCall.init(scope, sealed)
         NativeScript.init(cx, scope, sealed)
 
-        // TODO(P4): NativeIterator.init(cx, scope, sealed)
+        // Also installs the generator prototype, one or the other by language version.
+        NativeIterator.init(cx, scope, sealed)
         NativeArrayIterator.init(scope, sealed)
         NativeStringIterator.init(scope, sealed)
 
@@ -2563,6 +2570,11 @@ object ScriptRuntime {
         var iterator: Scriptable? = null
     }
 
+    /** Makes the enumeration hand back Int indices rather than their string form. */
+    fun setEnumNumbers(enumObj: Any?, enumNumbers: Boolean) {
+        (enumObj as IdEnumeration).enumNumbers = enumNumbers
+    }
+
     fun enumInit(value: Any?, cx: Context, enumValues: Boolean): Any =
         enumInit(value, cx, if (enumValues) ENUMERATE_VALUES else ENUMERATE_KEYS)
 
@@ -2774,6 +2786,29 @@ object ScriptRuntime {
     }
 
     /** Builds the scope object a `catch` block runs in, with the caught value bound to its name. */
+    /**
+     * Builds the script-visible error object for a Java-side exception. `javaException` and
+     * `rhinoException` are LiveConnect properties and are not ported.
+     */
+    fun wrapException(t: Throwable, scope: Scriptable, cx: Context): Scriptable {
+        val re: RhinoException
+        val errorName: String
+        val errorMsg: String?
+        when (t) {
+            is EcmaError -> { re = t; errorName = t.name; errorMsg = t.errorMessage }
+            is WrappedException -> { re = t; errorName = "InternalError"; errorMsg = t.wrappedException.message }
+            is EvaluatorException -> { re = t; errorName = "InternalError"; errorMsg = t.message }
+            else -> throw Kit.codeBug()
+        }
+        val sourceUri = re.sourceName ?: ""
+        val line = re.lineNumber
+        val args: Array<Any?> = if (line > 0) arrayOf(errorMsg, sourceUri, line) else arrayOf(errorMsg, sourceUri)
+        val errorObject = cx.newObject(scope, errorName, args)
+        ScriptableObject.putProperty(errorObject, "name", errorName)
+        if (errorObject is NativeError) errorObject.setStackProvider(re)
+        return errorObject
+    }
+
     fun newCatchScope(t: Throwable, lastCatchScope: Scriptable?, exceptionName: String?, cx: Context, scope: Scriptable): Scriptable {
         val obj: Any?
         val cacheObj: Boolean
@@ -2810,8 +2845,10 @@ object ScriptRuntime {
                 val sourceUri = re.sourceName ?: ""
                 val line = re.lineNumber
                 val args: Array<Any?> = if (line > 0) arrayOf(errorMsg, sourceUri, line) else arrayOf(errorMsg, sourceUri)
-                // TODO(P3.8): NativeError gets the stack provider once it lands.
-                obj = newNativeError(cx, scope, type, args)
+                val errorObject = newNativeError(cx, scope, type, args)
+                // Feeds the non-standard "stack" property.
+                if (errorObject is NativeError) errorObject.setStackProvider(re)
+                obj = errorObject
             }
         }
         val catchScopeObject = NativeObject()

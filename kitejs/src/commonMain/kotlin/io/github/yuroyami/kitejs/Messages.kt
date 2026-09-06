@@ -314,5 +314,8 @@ internal object Messages {
         "msg.str.match.all.no.global.flag" to "String.prototype.matchAll called with a non-global RegExp argument",
         "msg.str.replace.all.no.global.flag" to "replaceAll must be called with a global RegExp",
         "msg.no.assign.symbol.strict" to "Symbol objects may not be assigned properties in strict mode",
+        "msg.generator.executing" to "The generator is still executing from a previous invocation.",
+        "msg.no.properties" to "{0} has no properties.",
+        "msg.send.newborn" to "Attempt to send value to newborn generator",
     )
 }

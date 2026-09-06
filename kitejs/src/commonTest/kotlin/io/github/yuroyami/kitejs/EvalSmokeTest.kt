@@ -229,6 +229,25 @@ class EvalSmokeTest {
     }
 
     @Test
+    fun generators() {
+        assertEquals("object", eval("function* g() { yield 1 } typeof g()"))
+        assertEquals("1", eval("function* g() { yield 1 } g().next().value"))
+        assertEquals("true", eval("function* g() { yield 1 } var it = g(); it.next(); it.next().done"))
+        assertEquals("1,2,3", eval("function* g() { yield 1; yield 2; yield 3 } [...g()].join()"))
+        assertEquals("42", eval("function* g() { var x = yield 1; yield x * 2 } var it = g(); it.next(); it.next(21).value"))
+        assertEquals("0,1,2,3", eval("function* inner() { yield 1; yield 2 } function* g() { yield 0; yield* inner(); yield 3 } [...g()].join()"))
+        assertEquals("1,2,3", eval("function* g() { yield* [1, 2, 3] } [...g()].join()"))
+        assertEquals("9", eval("function* g() { yield 1; yield 2 } var it = g(); it.next(); it.return(9).value"))
+        assertEquals("caught boom", eval("function* g() { try { yield 1 } catch (e) { yield 'caught ' + e } } var it = g(); it.next(); it.throw('boom').value"))
+        assertEquals("1,2", eval("var o = { *g() { yield 1; yield 2 } }; [...o.g()].join()"))
+        assertEquals("true", eval("function* g() { yield 1 } var it = g(); it[Symbol.iterator]() === it"))
+        // Rhino runs the finally on an explicit return(), but not when a for-of loop breaks.
+        assertEquals("ran", eval("function* g() { try { yield 1 } finally { globalThis.fin = 'ran' } } var it = g(); it.next(); it.return(0); globalThis.fin"))
+        assertEquals("undefined", eval("function* g() { try { yield 1; yield 2 } finally { globalThis.brk = 'ran' } } for (var v of g()) break; globalThis.brk"))
+        assertEquals("0,1,2", eval("var o = {}; o[Symbol.iterator] = function () { var n = 0; return { next: function () { return n < 3 ? { value: n++, done: false } : { done: true } } } }; [...o].join()"))
+    }
+
+    @Test
     fun objectsAndPrototypes() {
         assertEquals("deep", eval("var o = { a: { b: { c: 'deep' } } }; o.a.b.c"))
         assertEquals("42", eval("var o = { get x() { return 42 } }; o.x"))

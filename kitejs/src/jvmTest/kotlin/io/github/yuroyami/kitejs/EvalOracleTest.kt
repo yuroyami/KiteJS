@@ -83,6 +83,26 @@ class EvalOracleTest {
         assertEquals(emptyList(), failures, "evaluation differs from upstream")
     }
 
+    /** Runs the same scripts on both engines at a language version other than the default. */
+    private fun checkAtVersion(version: Int, sources: List<String>) {
+        val savedU = ucx.languageVersion
+        val savedK = Context.getContext().languageVersion
+        val uold = uscope
+        val kold = kscope
+        try {
+            ucx.languageVersion = version
+            uscope = ucx.initStandardObjects()
+            Context.getContext().languageVersion = version
+            kscope = Context.getContext().initStandardObjects()
+            check(sources)
+        } finally {
+            ucx.languageVersion = savedU
+            Context.getContext().languageVersion = savedK
+            uscope = uold
+            kscope = kold
+        }
+    }
+
     @Test
     fun arithmeticAndCoercion() = check(listOf(
         "1 + 2", "1 - 2", "2 * 3", "7 / 2", "7 % 3", "2 ** 10", "-5", "+'3'", "1 / 0", "-1 / 0", "0 / 0",
@@ -475,6 +495,121 @@ class EvalOracleTest {
         "Symbol.prototype[Symbol.toStringTag]",
         "typeof Symbol.prototype[Symbol.toPrimitive]",
         "var s = Symbol('a'); s[Symbol.toPrimitive]() === s",
+    ))
+
+    @Test
+    fun generators() = check(listOf(
+        // The generator object itself.
+        "function* g() { yield 1 } typeof g", "function* g() { yield 1 } typeof g()",
+        "function* g() { yield 1 } Object.prototype.toString.call(g())",
+        "function* g() { yield 1 } var it = g(); it[Symbol.iterator]() === it",
+        "function* g() { yield 1 } typeof g().next", "function* g() { yield 1 } typeof g().return",
+        "function* g() { yield 1 } typeof g().throw",
+        "function* g() { yield 1 } var r = g().next(); r.value + ':' + r.done",
+        "function* g() { yield 1 } var it = g(); it.next(); var r = it.next(); r.value + ':' + r.done",
+        "function* g() {} var r = g().next(); r.value + ':' + r.done",
+        "function* g() { return 5 } var r = g().next(); r.value + ':' + r.done",
+        "function* g() { yield 1; return 5 } var it = g(); it.next(); var r = it.next(); r.value + ':' + r.done",
+        "function* g() { yield 1 } var it = g(); it.next(); it.next(); var r = it.next(); r.value + ':' + r.done",
+
+        // Values in and out.
+        "function* g() { var x = yield 1; yield x * 2 } var it = g(); it.next(); it.next(21).value",
+        "function* g() { var a = yield 1; var b = yield 2; yield a + b } var it = g(); it.next(); it.next(10); it.next(20).value",
+        "function* g() { yield 1; yield 2; yield 3 } var r = []; for (var v of g()) r.push(v); r.join()",
+        "function* g() { yield 1; yield 2; yield 3 } [...g()].join()",
+        "function* g() { yield 1; yield 2; yield 3 } var a = [...g()]; a.length",
+        "function* g() { yield 1; yield 2 } var [a, b] = g(); a + ':' + b",
+        "function* g() { yield 1; yield 2; yield 3 } var [a, ...rest] = g(); a + ':' + rest.join()",
+        "function* g() { var i = 0; while (true) yield i++ } var it = g(); var r = []; for (var i = 0; i < 5; i++) r.push(it.next().value); r.join()",
+        "function* g() { yield 1; yield 2 } Array.from(g()).join()",
+        "function* g() { yield 1; yield 2 } var m = 0; for (var v of g()) m += v; m",
+
+        // yield* delegation.
+        "function* inner() { yield 1; yield 2 } function* g() { yield 0; yield* inner(); yield 3 } [...g()].join()",
+        "function* g() { yield* [1, 2, 3] } [...g()].join()",
+        "function* g() { yield* 'abc' } [...g()].join()",
+        "function* inner() { yield 1; return 9 } function* g() { var r = yield* inner(); yield r } [...g()].join()",
+        "function* g() { yield* [] ; yield 1 } [...g()].join()",
+        "function* a() { yield 1 } function* b() { yield* a(); yield 2 } function* c() { yield* b(); yield 3 } [...c()].join()",
+        "function* g() { yield* [1, 2] } var it = g(); it.next(); it.return(7).value + ':' + it.next().done",
+        "function* inner() { try { yield 1; yield 2 } finally { } } function* g() { yield* inner() } var it = g(); it.next(); it.return(5).value",
+        "function* g() { yield* 5 }; var it = g(); try { it.next() } catch (e) { e.name }",
+        "function* g() { yield* { } }; var it = g(); try { it.next() } catch (e) { e.name }",
+
+        // return() and throw() into a suspended generator.
+        "function* g() { yield 1; yield 2 } var it = g(); it.next(); var r = it.return(9); r.value + ':' + r.done",
+        "function* g() { yield 1 } var it = g(); var r = it.return(9); r.value + ':' + r.done",
+        "function* g() { yield 1 } var it = g(); it.next(); it.next(); var r = it.return(9); r.value + ':' + r.done",
+        "function* g() { try { yield 1 } finally { globalThis.seen = 'yes' } } var it = g(); it.next(); it.return(2); globalThis.seen",
+        "function* g() { try { yield 1 } finally { } } var it = g(); it.next(); it.return(2).value",
+        "function* g() { try { yield 1 } catch (e) { yield 'caught ' + e } } var it = g(); it.next(); it.throw('boom').value",
+        "function* g() { yield 1 } var it = g(); it.next(); try { it.throw(new Error('x')) } catch (e) { e.message }",
+        "function* g() { yield 1 } var it = g(); try { it.throw('early') } catch (e) { e }",
+        "function* g() { try { yield 1 } finally { yield 2 } } var it = g(); it.next(); it.return(9).value",
+        "function* g() { yield 1; yield 2 } var it = g(); it.next(); it.return(); var r = it.next(); r.value + ':' + r.done",
+
+        // Errors from inside.
+        "function* g() { throw new Error('inside') } var it = g(); try { it.next() } catch (e) { e.message }",
+        "function* g() { yield 1; throw new Error('later') } var it = g(); it.next(); try { it.next() } catch (e) { e.message }",
+        "function* g() { throw new Error('x') } var it = g(); try { it.next() } catch (e) {} var r = it.next(); r.value + ':' + r.done",
+        "function* g() { yield 1 } var it = g(); it.next.call({})",
+        "function* g() { yield 1 } var it = g(); var n = it.next; try { n() } catch (e) { e.name }",
+
+        // Where generators can be written.
+        "var o = { *g() { yield 1; yield 2 } }; [...o.g()].join()",
+        "var o = { *[Symbol.iterator]() { yield 1; yield 2 } }; [...o].join()",
+        "var g = function* () { yield 1 }; g().next().value",
+        "var g = function* named() { yield 1 }; g.name",
+        "function* g() { yield this.x } var o = { x: 5, g: g }; o.g().next().value",
+        "function* g() { yield arguments.length } g(1, 2, 3).next().value",
+        "function* g(a, b) { yield a + b } g(1, 2).next().value",
+        "function* g() { yield 1 } g.prototype.extra = 7; g().extra",
+        "function* g() { yield 1 } Object.getPrototypeOf(g()) === g.prototype",
+        "function* g() { yield 1 } g.length",
+        "function* g() { yield (yield 1) + 1 } var it = g(); it.next(); it.next(4).value",
+        "function* g() { for (var i = 0; i < 3; i++) yield i } [...g()].join()",
+        "function* g() { var a = [1, 2]; for (var v of a) yield v * 2 } [...g()].join()",
+        "function* g() { yield [1, 2] } g().next().value.join()",
+        "function* g() { yield { a: 1 } } g().next().value.a",
+
+        // Custom iterables, and closing one on break.
+        "var o = {}; o[Symbol.iterator] = function () { var n = 0; return { next: function () { return n < 3 ? { value: n++, done: false } : { value: undefined, done: true } } } }; [...o].join()",
+        "var closed = false; var o = {}; o[Symbol.iterator] = function () { return { next: function () { return { value: 1, done: false } }, return: function () { closed = true; return { done: true } } } }; for (var v of o) break; closed",
+        "var o = {}; o[Symbol.iterator] = function () { return { next: function () { return { done: true } } } }; [...o].length",
+        "var o = {}; o[Symbol.iterator] = 5; try { [...o] } catch (e) { e.name }",
+        "var o = {}; o[Symbol.iterator] = function () { return 5 }; try { [...o] } catch (e) { e.name }",
+        "function* g() { yield 1; yield 2; yield 3 } var r = []; for (var v of g()) { if (v == 2) break; r.push(v) } r.join()",
+        "function* g() { try { yield 1; yield 2 } finally { globalThis.fin = 'ran' } } for (var v of g()) break; globalThis.fin",
+
+        // The iterator built-in and its prototype.
+        "typeof Iterator", "typeof StopIteration", "Object.prototype.toString.call(StopIteration)",
+        "var it = new Iterator({ a: 1, b: 2 }); it.next().join()",
+        "var it = new Iterator({ a: 1 }, true); it.next()",
+        "var it = new Iterator({}); try { it.next() } catch (e) { e === StopIteration }",
+        "new Iterator()", "new Iterator(null)", "Iterator({ a: 1 }).next().join()",
+        "var it = new Iterator({ a: 1 }); it.__iterator__() === it",
+        "var it = new Iterator([7, 8]); it.next().join()",
+    ))
+
+    /** JavaScript 1.7 generators: no star, and StopIteration instead of a done flag. */
+    @Test
+    fun legacyGenerators() = checkAtVersion(Context.VERSION_1_8, listOf(
+        "function g() { yield 1 } typeof g()",
+        "function g() { yield 1 } Object.prototype.toString.call(g())",
+        "function g() { yield 1 } g().next()",
+        "function g() { yield 1; yield 2 } var it = g(); it.next(); it.next()",
+        "function g() { yield 1 } var it = g(); it.next(); try { it.next() } catch (e) { e === StopIteration }",
+        "function g() { var x = yield 1; yield x * 2 } var it = g(); it.next(); it.send(21)",
+        "function g() { yield 1 } var it = g(); try { it.send(5) } catch (e) { e.name }",
+        "function g() { yield 1 } var it = g(); it.__iterator__() === it",
+        "function g() { yield 1 } var it = g(); it.close()",
+        "function g() { try { yield 1 } finally { globalThis.fin = 'ran' } } var it = g(); it.next(); it.close(); globalThis.fin",
+        "function g() { try { yield 1 } catch (e) { yield 'caught ' + e } } var it = g(); it.next(); it.throw('boom')",
+        "function g() { yield 1 } var it = g(); it.next(); try { it.throw('x') } catch (e) { e }",
+        "function g() { yield 1; yield 2; yield 3 } var r = []; for (var v in Iterator(g())) r.push(v); r.join()",
+        "function g() { yield 1; yield 2 } var s = 0; try { var it = g(); while (true) s += it.next() } catch (e) {} s",
+        "function g() { for (var i = 0; i < 3; i++) yield i } var it = g(); it.next() + ',' + it.next()",
+        "typeof StopIteration", "StopIteration instanceof StopIteration",
     ))
 
     @Test

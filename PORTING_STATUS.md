@@ -40,6 +40,7 @@ plan, read [KITEJS_IMPL.md](KITEJS_IMPL.md).
 | Eval oracle corpus | ✅ | 47 whole programs under `jvmTest/resources/eval` run on both engines with the same answers; twenty of them, with upstream's recorded answers, run on JVM, JS and iOS |
 | JSON | ✅ | `JSON.parse` with reviver and `JSON.stringify` with replacer and indentation. About 130 oracle scripts match upstream |
 | Symbol | ✅ | The constructor, the registry (`Symbol.for`, `Symbol.keyFor`), `description`, the wrapper object `Object(sym)` makes, and all thirteen well-known symbols. About 110 oracle scripts match upstream, including symbols as property keys and every coercion error |
+| Iterators and generators | ✅ | `ES6Generator` at ES6 and `NativeGenerator` below it, the legacy `Iterator` and `StopIteration`, `yield` and `yield*` with delegation, `return` and `throw` into a suspended generator. About 90 oracle scripts plus 16 at language version 1.8 match upstream, and three whole programs run on JVM, JS and iOS. Like upstream, breaking out of a `for...of` does not run the generator's `finally`; an explicit `return()` does |
 | RegExp engine | ⛔ | Phase 4 |
 | Date | ⛔ | Phase 4, needs a timezone decision |
 | Map, Set, Symbol, iterators, generators, typed arrays, Promise | ⛔ | Phase 4 |

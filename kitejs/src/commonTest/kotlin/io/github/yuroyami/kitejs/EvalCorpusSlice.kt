@@ -722,5 +722,205 @@ out.join('|');
 """,
             """k|||a||hi k||k|0||false|default|default|last|fallback|fallback|1||undefined|||1|hi other|0||1|1|function|true|false""",
         ),
+        Program(
+            "lazy_pipeline",
+            """// A pull-based pipeline: nothing runs until the consumer asks for the next value.
+function* range(start, end, step) {
+  for (var i = start; i < end; i += (step || 1)) yield i;
+}
+function* map(it, f) {
+  for (var v of it) yield f(v);
+}
+function* filter(it, pred) {
+  for (var v of it) if (pred(v)) yield v;
+}
+function* take(it, n) {
+  var i = 0;
+  for (var v of it) {
+    if (i++ >= n) return;
+    yield v;
+  }
+}
+function* zip(a, b) {
+  var ia = a[Symbol.iterator]();
+  var ib = b[Symbol.iterator]();
+  while (true) {
+    var ra = ia.next();
+    var rb = ib.next();
+    if (ra.done || rb.done) return;
+    yield [ra.value, rb.value];
+  }
+}
+function drain(it) {
+  var out = [];
+  for (var v of it) out.push(v);
+  return out;
+}
+
+var calls = 0;
+function counted(x) { calls++; return x * x; }
+
+var squares = take(map(range(1, 1000), counted), 5);
+var first = drain(squares).join();
+var lazily = calls;
+
+var evens = drain(take(filter(range(0, 100), function (n) { return n % 2 === 0; }), 6)).join();
+var pairs = drain(zip(range(0, 4), 'abcd')).map(function (p) { return p.join(':'); }).join();
+var spread = [...take(range(10, 100, 10), 4)].join();
+var summed = drain(map(range(1, 6), function (n) { return n; })).reduce(function (a, b) { return a + b; }, 0);
+
+// Rhino does not close a generator when a for-of loop breaks, so this finally never runs.
+// The value stays at its starting point, which is what both engines have to agree on.
+var closedAt = -1;
+function* watched() {
+  try {
+    var i = 0;
+    while (true) yield i++;
+  } finally {
+    closedAt = i;
+  }
+}
+for (var v of watched()) if (v === 3) break;
+
+// Delegation keeps the same laziness.
+function* concat(a, b) { yield* a; yield* b; }
+var joined = drain(concat(range(0, 3), range(10, 13))).join();
+
+[first, lazily, evens, pairs, spread, summed, closedAt, joined].join('|');
+""",
+            """1,4,9,16,25|6|0,2,4,6,8,10|0:a,1:b,2:c,3:d|10,20,30,40|15|-1|0,1,2,10,11,12""",
+        ),
+        Program(
+            "tree_walker",
+            """// An in-order walk written as a generator, plus the same walk done eagerly for comparison.
+function Node(value, left, right) {
+  this.value = value;
+  this.left = left || null;
+  this.right = right || null;
+}
+function insert(node, value) {
+  if (node === null) return new Node(value);
+  if (value < node.value) node.left = insert(node.left, value);
+  else if (value > node.value) node.right = insert(node.right, value);
+  return node;
+}
+var root = null;
+var input = [50, 30, 70, 20, 40, 60, 80, 35, 45, 75];
+for (var i = 0; i < input.length; i++) root = insert(root, input[i]);
+
+function* inOrder(node) {
+  if (node === null) return;
+  yield* inOrder(node.left);
+  yield node.value;
+  yield* inOrder(node.right);
+}
+function* preOrder(node) {
+  if (node === null) return;
+  yield node.value;
+  yield* preOrder(node.left);
+  yield* preOrder(node.right);
+}
+function* leaves(node) {
+  if (node === null) return;
+  if (node.left === null && node.right === null) { yield node.value; return; }
+  yield* leaves(node.left);
+  yield* leaves(node.right);
+}
+
+var sortedOut = [...inOrder(root)].join();
+var pre = [...preOrder(root)].join();
+var leafList = [...leaves(root)].join();
+
+// The generator is lazy: stop as soon as the answer is known.
+function firstAbove(node, limit) {
+  for (var v of inOrder(node)) if (v > limit) return v;
+  return null;
+}
+var above = firstAbove(root, 44);
+
+// Depth without a generator, to check the tree itself.
+function depth(node) {
+  if (node === null) return 0;
+  var l = depth(node.left);
+  var r = depth(node.right);
+  return 1 + (l > r ? l : r);
+}
+
+// A generator can be restarted only by calling the function again.
+var it = inOrder(root);
+var firstThree = [it.next().value, it.next().value, it.next().value].join();
+it.return(0);
+var afterReturn = it.next().done;
+
+[sortedOut, pre, leafList, above, depth(root), firstThree, afterReturn].join('|');
+""",
+            """20,30,35,40,45,50,60,70,75,80|50,30,20,40,35,45,70,60,80,75|20,35,45,60,75|45|4|20,30,35|true""",
+        ),
+        Program(
+            "fibonacci_generator",
+            """// Several ways to produce the same sequence, so the generator can be checked against them.
+function* fib() {
+  var a = 0, b = 1;
+  while (true) {
+    yield a;
+    var next = a + b;
+    a = b;
+    b = next;
+  }
+}
+function fibArray(n) {
+  var out = [0, 1];
+  while (out.length < n) out.push(out[out.length - 1] + out[out.length - 2]);
+  return out.slice(0, n);
+}
+function fibRecursive(n) {
+  return n < 2 ? n : fibRecursive(n - 1) + fibRecursive(n - 2);
+}
+
+function takeN(it, n) {
+  var out = [];
+  for (var v of it) {
+    if (out.length >= n) break;
+    out.push(v);
+  }
+  return out;
+}
+
+var fromGenerator = takeN(fib(), 15);
+var fromArray = fibArray(15);
+var same = fromGenerator.join() === fromArray.join();
+var recursiveMatch = fromGenerator.slice(0, 12).every(function (v, i) { return v === fibRecursive(i); });
+
+// Two iterators over the same generator function are independent.
+var a = fib();
+var b = fib();
+a.next(); a.next(); a.next();
+var independent = a.next().value + ':' + b.next().value;
+
+// Sending a value in restarts the sequence.
+function* resettable() {
+  var a = 0, b = 1;
+  while (true) {
+    var reset = yield a;
+    if (reset !== undefined) { a = reset; b = 1; continue; }
+    var next = a + b;
+    a = b;
+    b = next;
+  }
+}
+var r = resettable();
+var before = [r.next().value, r.next().value, r.next().value, r.next().value].join();
+var afterReset = r.next(100).value;
+var thenOn = [r.next().value, r.next().value].join();
+
+// Big values stay exact until doubles run out of integer precision.
+var big = takeN(fib(), 79);
+var last = big[big.length - 1];
+var exact = last === 14472334024676221;
+
+[fromGenerator.join(), same, recursiveMatch, independent, before, afterReset, thenOn, big.length, last, exact].join('|');
+""",
+            """0,1,1,2,3,5,8,13,21,34,55,89,144,233,377|true|true|2:0|0,1,1,2|100|1,101|79|8944394323791464|false""",
+        ),
     )
 }
