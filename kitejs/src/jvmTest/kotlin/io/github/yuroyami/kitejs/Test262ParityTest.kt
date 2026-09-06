@@ -94,6 +94,7 @@ class Test262ParityTest {
 
             for (strict in modes) {
                 ran++
+                currentTest = relative
                 val upstream = runUpstream(relative, source, meta, strict)
                 val ported = runPorted(relative, source, meta, strict)
                 val known = relative in knownDifferences
@@ -119,6 +120,36 @@ class Test262ParityTest {
             "test262 parity: ran $ran cases, skipped $skipped files. " +
                 "$passed agree passing, $failedBoth agree failing, ${differences.size} differ.",
         )
+
+        // The whole list goes to a file: a long run is expensive, so nothing it learned is thrown
+        // away just because the assertion message has to stay readable.
+        if (differences.isNotEmpty()) {
+            val report = File("build/test262/differences.txt")
+            report.parentFile.mkdirs()
+            report.writeText(differences.joinToString("\n\n"))
+            println("full difference list: ${report.absolutePath}")
+
+            if (portCrashByTest.isNotEmpty()) {
+                val byTest = File("build/test262/crashes.txt")
+                byTest.parentFile.mkdirs()
+                byTest.writeText(
+                    portCrashByTest.distinct().sortedBy { it.first }
+                        .joinToString("\n") { "${it.first}\t${it.second}" },
+                )
+            }
+            if (portCrashSites.isNotEmpty()) {
+                println("where the port crashed:")
+                portCrashSites.entries.sortedByDescending { it.value }.take(20)
+                    .forEach { println("  ${it.value.toString().padStart(6)}  ${it.key}") }
+            }
+            println("differences by folder:")
+            differences.groupingBy { it.substringBefore(" [").split('/').take(2).joinToString("/") }
+                .eachCount()
+                .entries
+                .sortedByDescending { it.value }
+                .take(30)
+                .forEach { println("  ${it.value.toString().padStart(6)}  ${it.key}") }
+        }
         assertTrue(ran > 0, "no test262 cases ran; is the filter '$filter' right?")
 
         if (staleExpectations.isNotEmpty()) {
@@ -191,9 +222,11 @@ class Test262ParityTest {
                 if (meta.isNegative) unexpectedPass(meta) else PASS
             } catch (e: RhinoException) {
                 judge(meta, errorNamePorted(e), failedEarly)
+            } catch (e: Throwable) {
+                crash(e, record = true)
             }
         } catch (e: Throwable) {
-            return crash(e)
+            return crash(e, record = true)
         } finally {
             Context.exit()
         }
@@ -212,8 +245,32 @@ class Test262ParityTest {
     private fun unexpectedPass(meta: Test262FrontMatter): String =
         "expected ${meta.negativeType} at ${meta.negativePhase} but nothing was thrown"
 
-    /** A crash is not a JavaScript outcome, so it is reported by type and never by message. */
-    private fun crash(e: Throwable): String = "crashed with ${e::class.simpleName}"
+    /** Where the port crashed, counted per site, so the report groups by cause not by test. */
+    private val portCrashSites = HashMap<String, Int>()
+
+    /** The site for each crashing test, so a site can be traced back to something runnable. */
+    private val portCrashByTest = mutableListOf<Pair<String, String>>()
+
+    /** Set while a case runs, so [crash] knows which test it belongs to. */
+    private var currentTest = ""
+
+    /**
+     * A crash is not a JavaScript outcome, so it is compared by type alone and never by message or
+     * line: the two engines are different code and would never agree on a frame. The port's crash
+     * site is recorded on the side, which is what makes 100 failures readable as three bugs.
+     */
+    private fun crash(e: Throwable, record: Boolean = false): String {
+        if (record) {
+            val frame = e.stackTrace.firstOrNull { it.className.startsWith("io.github.yuroyami.kitejs") }
+            val where = frame?.let {
+                "${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}"
+            } ?: "unknown"
+            val key = "${e::class.simpleName} at $where"
+            portCrashSites[key] = (portCrashSites[key] ?: 0) + 1
+            portCrashByTest.add(key to currentTest)
+        }
+        return "crashed with ${e::class.simpleName}"
+    }
 
     private fun errorNameUpstream(e: org.mozilla.javascript.RhinoException): String {
         if (e is org.mozilla.javascript.EvaluatorException) return "SyntaxError"

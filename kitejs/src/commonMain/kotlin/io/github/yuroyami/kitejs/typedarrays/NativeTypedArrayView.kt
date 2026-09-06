@@ -9,6 +9,7 @@ import io.github.yuroyami.kitejs.ArrayLikeAbstractOperations
 import io.github.yuroyami.kitejs.Callable
 import io.github.yuroyami.kitejs.Constructable
 import io.github.yuroyami.kitejs.Context
+import io.github.yuroyami.kitejs.KBigInt
 import io.github.yuroyami.kitejs.ExternalArrayData
 import io.github.yuroyami.kitejs.Function
 import io.github.yuroyami.kitejs.IteratorLikeIterable
@@ -190,7 +191,13 @@ abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
         } else {
             // The default order for a typed array is numeric, not the string order Array uses.
             // compareTo, not <, so it is the total order: -0 before 0, and NaN last.
-            sortStable(working) { a, b -> (a as Number).toDouble().compareTo((b as Number).toDouble()) }
+            sortStable(working) { a, b ->
+                if (a is KBigInt && b is KBigInt) {
+                    a.compareTo(b)
+                } else {
+                    (a as Number).toDouble().compareTo((b as Number).toDouble())
+                }
+            }
         }
         return working
     }

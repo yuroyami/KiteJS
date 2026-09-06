@@ -117,7 +117,10 @@ class AccessorSlot : Slot {
         override fun getValue(start: Scriptable?): Any? {
             if (target is Function) {
                 val cx = Context.getContext()
-                return target.call(cx, target.declarationScope!!, start, ScriptRuntime.emptyArgs)
+                // A bound function has no declaration scope. Upstream passes the null along; the
+                // port's call needs one, so the caller's top level stands in.
+                val scope = target.declarationScope ?: ScriptableObject.getTopLevelScope(start ?: target)
+                return target.call(cx, scope, start, ScriptRuntime.emptyArgs)
             }
             return Undefined.instance
         }
@@ -141,7 +144,8 @@ class AccessorSlot : Slot {
         override fun setValue(value: Any?, owner: Scriptable, start: Scriptable): Boolean {
             if (target is Function) {
                 val cx = Context.getContext()
-                target.call(cx, target.declarationScope!!, start, arrayOf(value))
+                val scope = target.declarationScope ?: ScriptableObject.getTopLevelScope(start ?: target)
+                target.call(cx, scope, start, arrayOf(value))
             }
             return true
         }

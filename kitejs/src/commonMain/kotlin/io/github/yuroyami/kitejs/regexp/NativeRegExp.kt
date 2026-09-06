@@ -386,11 +386,11 @@ open class NativeRegExp : IdScriptableObject {
             Id_exec -> js_exec(cx, scope, thisObj, args)
             Id_test -> realThis(thisObj, f).execSub(cx, scope, args, TEST) == true
             Id_prefix -> realThis(thisObj, f).execSub(cx, scope, args, PREFIX)
-            SymbolId_match -> js_SymbolMatch(cx, scope, thisObj!!, args)
-            SymbolId_matchAll -> js_SymbolMatchAll(cx, scope, thisObj!!, args)
-            SymbolId_search -> js_SymbolSearch(cx, scope, thisObj!!, args)
-            SymbolId_replace -> js_SymbolReplace(cx, scope, thisObj!!, args)
-            SymbolId_split -> js_SymbolSplit(cx, scope, thisObj!!, args)
+            SymbolId_match -> js_SymbolMatch(cx, scope, thisObj, args)
+            SymbolId_matchAll -> js_SymbolMatchAll(cx, scope, thisObj, args)
+            SymbolId_search -> js_SymbolSearch(cx, scope, thisObj, args)
+            SymbolId_replace -> js_SymbolReplace(cx, scope, thisObj, args)
+            SymbolId_split -> js_SymbolSplit(cx, scope, thisObj, args)
             else -> throw IllegalArgumentException(f.methodId().toString())
         }
     }
@@ -416,7 +416,7 @@ open class NativeRegExp : IdScriptableObject {
 
     // ---- The Symbol protocols String.prototype uses --------------------------------------------
 
-    private fun js_SymbolMatch(cx: Context, scope: Scriptable, thisScriptable: Scriptable, args: Array<Any?>): Any? {
+    private fun js_SymbolMatch(cx: Context, scope: Scriptable, thisScriptable: Scriptable?, args: Array<Any?>): Any? {
         val thisObj = ensureScriptableObject(thisScriptable)
 
         val string = ScriptRuntime.toString(if (args.isNotEmpty()) args[0] else Undefined.instance)
@@ -442,10 +442,16 @@ open class NativeRegExp : IdScriptableObject {
         }
     }
 
-    private fun js_SymbolSearch(cx: Context, scope: Scriptable, thisObj: Scriptable, args: Array<Any?>): Any? {
-        if (!ScriptRuntime.isObject(thisObj)) {
-            throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(thisObj))
+    /** The spec's "this must be an object" step, answering a value the rest of the body can use. */
+    private fun requireObject(value: Scriptable?): Scriptable {
+        if (!ScriptRuntime.isObject(value)) {
+            throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(value))
         }
+        return value!!
+    }
+
+    private fun js_SymbolSearch(cx: Context, scope: Scriptable, thisArg: Scriptable?, args: Array<Any?>): Any? {
+        val thisObj = requireObject(thisArg)
 
         val string = ScriptRuntime.toString(if (args.isNotEmpty()) args[0] else Undefined.instance)
         val previousLastIndex = getLastIndex(cx, thisObj)
@@ -460,10 +466,8 @@ open class NativeRegExp : IdScriptableObject {
         return if (result == null) -1 else ScriptRuntime.getObjectProp(result, "index", cx, scope)
     }
 
-    private fun js_SymbolMatchAll(cx: Context, scope: Scriptable, thisObj: Scriptable, args: Array<Any?>): Any? {
-        if (!ScriptRuntime.isObject(thisObj)) {
-            throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(thisObj))
-        }
+    private fun js_SymbolMatchAll(cx: Context, scope: Scriptable, thisArg: Scriptable?, args: Array<Any?>): Any? {
+        val thisObj = requireObject(thisArg)
 
         val s = ScriptRuntime.toString(if (args.isNotEmpty()) args[0] else Undefined.instance)
 
@@ -481,7 +485,7 @@ open class NativeRegExp : IdScriptableObject {
         return NativeRegExpStringIterator(scope, matcher, s, global, fullUnicode)
     }
 
-    private fun js_SymbolReplace(cx: Context, scope: Scriptable, thisObj: Scriptable, args: Array<Any?>): Any? {
+    private fun js_SymbolReplace(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
         // The fast path only applies when nothing about this regexp has been replaced by a script.
         if (thisObj is NativeRegExp) {
             val exec = getProperty(thisObj, "exec")
@@ -491,7 +495,7 @@ open class NativeRegExp : IdScriptableObject {
                 return thisObj.js_SymbolReplaceFast(cx, scope, thisObj, args)
             }
         }
-        return js_SymbolReplaceSlow(cx, scope, thisObj, args)
+        return js_SymbolReplaceSlow(cx, scope, requireObject(thisObj), args)
     }
 
     private fun js_SymbolReplaceFast(cx: Context, scope: Scriptable, thisObj: NativeRegExp, args: Array<Any?>): Any? {
@@ -697,10 +701,8 @@ open class NativeRegExp : IdScriptableObject {
         )
     }
 
-    private fun js_SymbolSplit(cx: Context, scope: Scriptable, rx: Scriptable, args: Array<Any?>): Any? {
-        if (!ScriptRuntime.isObject(rx)) {
-            throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(rx))
-        }
+    private fun js_SymbolSplit(cx: Context, scope: Scriptable, rxArg: Scriptable?, args: Array<Any?>): Any? {
+        val rx = requireObject(rxArg)
 
         val s = ScriptRuntime.toString(if (args.isNotEmpty()) args[0] else Undefined.instance)
 

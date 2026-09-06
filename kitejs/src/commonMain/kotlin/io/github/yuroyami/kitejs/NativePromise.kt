@@ -387,10 +387,10 @@ class NativePromise : ScriptableObject() {
 
             constructor.defineConstructorMethod(scope, "resolve", 1, SerializableCallable { icx, s, t, a -> js_resolve(icx, s, t, a) })
             constructor.defineConstructorMethod(scope, "reject", 1, SerializableCallable { icx, s, t, a -> js_reject(icx, s, t, a) })
-            constructor.defineConstructorMethod(scope, "all", 1, SerializableCallable { icx, s, t, a -> doAll(icx, s, t!!, a, true) })
-            constructor.defineConstructorMethod(scope, "allSettled", 1, SerializableCallable { icx, s, t, a -> doAll(icx, s, t!!, a, false) })
-            constructor.defineConstructorMethod(scope, "race", 1, SerializableCallable { icx, s, t, a -> race(icx, s, t!!, a) })
-            constructor.defineConstructorMethod(scope, "any", 1, SerializableCallable { icx, s, t, a -> any(icx, s, t!!, a) })
+            constructor.defineConstructorMethod(scope, "all", 1, SerializableCallable { icx, s, t, a -> doAll(icx, s, t, a, true) })
+            constructor.defineConstructorMethod(scope, "allSettled", 1, SerializableCallable { icx, s, t, a -> doAll(icx, s, t, a, false) })
+            constructor.defineConstructorMethod(scope, "race", 1, SerializableCallable { icx, s, t, a -> race(icx, s, t, a) })
+            constructor.defineConstructorMethod(scope, "any", 1, SerializableCallable { icx, s, t, a -> any(icx, s, t, a) })
             constructor.defineConstructorMethod(scope, "withResolvers", 0, SerializableCallable { icx, s, t, a -> withResolvers(icx, s, t) })
             constructor.defineConstructorMethod(scope, "try", 1, SerializableCallable { icx, s, t, a -> promiseTry(icx, s, t, a) })
 
@@ -456,7 +456,7 @@ class NativePromise : ScriptableObject() {
             return cap.promise
         }
 
-        private fun doAll(cx: Context, scope: Scriptable, thisObj: Scriptable, args: Array<Any?>, failFast: Boolean): Any? {
+        private fun doAll(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>, failFast: Boolean): Any? {
             val cap = Capability(cx, scope, thisObj)
             val arg = if (args.isNotEmpty()) args[0] else Undefined.instance
 
@@ -470,7 +470,8 @@ class NativePromise : ScriptableObject() {
 
             val iterator = iterable.iterator()
             try {
-                val resolver = PromiseAllResolver(iterator, thisObj, cap, failFast)
+                // Capability threw above if `this` was not a constructor, so it is an object here.
+                val resolver = PromiseAllResolver(iterator, checkNotNull(thisObj), cap, failFast)
                 try {
                     return resolver.resolve(cx, scope)
                 } finally {
@@ -482,7 +483,7 @@ class NativePromise : ScriptableObject() {
             }
         }
 
-        private fun race(cx: Context, scope: Scriptable, thisObj: Scriptable, args: Array<Any?>): Any? {
+        private fun race(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val cap = Capability(cx, scope, thisObj)
             val arg = if (args.isNotEmpty()) args[0] else Undefined.instance
 
@@ -497,7 +498,8 @@ class NativePromise : ScriptableObject() {
             val iterator = iterable.iterator()
             try {
                 try {
-                    return performRace(cx, scope, iterator, thisObj, cap)
+                    // Capability threw above if `this` was not a constructor.
+                    return performRace(cx, scope, iterator, checkNotNull(thisObj), cap)
                 } finally {
                     if (!iterator.isDone) iterable.close()
                 }
@@ -537,7 +539,7 @@ class NativePromise : ScriptableObject() {
             }
         }
 
-        private fun any(cx: Context, scope: Scriptable, thisObj: Scriptable, args: Array<Any?>): Any? {
+        private fun any(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val cap = Capability(cx, scope, thisObj)
             val arg = if (args.isNotEmpty()) args[0] else Undefined.instance
 
@@ -551,7 +553,8 @@ class NativePromise : ScriptableObject() {
 
             val iterator = iterable.iterator()
             try {
-                val rejector = PromiseAnyRejector(iterator, thisObj, cap)
+                // Capability threw above if `this` was not a constructor.
+                val rejector = PromiseAnyRejector(iterator, checkNotNull(thisObj), cap)
                 try {
                     return rejector.reject(cx, scope)
                 } finally {
