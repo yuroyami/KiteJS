@@ -1971,10 +1971,23 @@ class Interpreter : Evaluator {
         }
 
         private fun enterFrame(cx: Context, frame: CallFrame, args: Array<Any?>, continuationRestart: Boolean) {
-            if (frame.fnOrScript.descriptor!!.requiresActivationFrame) {
-                val scope = frame.scope ?: throw Kit.codeBug()
-                ScriptRuntime.enterActivationFunction(cx, scope)
+            if (!frame.fnOrScript.descriptor!!.requiresActivationFrame) return
+            var scope = frame.scope ?: throw Kit.codeBug()
+            if (continuationRestart) {
+                // Coming from initFrame the scope is the NativeCall itself, but restarting a
+                // continuation it may be a NativeWith: a continuation captured inside a `with`, or
+                // inside a `catch`, which uses a NativeWith of its own to hold the caught value.
+                // So the chain is walked down until the call is found.
+                while (scope is NativeWith) {
+                    val parent = scope.parentScope
+                    if (parent == null || (frame.parentFrame != null && frame.parentFrame?.scope === parent)) {
+                        // No NativeCall before the caller's own scope, which should not happen.
+                        throw Kit.codeBug()
+                    }
+                    scope = parent
+                }
             }
+            ScriptRuntime.enterActivationFunction(cx, scope)
         }
 
         private fun exitFrame(cx: Context, frame: CallFrame, throwable: Any?) {

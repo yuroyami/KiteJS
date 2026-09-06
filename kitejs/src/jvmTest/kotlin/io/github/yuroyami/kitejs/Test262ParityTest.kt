@@ -262,6 +262,7 @@ class Test262ParityTest {
     private fun crash(e: Throwable, record: Boolean = false): String {
         if (record) {
             val frame = e.stackTrace.firstOrNull { it.className.startsWith("io.github.yuroyami.kitejs") }
+                ?: e.stackTrace.firstOrNull()
             val where = frame?.let {
                 "${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}"
             } ?: "unknown"
