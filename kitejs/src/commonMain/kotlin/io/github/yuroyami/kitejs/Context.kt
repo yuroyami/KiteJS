@@ -68,6 +68,17 @@ open class Context internal constructor(val factory: ContextFactory) : AutoClose
 
     private val microtasks = ArrayDeque<Runnable>()
 
+    /**
+     * Where rejected promises with nothing to catch them are collected. Nothing is collected until
+     * [trackUnhandledPromiseRejections] turns it on, because what to do about them is the
+     * embedder's decision.
+     */
+    val unhandledPromiseTracker: UnhandledRejectionTracker = UnhandledRejectionTracker()
+
+    fun trackUnhandledPromiseRejections(track: Boolean) {
+        unhandledPromiseTracker.enable(track)
+    }
+
     internal var activationNames: MutableSet<String>? = null
 
     /** The interpreter's current frame, when one is running. */

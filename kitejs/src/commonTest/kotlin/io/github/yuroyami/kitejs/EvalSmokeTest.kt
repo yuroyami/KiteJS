@@ -33,6 +33,31 @@ class EvalSmokeTest {
         }
     }
 
+    /**
+     * Runs [setup], then reads [answer] in a second top call. A promise's result only exists once
+     * the microtask queue has drained, and the queue drains when the top call returns, so reading
+     * it inside the same script would always give the state before anything ran.
+     */
+    private fun evalAfterDrain(setup: String, answer: String): String = ContextFactory.getGlobal().call { cx ->
+        cx.languageVersion = Context.VERSION_ES6
+        val scope = cx.initStandardObjects()
+        try {
+            cx.evaluateString(scope, setup, "smoke.js", 1)
+            val v = cx.evaluateString(scope, answer, "smoke.js", 1)
+            when {
+                v == null -> "null"
+                Undefined.isUndefined(v) -> "undefined"
+                v is Boolean -> v.toString()
+                v is Number -> ScriptRuntime.numberToString(v.toDouble(), 10)
+                v is CharSequence -> v.toString()
+                v is Scriptable -> "[object " + v.className + "]"
+                else -> v.toString()
+            }
+        } catch (e: RhinoException) {
+            "throws " + e.details()
+        }
+    }
+
     @Test
     fun arithmetic() {
         assertEquals("3", eval("1 + 2"))
@@ -313,6 +338,26 @@ class EvalSmokeTest {
         assertEquals("0.3333333333333333", eval("var d = new DataView(new ArrayBuffer(8)); d.setFloat64(0, 1/3); d.getFloat64(0)"))
         assertEquals("1,2,3", eval("Int8Array.from([1, 2, 3]).join()"))
         assertEquals("[object Int8Array]", eval("Object.prototype.toString.call(new Int8Array(1))"))
+    }
+
+    @Test
+    fun promises() {
+        val log = "var log = []; globalThis.read = function () { return log.join('|') };"
+        assertEquals("a|b|c", evalAfterDrain("$log log.push('a'); Promise.resolve().then(function () { log.push('c') }); log.push('b')", "read()"))
+        assertEquals("1|2|3", evalAfterDrain("$log Promise.resolve().then(function () { log.push(1) }).then(function () { log.push(2) }).then(function () { log.push(3) })", "read()"))
+        assertEquals("2", evalAfterDrain("$log Promise.resolve(1).then(function (v) { return v + 1 }).then(function (v) { log.push(v) })", "read()"))
+        assertEquals("caught x", evalAfterDrain("$log Promise.reject('x').catch(function (e) { log.push('caught ' + e) })", "read()"))
+        assertEquals("boom", evalAfterDrain("$log new Promise(function () { throw 'boom' }).catch(function (e) { log.push(e) })", "read()"))
+        assertEquals("1,2", evalAfterDrain("$log Promise.all([1, Promise.resolve(2)]).then(function (v) { log.push(v.join()) })", "read()"))
+        assertEquals("fulfilled:1 rejected:e", evalAfterDrain("$log Promise.allSettled([1, Promise.reject('e')]).then(function (rs) { log.push(rs.map(function (r) { return r.status.trim() + ':' + (r.status.trim() === 'fulfilled' ? r.value : r.reason) }).join(' ')) })", "read()"))
+        assertEquals("1", evalAfterDrain("$log Promise.race([Promise.resolve(1), 2]).then(function (v) { log.push(v) })", "read()"))
+        assertEquals("2", evalAfterDrain("$log Promise.any([Promise.reject(1), Promise.resolve(2)]).then(function (v) { log.push(v) })", "read()"))
+        assertEquals("AggregateError", evalAfterDrain("$log Promise.any([Promise.reject(1), Promise.reject(2)]).catch(function (e) { log.push(e.name) })", "read()"))
+        assertEquals("f|1", evalAfterDrain("$log Promise.resolve(1).finally(function () { log.push('f') }).then(function (v) { log.push(v) })", "read()"))
+        assertEquals("5", evalAfterDrain("$log Promise.resolve({ then: function (r) { r(5) } }).then(function (v) { log.push(v) })", "read()"))
+        assertEquals("4", evalAfterDrain("$log var w = Promise.withResolvers(); w.promise.then(function (v) { log.push(v) }); w.resolve(4)", "read()"))
+        assertEquals("[object Promise]", eval("Object.prototype.toString.call(Promise.resolve())"))
+        assertEquals("true", eval("Promise.resolve() instanceof Promise"))
     }
 
     @Test

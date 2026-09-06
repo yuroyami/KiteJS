@@ -15,11 +15,18 @@ import kotlin.test.assertTrue
  */
 class EvalCorpusTest {
 
+    /**
+     * A program whose answer only exists after the microtask queue has drained ends with
+     * "// AFTER: <expression>", and that expression is evaluated as a second top call. The queue
+     * drains when a top call returns, so this is the first point at which promises have settled.
+     */
     private fun eval(source: String): String = ContextFactory.getGlobal().call { cx ->
         cx.languageVersion = Context.VERSION_ES6
         val scope = cx.initStandardObjects()
+        val after = source.lineSequence().lastOrNull { it.startsWith("// AFTER:") }?.removePrefix("// AFTER:")?.trim()
         val v = try {
-            cx.evaluateString(scope, source, "corpus.js", 1)
+            val first = cx.evaluateString(scope, source, "corpus.js", 1)
+            if (after == null) first else cx.evaluateString(scope, after, "corpus.js", 1)
         } catch (e: RhinoException) {
             return@call "throws " + e.details()
         }

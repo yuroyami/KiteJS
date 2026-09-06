@@ -1241,6 +1241,184 @@ class EvalOracleTest {
         "DataView.prototype.getInt8.call({}, 0)",
     ))
 
+    /**
+     * A promise's answer only exists after the microtask queue drains, and the queue drains when
+     * the top call returns. So each of these runs as two scripts in one scope: the body writes into
+     * a log, and a second evaluation reads the log back once everything has settled.
+     *
+     * Reading the log inside the same script would give an empty one every time, on both engines,
+     * and the comparison would prove nothing.
+     */
+    private fun checkAfterDrain(bodies: List<String>) {
+        val failures = mutableListOf<String>()
+        for (body in bodies) {
+            val setup = "globalThis.__log = []; var log = globalThis.__log; $body;"
+            val expected = try {
+                upstream(setup)
+                upstream("globalThis.__log.join('|')")
+            } catch (e: Throwable) {
+                "CRASH $e"
+            }
+            val actual = try {
+                ported(setup)
+                ported("globalThis.__log.join('|')")
+            } catch (e: Throwable) {
+                "CRASH $e"
+            }
+            if (expected != actual) failures.add("$body\n  upstream: $expected\n  ported:   $actual")
+        }
+        assertTrue(bodies.size > 10)
+        assertEquals(emptyList(), failures, "promise results differ from upstream")
+    }
+
+    @Test
+    fun promiseBasics() = check(listOf(
+        "typeof Promise", "Promise.length", "Promise.name",
+        "typeof new Promise(function () {})", "Object.prototype.toString.call(new Promise(function () {}))",
+        "new Promise(function () {}) instanceof Promise", "Promise[Symbol.species] === Promise",
+        "typeof Promise.prototype.then", "typeof Promise.prototype.catch", "typeof Promise.prototype.finally",
+        "typeof Promise.resolve", "typeof Promise.reject", "typeof Promise.all", "typeof Promise.allSettled",
+        "typeof Promise.race", "typeof Promise.any", "typeof Promise.withResolvers",
+        "new Promise()", "new Promise(5)", "Promise(function () {})",
+        "Promise.resolve.call(null, 1)", "Promise.reject.call(undefined, 1)",
+        "Promise.prototype.then.call({}, function () {})",
+        "typeof Promise.withResolvers().promise", "typeof Promise.withResolvers().resolve",
+        "typeof Promise.withResolvers().reject",
+        "var r = Promise.resolve(1); r === Promise.resolve(r)",
+        "var p = new Promise(function () {}); Promise.resolve(p) === p",
+        "Object.getOwnPropertyDescriptor(Promise.prototype, Symbol.toStringTag).value",
+    ))
+
+    @Test
+    fun promiseOrdering() = checkAfterDrain(listOf(
+        // Ordering against synchronous code.
+        "log.push('a'); Promise.resolve().then(function () { log.push('c') }); log.push('b')",
+        "Promise.resolve(1).then(function (v) { log.push(v) }); log.push('sync')",
+        "Promise.resolve().then(function () { log.push(1) }).then(function () { log.push(2) })",
+        "Promise.resolve().then(function () { log.push(1) }); Promise.resolve().then(function () { log.push(2) })",
+        "Promise.resolve().then(function () { log.push('a'); return Promise.resolve() }).then(function () { log.push('c') }); Promise.resolve().then(function () { log.push('b') })",
+
+        // Values and chaining.
+        "Promise.resolve(1).then(function (v) { return v + 1 }).then(function (v) { log.push(v) })",
+        "Promise.resolve(1).then(function () {}).then(function (v) { log.push(String(v)) })",
+        "Promise.resolve(1).then(null).then(function (v) { log.push(v) })",
+        "Promise.resolve(1).then(5).then(function (v) { log.push(v) })",
+        "Promise.resolve(Promise.resolve(7)).then(function (v) { log.push(v) })",
+        "new Promise(function (res) { res(3) }).then(function (v) { log.push(v) })",
+        "new Promise(function (res) { res(3); res(4) }).then(function (v) { log.push(v) })",
+        "new Promise(function (res, rej) { res(3); rej(4) }).then(function (v) { log.push('ok' + v) }, function (e) { log.push('no' + e) })",
+
+        // Rejection.
+        "Promise.reject('x').catch(function (e) { log.push(e) })",
+        "Promise.reject('x').then(null, function (e) { log.push(e) })",
+        "Promise.reject('x').then(function () { log.push('bad') }).catch(function (e) { log.push('caught ' + e) })",
+        "new Promise(function () { throw 'boom' }).catch(function (e) { log.push(e) })",
+        "Promise.resolve().then(function () { throw 'boom' }).catch(function (e) { log.push(e) })",
+        "Promise.resolve().then(function () { null.x }).catch(function (e) { log.push(e.name) })",
+        "Promise.reject(new Error('m')).catch(function (e) { log.push(e.message) })",
+        "Promise.resolve().then(function () { return Promise.reject('r') }).catch(function (e) { log.push(e) })",
+
+        // finally.
+        "Promise.resolve(1).finally(function () { log.push('f') }).then(function (v) { log.push(v) })",
+        "Promise.reject('e').finally(function () { log.push('f') }).catch(function (e) { log.push(e) })",
+        "Promise.resolve(1).finally(function () { return 99 }).then(function (v) { log.push(v) })",
+        "Promise.resolve(1).finally(function () { throw 'ff' }).catch(function (e) { log.push(e) })",
+        "Promise.resolve(1).finally(5).then(function (v) { log.push(v) })",
+
+        // Thenables.
+        "Promise.resolve({ then: function (res) { res(5) } }).then(function (v) { log.push(v) })",
+        "Promise.resolve({ then: function (res) { res(1); res(2) } }).then(function (v) { log.push(v) })",
+        "Promise.resolve({ then: function (res, rej) { rej('t') } }).catch(function (e) { log.push(e) })",
+        "Promise.resolve({ then: function () { throw 'tt' } }).catch(function (e) { log.push(e) })",
+        "Promise.resolve({ then: 5 }).then(function (v) { log.push(typeof v) })",
+        "var p = new Promise(function (res) { res({ then: function (r) { r(9) } }) }); p.then(function (v) { log.push(v) })",
+
+        // Thenable adoption costs an extra turn, which only shows against a parallel chain.
+        "Promise.resolve({ then: function (r) { r('T') } }).then(function (v) { log.push(v) }); Promise.resolve().then(function () { log.push('a') }).then(function () { log.push('b') }).then(function () { log.push('c') })",
+        "new Promise(function (res) { res({ then: function (r) { r('T') } }) }).then(function (v) { log.push(v) }); Promise.resolve().then(function () { log.push(1) }).then(function () { log.push(2) }).then(function () { log.push(3) })",
+        "Promise.resolve().then(function () { return { then: function (r) { r('T') } } }).then(function (v) { log.push(v) }); Promise.resolve().then(function () { log.push(1) }).then(function () { log.push(2) }).then(function () { log.push(3) }).then(function () { log.push(4) })",
+        "Promise.resolve().then(function () { return Promise.resolve('P') }).then(function (v) { log.push(v) }); Promise.resolve().then(function () { log.push(1) }).then(function () { log.push(2) }).then(function () { log.push(3) })",
+        "var t = { then: function (r) { log.push('called'); r(1) } }; Promise.resolve(t).then(function () { log.push('settled') }); log.push('sync')",
+
+        // Self resolution.
+        "var res; var p = new Promise(function (r) { res = r }); res(p); p.catch(function (e) { log.push(e.name) })",
+
+        // withResolvers.
+        "var w = Promise.withResolvers(); w.promise.then(function (v) { log.push(v) }); w.resolve(4)",
+        "var w = Promise.withResolvers(); w.promise.catch(function (v) { log.push(v) }); w.reject(5)",
+
+        // Promise.try.
+        "Promise.try(function () { return 1 }).then(function (v) { log.push(v) })",
+        "Promise.try(function () { throw 'e' }).catch(function (e) { log.push(e) })",
+        "Promise.try(function (a, b) { return a + b }, 1, 2).then(function (v) { log.push(v) })",
+    ))
+
+    @Test
+    fun promiseCombinators() = checkAfterDrain(listOf(
+        // all.
+        "Promise.all([]).then(function (v) { log.push(v.length) })",
+        "Promise.all([1, 2, 3]).then(function (v) { log.push(v.join()) })",
+        "Promise.all([Promise.resolve(1), 2]).then(function (v) { log.push(v.join()) })",
+        "Promise.all([Promise.reject('a'), Promise.resolve(1)]).catch(function (e) { log.push(e) })",
+        "Promise.all([Promise.reject('a'), Promise.reject('b')]).catch(function (e) { log.push(e) })",
+        "Promise.all(5).catch(function (e) { log.push(e.name) })",
+        "Promise.all([Promise.resolve(1)]).then(function (v) { log.push(Array.isArray(v)) })",
+        "Promise.all(new Set([1, 2])).then(function (v) { log.push(v.join()) })",
+        "Promise.all('ab').then(function (v) { log.push(v.join()) })",
+
+        // allSettled.
+        "Promise.allSettled([]).then(function (v) { log.push(v.length) })",
+        "Promise.allSettled([1]).then(function (v) { log.push(v[0].status + ':' + v[0].value) })",
+        "Promise.allSettled([Promise.reject('r')]).then(function (v) { log.push(v[0].status + ':' + v[0].reason) })",
+        "Promise.allSettled([1, Promise.reject('r')]).then(function (v) { log.push(v.length + ':' + v[0].status + ':' + v[1].status) })",
+        "Promise.allSettled([1]).then(function (v) { log.push(Object.keys(v[0]).join()) })",
+
+        // race.
+        "Promise.race([]).then(function () { log.push('never') })",
+        "Promise.race([1, 2]).then(function (v) { log.push(v) })",
+        "Promise.race([Promise.reject('r'), 1]).catch(function (e) { log.push(e) })",
+        "Promise.race([Promise.resolve(1), Promise.reject('r')]).then(function (v) { log.push('ok' + v) }, function (e) { log.push('no' + e) })",
+        "Promise.race(5).catch(function (e) { log.push(e.name) })",
+
+        // any.
+        "Promise.any([1, 2]).then(function (v) { log.push(v) })",
+        "Promise.any([Promise.reject('a'), 2]).then(function (v) { log.push(v) })",
+        "Promise.any([Promise.reject('a'), Promise.reject('b')]).catch(function (e) { log.push(e.name + ':' + e.errors.join()) })",
+        "Promise.any([]).catch(function (e) { log.push(e.name) })",
+        "Promise.any(5).catch(function (e) { log.push(e.name) })",
+
+        // Ordering across a combinator.
+        "Promise.all([Promise.resolve(1)]).then(function () { log.push('all') }); Promise.resolve().then(function () { log.push('single') })",
+        "var order = []; Promise.all([Promise.resolve().then(function () { order.push(1) }), Promise.resolve().then(function () { order.push(2) })]).then(function () { log.push(order.join()) })",
+    ))
+
+    @Test
+    fun promiseHandlingAndReentrancy() = checkAfterDrain(listOf(
+        // A rejection with a handler attached later still counts as handled once it is.
+        "var p = Promise.reject('a'); p.catch(function (e) { log.push('late ' + e) })",
+        "var p = Promise.reject('a'); Promise.resolve().then(function () { p.catch(function (e) { log.push('later ' + e) }) })",
+        "var p = new Promise(function (res, rej) { rej('b') }); p.then(null, function (e) { log.push(e) })",
+        // Rejections that nothing ever catches simply do not run anything.
+        "Promise.reject('never'); log.push('done')",
+        "new Promise(function (res, rej) { rej('never') }); log.push('done')",
+
+        // One promise with several handlers, and handlers added after it settled.
+        "var p = Promise.resolve(1); p.then(function (v) { log.push('a' + v) }); p.then(function (v) { log.push('b' + v) })",
+        "var p = Promise.resolve(1); p.then(function () { log.push('one'); p.then(function () { log.push('two') }) })",
+        "var p = new Promise(function (r) { r(1) }); Promise.resolve().then(function () { p.then(function (v) { log.push('after' + v) }) })",
+        "var res; var p = new Promise(function (r) { res = r }); p.then(function (v) { log.push(v) }); res('deferred')",
+        "var res; var p = new Promise(function (r) { res = r }); p.then(function (v) { log.push('1:' + v) }); p.then(function (v) { log.push('2:' + v) }); res('x')",
+
+        // Deep chains, so the queue order over several turns is checked.
+        "Promise.resolve().then(function () { log.push(1) }).then(function () { log.push(2) }).then(function () { log.push(3) })",
+        "Promise.resolve().then(function () { log.push('a1') }).then(function () { log.push('a2') }); Promise.resolve().then(function () { log.push('b1') }).then(function () { log.push('b2') })",
+        "var p = Promise.resolve(); for (var i = 0; i < 3; i++) { (function (n) { p = p.then(function () { log.push(n) }) })(i) }",
+
+        // A subclass, so the species path is exercised.
+        "function P(e) { Promise.call(this, e) } log.push(typeof Promise.resolve(1).constructor)",
+        "var p = Promise.resolve(1); p.constructor = 5; p.then(function (v) { log.push(v) })",
+    ))
+
     @Test
     fun stringBuiltin() = check(listOf(
         "'abc'.length", "'abc'[1]", "'abc'[5]", "'abc'.charAt(1)", "'abc'.charAt(5)", "'abc'.charAt()", "'abc'.charCodeAt(1)",
@@ -1451,8 +1629,26 @@ class EvalOracleTest {
         val failures = mutableListOf<String>()
         for (file in files) {
             val source = file.readText()
-            val expected = upstream(source)
-            val actual = try { ported(source) } catch (e: Throwable) { "CRASH $e" }
+            // A program whose answer only exists after the microtask queue has drained ends with
+            // "// AFTER: <expression>". That expression is evaluated as a second top call, which
+            // is the point at which the queue has run.
+            val after = source.lineSequence().lastOrNull { it.startsWith("// AFTER:") }?.removePrefix("// AFTER:")?.trim()
+            val expected = if (after == null) {
+                upstream(source)
+            } else {
+                upstream(source)
+                upstream(after)
+            }
+            val actual = try {
+                if (after == null) {
+                    ported(source)
+                } else {
+                    ported(source)
+                    ported(after)
+                }
+            } catch (e: Throwable) {
+                "CRASH $e"
+            }
             if (expected != actual) failures.add("${file.name}\n  upstream: $expected\n  ported:   $actual")
         }
         assertEquals(emptyList(), failures, "corpus evaluation differs from upstream")

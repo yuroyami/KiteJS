@@ -1400,10 +1400,11 @@ object ScriptRuntime {
             NativeCollectionIterator.init(scope, NativeSet.ITERATOR_TAG, sealed)
             NativeCollectionIterator.init(scope, NativeMap.ITERATOR_TAG, sealed)
             LazilyLoadedCtor(scope, "Map", sealed, Initializable { icx, s, sld -> NativeMap.init(icx, s, sld) })
+            LazilyLoadedCtor(scope, "Promise", sealed, Initializable { icx, s, sld -> NativePromise.init(icx, s, sld) })
             LazilyLoadedCtor(scope, "Set", sealed, Initializable { icx, s, sld -> NativeSet.init(icx, s, sld) })
             // Upstream's registration order here is Map, Promise, Set, WeakMap, WeakSet, BigInt,
             // Proxy, Reflect. Each one goes in its own slot as it lands.
-            // TODO(P4): Promise (between Map and Set), Proxy and Reflect.
+            // TODO(P4): Proxy and Reflect.
             // TODO(P5): WeakMap, WeakSet and BigInt.
         }
 

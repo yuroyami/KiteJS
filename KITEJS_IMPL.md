@@ -1044,21 +1044,21 @@ simple case mapping, which come from the generated tables (rule 3).
 
 #### P4.7: Promise
 
-- [ ] Port `UnhandledRejectionTracker.kt` (77) and wire `Context.unhandledPromiseTracker`;
+- [x] Port `UnhandledRejectionTracker.kt` (77) and wire `Context.unhandledPromiseTracker`;
       the identity-keyed map from P3 replaces `IdentityHashMap`.
-- [ ] Port `NativePromise.kt` (996): constructor, `then`, `catch`, `finally`, `resolve`,
+- [x] Port `NativePromise.kt` (996): constructor, `then`, `catch`, `finally`, `resolve`,
       `reject`, `all`, `allSettled`, `any` with `AggregateError` (P3.8 has it), `race`,
       `withResolvers`, the thenable job, `Symbol.species`, and the microtask reactions through
       `Context.enqueueMicrotask` (P3.5 has the queue; `doTopCall` already drains it).
-- [ ] Oracle, compared through log arrays written by the callbacks: ordering of `then` chains
+- [x] Oracle, compared through log arrays written by the callbacks: ordering of `then` chains
       against synchronous code, nested promises, thenables that call back twice, `resolve` with
       itself, rejection with a non-error, `finally` pass-through, every combinator on empty,
       mixed and rejecting inputs, unhandled rejections reported through the tracker, and the
       `async` test262-style `$DONE` pattern. Note for readers: upstream has no `async`
       functions, so `await` does not exist in either engine.
-- [ ] Corpus programs: a promise-based task queue, a retry-with-backoff simulation driven by a
+- [x] Corpus programs: a promise-based task queue, a retry-with-backoff simulation driven by a
       manual clock, `Promise.all` over a fake fetch table.
-- [ ] Green on all targets; commit.
+- [x] Green on all targets; commit.
 
 #### P4.8: Proxy and Reflect
 

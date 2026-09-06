@@ -23,8 +23,12 @@ class EvalCorpusSliceOracleTest {
             val failures = mutableListOf<String>()
             for (program in EvalCorpusSlice.programs) {
                 val scope = ucx.initStandardObjects()
+                // A program that ends with "// AFTER: <expression>" is read back in a second top
+                // call, which is when the microtask queue has drained.
+                val after = program.source.lineSequence().lastOrNull { it.startsWith("// AFTER:") }?.removePrefix("// AFTER:")?.trim()
                 val actual = try {
-                    val v = ucx.evaluateString(scope, program.source, program.name, 1, null)
+                    val first = ucx.evaluateString(scope, program.source, program.name, 1, null)
+                    val v = if (after == null) first else ucx.evaluateString(scope, after, program.name, 1, null)
                     org.mozilla.javascript.ScriptRuntime.toString(v)
                 } catch (e: org.mozilla.javascript.RhinoException) {
                     "throws " + e.details()
