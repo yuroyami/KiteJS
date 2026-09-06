@@ -46,6 +46,26 @@ open class Context internal constructor(val factory: ContextFactory) : AutoClose
     private var enterCount: Int = 0
     private var threadLocalMap: MutableMap<Any, Any?>? = null
 
+    /**
+     * The zone `Date` reads for local time. Defaults to the system's, and a test or an embedder
+     * can set it to anything. This is the only place the engine asks the platform about time
+     * zones; every other date calculation is its own arithmetic.
+     */
+    var timeZone: kotlinx.datetime.TimeZone = kotlinx.datetime.TimeZone.currentSystemDefault()
+        set(value) {
+            field = value
+            rawTimeZoneOffsetMs = null
+        }
+
+    /** The zone's standard offset, worked out once per zone rather than per date calculation. */
+    internal var rawTimeZoneOffsetMs: Int? = null
+
+    /**
+     * Where `Date.now()` and `new Date()` get the time, as epoch milliseconds. Defaults to the
+     * system clock; a test pins it so results do not depend on when the test runs.
+     */
+    var clock: () -> Double = { kotlin.time.Clock.System.now().toEpochMilliseconds().toDouble() }
+
     private val microtasks = ArrayDeque<Runnable>()
 
     internal var activationNames: MutableSet<String>? = null

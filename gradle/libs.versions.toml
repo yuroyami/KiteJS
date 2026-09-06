@@ -6,11 +6,16 @@ agp = "9.2.1"
 vanniktechPublish = "0.36.0"
 dokka = "2.2.0"
 
+# Time zone data for Date. It is the one piece the engine cannot compute for itself:
+# every platform ships its own IANA database and they have to agree.
+kotlinxDatetime = "0.8.0"
+
 # jvmTest only: upstream Rhino, pinned to the exact release the port mirrors.
 # It is the differential-testing oracle. It must never become a runtime dependency.
 rhino = "1.9.1"
 
 [libraries] ######################################################################################
+kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
 rhino-oracle = { module = "org.mozilla:rhino", version.ref = "rhino" }
 
 [plugins] ########################################################################################

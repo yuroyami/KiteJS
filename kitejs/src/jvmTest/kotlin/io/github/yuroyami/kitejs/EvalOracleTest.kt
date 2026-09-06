@@ -24,6 +24,9 @@ class EvalOracleTest {
     private lateinit var uscope: org.mozilla.javascript.Scriptable
     private lateinit var kscope: Scriptable
 
+    /** A pinned "now" so Date.now() answers the same on both sides. */
+    private val FIXED_NOW = 1719792000000.0
+
     @BeforeTest
     fun enter() {
         ucx = UContext.enter()
@@ -893,6 +896,196 @@ class EvalOracleTest {
         "typeof RegExp.prototype[Symbol.matchAll].call(/a/g, 'aa')",
         "[...RegExp.prototype[Symbol.matchAll].call(/a/g, 'aa')].length",
         "Object.prototype.toString.call(/a/g[Symbol.matchAll]('aa'))",
+    ))
+
+    /**
+     * Runs the scripts with the same zone and the same fixed clock on both engines. Date is the
+     * one builtin whose answers depend on something outside the script.
+     */
+    private fun checkInZone(zoneId: String, sources: List<String>) {
+        val savedULocale = java.util.Locale.getDefault()
+        val uold = uscope
+        val kold = kscope
+        try {
+            java.util.Locale.setDefault(java.util.Locale.US)
+            ucx.timeZone = java.util.TimeZone.getTimeZone(zoneId)
+            uscope = ucx.initStandardObjects()
+            Context.getContext().timeZone = kotlinx.datetime.TimeZone.of(zoneId)
+            Context.getContext().clock = { FIXED_NOW }
+            kscope = Context.getContext().initStandardObjects()
+            check(sources)
+        } finally {
+            java.util.Locale.setDefault(savedULocale)
+            ucx.timeZone = java.util.TimeZone.getDefault()
+            Context.getContext().timeZone = kotlinx.datetime.TimeZone.currentSystemDefault()
+            uscope = uold
+            kscope = kold
+        }
+    }
+
+    /** Everything that does not print a zone name, checked in four zones. */
+    private fun dateScripts(): List<String> = listOf(
+        // Construction.
+        "typeof Date", "Date.length", "typeof new Date()", "Object.prototype.toString.call(new Date(0))",
+        "new Date(0).getTime()", "new Date(0).valueOf()", "new Date(1719792000000).getTime()",
+        "new Date(-1).getTime()", "new Date(NaN).getTime()", "new Date(Infinity).getTime()",
+        "new Date(8.64e15).getTime()", "new Date(8.64e15 + 1).getTime()", "new Date(-8.64e15).getTime()",
+        "new Date(2024, 0).getTime()", "new Date(2024, 0, 2).getTime()",
+        "new Date(2024, 0, 2, 3).getTime()", "new Date(2024, 0, 2, 3, 4).getTime()",
+        "new Date(2024, 0, 2, 3, 4, 5).getTime()", "new Date(2024, 0, 2, 3, 4, 5, 6).getTime()",
+        "new Date(99, 0, 1).getFullYear()", "new Date(0, 0, 1).getFullYear()", "new Date(100, 0, 1).getFullYear()",
+        "new Date(2024, 12, 1).getMonth()", "new Date(2024, -1, 1).getMonth()",
+        "new Date(2024, 1, 30).getDate()", "new Date(2024, 1, 0).getDate()",
+        "new Date(2024, 0, 1, 25).getDate()", "new Date(NaN, 0).getTime()",
+        "var d = new Date(0); var e = new Date(d); e.getTime()",
+        "new Date('2024-01-02T03:04:05.006Z').getTime()",
+        "new Date(true).getTime()", "new Date(null).getTime()", "new Date(undefined).getTime()",
+        "new Date({}).getTime()", "new Date([]).getTime()",
+
+        // Date.UTC and Date.parse.
+        "Date.UTC()", "Date.UTC(2024)", "Date.UTC(2024, 0)", "Date.UTC(2024, 0, 2)",
+        "Date.UTC(2024, 0, 2, 3, 4, 5, 6)", "Date.UTC(NaN)", "Date.UTC(99, 0)",
+        "Date.parse('2024-01-02T03:04:05.006Z')", "Date.parse('2024-01-02T03:04:05Z')",
+        "Date.parse('2024-01-02T03:04Z')", "Date.parse('2024-01-02')", "Date.parse('2024-01')", "Date.parse('2024')",
+        "Date.parse('2024-01-02T03:04:05.006+02:00')", "Date.parse('2024-01-02T03:04:05.006-05:30')",
+        "Date.parse('2024-01-02T03:04:05.006+0200')", "Date.parse('+002024-01-02T00:00:00Z')",
+        "Date.parse('-000001-01-01T00:00:00Z')", "Date.parse('2024-01-02T03:04:05.6Z')",
+        "Date.parse('2024-01-02T03:04:05.06Z')", "Date.parse('2024-13-01')", "Date.parse('2024-02-30')",
+        "Date.parse('2024-01-02T25:00:00Z')", "Date.parse('2024-01-02T24:00:00Z')",
+        "Date.parse('2024-01-02T24:00:01Z')", "Date.parse('garbage')", "Date.parse('')",
+        "Date.parse('Jan 2, 2024')", "Date.parse('2 Jan 2024')", "Date.parse('Tue Jan 02 2024')",
+        "Date.parse('Jan 2 2024 03:04:05')", "Date.parse('Jan 2 2024 03:04:05 GMT')",
+        "Date.parse('Jan 2 2024 03:04:05 GMT+0200')", "Date.parse('Jan 2 2024 03:04:05 GMT-05:30')",
+        "Date.parse('Jan 2 2024 3:04 PM')", "Date.parse('Jan 2 2024 12:04 AM')", "Date.parse('Jan 2 2024 12:04 PM')",
+        "Date.parse('Jan 2 2024 (a comment) 03:04')", "Date.parse('1/2/2024')", "Date.parse('2024/01/02')",
+        "Date.parse('Mon Jan 02 2024 EST')", "Date.parse('Mon Jan 02 2024 PDT')", "Date.parse('Jan 2 2024 UTC')",
+
+        // Getters, both local and UTC.
+        "var d = new Date(1719792000000); [d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), d.getUTCDay(), d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds(), d.getUTCMilliseconds()].join()",
+        "var d = new Date(1719792000000); [d.getFullYear(), d.getMonth(), d.getDate(), d.getDay(), d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds()].join()",
+        "var d = new Date(0); [d.getFullYear(), d.getMonth(), d.getDate(), d.getDay(), d.getHours()].join()",
+        "new Date(1719792000000).getTimezoneOffset()", "new Date(0).getTimezoneOffset()",
+        "new Date(NaN).getFullYear()", "new Date(NaN).getTimezoneOffset()",
+        "new Date(1719792000000).getYear()", "new Date(0).getYear()",
+
+        // Setters.
+        "var d = new Date(0); d.setTime(1719792000000); d.getTime()",
+        "var d = new Date(0); d.setTime(NaN); d.getTime()",
+        "var d = new Date(0); d.setUTCMilliseconds(500); d.getTime()",
+        "var d = new Date(0); d.setUTCSeconds(30); d.getTime()",
+        "var d = new Date(0); d.setUTCSeconds(30, 500); d.getTime()",
+        "var d = new Date(0); d.setUTCMinutes(30); d.getTime()",
+        "var d = new Date(0); d.setUTCHours(6); d.getTime()",
+        "var d = new Date(0); d.setUTCDate(15); d.getTime()",
+        "var d = new Date(0); d.setUTCMonth(6); d.getTime()",
+        "var d = new Date(0); d.setUTCFullYear(2024); d.getTime()",
+        "var d = new Date(0); d.setUTCFullYear(2024, 5, 15); d.getTime()",
+        "var d = new Date(0); d.setMilliseconds(500); d.getUTCMilliseconds()",
+        "var d = new Date(0); d.setSeconds(30); d.getUTCSeconds()",
+        "var d = new Date(0); d.setMinutes(30); d.getUTCMinutes()",
+        "var d = new Date(0); d.setHours(6); d.getHours()",
+        "var d = new Date(0); d.setDate(15); d.getDate()",
+        "var d = new Date(0); d.setMonth(6); d.getMonth()",
+        "var d = new Date(0); d.setFullYear(2024); d.getFullYear()",
+        "var d = new Date(0); d.setMilliseconds(); d.getTime()",
+        "var d = new Date(0); d.setSeconds(NaN); d.getTime()",
+        "var d = new Date(NaN); d.setFullYear(2024); d.getTime()",
+        "var d = new Date(NaN); d.setMonth(1); d.getTime()",
+        "var d = new Date(0); d.setYear(99); d.getFullYear()",
+        "var d = new Date(0); d.setYear(2024); d.getFullYear()",
+        "var d = new Date(0); d.setYear(NaN); d.getTime()",
+        "var d = new Date(0); d.setUTCDate(32); d.getUTCMonth()",
+        "var d = new Date(0); d.setUTCMonth(-1); d.getUTCFullYear()",
+
+        // The formats that do not carry a zone name.
+        "new Date(1719792000000).toISOString()", "new Date(0).toISOString()",
+        "new Date(-62167219200000).toISOString()", "new Date(253402300799999).toISOString()",
+        "new Date(NaN).toISOString()", "try { new Date(NaN).toISOString() } catch (e) { e.name }",
+        "new Date(1719792000000).toUTCString()", "new Date(0).toUTCString()", "new Date(NaN).toUTCString()",
+        "new Date(0).toGMTString()", "Date.prototype.toGMTString === Date.prototype.toUTCString",
+        "new Date(1719792000000).toJSON()", "new Date(NaN).toJSON()",
+        "JSON.stringify({ d: new Date(0) })", "JSON.stringify(new Date(0))",
+        "new Date(0).toSource()", "new Date(NaN).toSource()",
+        "new Date(1719792000000).toDateString()", "new Date(NaN).toDateString()",
+
+        // Coercion and the prototype.
+        "+new Date(0)", "'' + new Date(NaN)", "new Date(0) instanceof Date",
+        "typeof new Date(0)[Symbol.toPrimitive]",
+        "new Date(0)[Symbol.toPrimitive]('number')",
+        "new Date(0)[Symbol.toPrimitive]('string') === new Date(0).toString()",
+        "new Date(0)[Symbol.toPrimitive]('default') === new Date(0).toString()",
+        "try { new Date(0)[Symbol.toPrimitive]('nope') } catch (e) { e.name }",
+        "Date.prototype.getTime.call({})", "Date.prototype.valueOf.call(1)",
+        "Object.prototype.toString.call(Date.prototype)",
+        "Date.prototype.getTime.call(Date.prototype)",
+        "typeof Date.now()", "Date.now() === Date.now()",
+        "var a = Date.now(); var b = new Date().getTime(); a === b",
+    )
+
+    @Test
+    fun dateInUtc() = checkInZone("UTC", dateScripts() + listOf(
+        // These print the zone's short name, which only lines up when it equals the zone id.
+        "new Date(0).toString()", "new Date(1719792000000).toString()",
+        "new Date(0).toTimeString()", "new Date(1719792000000).toTimeString()",
+        "new Date(-1000000000000).toString()", "new Date(NaN).toString()",
+        "String(new Date(0))", "new Date(0) + ''",
+        "new Date(0).toLocaleString()", "new Date(0).toLocaleDateString()", "new Date(0).toLocaleTimeString()",
+        "new Date(1719792000000).toLocaleString()", "new Date(NaN).toLocaleString()",
+        "new Date(1704067200000).toLocaleString()", "new Date(1704110645678).toLocaleString()",
+    ))
+
+    @Test
+    fun dateInBerlin() = checkInZone("Europe/Berlin", dateScripts())
+
+    @Test
+    fun dateInNewYork() = checkInZone("America/New_York", dateScripts())
+
+    @Test
+    fun dateInFixedOffset() = checkInZone("GMT+05:30", dateScripts())
+
+    /**
+     * Below ES6 the locale formats are the long ones, and they print the zone's short name. That
+     * only lines up with upstream where the name equals the zone id, so this runs in UTC.
+     */
+    @Test
+    fun dateLocaleFormatsBeforeEs6() {
+        val savedU = ucx.languageVersion
+        val savedK = Context.getContext().languageVersion
+        try {
+            ucx.languageVersion = UContext.VERSION_1_8
+            Context.getContext().languageVersion = Context.VERSION_1_8
+            checkInZone("UTC", listOf(
+                "new Date(0).toLocaleString()", "new Date(0).toLocaleDateString()", "new Date(0).toLocaleTimeString()",
+                "new Date(1719792000000).toLocaleString()", "new Date(1719792000000).toLocaleDateString()",
+                "new Date(1719792000000).toLocaleTimeString()",
+                "new Date(1704110645678).toLocaleString()", "new Date(NaN).toLocaleString()",
+                "new Date(Date.UTC(2024, 0, 1, 0, 0, 0)).toLocaleTimeString()",
+                "new Date(Date.UTC(2024, 0, 1, 12, 0, 0)).toLocaleTimeString()",
+                "new Date(Date.UTC(2024, 11, 25, 13, 5, 9)).toLocaleString()",
+                "new Date(0).toString()", "new Date(0).getYear()",
+                "new Date(1719792000000).getYear()",
+                "new Date(0).toLocaleString('en-US')",
+            ))
+        } finally {
+            ucx.languageVersion = savedU
+            Context.getContext().languageVersion = savedK
+        }
+    }
+
+    /** The ES6 locale formats print no zone name, so they can be checked in any zone. */
+    @Test
+    fun dateLocaleFormats() = checkInZone("Europe/Berlin", listOf(
+        "new Date(0).toLocaleString()", "new Date(0).toLocaleDateString()", "new Date(0).toLocaleTimeString()",
+        "new Date(1719792000000).toLocaleString()", "new Date(1719792000000).toLocaleDateString()",
+        "new Date(1719792000000).toLocaleTimeString()",
+        "new Date(1704110645678).toLocaleString()", "new Date(1704067200000).toLocaleString()",
+        "new Date(NaN).toLocaleString()", "new Date(NaN).toLocaleDateString()", "new Date(NaN).toLocaleTimeString()",
+        "new Date(Date.UTC(2024, 0, 1, 0, 0)).toLocaleTimeString()",
+        "new Date(Date.UTC(2024, 0, 1, 11, 0)).toLocaleTimeString()",
+        "new Date(Date.UTC(2024, 0, 1, 12, 0)).toLocaleTimeString()",
+        "new Date(Date.UTC(2024, 0, 1, 23, 0)).toLocaleTimeString()",
+        "new Date(Date.UTC(5, 0, 1)).toLocaleDateString()",
+        "new Date(0).toLocaleString(['en-US'])", "new Date(0).toLocaleString('en-US')",
     ))
 
     @Test

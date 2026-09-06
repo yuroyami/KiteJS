@@ -336,5 +336,8 @@ internal object Messages {
         "msg.trail.backslash" to "Trailing \\ in regular expression.",
         "msg.unterm.class" to "Unterminated character class {0}",
         "msg.unterm.paren" to "Unterminated parenthetical {0}",
+        "msg.invalid.date" to "Date is invalid.",
+        "msg.invalid.toprimitive.hint" to "[Symbol.toPrimitive]: expected \"string\", \"number\", or \"default\", but got \"{0}\"",
+        "msg.toisostring.must.return.primitive" to "toISOString must return a primitive value, but instead returned \"{0}\"",
     )
 }

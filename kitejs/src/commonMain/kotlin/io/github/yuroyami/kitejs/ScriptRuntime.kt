@@ -1338,7 +1338,7 @@ object ScriptRuntime {
         NativeString.init(scope, sealed)
         NativeBoolean.init(scope, sealed)
         NativeNumber.init(scope, sealed)
-        // TODO(P4): NativeDate.init(scope, sealed)
+        NativeDate.init(scope, sealed)
         LazilyLoadedCtor(scope, "Math", sealed, Initializable { icx, s, sld -> NativeMath.init(icx, s, sld) })
         LazilyLoadedCtor(scope, "JSON", sealed, Initializable { icx, s, sld -> NativeJSON.init(icx, s, sld) })
 

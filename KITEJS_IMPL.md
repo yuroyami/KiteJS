@@ -207,6 +207,20 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   implementation here and no service loader in common Kotlin. The debug disassembler
   (`prettyPrintRE`, about 250 lines behind a system property) is not ported either, since common
   Kotlin has no system properties.
+- D-45: the short zone name in `Date.prototype.toString` and in the pre-ES6 `toLocale*` formats is
+  the zone id, not the abbreviation. Upstream reads CLDR through `java.time`; there is no such data
+  in common Kotlin and no way to compute it. `new Date(0).toString()` therefore ends `(UTC)` where
+  it would say `(CET)` under Europe/Berlin. Everything before that in the string, the offset
+  included, is identical, and the oracle checks the whole string in a zone whose id is its own
+  abbreviation.
+- D-46: `Date.prototype.toLocaleString`, `toLocaleDateString` and `toLocaleTimeString` format with
+  fixed en-US patterns and ignore their locale argument. Upstream asks `java.time` with the default
+  locale, which is what an engine with no `Intl` is allowed to do. At ES6 and above the patterns
+  print no zone name, so those answers are identical to upstream's under `Locale.US`.
+- D-47: Kotlin/JS needs the `@js-joda/timezone` npm package and an eager reference to it, or
+  `TimeZone.of("Europe/Berlin")` throws and only UTC and fixed offsets work. The dependency alone is
+  not enough: nothing loads the package unless something references it, and the reference is dropped
+  as dead code without `@EagerInitialization`. `DateZoneSliceTest` is what caught this.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -956,7 +970,7 @@ simple case mapping, which come from the generated tables (rule 3).
 
 #### P4.5: Date
 
-- [ ] Add `kotlinx-datetime` to `commonMain` (version in `libs.versions.toml`, one that
+- [x] Add `kotlinx-datetime` to `commonMain` (version in `libs.versions.toml`, one that
       supports wasmJs; on JS and Wasm it reads zone data from the host's `Intl`, on Apple from
       Foundation, on the JVM from `java.time`). `Context.timeZone: TimeZone`, default
       `TimeZone.currentSystemDefault()`, settable like upstream's `Context.setTimeZone`.
@@ -965,19 +979,19 @@ simple case mapping, which come from the generated tables (rule 3).
       instant differs from the raw offset", and the short zone name for the `zzz` pattern is the
       zone id (kotlinx-datetime has no abbreviations; ledger entry, and the oracle runs with a
       zone whose id equals its abbreviation, such as `UTC`, for the formats that print it).
-- [ ] `Context.clock`: a `() -> Double` of epoch milliseconds, default `Clock.System` from the
+- [x] `Context.clock`: a `() -> Double` of epoch milliseconds, default `Clock.System` from the
       stdlib (opt in if the API is still marked experimental at 2.4). `Date.now()`,
       `new Date()` and the tests use it; tests pin it.
-- [ ] Port `NativeDate.kt` (2038). The date arithmetic (`MakeDay`, `MakeTime`, `YearFromTime`,
+- [x] Port `NativeDate.kt` (2038). The date arithmetic (`MakeDay`, `MakeTime`, `YearFromTime`,
       `WeekDay`, the 64 static helpers) is pure and ports verbatim. `LocalTZA` and
       `DaylightSavingTA` read `Context.timeZone`. `date_parseString` and `date_format` port
       verbatim. The four `toLocale*` methods format with fixed en-US patterns that equal what
       upstream produces under `Locale.US` (`MMMM d, yyyy h:mm:ss a z` below ES6, the short
       localized forms at ES6 and above); other locales and the `Intl` object are out of scope
       (ledger entry, listed in `PORTING_STATUS.md` as a limitation).
-- [ ] `NativeDate.init` in `initSafeStandardObjects`; `TopLevel.Builtins.Date`;
+- [x] `NativeDate.init` in `initSafeStandardObjects`; `TopLevel.Builtins.Date`;
       `JSON.stringify` of a date through `toJSON`; `Date.prototype[Symbol.toPrimitive]`.
-- [ ] Oracle with the same zone on both sides (`cx.setTimeZone(TimeZone.getTimeZone(id))`
+- [x] Oracle with the same zone on both sides (`cx.setTimeZone(TimeZone.getTimeZone(id))`
       upstream, `cx.timeZone = TimeZone.of(id)` here; both read the same IANA database on the
       JVM) and a fixed clock, for `UTC`, a fixed offset, `Europe/Berlin` and
       `America/New_York`: constructors from millis, strings and components,
@@ -986,10 +1000,10 @@ simple case mapping, which come from the generated tables (rule 3).
       `toISOString` (and its RangeError), `toDateString`, `toTimeString`, `toJSON`,
       `getTimezoneOffset`, `getYear` and `setYear`, invalid dates everywhere, the
       millisecond limits, leap years and the year-zero corners.
-- [ ] The cross-target slice adds a Date program with `UTC` and with `Europe/Berlin` across a
+- [x] The cross-target slice adds a Date program with `UTC` and with `Europe/Berlin` across a
       daylight-saving switch, with upstream's recorded answers, so the JS, iOS and Wasm zone
       data are checked against the JVM's, not assumed.
-- [ ] Green on all targets; commit.
+- [x] Green on all targets; commit.
 
 #### P4.6: Typed arrays, ArrayBuffer and DataView
 

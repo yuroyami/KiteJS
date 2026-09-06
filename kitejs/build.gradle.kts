@@ -61,7 +61,15 @@ kotlin {
         }
 
         commonMain.dependencies {
-            // Intentionally empty. KiteJS core depends on kotlin-stdlib only.
+            // The only runtime dependency: time zone rules for Date. Everything else the engine
+            // computes itself, so JVM, JS, iOS and Wasm cannot drift apart.
+            implementation(libs.kotlinx.datetime)
+        }
+
+        // kotlinx-datetime on Kotlin/JS ships no zone database of its own. Without this the
+        // engine only knows UTC and fixed offsets, which DateZoneSliceTest catches at once.
+        jsMain.dependencies {
+            implementation(npm("@js-joda/timezone", "2.3.0"))
         }
 
         commonTest.dependencies {
