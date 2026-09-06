@@ -221,6 +221,16 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   `TimeZone.of("Europe/Berlin")` throws and only UTC and fixed offsets work. The dependency alone is
   not enough: nothing loads the package unless something references it, and the reference is dropped
   as dead code without `@EagerInitialization`. `DateZoneSliceTest` is what caught this.
+- D-48: the byte reader hands back `Int` where upstream hands back `Byte` and `Short`, and a
+  `Double` where it hands back a `Long`. Those are the number types the rest of the engine speaks,
+  so a value read out of a typed array needs no further boxing. Script sees a number either way.
+  The typed array views also drop the `java.util.List` face, same reasoning as D-34 and D-36.
+- D-49: two message keys upstream's code uses but its properties file never defines,
+  `msg.missing.argument` and `msg.typed.array.abstract.ctor`. Asking upstream for either raises a
+  missing-resource error instead of returning text, so there is nothing to copy and the port writes
+  its own wording. `MessageParityTest` pins that upstream still lacks them, so the port takes their
+  text the moment upstream defines it. The second one also replaces a placeholder message upstream
+  never meant to ship.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -1007,22 +1017,22 @@ simple case mapping, which come from the generated tables (rule 3).
 
 #### P4.6: Typed arrays, ArrayBuffer and DataView
 
-- [ ] Port `ByteIo.kt` (184) and `Conversions.kt` (59): the little- and big-endian packing
+- [x] Port `ByteIo.kt` (184) and `Conversions.kt` (59): the little- and big-endian packing
       over `ByteArray`, floats through `Float.toBits` and `Double.toBits`, the
       `Uint8Clamped` rounding. Pure.
-- [ ] Port `NativeArrayBuffer.kt` (355), `NativeArrayBufferView.kt` (82),
+- [x] Port `NativeArrayBuffer.kt` (355), `NativeArrayBufferView.kt` (82),
       `NativeTypedArrayIterator.kt` (83), then `NativeTypedArrayView.kt` (1567) without its
       `java.util.List` and `RandomAccess` views (same reasoning as D-36) and without
       `java.lang.reflect.Array`; keep `ExternalArrayData` (P3.3 already has it).
-- [ ] Port the nine numeric views (`Int8`, `Uint8`, `Uint8Clamped`, `Int16`, `Uint16`,
+- [x] Port the nine numeric views (`Int8`, `Uint8`, `Uint8Clamped`, `Int16`, `Uint16`,
       `Int32`, `Uint32`, `Float32`, `Float64`, about 110 lines each) and `NativeDataView.kt`
       (422). `BigInt64Array` and `BigUint64Array` wait for P5.
-- [ ] `NativeArrayIterator.isDone` gets its detached-array check (the `TODO(P4)` from P3.8);
+- [x] `NativeArrayIterator.isDone` gets its detached-array check (the `TODO(P4)` from P3.8);
       `ArrayLikeAbstractOperations.iterativeMethod` and `reduceMethodWithLength` serve the
       typed views as upstream intends.
-- [ ] Register the lazy constructors in `initSafeStandardObjects` under the same version gate
+- [x] Register the lazy constructors in `initSafeStandardObjects` under the same version gate
       as upstream (`VERSION_ES6`, or `VERSION_1_8` with `FEATURE_V8_EXTENSIONS`).
-- [ ] Oracle: buffers shared between views, offsets and lengths and their RangeErrors,
+- [x] Oracle: buffers shared between views, offsets and lengths and their RangeErrors,
       element conversion for every type including NaN, infinity, negative zero and clamping,
       `set` from arrays and from overlapping views, `subarray` sharing memory, `slice` copying,
       `copyWithin`, `fill`, `sort` with and without comparator, `indexOf` and `includes` on
@@ -1030,7 +1040,7 @@ simple case mapping, which come from the generated tables (rule 3).
       get and set for every type in both endiannesses with byte offsets, `byteLength`,
       `byteOffset`, `BYTES_PER_ELEMENT`, `Object.prototype.toString` tags, and the
       `FEATURE_LITTLE_ENDIAN` default.
-- [ ] Green on all targets; commit.
+- [x] Green on all targets; commit.
 
 #### P4.7: Promise
 

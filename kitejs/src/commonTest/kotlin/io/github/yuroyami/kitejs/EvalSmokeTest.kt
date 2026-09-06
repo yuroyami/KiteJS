@@ -294,6 +294,28 @@ class EvalSmokeTest {
     }
 
     @Test
+    fun typedArrays() {
+        assertEquals("4", eval("new ArrayBuffer(4).byteLength"))
+        assertEquals("1,2,3", eval("new Int8Array([1, 2, 3]).join()"))
+        assertEquals("1,-1,44", eval("new Int8Array([1.7, -1.7, 300]).join()"))
+        // Clamping rounds half to even: 0.5 and 2.5 go down, 1.5 goes up.
+        assertEquals("0,0,2,2,255", eval("new Uint8ClampedArray([-5, 0.5, 1.5, 2.5, 300]).join()"))
+        assertEquals("9", eval("var b = new ArrayBuffer(4); var a = new Uint8Array(b); var c = new Uint8Array(b); a[0] = 9; c[0]"))
+        assertEquals("undefined", eval("new Int8Array([1, 2, 3])[5]"))
+        assertEquals("2", eval("new Int8Array(4).fill(2)[3]"))
+        assertEquals("1,3,NaN", eval("new Float64Array([3, NaN, 1]).sort().join()"))
+        assertEquals("2,4,6", eval("new Int8Array([1, 2, 3]).map(function (v) { return v * 2 }).join()"))
+        assertEquals("2,3", eval("new Int8Array([1, 2, 3]).subarray(1).join()"))
+        assertEquals("-1", eval("var d = new DataView(new ArrayBuffer(8)); d.setInt8(0, -1); d.getInt8(0)"))
+        assertEquals("1:2", eval("var d = new DataView(new ArrayBuffer(8)); d.setInt16(0, 258); d.getUint8(0) + ':' + d.getUint8(1)"))
+        assertEquals("2:1", eval("var d = new DataView(new ArrayBuffer(8)); d.setInt16(0, 258, true); d.getUint8(0) + ':' + d.getUint8(1)"))
+        assertEquals("4294967295", eval("var d = new DataView(new ArrayBuffer(8)); d.setUint32(0, 4294967295); d.getUint32(0)"))
+        assertEquals("0.3333333333333333", eval("var d = new DataView(new ArrayBuffer(8)); d.setFloat64(0, 1/3); d.getFloat64(0)"))
+        assertEquals("1,2,3", eval("Int8Array.from([1, 2, 3]).join()"))
+        assertEquals("[object Int8Array]", eval("Object.prototype.toString.call(new Int8Array(1))"))
+    }
+
+    @Test
     fun objectsAndPrototypes() {
         assertEquals("deep", eval("var o = { a: { b: { c: 'deep' } } }; o.a.b.c"))
         assertEquals("42", eval("var o = { get x() { return 42 } }; o.x"))

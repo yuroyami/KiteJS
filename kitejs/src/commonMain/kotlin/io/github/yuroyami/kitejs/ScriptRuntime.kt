@@ -1000,6 +1000,30 @@ object ScriptRuntime {
         }
     }
 
+    /**
+     * The number a property name stands for when it is a canonical numeric index, or null. A typed
+     * array treats those names as element positions and everything else as ordinary properties.
+     */
+    fun canonicalNumericIndexString(arg: String): Double? {
+        if ("-0" == arg) return Double.NEGATIVE_INFINITY
+        val num = toNumber(arg)
+        // "NaN" is deliberately not a number here.
+        if (num.isNaN()) return null
+        return if (toString(num) == arg) num else null
+    }
+
+    /** ToIndex: a non-negative integer that fits the safe range, or a RangeError. */
+    fun toIndex(value: Any?): Int {
+        if (Undefined.isUndefined(value)) return 0
+        val integerIndex = toInteger(value)
+        if (integerIndex < 0) throw rangeErrorById("msg.out.of.range.index", integerIndex)
+        val index = if (integerIndex < NativeNumber.MAX_SAFE_INTEGER) integerIndex else NativeNumber.MAX_SAFE_INTEGER
+        if (integerIndex != index) throw rangeErrorById("msg.out.of.range.index", integerIndex)
+        return index.toInt()
+    }
+
+    fun isArrayObject(obj: Any?): Boolean = obj is NativeArray || obj is Arguments
+
     /** True when an iterator result object says the iteration is over. */
     fun isIteratorDone(cx: Context, result: Any?): Boolean {
         if (result !is Scriptable) return false
@@ -1353,7 +1377,23 @@ object ScriptRuntime {
 
         registerRegExp(cx, scope, sealed)
         // NativeJavaObject, NativeJavaMap, Continuation and E4X are out of scope.
-        // TODO(P4): the typed arrays, ArrayBuffer and DataView.
+        // The typed arrays are behind the same version gate upstream uses.
+        if ((cx.languageVersion >= Context.VERSION_1_8 && cx.hasFeature(Context.FEATURE_V8_EXTENSIONS)) ||
+            cx.languageVersion >= Context.VERSION_ES6
+        ) {
+            LazilyLoadedCtor(scope, "ArrayBuffer", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.typedarrays.NativeArrayBuffer.init(icx, s, sld) })
+            LazilyLoadedCtor(scope, "Int8Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.typedarrays.NativeInt8Array.init(icx, s, sld) })
+            LazilyLoadedCtor(scope, "Uint8Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.typedarrays.NativeUint8Array.init(icx, s, sld) })
+            LazilyLoadedCtor(scope, "Uint8ClampedArray", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.typedarrays.NativeUint8ClampedArray.init(icx, s, sld) })
+            LazilyLoadedCtor(scope, "Int16Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.typedarrays.NativeInt16Array.init(icx, s, sld) })
+            LazilyLoadedCtor(scope, "Uint16Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.typedarrays.NativeUint16Array.init(icx, s, sld) })
+            LazilyLoadedCtor(scope, "Int32Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.typedarrays.NativeInt32Array.init(icx, s, sld) })
+            LazilyLoadedCtor(scope, "Uint32Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.typedarrays.NativeUint32Array.init(icx, s, sld) })
+            // TODO(P5): BigInt64Array and BigUint64Array need the BigInt type.
+            LazilyLoadedCtor(scope, "Float32Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.typedarrays.NativeFloat32Array.init(icx, s, sld) })
+            LazilyLoadedCtor(scope, "Float64Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.typedarrays.NativeFloat64Array.init(icx, s, sld) })
+            LazilyLoadedCtor(scope, "DataView", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.typedarrays.NativeDataView.init(icx, s, sld) })
+        }
 
         if (cx.languageVersion >= Context.VERSION_ES6) {
             NativeSymbol.init(cx, scope, sealed)

@@ -16,11 +16,27 @@ import org.mozilla.javascript.ScriptRuntime as UpstreamScriptRuntime
  */
 class MessageParityTest {
 
+    /**
+     * Two keys upstream's code uses but its properties file never defines. Asking upstream for one
+     * of them raises a missing-resource error rather than returning text, so there is nothing to
+     * compare against and the port writes its own wording (D-49).
+     */
+    private val addedByThePort = setOf("msg.missing.argument", "msg.typed.array.abstract.ctor")
+
     private fun portedKeys(): List<String> {
         val field = Messages::class.java.getDeclaredField("en")
         field.isAccessible = true
         @Suppress("UNCHECKED_CAST")
-        return (field.get(Messages) as Map<String, String>).keys.sorted()
+        return (field.get(Messages) as Map<String, String>).keys.filterNot { it in addedByThePort }.sorted()
+    }
+
+    @Test
+    fun theAddedKeysAreStillMissingUpstream() {
+        // If upstream ever defines these, the port should take their wording instead.
+        for (key in addedByThePort) {
+            val upstream = try { UpstreamScriptRuntime.getMessageById(key) } catch (e: Exception) { null }
+            assertEquals(null, upstream, "upstream now defines $key, so the port should use its text")
+        }
     }
 
     @Test

@@ -339,5 +339,27 @@ internal object Messages {
         "msg.invalid.date" to "Date is invalid.",
         "msg.invalid.toprimitive.hint" to "[Symbol.toPrimitive]: expected \"string\", \"number\", or \"default\", but got \"{0}\"",
         "msg.toisostring.must.return.primitive" to "toISOString must return a primitive value, but instead returned \"{0}\"",
+        "msg.arraybuf.detached" to "Expected ArrayBuffer to not be detached",
+        "msg.arraybuf.same" to "Expected different ArrayBuffer",
+        "msg.arraybuf.smaller.len" to "Expected ArrayBuffer with at least {0} bytes, but got {1} bytes instead",
+        "msg.constructor.expected" to "Expecting the first argument to be a constructor",
+        "msg.dataview.bounds" to "DataView is out of bounds",
+        "msg.dataview.length.range" to "DataView length is out of range",
+        "msg.dataview.offset.range" to "DataView offset is out of range",
+        "msg.function.expected" to "Expecting the first argument to be a function",
+        "msg.out.of.range.index" to "Index {0} out of range",
+        "msg.species.invalid.ctor" to "The [Symbol.species] property of object's constructor is not a constructor",
+        "msg.typed.array.bad.buffer.length.byte.size" to "used buffer length {0} must be a multiple of the byte size {1}",
+        "msg.typed.array.bad.length" to "length {0} out of range",
+        "msg.typed.array.bad.offset" to "offset {0} out of range",
+        "msg.typed.array.bad.offset.byte.size" to "offset {0} must be a multiple of the byte size {1}",
+        "msg.typed.array.bad.source.array" to "source array is too long",
+        "msg.typed.array.index.out.of.bounds" to "index {0} is out of bounds [{1}..{2}]",
+        "msg.typed.array.length.too.small" to "Derived TypedArray constructor created an array which was too small",
+        "msg.typed.array.receiver.incompatible" to "Method %TypedArray%.{0} called on incompatible receiver",
+        // Two keys upstream uses but never defined. See the ledger: upstream produces a missing
+        // resource error at these two points, which is a bug, not behaviour worth copying.
+        "msg.missing.argument" to "Missing argument",
+        "msg.typed.array.abstract.ctor" to "Abstract class TypedArray not directly constructable",
     )
 }
