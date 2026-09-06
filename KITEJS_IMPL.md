@@ -68,7 +68,13 @@ Living list. Every entry is a known, deliberate behavior or structure difference
 - D-2: no `Reader`-based source input. String in, that is all.
 - D-3: engine instances are single-thread confined. No shared-context multithreading.
 - D-4: error messages exist in English only, and only the keys the ported code uses.
-- D-5: BigInt is a stub until Phase 5 (literals lex and store, arithmetic throws).
+- D-5: `KBigInt` replaces `java.math.BigInteger`, which common Kotlin has no equal of. Sign and
+  magnitude over base 2^32 limbs, with Karatsuba multiplication and Knuth division, written here
+  rather than taken from a library (rule 4): the multiplatform candidates do sign-magnitude
+  bitwise operations, and JavaScript needs two's complement over an infinite bit string, which is
+  the harder half. `KBigIntOracleTest` checks every operation against `java.math.BigInteger`.
+  It was a stub through phases 0 to 4, holding a literal's digits so the lexer had somewhere to
+  put them; the real arithmetic landed in P5.1.
 - D-6: feature flags are compile-time constants, not system properties.
 - D-8: where upstream pairs a protected field with a public accessor that has extra behavior
   (`Node.type/lineno/column`, `AstNode.parent`, `Scope.parentScope`, `Loop.body`), the port keeps the
@@ -1116,7 +1122,7 @@ smoke test covers every new builtin on every target, and every deviation is a le
 
 #### P5.1: KBigInt
 
-- [ ] Replace the stub with a real immutable arbitrary-precision integer in
+- [x] Replace the stub with a real immutable arbitrary-precision integer in
       `commonMain/.../KBigInt.kt`: sign and magnitude as an `IntArray` of base 2^32 limbs. Operations
       in the order the engine needs them: `compareTo`, `add`, `subtract`, `multiply`
       (schoolbook, Karatsuba above a threshold), `divideAndRemainder` (Knuth algorithm D),
@@ -1124,13 +1130,15 @@ smoke test covers every new builtin on every target, and every deviation is a le
       complement semantics like `java.math.BigInteger`), `negate`, `abs`, `signum`,
       `bitLength`, `toString(radix)`, `parse(text, radix)`, `toDouble` (correctly rounded),
       `fromDouble`, `toLong` and `toInt` (low bits), `asIntN` and `asUintN`, `equals` and
-      `hashCode`. Zero third-party dependency (rule 4).
-- [ ] Test `jvmTest/KBigIntOracleTest`: every operation against `java.math.BigInteger` on a
+      `hashCode`. Zero third-party dependency (rule 4). `mod`, `testBit` and `longValueExact`
+      came along too, since P5.2 needs them.
+- [x] Test `jvmTest/KBigIntOracleTest`: every operation against `java.math.BigInteger` on a
       seeded corpus of operands (small, limb-boundary, thousands of bits, negative, zero) and
       every radix from 2 to 36; algebraic checks (`(a*b)/b == a`, `a - a == 0`, shifts against
       multiplication) as negative controls. `commonTest/KBigIntTest` runs a slice on every
-      target.
-- [ ] Commit.
+      target. The slice is not a formality here: Kotlin/JS has no 64-bit integer, so every
+      `Long` and `ULong` in the division loops is emulated with a pair of Ints.
+- [x] Commit.
 
 #### P5.2: BigInt in the language
 
