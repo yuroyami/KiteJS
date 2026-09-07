@@ -40,7 +40,16 @@ class Test262SliceTest {
 
     private fun read(path: String): String = fs.source(Path(path)).buffered().use { it.readString() }
 
-    private fun exists(path: String): Boolean = fs.exists(Path(path))
+    /**
+     * A browser has no file system at all, and asking kotlinx-io for one there throws rather than
+     * answering false. The slice needs the suite on disk, so a target that cannot reach a disk
+     * skips it the same way a machine that has not fetched the suite does.
+     */
+    private fun exists(path: String): Boolean = try {
+        fs.exists(Path(path))
+    } catch (e: UnsupportedOperationException) {
+        false
+    }
 
     @Test
     fun everyTargetReachesTheOutcomesTheJvmRecorded() {
@@ -49,7 +58,7 @@ class Test262SliceTest {
             return
         }
         if (!exists("$TEST262_ROOT/test")) {
-            println("test262 not fetched; run tools/fetch-test262.sh. Skipping.")
+            println("test262 not reachable from here; run tools/fetch-test262.sh. Skipping.")
             return
         }
 

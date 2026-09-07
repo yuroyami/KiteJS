@@ -19,13 +19,16 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
-      - name: Build and test (JVM, Android, JS, Wasm, Linux, ABI check)
+      - name: Build and test (JVM, Android, JS and Wasm on Node and in Chrome, Linux, ABI check)
         run: >
           ./gradlew
-          :kitejs:jvmTest :kitejs:testAndroidHostTest :kitejs:jsNodeTest
-          :kitejs:wasmJsNodeTest :kitejs:linuxX64Test
+          :kitejs:jvmTest :kitejs:testAndroidHostTest
+          :kitejs:jsNodeTest :kitejs:jsBrowserTest
+          :kitejs:wasmJsNodeTest :kitejs:wasmJsBrowserTest
+          :kitejs:linuxX64Test
           :kitejs-coroutines:jvmTest :kitejs-coroutines:testAndroidHostTest
-          :kitejs-coroutines:jsNodeTest :kitejs-coroutines:wasmJsNodeTest
+          :kitejs-coroutines:jsNodeTest :kitejs-coroutines:jsBrowserTest
+          :kitejs-coroutines:wasmJsNodeTest :kitejs-coroutines:wasmJsBrowserTest
           :kitejs-coroutines:linuxX64Test
           assemble check
 

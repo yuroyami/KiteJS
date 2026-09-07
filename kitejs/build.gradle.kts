@@ -69,10 +69,13 @@ kotlin {
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     js {
         browser {
-            // The library is built for the browser so it can be used there. Its tests are not
-            // run there: they are the same tests Node already runs, and a browser run needs a
-            // browser installed on whatever machine is building.
-            testTask { enabled = false }
+            // Karma serves the project directory over HTTP. A '#' anywhere in the absolute path
+            // truncates that URL at the fragment marker, and every file 404s. If jsBrowserTest
+            // fails locally with "404: /absolute/<some prefix>", that is why: move the checkout
+            // to a path without a '#'.
+            testTask {
+                useKarma { useChromeHeadless() }
+            }
         }
         nodejs {
             testTask {
@@ -87,10 +90,10 @@ kotlin {
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
         browser {
-            // The library is built for the browser so it can be used there. Its tests are not
-            // run there: they are the same tests Node already runs, and a browser run needs a
-            // browser installed on whatever machine is building.
-            testTask { enabled = false }
+            // Same Karma path caveat as the js target above.
+            testTask {
+                useKarma { useChromeHeadless() }
+            }
         }
         nodejs {
             testTask {
