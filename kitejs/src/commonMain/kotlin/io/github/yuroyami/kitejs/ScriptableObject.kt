@@ -97,8 +97,16 @@ abstract class ScriptableObject :
             if (index < ext.getArrayLength()) {
                 ext.setArrayElement(index, value)
             } else {
-                // TODO(P3.4): upstream throws a JavaScriptException wrapping a NativeError here.
-                throw ScriptRuntime.rangeError("External array index out of bounds ")
+                throw JavaScriptException(
+                    ScriptRuntime.newNativeError(
+                        Context.getCurrentContext() ?: throw Kit.codeBug(),
+                        this,
+                        TopLevel.NativeErrors.RangeError,
+                        arrayOf("External array index out of bounds "),
+                    ),
+                    null,
+                    0,
+                )
             }
             return
         }

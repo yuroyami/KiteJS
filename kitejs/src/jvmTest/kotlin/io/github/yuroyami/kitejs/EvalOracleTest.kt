@@ -2104,4 +2104,34 @@ class EvalOracleTest {
         "WeakMap.prototype.set.length", "WeakSet.prototype.add.length",
         "new WeakMap() instanceof WeakMap", "new WeakSet() instanceof WeakSet",
     ))
+
+    /**
+     * Array spread when no `Symbol.iterator` is in reach. A real array is still walked by its
+     * length, so a hole arrives as undefined and a non-index own property is left out; anything
+     * else spreads by its own ids. Each script puts the iterator back so the next one starts clean.
+     */
+    @Test
+    fun arraySpreadWithoutTheIteratorProtocol() = check(listOf(
+        "return String([...[1, 2, 3]])", "return [...[1, 2, 3]].length",
+        "return String([...[1, , 3]])", "return [...[1, , 3]].length",
+        "return String([...[, , ]])", "return [...[, , ]].length",
+        "return String([...[]])", "return [...[]].length",
+        "var a = [1, 2]; a.foo = 9; return String([...a]) + '|' + [...a].length",
+        "var a = []; a.length = 3; return String([...a]) + '|' + [...a].length",
+        "var a = [1, 2]; a[5] = 6; return String([...a]) + '|' + [...a].length",
+        "return String([0, ...[1, 2], 3])", "return String([...[1, 2], ...[3, 4]])",
+        "return String([...[[1, 2], [3]]])", "return [...[[1, 2], [3]]].length",
+        "var o = { a: 1, b: 2 }; return String([...o]) + '|' + [...o].length",
+        "var o = { 0: 'x', length: 1 }; return String([...o]) + '|' + [...o].length",
+        "return String([...'abc'])",
+        "return (function () { return String([...arguments]) })(1, 2, 3)",
+        "var a = [1, 2]; a[Symbol.iterator] = function () { var n = 0; return { next: function () { return n < 2 ? { value: 'own' + n++, done: false } : { done: true } } } }; return String([...a])",
+        "return String([...Object.create([4, 5])])",
+        "try { return String([...null]) } catch (e) { return e.name }",
+        "try { return String([...undefined]) } catch (e) { return e.name }",
+    ).map {
+        "(function () { var saved = Array.prototype[Symbol.iterator];" +
+            " delete Array.prototype[Symbol.iterator];" +
+            " try { $it } finally { Array.prototype[Symbol.iterator] = saved } })()"
+    })
 }

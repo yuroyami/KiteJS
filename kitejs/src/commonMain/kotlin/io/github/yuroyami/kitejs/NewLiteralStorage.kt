@@ -75,12 +75,17 @@ abstract class NewLiteralStorage protected constructor(ids: Array<Any?>?, length
                 return
             }
         }
-        // TODO(P3.8): a NativeArray spreads by its length, without a property lookup per element.
-        val ids = src.getIds()
-        val newLen = valuesField.size + ids.size
+        // No Symbol.iterator. An array still spreads by its length, so holes come through as
+        // undefined and a non-index own property is left out; anything else spreads by its own ids.
+        val spreadSize = if (src is NativeArray) src.length.toInt() else src.getIds().size
+        val newLen = valuesField.size + spreadSize
         getterSettersField = getterSettersField.copyOf(newLen)
         valuesField = valuesField.copyOf(newLen)
-        for (id in ids) pushValue(getPropertyById(src, id))
+        if (src is NativeArray) {
+            for (i in 0 until src.length) pushValue(NativeArray.getElem(cx, src, i))
+        } else {
+            for (id in src.getIds()) pushValue(getPropertyById(src, id))
+        }
     }
 
     private fun spreadObject(cx: Context, scope: Scriptable, source: Any?) {

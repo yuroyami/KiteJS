@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+<title id="title">KiteJS — Rhino script</title>
+<desc id="desc">A geometric rhinoceros profile, with JS cut into its cheek, connects JavaScript to the library&#x27;s Mozilla Rhino ancestry. A short-tailed geometric kite in Kotlin violet, magenta and orange.</desc>
+<defs>
+<linearGradient id="sail" gradientUnits="userSpaceOnUse" x1="352" y1="256" x2="672" y2="576">
+ <stop offset="0" stop-color="#7F52FF"/><stop offset="0.333333" stop-color="#7136F4"/>
+ <stop offset="0.333333" stop-color="#BC35E8"/><stop offset="0.666667" stop-color="#D63BDD"/>
+ <stop offset="0.666667" stop-color="#FF8C25"/><stop offset="1" stop-color="#FF6950"/>
+</linearGradient>
+<linearGradient id="tail" gradientUnits="userSpaceOnUse" x1="500" y1="736" x2="570" y2="944">
+ <stop offset="0" stop-color="#7136F4"/><stop offset="0.333333" stop-color="#7F42FC"/>
+ <stop offset="0.333333" stop-color="#BC35E8"/><stop offset="0.666667" stop-color="#D63BDD"/>
+ <stop offset="0.666667" stop-color="#FF8C25"/><stop offset="1" stop-color="#FF7840"/>
+</linearGradient>
+<clipPath id="inner"><path d="M512 152L776 416L512 680L248 416Z"/></clipPath>
+<mask id="rhino-cuts" maskUnits="userSpaceOnUse" x="300" y="250" width="440" height="300"><rect x="300" y="250" width="440" height="300" fill="white"/><g fill="black"><path d="M399 375H451V430C451 469 416 478 389 452L405 433C418 447 427 442 427 428V397H399Z"/>
+<path d="M535 386L521 404C507 393 489 392 489 402C489 411 502 411 517 416C551 427 543 469 512 473C491 475 474 467 461 454L477 436C491 450 516 455 518 442C520 433 504 432 491 428C454 417 462 380 491 375C508 371 524 376 535 386Z"/>
+<circle cx="610" cy="399" r="8"/><circle cx="682" cy="423" r="5"/></g></mask></defs>
+<polygon fill="url(#tail)" transform="translate(512 736) scale(.7) translate(-512 -736)" points="512,716 472,786 546,838 494,898 574,956 574,920 536,892 586,832 512,780 532,728"/>
+<path fill="url(#sail)" d="M512 96L832 416L512 736L192 416Z"/>
+<g fill="#FFFFFF"><path d="M332 418L365 352L430 319L525 335L557 303L574 353L611 357L674 280L658 383L711 408L697 449L612 472L577 512L426 499L371 465Z" mask="url(#rhino-cuts)"/></g></svg>
