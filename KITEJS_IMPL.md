@@ -291,6 +291,18 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   arguments and the BigInt typed array constructors. Nothing to do about them beyond recording
   them: `Test262ParityTest` asserts each still differs, so an upstream fix shows up as a stale
   entry rather than as silence.
+- D-59: `Math.fround` does its own rounding to the nearest 32-bit float rather than going through
+  `Double.toFloat()`. On Kotlin/JS that conversion does nothing at all, because JavaScript has only
+  doubles, so `Math.fround` was answering its own argument. The rounding is written out over the
+  bits, and `FroundOracleTest` checks it against the JVM's real conversion on the boundaries, on
+  the ties, and on 200,000 seeded doubles. The test262 cross-target run is what found this.
+- D-60: `String.prototype.toLowerCase` and its neighbours call Kotlin's `lowercase()`, which is the
+  platform's own. That makes case conversion the one operation in the engine that is not computed
+  here, and the one place the targets disagree: the JVM applies the conditional special casing for
+  a Greek final sigma, and JS and Native do not. The JVM answer is upstream's, so the parity run is
+  clean; `Test262SliceTest` lists the two files where the other targets differ. Putting this right
+  means generating the full and conditional case mappings from the UCD, the way D-43 generated the
+  classification tables, which is a job of its own.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -1253,7 +1265,7 @@ port passes exactly when upstream passes. Every difference becomes a fix or a le
       branches; a developer runs it before a phase close-out.
 - [x] Every parity difference gets a fix or a ledger entry with the test path; the ledger
       entry is the only acceptable way to leave a difference in place.
-- [ ] `commonTest/Test262Runner.kt` over `kotlinx-io` (test scope only): the same properties
+- [x] `commonTest/Test262Runner.kt` over `kotlinx-io` (test scope only): the same properties
       parsing, front-matter parsing and harness loading as the JVM runner, reading the fetched
       `reference/test262` tree from disk on the JVM, on the iOS simulator and on Node (the path
       arrives through a generated constant or an environment variable). It compares the port's
@@ -1261,7 +1273,7 @@ port passes exactly when upstream passes. Every difference becomes a fix or a le
       `build/test262/expectations.json`, so every target runs the same files the JVM runs, not
       a capped slice. Browser and Wasm-browser targets, which have no file system, skip it
       with a visible message; Wasm on Node runs it. Nothing generated is committed.
-- [ ] Native tests actually run: `iosSimulatorArm64Test` joins the default check (today the
+- [x] Native tests actually run: `iosSimulatorArm64Test` joins the default check (today the
       iOS target only compiles), and `macosArm64Test` once P8 adds the target.
 - [ ] V8 differential report: when `jsNodeTest` runs, a reporter evaluates the eval corpus in
       Node's own engine as well and prints where KiteJS and V8 disagree. Informational only:

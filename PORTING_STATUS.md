@@ -80,6 +80,13 @@ input, and `localeCompare` falls back to code unit order.
 
 The per-folder table is written to `kitejs/build/test262/summary.md` by the run itself.
 
+The same 52,802 cases then run on JS and on the iOS simulator, against the outcomes the JVM run
+recorded, so no target gets to quietly behave differently. Two files differ there, both
+`String.prototype.toLowerCase` with a Greek final sigma: case conversion is the one operation the
+engine still borrows from the platform, and the platforms disagree about it. Everything else,
+including the whole regexp engine, the date arithmetic and the big-integer arithmetic, gives the
+same answer on all three.
+
 ## Language level
 
 Upstream Rhino 1.9.1 implements complete ES5.1 plus a large part of ES2015+

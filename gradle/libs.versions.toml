@@ -10,12 +10,17 @@ dokka = "2.2.0"
 # every platform ships its own IANA database and they have to agree.
 kotlinxDatetime = "0.8.0"
 
+# Test scope only: reading the test262 tree from disk on every target. The engine itself
+# touches no files, so this must never become a runtime dependency.
+kotlinxIo = "0.9.1"
+
 # jvmTest only: upstream Rhino, pinned to the exact release the port mirrors.
 # It is the differential-testing oracle. It must never become a runtime dependency.
 rhino = "1.9.1"
 
 [libraries] ######################################################################################
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
+kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinxIo" }
 rhino-oracle = { module = "org.mozilla:rhino", version.ref = "rhino" }
 
 [plugins] ########################################################################################

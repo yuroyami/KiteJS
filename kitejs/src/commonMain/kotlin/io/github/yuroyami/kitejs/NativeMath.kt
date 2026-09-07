@@ -286,8 +286,51 @@ class NativeMath private constructor() : ScriptableObject() {
 
         private fun fround(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val x = ScriptRuntime.toNumber(args, 0)
-            return ScriptRuntime.wrapNumber(x.toFloat().toDouble())
+            return ScriptRuntime.wrapNumber(froundToDouble(x))
         }
+
+        /**
+         * The nearest 32-bit float, as a double.
+         *
+         * `Double.toFloat()` cannot be used for this: on Kotlin/JS it does nothing at all, because
+         * JavaScript has only doubles, so `Math.fround` would answer its own argument (D-59). The
+         * rounding is done here so that every target gives the same answer.
+         */
+        internal fun froundToDouble(x: Double): Double {
+            if (x.isNaN() || x.isInfinite() || x == 0.0) return x
+
+            val bits = x.toRawBits()
+            val negative = bits < 0
+            val biased = ((bits ushr 52) and 0x7FFL).toInt()
+            val fraction = bits and 0x000FFFFFFFFFFFFFL
+
+            // Every double subnormal sits far below the smallest float, so it becomes a signed zero.
+            if (biased == 0) return if (negative) -0.0 else 0.0
+
+            val exponent = biased - 1023
+            if (exponent > 127) return if (negative) Double.NEGATIVE_INFINITY else Double.POSITIVE_INFINITY
+
+            // A float keeps 23 fraction bits against a double's 52, and fewer still once the
+            // answer is subnormal as a float, which starts below 2^-126.
+            val drop = if (exponent >= -126) 29 else 29 + (-126 - exponent)
+            if (drop >= 64) return if (negative) -0.0 else 0.0
+
+            val significand = fraction or (1L shl 52)
+            val kept = significand ushr drop
+            val roundBit = (significand ushr (drop - 1)) and 1L
+            val sticky = (significand and ((1L shl (drop - 1)) - 1L)) != 0L
+            val rounded = if (roundBit == 1L && (sticky || (kept and 1L) == 1L)) kept + 1L else kept
+
+            val magnitude = rounded.toDouble() * pow2(exponent - (52 - drop))
+            // Rounding up at the very top carries past what a float can hold.
+            if (magnitude >= pow2(128)) {
+                return if (negative) Double.NEGATIVE_INFINITY else Double.POSITIVE_INFINITY
+            }
+            return if (negative) -magnitude else magnitude
+        }
+
+        /** An exact power of two, built from the exponent field rather than by multiplying. */
+        private fun pow2(n: Int): Double = Double.fromBits(((n + 1023).toLong() and 0x7FFL) shl 52)
 
         private fun hypot(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             var y = 0.0

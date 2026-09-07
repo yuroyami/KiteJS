@@ -112,6 +112,7 @@ class Test262ParityTest {
         val properties = Test262Properties.load(propertiesFile, testRoot)
         val filter = System.getProperty("test262.filter") ?: ""
 
+        val expectations = StringBuilder()
         val differences = mutableListOf<String>()
         val staleExpectations = mutableListOf<String>()
         val agreedButExpectedToDiffer = mutableListOf<String>()
@@ -146,6 +147,9 @@ class Test262ParityTest {
                 currentTest = relative
                 val upstream = runUpstream(relative, source, meta, strict)
                 val ported = runPorted(relative, source, meta, strict)
+                // What the port did here, for the other targets to match (Test262SliceTest).
+                expectations.append(relative).append(if (strict) "\tstrict\t" else "\tsloppy\t")
+                    .append(ported).append('\n')
                 val known = relative in knownDifferences
                 if (upstream != ported) {
                     if (!known) {
@@ -204,6 +208,14 @@ class Test262ParityTest {
                 .forEach { println("  ${it.value.toString().padStart(6)}  ${it.key}") }
         }
         assertTrue(ran > 0, "no test262 cases ran; is the filter '$filter' right?")
+
+        // The port's own outcomes, which the common runner replays on JS and iOS. Lines rather
+        // than JSON: common Kotlin has no parser in scope, and using the engine's own JSON to read
+        // the expectations for the engine would be circular.
+        val expectationsFile = File("build/test262/expectations.txt")
+        expectationsFile.parentFile.mkdirs()
+        expectationsFile.writeText(expectations.toString())
+        println("recorded $ran outcomes to ${expectationsFile.absolutePath}")
 
         // A summary PORTING_STATUS can quote, so the numbers there come from a run.
         val summary = File("build/test262/summary.md")
@@ -269,36 +281,16 @@ class Test262ParityTest {
         }
     }
 
-    private fun runPorted(path: String, source: String, meta: Test262FrontMatter, strict: Boolean): String {
-        val cx = Context.enter()
-        try {
-            cx.languageVersion = Context.VERSION_ES6
-            val scope = cx.initSafeStandardObjects(TopLevel(), false)
-            for (name in meta.harnessFiles()) {
-                portedHarness.getOrPut(name) {
-                    cx.compileString(harnessSource(name), "harness/$name", 1, null)
-                }.exec(cx, scope, scope)
-            }
-            Test262Host.installPorted(cx, scope)
-
-            var failedEarly = true
-            return try {
-                val text = if (strict) "\"use strict\";\n$source" else source
-                val script = cx.compileString(text, path, if (strict) 0 else 1, null)
-                failedEarly = false
-                script.exec(cx, scope, scope)
-                if (meta.isNegative) unexpectedPass(meta) else PASS
-            } catch (e: RhinoException) {
-                judge(meta, errorNamePorted(e), failedEarly)
-            } catch (e: Throwable) {
-                crash(e, record = true)
-            }
-        } catch (e: Throwable) {
-            return crash(e, record = true)
-        } finally {
-            Context.exit()
-        }
-    }
+    /** The port's side, run through the same code every other target uses. */
+    private fun runPorted(path: String, source: String, meta: Test262FrontMatter, strict: Boolean): String =
+        Test262Execution.run(
+            path,
+            source,
+            meta,
+            strict,
+            meta.harnessFiles().map { harnessSource(it) },
+            onCrash = { crash(it, record = true) },
+        )
 
     // ---- Turning what happened into a string the two engines can be compared on -----------------
 
@@ -357,7 +349,7 @@ class Test262ParityTest {
         harnessCache.getOrPut(name) { File(harnessRoot, name).readText() }
 
     private companion object {
-        const val PASS = "passed"
+        val PASS = Test262Execution.PASS
 
         /** Enough differences to see the shape of a problem without an unreadable failure. */
         const val MAX_REPORTED = 40
