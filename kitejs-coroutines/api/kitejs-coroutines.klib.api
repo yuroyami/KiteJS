@@ -1,0 +1,20 @@
+// Klib ABI Dump
+// Targets: [iosArm64, iosSimulatorArm64, iosX64, js, linuxArm64, linuxX64, macosArm64, mingwX64, wasmJs]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <io.github.yuroyami:kitejs-coroutines>
+final class io.github.yuroyami.kitejs.coroutines/AsyncKiteJs : kotlin/AutoCloseable { // io.github.yuroyami.kitejs.coroutines/AsyncKiteJs|null[0]
+    final fun close() // io.github.yuroyami.kitejs.coroutines/AsyncKiteJs.close|close(){}[0]
+    final suspend fun <#A1: kotlin/Any?> deferredToPromise(kotlinx.coroutines/Deferred<#A1>, kotlinx.coroutines/CoroutineScope): io.github.yuroyami.kitejs.api/JsObject // io.github.yuroyami.kitejs.coroutines/AsyncKiteJs.deferredToPromise|deferredToPromise(kotlinx.coroutines.Deferred<0:0>;kotlinx.coroutines.CoroutineScope){0§<kotlin.Any?>}[0]
+    final suspend fun <#A1: kotlin/Any?> onEngine(kotlin/Function1<io.github.yuroyami.kitejs.api/KiteJs, #A1>): #A1 // io.github.yuroyami.kitejs.coroutines/AsyncKiteJs.onEngine|onEngine(kotlin.Function1<io.github.yuroyami.kitejs.api.KiteJs,0:0>){0§<kotlin.Any?>}[0]
+    final suspend fun await(io.github.yuroyami.kitejs.api/JsValue): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.coroutines/AsyncKiteJs.await|await(io.github.yuroyami.kitejs.api.JsValue){}[0]
+    final suspend fun compile(kotlin/String, kotlin/String = ...): io.github.yuroyami.kitejs.api/JsScript // io.github.yuroyami.kitejs.coroutines/AsyncKiteJs.compile|compile(kotlin.String;kotlin.String){}[0]
+    final suspend fun evaluate(kotlin/String, kotlin/String = ...): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.coroutines/AsyncKiteJs.evaluate|evaluate(kotlin.String;kotlin.String){}[0]
+    final suspend fun evaluateAwaiting(kotlin/String, kotlin/String = ...): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.coroutines/AsyncKiteJs.evaluateAwaiting|evaluateAwaiting(kotlin.String;kotlin.String){}[0]
+    final suspend fun suspendFunction(io.github.yuroyami.kitejs.api/JsObject, kotlin/String, kotlin/Int = ..., kotlinx.coroutines/CoroutineScope, kotlin.coroutines/SuspendFunction1<kotlin.collections/List<io.github.yuroyami.kitejs.api/JsValue>, kotlin/Any?>): io.github.yuroyami.kitejs.api/JsFunction // io.github.yuroyami.kitejs.coroutines/AsyncKiteJs.suspendFunction|suspendFunction(io.github.yuroyami.kitejs.api.JsObject;kotlin.String;kotlin.Int;kotlinx.coroutines.CoroutineScope;kotlin.coroutines.SuspendFunction1<kotlin.collections.List<io.github.yuroyami.kitejs.api.JsValue>,kotlin.Any?>){}[0]
+}
+
+final suspend fun io.github.yuroyami.kitejs.coroutines/asyncKiteJs(kotlinx.coroutines/CoroutineDispatcher = ..., kotlin/Function1<io.github.yuroyami.kitejs.api/KiteJsConfig, kotlin/Unit> = ...): io.github.yuroyami.kitejs.coroutines/AsyncKiteJs // io.github.yuroyami.kitejs.coroutines/asyncKiteJs|asyncKiteJs(kotlinx.coroutines.CoroutineDispatcher;kotlin.Function1<io.github.yuroyami.kitejs.api.KiteJsConfig,kotlin.Unit>){}[0]

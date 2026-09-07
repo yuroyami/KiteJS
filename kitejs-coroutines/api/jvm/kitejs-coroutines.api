@@ -1,0 +1,20 @@
+public final class io/github/yuroyami/kitejs/coroutines/AsyncKiteJs : java/lang/AutoCloseable {
+	public final fun await-gF0PohQ (Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public fun close ()V
+	public final fun compile (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun compile$default (Lio/github/yuroyami/kitejs/coroutines/AsyncKiteJs;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun deferredToPromise (Lkotlinx/coroutines/Deferred;Lkotlinx/coroutines/CoroutineScope;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun evaluate-qw2lGYo (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun evaluate-qw2lGYo$default (Lio/github/yuroyami/kitejs/coroutines/AsyncKiteJs;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun evaluateAwaiting-qw2lGYo (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun evaluateAwaiting-qw2lGYo$default (Lio/github/yuroyami/kitejs/coroutines/AsyncKiteJs;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun onEngine (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun suspendFunction (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;ILkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun suspendFunction$default (Lio/github/yuroyami/kitejs/coroutines/AsyncKiteJs;Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;ILkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class io/github/yuroyami/kitejs/coroutines/AsyncKiteJsKt {
+	public static final fun asyncKiteJs (Lkotlinx/coroutines/CoroutineDispatcher;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun asyncKiteJs$default (Lkotlinx/coroutines/CoroutineDispatcher;Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+}
+

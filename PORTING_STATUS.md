@@ -21,7 +21,7 @@ plan, read [KITEJS_IMPL.md](KITEJS_IMPL.md).
 | CompilerEnvirons | ✅ | Complete except `initFromContext`, which needs a real Context (phase 3). Security controllers and the deprecated optimization level are out of scope |
 | AST node hierarchy | ✅ | All 70 node types ported. Every one is checked against the upstream jar: rendered source, positions, line-number fallback, child-list surgery and symbol tables all match. E4X node types are out of scope |
 | Parser | ✅ | Matches upstream on a 30 file construct corpus: same rendered source, same node positions and line numbers, same recorded comments, same accept-or-reject decision. Error reporting matches too, over 60 malformed sources, in both collecting and throwing modes. E4X syntax is rejected rather than parsed |
-| Number formatting (Schubfach) | ✅ | `ScriptRuntime.numberToString` at radix 10 matches upstream on 300000 sampled values plus every boundary case. Same answer on every target. Other radixes wait for BigInt |
+| Number reading and formatting | ✅ | `ScriptRuntime.numberToString` at radix 10 matches upstream on 300000 sampled values plus every boundary case. Same answer on every target. Other radixes wait for BigInt |
 | Icode constants | ✅ | All 89 values equal the upstream table, checked by reflection. The icode range and the bytecode token range still do not overlap |
 | IR generator (IRFactory) | ✅ | The whole corpus lowers to an IR tree identical to upstream's at both language versions: same node types, values, positions, property slots and function tables. E4X transforms are out of scope |
 | IR transform pass (NodeTransformer) | ✅ | The whole corpus transforms to a tree identical to upstream's at both language versions and in strict mode, script tree and every nested function compared |
@@ -56,6 +56,22 @@ plan, read [KITEJS_IMPL.md](KITEJS_IMPL.md).
 | E4X (XML syntax) | 🚫 | Deprecated language extension, dead in the wild |
 | LiveConnect (Java interop) | 🚫 | Reflection-based JVM interop has no meaning in common Kotlin. The binding DSL in the embedding API covers the same ground with lambdas and property references |
 | Intl | 🚫 | Upstream barely supports it; would need ICU-scale data |
+
+## Targets
+
+| Target | Runs the suite |
+|---|---|
+| JVM (bytecode 11) | yes, plus the differential tests against upstream |
+| Android | compiled here, tested through the JVM source it shares |
+| iOS (arm64, x64, simulator) | yes, on the simulator |
+| macOS (arm64) | yes |
+| JavaScript (browser and Node) | yes, on Node |
+| WebAssembly (browser and Node) | yes, on Node |
+| Linux (x64, arm64) | yes, in CI |
+| Windows (x64) | yes, in CI |
+
+The engine depends on nothing that limits this list. Adding a target needs a `WeakRef`, and every
+Kotlin/Native target shares one already.
 
 ## Artifacts
 
@@ -93,12 +109,16 @@ input, and `localeCompare` falls back to code unit order.
 
 The per-folder table is written to `kitejs/build/test262/summary.md` by the run itself.
 
-The same 52,802 cases then run on JS and on the iOS simulator, against the outcomes the JVM run
-recorded, so no target gets to quietly behave differently. Two files differ there, both
-`String.prototype.toLowerCase` with a Greek final sigma: case conversion is the one operation the
-engine still borrows from the platform, and the platforms disagree about it. Everything else,
-including the whole regexp engine, the date arithmetic and the big-integer arithmetic, gives the
-same answer on all three.
+The same 52,802 cases then run on JS, WebAssembly, macOS and the iOS simulator, against the
+outcomes the JVM run recorded, so no target gets to quietly behave differently. Two files differ
+there, both `String.prototype.toLowerCase` with a Greek final sigma: case conversion is the one
+operation the engine still borrows from the platform, and the platforms disagree about it.
+Everything else, including the whole regexp engine, the date arithmetic, the big-integer
+arithmetic and reading a decimal number, gives the same answer on every target.
+
+Adding WebAssembly is what proved that last one matters. Kotlin/Wasm's `String.toDouble` answers
+a neighbouring double for about one string in a hundred, so the engine reads decimals itself now
+rather than asking the platform.
 
 ## Language level
 

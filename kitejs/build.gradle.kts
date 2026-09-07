@@ -64,7 +64,12 @@ kotlin {
 
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
     js {
-        browser()
+        browser {
+            // The library is built for the browser so it can be used there. Its tests are not
+            // run there: they are the same tests Node already runs, and a browser run needs a
+            // browser installed on whatever machine is building.
+            testTask { enabled = false }
+        }
         nodejs {
             testTask {
                 // The eval corpus runs whole programs and the test262 slice runs fifty thousand
@@ -77,7 +82,12 @@ kotlin {
 
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
-        browser()
+        browser {
+            // The library is built for the browser so it can be used there. Its tests are not
+            // run there: they are the same tests Node already runs, and a browser run needs a
+            // browser installed on whatever machine is building.
+            testTask { enabled = false }
+        }
         nodejs {
             testTask {
                 useMocha { timeout = "1800s" }

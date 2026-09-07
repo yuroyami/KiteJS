@@ -1,0 +1,82 @@
+site_name: KiteJS
+site_url: https://yuroyami.github.io/KiteJS/
+site_description: "A JavaScript engine for Kotlin Multiplatform. The parser, the regular expression engine, the date arithmetic and the big integer arithmetic are all written in common Kotlin, so a script gives the same answer on Android, iOS, the JVM, the browser, WebAssembly, Linux and Windows."
+site_author: yuroyami
+copyright: MPL-2.0
+
+repo_name: yuroyami/KiteJS
+repo_url: https://github.com/yuroyami/KiteJS
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+
+theme:
+  name: material
+  language: en
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: black
+      accent: deep purple
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: deep purple
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - toc.follow
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - search.suggest
+    - search.highlight
+    - search.share
+
+extra_css:
+  - theme/kite.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Using the engine:
+      - Evaluating scripts: evaluating.md
+      - Binding host objects: host-objects.md
+      - Promises and coroutines: promises-and-coroutines.md
+      - Dates and time zones: dates-and-time-zones.md
+  - Knowing the edges:
+      - Limits and safety: limits.md
+      - Differences from a browser: differences.md
+  - API reference: https://yuroyami.github.io/KiteJS/api/

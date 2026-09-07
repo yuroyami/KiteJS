@@ -1,22 +1,12 @@
 # KiteJS
 
-A JavaScript engine for Kotlin Multiplatform, ported from Mozilla Rhino. The whole
-engine lives in common Kotlin: no platform engines, no binary blobs, no JIT.
+A JavaScript engine for Kotlin Multiplatform, built on the interpreter from
+[Mozilla Rhino](https://github.com/mozilla/rhino). It runs the same script the same way on every
+target.
 
-Full guide: [docs/](docs/) (placeholder for now).
-
-## Status
-
-Pre-alpha, but it runs. KiteJS evaluates ES5 and most of ES2015 (minus classes and
-modules) on the JVM, Android, iOS and JS. That includes regular expressions, dates,
-typed arrays, promises, generators, `Map` and `Set`, symbols, `Proxy`, `Reflect`, `BigInt` and
-the weak collections.
-Everything is checked against upstream Rhino: the same script runs on both engines and
-the answers have to match, and a slice of whole programs runs on every target so the
-answers cannot quietly differ off the JVM. On the last full test262 run, 52,802 cases went
-through both engines and none of them disagreed.
-
-## Using it
+**[Documentation](docs/)** · [Getting started](docs/getting-started.md) ·
+[Binding host objects](docs/host-objects.md) ·
+[Differences from a browser](docs/differences.md)
 
 ```kotlin
 KiteJs { instructionBudget = 5_000_000 }.use { js ->
@@ -27,20 +17,64 @@ KiteJs { instructionBudget = 5_000_000 }.use { js ->
     }
     println(js.evaluate("document.title + ':' + hypot(3, 4)").asString())
 }
+// Untitled:5
 ```
 
-Host functions, properties, accessors and constructors are bound with lambdas and property
-references, so nothing here uses reflection and it works the same on every target. The budget
-stops a script that will not return.
+## What it does
 
-`kitejs-coroutines` is a second artifact that puts the engine behind suspending functions:
-`await` on a JavaScript promise, a Kotlin `Deferred` handed to a script as a promise, host
-functions that suspend, and cancellation that actually stops a running script.
+Runs ES5.1 and most of ES2015 and later: `let` and `const`, arrow functions, template literals,
+destructuring, `Symbol`, `Map`, `Set`, `WeakMap`, `WeakSet`, generators, `Promise`, `Proxy`,
+`Reflect`, `BigInt`, typed arrays, optional chaining, and the full regular expression syntax
+including named groups and lookbehind. It does not run classes, modules or `async`/`await`.
 
-[PORTING_STATUS.md](PORTING_STATUS.md) tracks what works,
-[KITEJS_IMPL.md](KITEJS_IMPL.md) is the implementation plan.
+The engine is common Kotlin. There is no platform engine underneath, no native library to ship,
+and no code generation at runtime. The parser, the regular expression engine, the date
+arithmetic, the number formatting and the number parsing are all computed inside the engine, so
+the same script gives the same answer everywhere.
 
-## License
+Binding your own functions and objects uses lambdas and property references, not reflection, so
+it behaves identically on every target too.
+
+## Targets
+
+JVM (bytecode 11), Android, iOS, macOS, JavaScript, WebAssembly, Linux (x64 and arm64) and
+Windows.
+
+## Building it
+
+KiteJS is not published yet. Build it and include it locally:
+
+```bash
+git clone https://github.com/yuroyami/KiteJS.git
+cd KiteJS
+./gradlew :kitejs:assemble
+```
+
+```kotlin
+// settings.gradle.kts
+includeBuild("../KiteJS")
+```
+
+```kotlin
+// build.gradle.kts
+commonMain.dependencies {
+    implementation("io.github.yuroyami:kitejs:0.0.1")
+    implementation("io.github.yuroyami:kitejs-coroutines:0.0.1")  // optional
+}
+```
+
+The second artifact puts the engine behind suspending functions: awaiting a promise, handing a
+`Deferred` to a script, host functions that suspend, and cancellation that stops a running
+script.
+
+## Correctness
+
+Every script runs through upstream Rhino as well, and the two answers have to match. On the last
+full test262 run, 52,802 cases went through both engines and none of them disagreed. The same
+52,802 cases then run on JavaScript, WebAssembly, iOS and macOS against the outcomes the JVM
+recorded, so no target can quietly behave differently.
+
+## Licence
 
 MPL-2.0, because KiteJS is a derivative of [Mozilla Rhino](https://github.com/mozilla/rhino).
 See [LICENSE](LICENSE) and [NOTICE](NOTICE).

@@ -17,6 +17,7 @@ allprojects {
 
 dependencies {
     dokka(project(":kitejs"))
+    dokka(project(":kitejs-coroutines"))
 }
 
 dokka {

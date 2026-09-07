@@ -1515,33 +1515,40 @@ means reshaping the node model rather than fixing anything.
       database Kotlin/JS does. `macosArm64Test` and `wasmJsNodeTest` run the whole suite,
       including the 52,802-case test262 slice, and the slice is what found two real bugs (D-68).
       `mingwX64Test` and `linuxX64Test` run in CI, since a host can only test itself.
-- [ ] CI (`.github/workflows`, modelled on KiteCore's `ci.yml`, `docs.yml`, `release.yml`):
-      the default check on every push (JVM, JS on Node, iOS simulator, macOS, Wasm), the
-      nightly `test262Parity` after fetching test262, ABI validation (`abiValidation {}` like
-      KiteCore), and the docs build.
+- [x] CI in `.github/workflows`: `ci.yml` runs three jobs on every push, a Linux one (JVM, JS
+      on Node, Wasm on Node, Linux native, `assemble` and `check`, which carries the ABI check), a
+      macOS one (macOS and the iOS simulator) and a Windows one, since a host can only test
+      itself. `test262.yml` fetches the suite and runs the parity check nightly, keeping the
+      per-folder summary as an artifact. `docs.yml` builds the MkDocs site and the Dokka
+      reference and deploys both to Pages. No `release.yml`: nothing is published yet.
 - [x] JVM bytecode target 11 on both modules, compiled with the 21 toolchain and
       `-Xjdk-release=11` so a newer standard library method cannot slip in. The upstream jar
       stays a test-only dependency. ABI validation is on for both modules.
-- [ ] Documentation site through `_kite-docs/sync.sh`: mkdocs pages (getting started,
-      evaluating scripts, binding host objects, promises and coroutines, dates and time zones,
-      limits, and a single page of differences from browsers' engines written as limitations
-      the reader will hit), Dokka for the API. Written to KITE.md: short sentences, no
-      history, no wave or ledger vocabulary, no em dashes, British or American spelling chosen
-      once for the repository.
-- [ ] README rewritten to KITE.md: what it does, targets, a compiling quickstart, the docs link
-      in the first screen, provenance once in the opening sentence and once under License.
-      `POM_DESCRIPTION` rewritten to the same truth. The status paragraph and the links to
-      `PORTING_STATUS.md` and `KITEJS_IMPL.md` are removed from the README; those two files stay
-      as maintainer documents.
+- [x] Documentation site: `mkdocs.yml` and seven pages under `docs/`, with the shared Kite
+      theme copied in by `_kite-docs/sync.sh`. Getting started, evaluating scripts, binding host
+      objects, promises and coroutines, dates and time zones, limits and safety, and one page of
+      differences from a browser written as limitations the reader will hit. Every claim on that
+      page was checked against the running engine rather than remembered, which is how the
+      missing spread-in-a-call turned up. `dokkaGenerate` covers both modules. No em dashes, no
+      ledger vocabulary, British spelling throughout.
+- [x] README rewritten: what it does, the targets, a working quickstart, the docs links in the
+      first screen, and provenance named once in the opening sentence and once under Licence.
+      `POM_DESCRIPTION` rewritten for both modules to say what the code does and what it does
+      not. The status paragraph and the links to `PORTING_STATUS.md` and `KITEJS_IMPL.md` are
+      gone; those two stay as maintainer documents.
 - [ ] Publish `io.github.yuroyami:kitejs:0.1.0` (and `kitejs-coroutines`) to Maven
       Central through vanniktech, with the shared POM values in `gradle.properties` and the
-      MPL-2.0 licence and NOTICE attribution intact.
+      MPL-2.0 licence and NOTICE attribution intact. Held back on purpose: everything the
+      publish needs is in place and nothing has been pushed anywhere.
 - [ ] Register KiteJS in KiteVersions (`repos.txt`) so the shared versions sync into
-      `gradle/libs.versions.toml`.
-- [ ] Announce nothing the code cannot support.
+      `gradle/libs.versions.toml`. Waits for the publish, since it touches another repository.
+- [x] Announce nothing the code cannot support. The README, the site and both POM descriptions
+      say what runs and name what does not: no classes, no modules, no async and await, no `Intl`,
+      and the three places an answer differs from a browser's.
 
 **Done when:** the artifacts resolve from Maven Central in a fresh project on every declared
-target, the site is live and linked from the README, and CI is green on the default check.
+target, the site is live and linked from the README, and CI is green on the default check. The
+first of those waits for the publish, which is deliberately not done.
 
 ## Self-review notes (kept with the plan)
 
