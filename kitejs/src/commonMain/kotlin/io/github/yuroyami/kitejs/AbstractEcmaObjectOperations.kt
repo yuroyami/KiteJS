@@ -112,7 +112,7 @@ object AbstractEcmaObjectOperations {
         items: Any?,
         callback: Any?,
         keyCoercion: KEY_COERCION,
-    ): Map<Any?, MutableList<Any?>> = groupBy(cx, scope, f.tag, f.getFunctionName(), items, callback, keyCoercion)
+    ): Map<Any?, MutableList<Any?>> = groupBy(cx, scope, f.tag, f.functionName, items, callback, keyCoercion)
 
     internal fun groupBy(
         cx: Context,

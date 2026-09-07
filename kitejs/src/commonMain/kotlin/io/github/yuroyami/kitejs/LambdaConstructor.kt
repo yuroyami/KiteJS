@@ -75,7 +75,7 @@ open class LambdaConstructor : LambdaFunction {
 
     override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
         if ((flags and CONSTRUCTOR_FUNCTION) == 0) {
-            throw ScriptRuntime.typeErrorById("msg.constructor.no.function", getFunctionName())
+            throw ScriptRuntime.typeErrorById("msg.constructor.no.function", functionName)
         }
         val declScope = declarationScope!!
         val t = getTarget()
@@ -84,7 +84,7 @@ open class LambdaConstructor : LambdaFunction {
 
     override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable {
         if ((flags and CONSTRUCTOR_NEW) == 0) {
-            throw ScriptRuntime.typeErrorById("msg.no.new", getFunctionName())
+            throw ScriptRuntime.typeErrorById("msg.no.new", functionName)
         }
         return fireConstructor(cx, declarationScope!!, args)
     }

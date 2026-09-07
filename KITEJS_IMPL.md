@@ -320,6 +320,14 @@ Living list. Every entry is a known, deliberate behavior or structure difference
 - D-64: `ContextListener` is not ported. Upstream marks it deprecated, its two methods are never
   called by the runtime, and the interface it extends, `ContextFactory.Listener`, is ported and
   used.
+- D-65: a write through a `Delegator` lands on the object behind it. Upstream forwards the write
+  with the wrapper still named as the receiver, and that loops: the delegee does not own the
+  property, so it bounces the write back to the receiver, which forwards it to the delegee again.
+  Every write through an upstream `Delegator` ends in a `StackOverflowError`, whether it comes from
+  a script (`wrapped.x = 1`, and even `wrapped.name = 'set'` for a property the delegee already
+  has) or from a host call to `put`. Reads are unaffected and stay byte-identical to upstream. The
+  port names the delegee as the receiver when the write was aimed at the wrapper, which is the one
+  line that makes the class usable as the base for host wrappers, which is what P7 wants it for.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -1321,8 +1329,12 @@ package, with the full suite green after each.
       `getLength()`, `getFunctionName()`, `getPrototypeProperty` and their setters on
       `BaseFunction` and its subclasses, `getDefaultValue` stays (it is the `[[DefaultValue]]`
       hook), `get(name, start)` and friends stay (they are the object protocol).
-- [ ] Explicit backing fields wherever P3 kept a `xField` plus an accessor pair
-      (`isExtensibleField`, `prototypePropertyAttributesField`, the `NewLiteralStorage` four).
+- [x] Explicit backing fields: checked and not applied. The feature solves a public read type
+      that differs from the internal write type, and no property in the port has that shape. Every
+      `xField` is either read and written at the same type, or backs a getter with real logic that
+      a backing field cannot express, or is a lazily allocated collection that reads back as a
+      shared empty list when null, which an explicit field would force to allocate on every node.
+      The `NewLiteralStorage` four turned out to have no accessor pair at all.
 - [ ] `Enum.entries` everywhere, `data object` for the sentinel singletons (`UniqueTag`
       instances, `Undefined`), guard conditions in `when`, and non-local `break` in the
       interpreter loops where the labelled returns came from Java.
@@ -1332,10 +1344,12 @@ package, with the full suite green after each.
 - [ ] `explicitApi()` on the module. Every public declaration is a decision: engine-level API
       (kept public, documented in one line), or `internal`. The one-liner oracle and the
       contract parity tests keep the internals honest.
-- [ ] The identifier classification in the lexer and `ScriptRuntime.isJavaIdentifierStart`
-      move onto the generated Unicode tables from P4.4, so every target classifies the same.
-- [ ] `ImplementationVersion` becomes a constant (`Context.implementationVersion`); `Delegator`
-      is ported (289) as the base for host wrappers.
+- [x] The identifier classification in the lexer and `ScriptRuntime.isJavaIdentifierStart`
+      moved onto the generated Unicode tables in P4.4 (D-43, D-57). Nothing in `commonMain` asks
+      the platform to classify a character any more.
+- [x] `ImplementationVersion` becomes a constant (`Context.IMPLEMENTATION_VERSION`, read by
+      `Context.implementationVersion`); `Delegator` is ported (289) as the base for host wrappers,
+      with the write path fixed under D-65 because upstream's overflows the stack.
 - [ ] Short KDoc on every public class and function, in the house style: one to three lines,
       plain words, no history, no wave or ledger vocabulary.
 

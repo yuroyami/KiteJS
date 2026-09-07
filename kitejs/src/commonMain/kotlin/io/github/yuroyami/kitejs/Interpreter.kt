@@ -373,9 +373,9 @@ class Interpreter : Evaluator {
 
     /** What one instruction tells the loop to do next. Null from the dispatch means "carry on". */
     private sealed class NewState {
-        object BreakLoop : NewState()
-        object BreakJumplessRun : NewState()
-        object BreakWithoutExtension : NewState()
+        data object BreakLoop : NewState()
+        data object BreakJumplessRun : NewState()
+        data object BreakWithoutExtension : NewState()
         class YieldResult(val yielding: Any?) : NewState()
         class StateBreakResult(val frame: CallFrame) : NewState()
         class StateContinueResult(val frame: CallFrame, val indexReg: Int) : NewState()
@@ -1847,7 +1847,7 @@ class Interpreter : Evaluator {
                 @Suppress("UNCHECKED_CAST")
                 val idata = f.constructorCode as InterpreterData<JSFunction>
                 if (cx.languageVersion >= Context.VERSION_ES6 && f.homeObject != null) {
-                    throw ScriptRuntime.typeErrorById("msg.not.ctor", f.getFunctionName())
+                    throw ScriptRuntime.typeErrorById("msg.not.ctor", f.functionName)
                 }
                 val newInstance = if (f.homeObject == null) f.createObject(cx, frame.scope!!) else null
                 val calleeFrame = initFrame(

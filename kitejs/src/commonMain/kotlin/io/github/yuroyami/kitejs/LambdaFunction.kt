@@ -11,8 +11,10 @@ package io.github.yuroyami.kitejs
 open class LambdaFunction : BaseFunction {
 
     protected val target: SerializableCallable?
-    private val name: String
-    private val length: Int
+    final override val functionName: String
+    final override val length: Int
+
+    override val arity: Int get() = length
 
     /** [defaultPrototype] gives the new function a `prototype` property of its own. */
     constructor(
@@ -23,7 +25,7 @@ open class LambdaFunction : BaseFunction {
         defaultPrototype: Boolean = true,
     ) {
         this.target = target
-        this.name = name
+        this.functionName = name
         this.length = length
         ScriptRuntime.setFunctionProtoAndParent(this, Context.getCurrentContext(), scope)
         if (defaultPrototype) setupDefaultPrototype(scope)
@@ -37,7 +39,7 @@ open class LambdaFunction : BaseFunction {
         target: SerializableCallable?,
     ) {
         this.target = target
-        this.name = name
+        this.functionName = name
         this.length = length
         ScriptRuntime.setFunctionProtoAndParent(this, Context.getCurrentContext(), scope)
         setPrototypeProperty(prototype)
@@ -47,7 +49,7 @@ open class LambdaFunction : BaseFunction {
     constructor(scope: Scriptable, length: Int, target: SerializableCallable) {
         this.target = target
         this.length = length
-        this.name = ""
+        this.functionName = ""
         ScriptRuntime.setFunctionProtoAndParent(this, Context.getCurrentContext(), scope)
     }
 
@@ -55,13 +57,7 @@ open class LambdaFunction : BaseFunction {
         target!!.call(cx, declarationScope!!, thisObj, args)
 
     override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable =
-        throw ScriptRuntime.typeErrorById("msg.no.new", getFunctionName())
-
-    override fun getLength(): Int = length
-
-    override fun getArity(): Int = length
-
-    override fun getFunctionName(): String = name
+        throw ScriptRuntime.typeErrorById("msg.no.new", functionName)
 
     internal fun getTarget(): Callable? = target
 }

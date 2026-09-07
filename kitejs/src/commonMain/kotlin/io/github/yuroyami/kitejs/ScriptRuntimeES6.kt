@@ -9,7 +9,7 @@ object ScriptRuntimeES6 {
 
     fun requireObjectCoercible(cx: Context?, value: Any?, idFuncObj: IdFunctionObject): Any? {
         if (value == null || Undefined.isUndefined(value)) {
-            throw ScriptRuntime.typeErrorById("msg.called.null.or.undefined", idFuncObj.tag, idFuncObj.getFunctionName())
+            throw ScriptRuntime.typeErrorById("msg.called.null.or.undefined", idFuncObj.tag, idFuncObj.functionName)
         }
         return value
     }

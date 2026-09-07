@@ -10,16 +10,16 @@ open class IdFunctionObject : BaseFunction {
     private val idcall: IdFunctionCall
     val tag: Any?
     private val methodIdField: Int
-    private val arity: Int
+    private val declaredArity: Int
     private var useCallAsConstructor = false
-    private var functionName: String? = null
+    private var name: String? = null
 
     constructor(idcall: IdFunctionCall, tag: Any?, id: Int, arity: Int) : super() {
         require(arity >= 0)
         this.idcall = idcall
         this.tag = tag
         this.methodIdField = id
-        this.arity = arity
+        this.declaredArity = arity
     }
 
     constructor(idcall: IdFunctionCall, tag: Any?, id: Int, name: String, arity: Int, scope: Scriptable) :
@@ -28,12 +28,12 @@ open class IdFunctionObject : BaseFunction {
         this.idcall = idcall
         this.tag = tag
         this.methodIdField = id
-        this.arity = arity
-        this.functionName = name
+        this.declaredArity = arity
+        this.name = name
     }
 
     fun initFunction(name: String, scope: Scriptable) {
-        this.functionName = name
+        this.name = name
         parentScope = scope
     }
 
@@ -47,7 +47,7 @@ open class IdFunctionObject : BaseFunction {
     }
 
     fun addAsProperty(target: Scriptable) {
-        defineProperty(target, functionName!!, this, DONTENUM)
+        defineProperty(target, name!!, this, DONTENUM)
     }
 
     open fun exportAsScopeProperty() {
@@ -75,11 +75,11 @@ open class IdFunctionObject : BaseFunction {
         throw ScriptRuntime.typeErrorById("msg.not.ctor", functionName)
     }
 
-    override fun getArity(): Int = arity
+    override val arity: Int get() = declaredArity
 
-    override fun getLength(): Int = getArity()
+    override val length: Int get() = arity
 
-    override fun getFunctionName(): String = functionName ?: ""
+    override val functionName: String get() = name ?: ""
 
     fun unknown(): RuntimeException =
         IllegalArgumentException("BAD FUNCTION ID=$methodIdField MASTER=$idcall")

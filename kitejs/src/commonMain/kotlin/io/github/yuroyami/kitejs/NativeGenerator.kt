@@ -50,7 +50,7 @@ class NativeGenerator : IdScriptableObject {
         if (!f.hasTag(GENERATOR_TAG)) {
             return super.execIdCall(f, cx, scope, thisObj, args)
         }
-        val generator = ensureType<NativeGenerator>(thisObj, f.getFunctionName())
+        val generator = ensureType<NativeGenerator>(thisObj, f.functionName)
         return when (f.methodId()) {
             // Closing still has to run any pending finally clauses.
             Id_close -> generator.resume(cx, scope, GENERATOR_CLOSE, GeneratorClosedException())

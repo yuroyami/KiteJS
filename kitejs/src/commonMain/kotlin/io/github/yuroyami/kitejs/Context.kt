@@ -135,7 +135,7 @@ open class Context internal constructor(val factory: ContextFactory) : AutoClose
 
     /** The version of this engine. */
     val implementationVersion: String
-        get() = "KiteJS 0.1 (Rhino 1.9.1 port)"
+        get() = IMPLEMENTATION_VERSION
 
     /** Where warnings and errors go. Defaults to a reporter that throws on error. */
     var errorReporter: ErrorReporter
@@ -439,6 +439,10 @@ open class Context internal constructor(val factory: ContextFactory) : AutoClose
         isTopLevelStrict || (currentActivationCall?.isStrict == true)
 
     companion object {
+
+        /** What `Context.implementationVersion` answers. Upstream reads it from a jar manifest. */
+        const val IMPLEMENTATION_VERSION: String = "KiteJS 0.1 (Rhino 1.9.1 port)"
+
         /** The version number a script asked for was not one of the known ones. */
         const val VERSION_UNKNOWN = -1
         const val VERSION_DEFAULT = 0

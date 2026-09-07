@@ -13,11 +13,11 @@ class BoundFunction(
     private val boundArgs: Array<Any?>,
 ) : BaseFunction() {
 
-    private val length: Int
+    final override val length: Int
 
     init {
         length =
-            if (targetFunction is BaseFunction) maxOf(0, targetFunction.getLength() - boundArgs.size)
+            if (targetFunction is BaseFunction) maxOf(0, targetFunction.length - boundArgs.size)
             else 0
         ScriptRuntime.setFunctionProtoAndParent(this, cx, scope, false)
         val thrower = ScriptRuntime.typeErrorThrower(cx)
@@ -41,10 +41,8 @@ class BoundFunction(
         throw ScriptRuntime.typeErrorById("msg.not.ctor")
     }
 
-    override fun getLength(): Int = length
-
-    override fun getFunctionName(): String =
-        if (targetFunction is BaseFunction) "bound " + targetFunction.getFunctionName() else ""
+    override val functionName: String
+        get() = if (targetFunction is BaseFunction) "bound " + targetFunction.functionName else ""
 
     internal fun getTargetFunction(): Callable = targetFunction
 

@@ -2867,13 +2867,13 @@ object ScriptRuntime {
     /** Puts a declared function into the scope it belongs to. */
     fun initFunction(cx: Context, scope: Scriptable, function: JSFunction, type: Int, fromEvalCode: Boolean) {
         if (type == FunctionNode.FUNCTION_STATEMENT) {
-            val name = function.getFunctionName()
+            val name = function.functionName
             if (name.isNotEmpty()) {
                 if (!fromEvalCode) ScriptableObject.defineProperty(scope, name, function, ScriptableObject.PERMANENT)
                 else scope.put(name, scope, function)
             }
         } else if (type == FunctionNode.FUNCTION_EXPRESSION_STATEMENT) {
-            val name = function.getFunctionName()
+            val name = function.functionName
             if (name.isNotEmpty()) {
                 var s = scope
                 while (s is NativeWith) s = s.parentScope!!

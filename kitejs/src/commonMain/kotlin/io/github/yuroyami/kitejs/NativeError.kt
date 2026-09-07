@@ -236,7 +236,7 @@ class NativeError : IdScriptableObject() {
         }
 
         private fun realThis(thisObj: Scriptable?, f: IdFunctionObject): NativeError =
-            ensureType<NativeError>(thisObj, f.getFunctionName())
+            ensureType<NativeError>(thisObj, f.functionName)
 
         private fun js_toString(thisObj: Scriptable): Any? {
             val nameObj = getProperty(thisObj, "name")

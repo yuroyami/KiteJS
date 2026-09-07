@@ -3160,7 +3160,7 @@ open class NativeRegExp : IdScriptableObject {
         }
 
         private fun realThis(thisObj: Scriptable?, f: IdFunctionObject): NativeRegExp =
-            realThis(thisObj, f.getFunctionName())
+            realThis(thisObj, f.functionName)
 
         private fun realThis(thisObj: Scriptable?, functionName: String): NativeRegExp =
             ensureType<NativeRegExp>(thisObj, functionName)

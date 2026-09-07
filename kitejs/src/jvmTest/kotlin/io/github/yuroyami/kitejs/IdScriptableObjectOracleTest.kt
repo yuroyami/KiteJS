@@ -108,7 +108,7 @@ class IdScriptableObjectOracleTest {
         v === UScriptable.NOT_FOUND || v === Scriptable.NOT_FOUND -> "NOT_FOUND"
         v === org.mozilla.javascript.Undefined.instance || v === Undefined.instance -> "undefined"
         v is UIdFunctionObject -> "idfn:${v.functionName}/${v.arity}"
-        v is IdFunctionObject -> "idfn:${v.getFunctionName()}/${v.getArity()}"
+        v is IdFunctionObject -> "idfn:${v.functionName}/${v.arity}"
         else -> v.toString()
     }
 

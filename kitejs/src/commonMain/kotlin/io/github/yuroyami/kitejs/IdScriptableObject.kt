@@ -691,6 +691,6 @@ abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
 
         /** [ensureType] that names the function complaining. */
         inline fun <reified T : Any> ensureType(obj: Any?, f: IdFunctionObject): T =
-            ensureType(obj, f.getFunctionName())
+            ensureType(obj, f.functionName)
     }
 }

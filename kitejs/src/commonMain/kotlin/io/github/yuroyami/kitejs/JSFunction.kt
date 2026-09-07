@@ -33,7 +33,7 @@ open class JSFunction(
     val isStrict: Boolean
         get() = descriptor.isStrict
 
-    override fun getArity(): Int = descriptor.arity
+    override val arity: Int get() = descriptor.arity
 
     protected fun getLanguageVersion(): Int = descriptor.languageVersion
 
@@ -41,12 +41,13 @@ open class JSFunction(
 
     override fun isGeneratorFunction(): Boolean = descriptor.isES6Generator
 
-    override fun getLength(): Int {
-        val arity = descriptor.arity
-        if (getLanguageVersion() != Context.VERSION_1_2) return arity
-        val activation = ScriptRuntime.findFunctionActivation(Context.getContext(), this) ?: return arity
-        return activation.originalArgs.size
-    }
+    override val length: Int
+        get() {
+            val declared = descriptor.arity
+            if (getLanguageVersion() != Context.VERSION_1_2) return declared
+            val activation = ScriptRuntime.findFunctionActivation(Context.getContext(), this) ?: return declared
+            return activation.originalArgs.size
+        }
 
     internal fun getParamAndVarCount(): Int = descriptor.paramAndVarCount
 
@@ -78,7 +79,7 @@ open class JSFunction(
     }
 
     override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable {
-        val ctor = descriptor.constructor ?: throw ScriptRuntime.typeErrorById("msg.not.ctor", getFunctionName())
+        val ctor = descriptor.constructor ?: throw ScriptRuntime.typeErrorById("msg.not.ctor", functionName)
         var thisObj = if (homeObject == null) createObject(cx, scope) else null
         val res = ctor.execute(cx, this, this, scope, thisObj, args)
         if (res is Scriptable) thisObj = res
@@ -92,7 +93,7 @@ open class JSFunction(
 
     fun hasFunctionNamed(name: String): Boolean = descriptor.hasFunctionNamed(name)
 
-    override fun getFunctionName(): String = descriptor.name
+    override val functionName: String get() = descriptor.name
 
     fun resumeGenerator(cx: Context, scope: Scriptable, operation: Int, state: Any?, value: Any?): Any? =
         descriptor.code!!.resume(cx, this, state, scope, operation, value)

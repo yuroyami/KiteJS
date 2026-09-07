@@ -146,7 +146,7 @@ internal class NativeDate private constructor() : IdScriptableObject() {
         }
 
         // Everything below needs `this` to be a real Date.
-        val realThis = ensureType<NativeDate>(thisObj, f.getFunctionName())
+        val realThis = ensureType<NativeDate>(thisObj, f.functionName)
         var t = realThis.date
         val id = f.methodId()
 

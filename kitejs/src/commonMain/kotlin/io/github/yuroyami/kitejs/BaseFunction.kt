@@ -111,7 +111,7 @@ open class BaseFunction : ScriptableObject, Function {
     override fun hasInstance(instance: Scriptable): Boolean {
         val protoProp = getProperty(this, PROTOTYPE_PROPERTY_NAME)
         if (protoProp is Scriptable) return ScriptRuntime.jsDelegatesTo(instance, protoProp)
-        throw ScriptRuntime.typeErrorById("msg.instanceof.bad.prototype", getFunctionName())
+        throw ScriptRuntime.typeErrorById("msg.instanceof.bad.prototype", functionName)
     }
 
     /** Makes [value] a non-enumerable, non-deletable, read-only `prototype` on this function. */
@@ -132,14 +132,14 @@ open class BaseFunction : ScriptableObject, Function {
     override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable {
         if (cx.languageVersion >= Context.VERSION_ES6 && homeObject != null) {
             // Only a method has a home object, and a method is not a constructor.
-            throw ScriptRuntime.typeErrorById("msg.not.ctor", getFunctionName())
+            throw ScriptRuntime.typeErrorById("msg.not.ctor", functionName)
         }
         var result = createObject(cx, scope)
         if (result == null) {
             val value = call(cx, scope, null, args)
             // When createObject returns null, call has to return the new object itself.
             check(value is Scriptable) {
-                "Bad implementation of call as constructor, name=${getFunctionName()}"
+                "Bad implementation of call as constructor, name=${functionName}"
             }
             result = value
             if (result.prototype == null) {
@@ -173,18 +173,21 @@ open class BaseFunction : ScriptableObject, Function {
         val sb = StringBuilder()
         val justbody = flags.contains(DecompilerFlag.ONLY_BODY)
         if (!justbody) {
-            sb.append("function ").append(getFunctionName()).append("() {\n\t")
+            sb.append("function ").append(functionName).append("() {\n\t")
         }
         sb.append("[native code]\n")
         if (!justbody) sb.append("}\n")
         return sb.toString()
     }
 
-    open fun getArity(): Int = 0
+    /** What the `arity` property answers. */
+    open val arity: Int get() = 0
 
-    open fun getLength(): Int = 0
+    /** What the `length` property answers: how many arguments the function declares. */
+    open val length: Int get() = 0
 
-    open fun getFunctionName(): String = ""
+    /** What the `name` property answers. Empty for an anonymous function. */
+    open val functionName: String get() = ""
 
     /** Sets the attributes of `name`, `length` and `arity`, which differ across the natives. */
     fun setStandardPropertyAttributes(attributes: Int) {
@@ -256,9 +259,9 @@ open class BaseFunction : ScriptableObject, Function {
 
         // ---- The built-in property accessors -------------------------------------------------
 
-        private fun lengthGetter(function: BaseFunction, start: Scriptable?): Any = function.getLength()
+        private fun lengthGetter(function: BaseFunction, start: Scriptable?): Any = function.length
 
-        private fun arityGetter(function: BaseFunction, start: Scriptable?): Any = function.getArity()
+        private fun arityGetter(function: BaseFunction, start: Scriptable?): Any = function.arity
 
         private fun argumentsGetter(function: BaseFunction, start: Scriptable?): Any? =
             function.getArguments()
@@ -275,7 +278,7 @@ open class BaseFunction : ScriptableObject, Function {
         }
 
         private fun nameGetter(function: BaseFunction, start: Scriptable?): Any? =
-            function.nameValue ?: function.getFunctionName()
+            function.nameValue ?: function.functionName
 
         private fun nameSetter(
             function: BaseFunction,
@@ -396,7 +399,7 @@ open class BaseFunction : ScriptableObject, Function {
             }
             throw ScriptRuntime.typeErrorById(
                 "msg.instanceof.bad.prototype",
-                if (thisObj is BaseFunction) thisObj.getFunctionName() else "unknown",
+                if (thisObj is BaseFunction) thisObj.functionName else "unknown",
             )
         }
 
