@@ -45,6 +45,13 @@ class KiteJsConfig internal constructor() {
      */
     var instructionBudget: Int = 0
 
+    /**
+     * Asked now and then while a script runs. Answer true, or throw, to stop it. This is how an
+     * outside signal reaches a running script: a deadline, a cancelled coroutine, a stop button.
+     * Setting it turns the instruction observer on even without a budget.
+     */
+    var interruptWhen: (() -> Boolean)? = null
+
     /** Leaves out the built-ins a sandbox does not want. Today that is only the old `Packages` hooks. */
     var safeBuiltins: Boolean = false
 
@@ -141,6 +148,9 @@ class KiteJs internal constructor(
     }
 
     companion object {
+        /** How often the interrupt hook is asked when there is no budget to pace it. */
+        private const val INTERRUPT_SLICE = 100_000
+
         internal fun build(config: KiteJsConfig): KiteJs {
             if (Context.getCurrentContext() != null) {
                 throw JsEngineError(
@@ -153,9 +163,14 @@ class KiteJs internal constructor(
                 cx.languageVersion = config.languageVersion.code
                 cx.timeZone = config.timeZone
                 config.clock?.let { cx.clock = it }
-                if (config.instructionBudget > 0) {
+                val watching = config.instructionBudget > 0 || config.interruptWhen != null
+                if (watching) {
                     cx.setGenerateObserverCount(true)
-                    cx.setInstructionObserverThreshold(config.instructionBudget)
+                    // With no budget the observer exists only to ask the interrupt hook, so it
+                    // needs a slice small enough to notice a stop but large enough to stay cheap.
+                    val slice =
+                        if (config.instructionBudget > 0) config.instructionBudget else INTERRUPT_SLICE
+                    cx.setInstructionObserverThreshold(slice)
                 }
                 val scope =
                     if (config.safeBuiltins) cx.initSafeStandardObjects(null, config.sealBuiltins)
@@ -182,6 +197,7 @@ internal class EngineFactory(private val config: KiteJsConfig) : ContextFactory(
                 "script used more than ${config.instructionBudget} instructions and was stopped",
             )
         }
+        if (config.interruptWhen?.invoke() == true) throw JsEngineError("script was interrupted")
     }
 }
 

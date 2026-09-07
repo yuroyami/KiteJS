@@ -10,6 +10,9 @@ dokka = "2.2.0"
 # every platform ships its own IANA database and they have to agree.
 kotlinxDatetime = "0.8.0"
 
+# :kitejs-coroutines only. The engine module never sees it.
+kotlinxCoroutines = "1.11.0"
+
 # Test scope only: reading the test262 tree from disk on every target. The engine itself
 # touches no files, so this must never become a runtime dependency.
 kotlinxIo = "0.9.1"
@@ -21,6 +24,8 @@ rhino = "1.9.1"
 [libraries] ######################################################################################
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
 kotlinx-io-core = { module = "org.jetbrains.kotlinx:kotlinx-io-core", version.ref = "kotlinxIo" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinxCoroutines" }
 rhino-oracle = { module = "org.mozilla:rhino", version.ref = "rhino" }
 
 [plugins] ########################################################################################

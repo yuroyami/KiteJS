@@ -26,3 +26,7 @@ rootProject.name = "KiteJS-KMP"
 // (interpreter path only, no JVM bytecode compiler). kotlin-stdlib only at runtime;
 // the upstream Rhino jar appears in jvmTest as a differential-testing oracle.
 include(":kitejs")
+
+// :kitejs-coroutines puts the engine behind suspending functions, on a dispatcher that runs one
+// thing at a time. Separate so :kitejs keeps its single runtime dependency.
+include(":kitejs-coroutines")

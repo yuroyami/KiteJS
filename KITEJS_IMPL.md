@@ -330,6 +330,11 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   line that makes the class usable as the base for host wrappers, which is what P7 wants it for.
 - D-66: `console.time` measures with `TimeSource.Monotonic` rather than `System.nanoTime`. It is
   the same monotonic clock idea, and it is the one common Kotlin has on every target.
+- D-67: cancelling a coroutine cannot stop a running script on Kotlin/JS. The engine and the
+  canceller share the one thread there, so while a script loops nothing else runs, and no signal
+  can arrive. The interrupt hook still works on every target when the hook can decide for itself,
+  such as a deadline it reads from a clock, because it is asked from inside the running script.
+  The job-cancellation tests are therefore JVM tests.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -1430,23 +1435,33 @@ js.close()
 
 #### P7.3: The coroutine artifact
 
-- [ ] A new Gradle module `kitejs-coroutines` depending on `kitejs` and
-      `kotlinx-coroutines-core`. It provides `KiteJs.asyncEngine()` (an engine owned by a
-      dedicated single-thread dispatcher), `suspend fun evaluateAsync`, `JsPromise.await()`,
-      `Deferred<T>.asJsPromise()`, host `suspendFunction { }` that returns a promise to the
-      script and resumes on the engine's dispatcher, and cancellation wired to the instruction
-      observer so `Job.cancel()` stops a running script.
-- [ ] Tests with `kotlinx-coroutines-test`: ordering, cancellation, a script awaiting a host
-      call, exceptions crossing both ways.
+- [x] A new Gradle module `kitejs-coroutines` depending on `kitejs` and
+      `kotlinx-coroutines-core`. `asyncKiteJs()` builds an engine on a dispatcher that runs one
+      thing at a time; `AsyncKiteJs` has `onEngine`, `evaluate`, `compile`, `evaluateAwaiting`,
+      `await` (a rejection arrives as the `JsError` it carried), `deferredToPromise` and
+      `suspendFunction`, which hands the script an ordinary function answering a promise.
+      Cancellation goes through a new `KiteJsConfig.interruptWhen` hook that the instruction
+      observer asks, so cancelling the caller stops a running script. The hook chains: whatever
+      the caller set is still asked. `newPromise()` in the facade gives the host a promise it
+      settles itself, built by evaluating a five-line script rather than reaching into the
+      engine.
+- [x] Tests with `kotlinx-coroutines-test`: 16 in `commonTest` on every target for ordering,
+      promises settled from either side, a script awaiting a host call, exceptions crossing both
+      ways, and a deadline stopping a runaway script. Cancelling from another coroutine needs a
+      second thread, which Kotlin/JS has none of, so those three tests are `jvmTest` and run on
+      the real clock (D-67). A negative control confirms the hook is what stops the script:
+      without it the run never finishes.
 
 #### P7.4: The EPUB-shaped demo
 
-- [ ] `kitejs/src/commonTest/.../EpubScriptingDemoTest`: a fake `document` with
-      `getElementById`, `querySelector`, `addEventListener` and an element with `textContent`
-      and `style`, plus `navigator.epubReadingSystem` with `name`, `version` and
-      `hasFeature`, bound through the facade; a real scripted-EPUB snippet runs and the test
-      asserts the DOM it touched. The real binding lives in KitePDF; this proves the facade is
-      enough for it.
+- [x] `commonTest/api/EpubScriptingDemoTest`: a fake `document` with `getElementById`,
+      `querySelector`, `querySelectorAll`, `addEventListener` and elements with `textContent`,
+      `className` and `style`, plus `navigator.epubReadingSystem` with `name`, `version` and
+      `hasFeature`, all bound through the facade and nothing else. A chapter script registers a
+      `DOMContentLoaded` handler, rewrites the title, counts paragraphs and installs a click
+      handler that keeps its own closed-over state across clicks; the test asserts the DOM it
+      touched. Also covers a chapter script that throws (the engine keeps working) and one that
+      never returns (the budget stops it).
 
 **Done when:** the facade tests are green on every target, the engine module compiles with
 `explicitApi()`, the `!!` count is under a hundred and commented, and the coroutine artifact

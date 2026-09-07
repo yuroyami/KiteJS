@@ -31,6 +31,16 @@ class JsError internal constructor(
 
     /** The message on its own, without the error's name in front. */
     val errorMessage: String = message
+
+    companion object {
+        /** Wraps a thrown or rejected value, reading `name` and `message` off it when it has them. */
+        fun from(value: JsValue): JsError {
+            val obj = value.asObjectOrNull()
+            val name = obj?.get("name")?.takeIf { !it.isNullish }?.asString() ?: "Error"
+            val message = obj?.get("message")?.takeIf { !it.isNullish }?.asString() ?: value.asString()
+            return JsError(value, name, message, emptyList(), null)
+        }
+    }
 }
 
 /** The source did not parse. */
