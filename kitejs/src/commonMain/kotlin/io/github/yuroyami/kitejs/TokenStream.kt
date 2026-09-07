@@ -4,6 +4,8 @@
 
 package io.github.yuroyami.kitejs
 
+import io.github.yuroyami.kitejs.dtoa.DecimalParser
+
 /**
  * This class implements the JavaScript scanner.
  *
@@ -582,10 +584,10 @@ internal class TokenStream(
 
                 val dval: Double
                 if (base == 10 && !isInteger) {
-                    dval = try {
-                        // Use the full string-to-double conversion...
-                        numString.toDouble()
-                    } catch (ex: NumberFormatException) {
+                    // The port's own reader, not the platform's: Kotlin/Wasm answers a
+                    // neighbouring double often enough that a literal would mean two different
+                    // numbers on two targets.
+                    dval = DecimalParser.parse(numString) ?: run {
                         parser.addError("msg.caught.nfe")
                         return Token.ERROR
                     }

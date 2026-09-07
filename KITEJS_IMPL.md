@@ -335,6 +335,19 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   can arrive. The interrupt hook still works on every target when the hook can decide for itself,
   such as a deadline it reads from a clock, because it is asked from inside the running script.
   The job-cancellation tests are therefore JVM tests.
+- D-68: the engine reads decimal numbers with its own parser, not the platform's. Kotlin/Wasm's
+  `String.toDouble` answers a neighbouring double for about one string in a hundred, mostly but
+  not only subnormal ones: `5.65865417e-315` came back one unit in the last place low. Measured
+  over 20,000 random strings, the JVM and Kotlin/JS were exact and Wasm was wrong 235 times. A
+  number literal that means two different numbers on two targets is not one engine, so
+  `dtoa/DecimalParser` does it here: a single exactly rounded multiply for the common case, and
+  an exact `KBigInt` fraction rounded half to even for everything else.
+  `DecimalParserOracleTest` checks it against the JVM over 250,000 random strings, every
+  subnormal power of two, and 100,000 round trips through the port's own printer.
+- D-69: `String.prototype.includes` clamps its start position to the string's length, which the
+  spec asks for and the port was leaving to the platform. The JVM clamps inside `indexOf` and
+  the other targets do not, so `"abc".includes("", 100)` was true on the JVM and false on Wasm.
+  The test262 cross-target slice is what caught it.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -1495,17 +1508,20 @@ means reshaping the node model rather than fixing anything.
 
 ### P8: Widen and publish
 
-- [ ] Targets: add `macosArm64` and `wasmJs` (browser and Node), then Linux and Windows. The
-      engine depends on nothing that limits the list, so each new target needs a `WeakRef`
-      actual (D-52) and nothing else. Wasm has no weak primitive, so its actual holds strongly
-      and reports `isWeakSupported` as false. Run `macosArm64Test` and `wasmJsNodeTest` in the
-      default check; the corpus slice and the smoke test decide.
+- [x] Targets: `macosArm64`, `wasmJs` (browser and Node), `linuxX64`, `linuxArm64` and
+      `mingwX64`. The three new native targets needed no code at all, since they share the same
+      `WeakRef` actual the Apple targets use. Wasm needed its own: it has no weak primitive, so
+      it holds strongly and reports `isWeakSupported` as false, and it needs the same npm zone
+      database Kotlin/JS does. `macosArm64Test` and `wasmJsNodeTest` run the whole suite,
+      including the 52,802-case test262 slice, and the slice is what found two real bugs (D-68).
+      `mingwX64Test` and `linuxX64Test` run in CI, since a host can only test itself.
 - [ ] CI (`.github/workflows`, modelled on KiteCore's `ci.yml`, `docs.yml`, `release.yml`):
       the default check on every push (JVM, JS on Node, iOS simulator, macOS, Wasm), the
       nightly `test262Parity` after fetching test262, ABI validation (`abiValidation {}` like
       KiteCore), and the docs build.
-- [ ] JVM bytecode target 11 like KiteCore, compiled with the 21 toolchain; the upstream jar
-      stays a test-only dependency.
+- [x] JVM bytecode target 11 on both modules, compiled with the 21 toolchain and
+      `-Xjdk-release=11` so a newer standard library method cannot slip in. The upstream jar
+      stays a test-only dependency. ABI validation is on for both modules.
 - [ ] Documentation site through `_kite-docs/sync.sh`: mkdocs pages (getting started,
       evaluating scripts, binding host objects, promises and coroutines, dates and time zones,
       limits, and a single page of differences from browsers' engines written as limitations

@@ -296,8 +296,12 @@ internal class NativeString internal constructor(private val string: CharSequenc
             val target = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "includes"))
             val searchStr = ScriptRuntime.toString(args, 0)
             checkValidRegex(cx, args, 0, "includes")
+            // The spec clamps the start to the string's own length, and that matters for an
+            // empty search string: it is found at the end. The JVM clamps inside indexOf, so
+            // leaving it out only shows up off the JVM.
             val position = ScriptRuntime.toInteger(args, 1).toInt()
-            return target.indexOf(searchStr, maxOf(position, 0)) != -1
+            val start = minOf(maxOf(position, 0), target.length)
+            return target.indexOf(searchStr, start) != -1
         }
 
         private fun checkValidRegex(cx: Context, args: Array<Any?>, pos: Int, functionName: String) {

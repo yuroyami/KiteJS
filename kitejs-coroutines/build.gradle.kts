@@ -1,4 +1,7 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -21,6 +24,10 @@ kotlin {
 
     jvmToolchain(21)
 
+    @OptIn(ExperimentalAbiValidation::class)
+    abiValidation {
+    }
+
     android {
         namespace = "io.github.yuroyami.kitejs.coroutines"
         compileSdk = 36
@@ -31,6 +38,7 @@ kotlin {
         iosSimulatorArm64(),
         iosArm64(),
         iosX64(),
+        macosArm64(),
     ).forEach { target ->
         target.binaries.framework {
             baseName = "KiteJSCoroutines"
@@ -38,8 +46,12 @@ kotlin {
         }
     }
 
+    linuxX64()
+    linuxArm64()
+    mingwX64()
+
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
-    js(IR) {
+    js {
         browser()
         nodejs {
             testTask {
@@ -49,7 +61,23 @@ kotlin {
         binaries.library()
     }
 
-    jvm()
+    @OptIn(ExperimentalWasmDsl::class, ExperimentalKotlinGradlePluginApi::class)
+    wasmJs {
+        browser()
+        nodejs {
+            testTask {
+                useMocha { timeout = "300s" }
+            }
+        }
+        binaries.library()
+    }
+
+    jvm {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_11)
+            freeCompilerArgs.add("-Xjdk-release=11")
+        }
+    }
 
     sourceSets {
         commonMain.dependencies {

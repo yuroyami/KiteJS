@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs
 
+import io.github.yuroyami.kitejs.dtoa.DecimalParser
 import io.github.yuroyami.kitejs.dtoa.DoubleFormatter
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -103,11 +104,7 @@ public object ScriptRuntime {
                  * the result from the repeated multiply-add above may be inaccurate. Use
                  * the full string-to-double conversion to get the correct answer.
                  */
-                return try {
-                    source.substring(sourceStart, end).toDouble()
-                } catch (nfe: NumberFormatException) {
-                    NaN
-                }
+                return DecimalParser.parse(source.substring(sourceStart, end)) ?: NaN
             } else if (radix == 2 || radix == 4 || radix == 8 || radix == 16 || radix == 32) {
                 /* The number may also be inaccurate for one of these bases. This happens
                  * if the addition in value*radix + digit causes a round-down to an even
@@ -327,7 +324,7 @@ public object ScriptRuntime {
             }
             return NaN
         }
-        return sub.toDoubleOrNull() ?: NaN
+        return DecimalParser.parse(sub) ?: NaN
     }
 
 

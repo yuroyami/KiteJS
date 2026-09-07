@@ -1,4 +1,7 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -29,6 +32,12 @@ kotlin {
         freeCompilerArgs.add("-Xexpect-actual-classes")
     }
 
+    // Records the public API in api/ so an accidental change to it shows up in review rather
+    // than in someone's build. `./gradlew updateLegacyAbi` accepts a deliberate change.
+    @OptIn(ExperimentalAbiValidation::class)
+    abiValidation {
+    }
+
     android {
         namespace = "io.github.yuroyami.kitejs"
         compileSdk = 36
@@ -39,6 +48,7 @@ kotlin {
         iosSimulatorArm64(),
         iosArm64(),
         iosX64(),
+        macosArm64(),
     ).forEach { target ->
         target.binaries.framework {
             baseName = "KiteJS"
@@ -46,8 +56,14 @@ kotlin {
         }
     }
 
+    // No framework on these: they are libraries, not Apple frameworks. They share nativeMain
+    // with the Apple targets, so they need no code of their own.
+    linuxX64()
+    linuxArm64()
+    mingwX64()
+
     @OptIn(ExperimentalKotlinGradlePluginApi::class)
-    js(IR) {
+    js {
         browser()
         nodejs {
             testTask {
@@ -59,7 +75,25 @@ kotlin {
         binaries.library()
     }
 
-    jvm()
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        browser()
+        nodejs {
+            testTask {
+                useMocha { timeout = "1800s" }
+            }
+        }
+        binaries.library()
+    }
+
+    jvm {
+        // Bytecode an application on Java 11 can load, produced by the 21 toolchain. The
+        // -Xjdk-release flag is what stops a newer standard library method slipping in.
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_11)
+            freeCompilerArgs.add("-Xjdk-release=11")
+        }
+    }
 
     sourceSets {
         all {
@@ -75,9 +109,13 @@ kotlin {
             implementation(libs.kotlinx.datetime)
         }
 
-        // kotlinx-datetime on Kotlin/JS ships no zone database of its own. Without this the
-        // engine only knows UTC and fixed offsets, which DateZoneSliceTest catches at once.
+        // kotlinx-datetime on Kotlin/JS and Kotlin/Wasm ships no zone database of its own. Without
+        // this the engine only knows UTC and fixed offsets, which DateZoneSliceTest catches at once.
         jsMain.dependencies {
+            implementation(npm("@js-joda/timezone", "2.3.0"))
+        }
+
+        wasmJsMain.dependencies {
             implementation(npm("@js-joda/timezone", "2.3.0"))
         }
 
