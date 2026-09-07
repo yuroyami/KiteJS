@@ -1275,11 +1275,12 @@ port passes exactly when upstream passes. Every difference becomes a fix or a le
       with a visible message; Wasm on Node runs it. Nothing generated is committed.
 - [x] Native tests actually run: `iosSimulatorArm64Test` joins the default check (today the
       iOS target only compiles), and `macosArm64Test` once P8 adds the target.
-- [ ] V8 differential report: when `jsNodeTest` runs, a reporter evaluates the eval corpus in
+- [x] V8 differential report: when `jsNodeTest` runs, a reporter evaluates the eval corpus in
       Node's own engine as well and prints where KiteJS and V8 disagree. Informational only:
       upstream Rhino itself disagrees with V8 (no classes, no modules), so this cannot be a
       gate, but it shows the reader where the engine stands against a modern one.
-- [ ] Optional, after the above: upstream's 149 Mozilla `jstests` through the same runner.
+- [ ] Optional, after the above: upstream's 149 Mozilla `jstests` through the same runner. Not
+      done: test262 already covers the same ground and the parity mechanism is what mattered.
 
 **Done when:** `test262Parity` reports zero unexplained differences, the common runner matches
 the JVM's recorded outcomes on JS, iOS and (after P8) macOS and Wasm, and `PORTING_STATUS.md`
