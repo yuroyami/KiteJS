@@ -50,12 +50,25 @@ plan, read [KITEJS_IMPL.md](KITEJS_IMPL.md).
 | Reflect | ✅ | All thirteen methods, including `Reflect.construct` with a separate new.target. About 55 oracle scripts match upstream |
 | WeakMap, WeakSet | ✅ | Both, with the TypeErrors for a key that is not an object or an unregistered symbol, and construction from an iterable. They sit on the engine's own `WeakKeyMap` over `WeakRef`, since common Kotlin has no `WeakHashMap`. About 50 oracle scripts match upstream. Nothing in JavaScript can observe a collection, so a JVM test forces one and checks the entries really go |
 | BigInt | ✅ | Literals, every operator with the TypeErrors for mixing a bigint with a number, comparisons that stay exact across the two, `BigInt`, `asIntN` and `asUintN`, `toString` in every radix, and `BigInt64Array` and `BigUint64Array`. The arithmetic is the port's own `KBigInt`, checked operation by operation against `java.math.BigInteger`. `Number.prototype.toString(radix)` came back with it, since the shortest-round-trip printer needs big integers. One gap upstream has and the port does not: upstream's `BigUint64Array` returns garbage for any element with its top bit set |
-| test262 conformance harness | ⛔ | Phase 6 |
-| Kotlin embedding API (host objects without reflection) | ⛔ | Phase 7 |
+| test262 conformance harness | ✅ | Every file the suite has, through upstream and through this port, comparing outcomes. Read the conformance section below |
+| Kotlin embedding API (host objects without reflection) | ✅ | `io.github.yuroyami.kitejs.api`: an engine handle with a config DSL, a value class over the engine's values, thin object, array and function wrappers, a fixed conversion table both ways, and a binding DSL for host functions, properties, accessors, constructors and whole Kotlin objects. No reflection anywhere, so it works the same on every target. An instruction budget and an interrupt hook stop a script that will not return. 39 tests on every target, plus a JVM test that runs the whole eval corpus through both the facade and the engine and compares, which is what proves the facade adds no semantics of its own |
 | JVM bytecode compiler | 🚫 | JIT and runtime codegen are impossible on iOS and pointless for this port; upstream's interpreted mode is the model |
 | E4X (XML syntax) | 🚫 | Deprecated language extension, dead in the wild |
-| LiveConnect (Java interop) | 🚫 | Reflection-based JVM interop has no meaning in common Kotlin; Phase 7 replaces it with a Kotlin DSL |
+| LiveConnect (Java interop) | 🚫 | Reflection-based JVM interop has no meaning in common Kotlin. The binding DSL in the embedding API covers the same ground with lambdas and property references |
 | Intl | 🚫 | Upstream barely supports it; would need ICU-scale data |
+
+## Artifacts
+
+| Module | What it is |
+|---|---|
+| `kitejs` | The whole engine plus the embedding API. One runtime dependency: kotlinx-datetime, for the zone rules `Date` needs |
+| `kitejs-coroutines` | The engine behind suspending functions, on a dispatcher that runs one thing at a time. `await` on a JavaScript promise, a Kotlin `Deferred` handed to a script as a promise, host functions that suspend, and cancellation that actually stops a running script. Separate artifact, so an embedder who does not use coroutines pays nothing |
+
+## Console
+
+`console.log` and its neighbours are ported, including the format specifiers (`%s`, `%d`, `%i`,
+`%f`, `%o`, `%O`, `%c`, `%%`), the counters and the timers. Where the output goes is the
+embedder's choice: pass a printer when building the engine, or leave `console` out entirely.
 
 ## Conformance
 
