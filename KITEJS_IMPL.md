@@ -328,6 +328,8 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   has) or from a host call to `put`. Reads are unaffected and stay byte-identical to upstream. The
   port names the delegee as the receiver when the write was aimed at the wrapper, which is the one
   line that makes the class usable as the base for host wrappers, which is what P7 wants it for.
+- D-66: `console.time` measures with `TimeSource.Monotonic` rather than `System.nanoTime`. It is
+  the same monotonic clock idea, and it is the one common Kotlin has on every target.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -1381,39 +1383,50 @@ js.runMicrotasks()
 js.close()
 ```
 
-- [ ] `KiteJs`: the engine handle. Builds a `Context` and a global scope from a `KiteJsConfig`
-      DSL; `evaluate`, `compile` (a reusable `JsScript`), `global`, `runMicrotasks`, `close`;
-      implements `AutoCloseable` so `use { }` works. One instance, one thread (rule 7).
-- [ ] `JsValue`: a value class over the engine's `Any?` with `isUndefined`, `isNull`,
-      `asBoolean()`, `asDouble()`, `asInt()`, `asString()`, `asObject()`, `asArray()`,
-      `asFunction()`, `toKotlin()` (deep conversion to `Map`, `List`, `Double`, `String`,
-      `Boolean`, `null`), and `typeOf`. Exhaustive handling through a `when` on `JsValue.kind`.
-- [ ] `JsObject`, `JsArray`, `JsFunction`: thin wrappers with `operator get` and `set`, `keys`,
-      `invoke`, `construct`, `bind`, and conversion to and from Kotlin collections. No new
-      object model; they wrap `ScriptableObject`, `NativeArray` and `Function`.
-- [ ] `Converters`: the fixed table Kotlin to JS (`Int`, `Long` within the safe range,
-      `Double`, `Boolean`, `String`, `CharSequence`, `List`, `Array`, `Map`, `Unit`, `null`,
-      `JsValue`) and back, plus a registry for user types. Typed `function<A, B, R>` overloads
-      resolve arguments through it at call time, without reflection.
-- [ ] Host binding DSL: `obj { }`, `function`, `property`, `getter`, `setter`, `constructor`,
-      `readonly`, `enumerable`, and a `bind(instance) { property(Kotlin::prop); method(...) }`
-      form built on callable references (`KProperty1.get` and `KFunction.invoke` need no
-      reflection library). Context parameters carry the engine into the DSL lambdas instead of
-      an explicit receiver chain.
-- [ ] `JsException` hierarchy (sealed): `JsError` (a thrown script value, with `value`,
-      `name`, `message` and `scriptStack: List<StackFrame>`), `JsSyntaxError` (with line and
-      column), `JsEngineError` (an internal failure). The engine's `RhinoException` family
-      stays underneath; the facade translates at the boundary.
-- [ ] Instruction budget: `Context.observeInstructionCount` from P3.5 backs
-      `KiteJsConfig.instructionBudget`; exceeding it throws `JsError` with a clear name. This
-      is how an embedder stops a runaway script on every target.
-- [ ] `NativeConsole.kt` (386) ported with a Kotlin `ConsolePrinter` interface, a `Level`
-      enum, the format specifiers (`%s`, `%d`, `%i`, `%f`, `%o`, `%O`, `%c`) formatted by hand,
-      and plain counters instead of `AtomicInteger` (rule 7). Installed by the facade when a
-      printer is configured.
-- [ ] Tests: `commonTest/FacadeTest` on every target for each DSL form, conversions in both
-      directions, exceptions, the budget; a jvmTest that the facade's answers equal
-      `evaluateString` on the engine (no semantic layer added).
+- [x] `KiteJs`: the engine handle. Builds a `Context` and a global scope from a `KiteJsConfig`
+      DSL; `evaluate`, `compile` (a reusable `JsScript`), `global`, `runMicrotasks`, `close`,
+      `valueOf`, `newObject`, `newArray`; implements `AutoCloseable` so `use { }` works. One
+      instance at a time, and opening a second while one is live says so rather than quietly
+      sharing the first one's context.
+- [x] `JsValue`: a value class over the engine's `Any?` with `isUndefined`, `isNull`,
+      `isNullish`, `asBoolean()`, `asDouble()`, `asInt()`, `asLong()`, `asString()`, `asBigInt()`,
+      `asObject()`, `asArray()`, `asFunction()` and their `OrNull` twins, `toKotlin()` (deep, and
+      a cycle stops at the object that closed it), and `typeOf`. A `when` over `JsValue.type`
+      is exhaustive.
+- [x] `JsObject`, `JsArray`, `JsFunction`: thin wrappers with `operator get` and `set`, `keys`,
+      `has`, `delete`, `call`, `invoke`, `callOn`, `construct`, `bind`, and conversion to and from
+      Kotlin collections. No new object model; they wrap `Scriptable`, `NativeArray` and
+      `Function`. A call the host starts is wrapped in a top call, so it sets up the same top
+      scope a script would; without that `bind` cannot even build its type-error thrower.
+- [x] `Converters`: the fixed table Kotlin to JS (`Int`, `Long` (a BigInt outside the safe
+      range), `Double`, `Float`, `Short`, `Byte`, `Boolean`, `Char`, `String`, `CharSequence`,
+      `List`, `Array`, the primitive arrays, `Map`, `Set`, `Unit`, `null`, `JsValue`, `JsObject`)
+      and back, plus `register` for user types. Typed `function<A, B, R>` overloads resolve
+      arguments through it at call time, with reified types and no reflection.
+- [x] Host binding DSL: `obj { }`, `function`, `method`, `property`, `constant`, `getter`,
+      `setter`, `accessor`, `constructor`, a `PropertyFlags` for writable, enumerable and
+      configurable, and a `bind(name, instance) { property(Kotlin::prop); method(...) }` form
+      built on callable references (`KProperty1.get` needs no reflection library). Context
+      parameters were not used: the DSL receiver is the object being built, which is the thing
+      the lambda is about, and the engine reaches the lambdas through the entered context.
+- [x] `JsException` hierarchy (sealed): `JsError` (a thrown script value, with `value`,
+      `name`, `errorMessage` and `scriptStack: List<JsStackFrame>`), `JsSyntaxError` (with file,
+      line, column and line source), `JsEngineError` (closed, misused, or out of budget). The
+      engine's `RhinoException` family stays underneath; the facade translates at the boundary.
+- [x] Instruction budget: `ContextFactory.observeInstructionCount` backs
+      `KiteJsConfig.instructionBudget`; exceeding it throws `JsEngineError` naming the budget.
+      Each call gets the budget again. This is how an embedder stops a runaway script on every
+      target.
+- [x] `NativeConsole.kt` (386) ported with a `ConsolePrinter` fun interface, a `Level` enum,
+      the format specifiers (`%s`, `%d`, `%i`, `%f`, `%o`, `%O`, `%c`, `%%`) formatted by hand,
+      plain counters instead of `AtomicInteger` and `TimeSource.Monotonic` instead of
+      `System.nanoTime` (D-66). Installed by the facade when a printer is configured;
+      `ConsolePrinters` has ready-made ones for stdout and for collecting into a list.
+- [x] Tests: `commonTest/FacadeTest`, 39 tests on every target covering each DSL form,
+      conversions in both directions, exceptions, the budget, the console and the config;
+      `jvmTest/FacadeEquivalenceTest` runs the whole eval corpus plus 56 scripts through both the
+      facade and `evaluateString` and compares, proving no semantic layer was added. Three
+      negative controls confirm all four of its cases are live.
 
 #### P7.3: The coroutine artifact
 
