@@ -11,12 +11,12 @@ package io.github.yuroyami.kitejs
 abstract class ES6Iterator : ScriptableObject {
 
     protected var exhausted = false
-    private var tag: String? = null
+    private var tagValue: String? = null
 
     protected constructor() : super()
 
     protected constructor(scope: Scriptable, tag: String) : super() {
-        this.tag = tag
+        this.tagValue = tag
         val top = getTopLevelScope(scope)
         parentScope = top
         val prototype = getTopScopeValue(top, tag) as ScriptableObject
@@ -38,7 +38,7 @@ abstract class ES6Iterator : ScriptableObject {
         return makeIteratorResult(cx, scope, done, value)
     }
 
-    protected open fun getTag(): String? = tag
+    protected open val tag: String? get() = tagValue
 
     companion object {
         const val NEXT_METHOD = "next"

@@ -94,10 +94,10 @@ internal open class Arguments(private val activation: NativeCall, cx: Context) :
 
     /** Whether slot [index] is the same variable as a named parameter. */
     private fun sharedWithActivation(index: Int): Boolean {
-        if (Context.getContext().isStrictMode()) return false
+        if (Context.getContext().isStrictMode) return false
         val f = activation.function
         if (f == null || f.hasDefaultParameters()) return false
-        val definedCount = f.getParamCount()
+        val definedCount = f.paramCount
         if (index < definedCount) {
             // A later parameter with the same name takes the slot.
             if (index < definedCount - 1) {
@@ -179,7 +179,7 @@ internal open class Arguments(private val activation: NativeCall, cx: Context) :
         if (d != index.toDouble()) return true
         val value = arg(index)
         if (value === Scriptable.NOT_FOUND) return true
-        if (desc.isAccessorDescriptor()) {
+        if (desc.isAccessorDescriptor) {
             removeArg(index)
             return true
         }

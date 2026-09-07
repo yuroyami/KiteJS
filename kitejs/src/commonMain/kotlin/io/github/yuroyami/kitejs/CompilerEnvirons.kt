@@ -88,16 +88,16 @@ class CompilerEnvirons {
     fun initFromContext(cx: Context) {
         errorReporter = cx.errorReporter
         languageVersion = cx.languageVersion
-        generateDebugInfo = !cx.isGeneratingDebugChanged() || cx.isGeneratingDebug()
+        generateDebugInfo = !cx.isGeneratingDebugChanged || cx.isGeneratingDebug
         reservedKeywordAsIdentifier = cx.hasFeature(Context.FEATURE_RESERVED_KEYWORD_AS_IDENTIFIER)
         allowMemberExprAsFunctionName = cx.hasFeature(Context.FEATURE_MEMBER_EXPR_AS_FUNCTION_NAME)
         strictMode = cx.hasFeature(Context.FEATURE_STRICT_MODE)
         warningAsError = cx.hasFeature(Context.FEATURE_WARNING_AS_ERROR)
         xmlAvailable = cx.hasFeature(Context.FEATURE_E4X)
-        interpretedMode = cx.isInterpretedMode()
-        generatingSource = cx.isGeneratingSource()
+        interpretedMode = cx.isInterpretedMode
+        generatingSource = cx.isGeneratingSource
         activationNames = cx.activationNames
-        generateObserverCount = cx.isGenerateObserverCount()
+        generateObserverCount = cx.isGenerateObserverCount
     }
 
     fun reportWarningAsError(): Boolean = warningAsError

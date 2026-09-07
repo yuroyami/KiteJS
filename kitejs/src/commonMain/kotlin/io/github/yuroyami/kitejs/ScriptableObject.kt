@@ -53,7 +53,7 @@ abstract class ScriptableObject :
     override fun has(name: String, start: Scriptable): Boolean = map.query(name, 0) != null
 
     override fun has(index: Int, start: Scriptable): Boolean {
-        externalData?.let { return index < it.getArrayLength() }
+        externalData?.let { return index < it.arrayLength }
         return map.query(null, index) != null
     }
 
@@ -66,7 +66,7 @@ abstract class ScriptableObject :
 
     override fun get(index: Int, start: Scriptable): Any? {
         externalData?.let {
-            return if (index < it.getArrayLength()) it.getArrayElement(index)
+            return if (index < it.arrayLength) it.getArrayElement(index)
             else Scriptable.NOT_FOUND
         }
         val slot = map.query(null, index) ?: return Scriptable.NOT_FOUND
@@ -79,7 +79,7 @@ abstract class ScriptableObject :
     }
 
     override fun put(name: String, start: Scriptable, value: Any?) {
-        if (putOwnProperty(name, start, value, Context.isCurrentContextStrict())) return
+        if (putOwnProperty(name, start, value, Context.isCurrentContextStrict)) return
         if (start === this) throw Kit.codeBug()
         start.put(name, start, value)
     }
@@ -94,7 +94,7 @@ abstract class ScriptableObject :
     override fun put(index: Int, start: Scriptable, value: Any?) {
         val ext = externalData
         if (ext != null) {
-            if (index < ext.getArrayLength()) {
+            if (index < ext.arrayLength) {
                 ext.setArrayElement(index, value)
             } else {
                 throw JavaScriptException(
@@ -110,7 +110,7 @@ abstract class ScriptableObject :
             }
             return
         }
-        if (putOwnProperty(index, start, value, Context.isCurrentContextStrict())) return
+        if (putOwnProperty(index, start, value, Context.isCurrentContextStrict)) return
         if (start === this) throw Kit.codeBug()
         start.put(index, start, value)
     }
@@ -123,7 +123,7 @@ abstract class ScriptableObject :
     ): Boolean = putImpl(null, index, start, value, isThrow)
 
     override fun put(key: Symbol, start: Scriptable, value: Any?) {
-        if (putOwnProperty(key, start, value, Context.isCurrentContextStrict())) return
+        if (putOwnProperty(key, start, value, Context.isCurrentContextStrict)) return
         if (start === this) throw Kit.codeBug()
         ensureSymbolScriptable(start).put(key, start, value)
     }
@@ -284,16 +284,16 @@ abstract class ScriptableObject :
             defineProperty(
                 Context.getContext(),
                 "length",
-                LambdaGetterFunction { getExternalArrayLength() },
+                LambdaGetterFunction { externalArrayLength },
                 null,
                 READONLY or DONTENUM,
             )
         }
     }
 
-    fun getExternalArrayData(): ExternalArrayData? = externalData
+    val externalArrayData: ExternalArrayData? get() = externalData
 
-    fun getExternalArrayLength(): Any = externalData?.getArrayLength() ?: 0
+    val externalArrayLength: Any get() = externalData?.arrayLength ?: 0
 
     // ---- Prototype and scope ------------------------------------------------------------------
 
@@ -312,7 +312,7 @@ abstract class ScriptableObject :
     override fun getIds(): Array<Any?> = startCompoundOp(false).use { getIds(it, false, false) }
 
     /** Every property, enumerable or not. */
-    open fun getAllIds(): Array<Any?> = startCompoundOp(false).use { getIds(it, true, false) }
+    open val allIds: Array<Any?> get() = startCompoundOp(false).use { getIds(it, true, false) }
 
     override fun getDefaultValue(hint: KClass<*>?): Any? = getDefaultValue(this, hint)
 
@@ -578,19 +578,19 @@ abstract class ScriptableObject :
             configurable = (attributes and PERMANENT) == 0
         }
 
-        fun isWritable(): Boolean = writable == true
+        val isWritable: Boolean get() = writable == true
 
         fun isWritable(value: Boolean): Boolean = writable == value
 
         fun hasWritable(): Boolean = writable !== Scriptable.NOT_FOUND
 
-        fun isEnumerable(): Boolean = enumerable == true
+        val isEnumerable: Boolean get() = enumerable == true
 
         fun isEnumerable(value: Boolean): Boolean = enumerable == value
 
         fun hasEnumerable(): Boolean = enumerable !== Scriptable.NOT_FOUND
 
-        fun isConfigurable(): Boolean = configurable == true
+        val isConfigurable: Boolean get() = configurable == true
 
         fun isConfigurable(value: Boolean): Boolean = configurable == value
 
@@ -602,11 +602,11 @@ abstract class ScriptableObject :
 
         fun hasSetter(): Boolean = setter !== Scriptable.NOT_FOUND
 
-        fun isDataDescriptor(): Boolean = hasValue() || hasWritable()
+        val isDataDescriptor: Boolean get() = hasValue() || hasWritable()
 
-        fun isAccessorDescriptor(): Boolean = hasGetter() || hasSetter()
+        val isAccessorDescriptor: Boolean get() = hasGetter() || hasSetter()
 
-        fun isGenericDescriptor(): Boolean = !isDataDescriptor() && !isAccessorDescriptor()
+        val isGenericDescriptor: Boolean get() = !isDataDescriptor && !isAccessorDescriptor
 
         /** Renders this descriptor as the script object `Object.getOwnPropertyDescriptor` returns. */
         internal fun toObject(scope: Scriptable): Scriptable {
@@ -640,7 +640,7 @@ abstract class ScriptableObject :
             throw ScriptRuntime.typeErrorById("msg.change.enumerable.with.configurable.false", id)
         }
 
-        val isData = info.isDataDescriptor()
+        val isData = info.isDataDescriptor
         val isAccessor = info.accessorDescriptor
         when {
             // A generic descriptor needs no further checking.
@@ -789,7 +789,7 @@ abstract class ScriptableObject :
         constFlag: Int,
     ): Boolean {
         check(constFlag != EMPTY)
-        if (!isExtensibleField && Context.getContext().isStrictMode()) {
+        if (!isExtensibleField && Context.getContext().isStrictMode) {
             throw ScriptRuntime.typeErrorById("msg.not.extensible")
         }
         val slot: Slot
@@ -824,7 +824,7 @@ abstract class ScriptableObject :
 
     internal open fun getIds(map: CompoundOperationMap, getNonEnumerable: Boolean, getSymbols: Boolean): Array<Any?> {
         var a: Array<Any?>
-        val externalLen = externalData?.getArrayLength() ?: 0
+        val externalLen = externalData?.arrayLength ?: 0
         if (externalLen == 0) {
             a = ScriptRuntime.emptyArgs
         } else {
@@ -923,7 +923,7 @@ abstract class ScriptableObject :
             owner: SlotMapOwner?,
         ): Slot? {
             if (slot != null && (slot.attributes and PERMANENT) != 0) {
-                if (Context.getContext().isStrictMode()) {
+                if (Context.getContext().isStrictMode) {
                     throw ScriptRuntime.typeErrorById(
                         "msg.delete.property.with.configurable.false",
                         key,
@@ -1041,7 +1041,7 @@ abstract class ScriptableObject :
                     s.setValueFromDescriptor(info.value, owner, owner, true)
                 }
             } else {
-                if (!s.isValueSlot && info.isDataDescriptor()) {
+                if (!s.isValueSlot && info.isDataDescriptor) {
                     // Turn a slot that is not a plain value slot back into one.
                     s = Slot(s)
                 }
@@ -1078,7 +1078,7 @@ abstract class ScriptableObject :
             if (setter !== Scriptable.NOT_FOUND && setter !== Undefined.instance && setter !is Callable) {
                 throw ScriptRuntime.notFunctionError(setter)
             }
-            if (desc.isDataDescriptor() && desc.isAccessorDescriptor()) {
+            if (desc.isDataDescriptor && desc.isAccessorDescriptor) {
                 throw ScriptRuntime.typeErrorById("msg.both.data.and.accessor.desc")
             }
         }
@@ -1121,7 +1121,7 @@ abstract class ScriptableObject :
 
         // Upstream's condition here reads oddly, but it is copied as written.
         internal fun isGenericDescriptor(desc: DescriptorInfo): Boolean =
-            desc.isDataDescriptor() && !desc.isAccessorDescriptor()
+            desc.isDataDescriptor && !desc.isAccessorDescriptor
 
         fun ensureScriptable(arg: Any?): Scriptable =
             arg as? Scriptable

@@ -28,7 +28,7 @@ internal class NativeDate private constructor() : IdScriptableObject() {
     override fun getDefaultValue(hint: KClass<*>?): Any? =
         super.getDefaultValue(hint ?: ScriptRuntime.StringClass)
 
-    internal fun getJSTimeValue(): Double = date
+    internal val jsTimeValue: Double get() = date
 
     override fun fillConstructorProperties(ctor: IdFunctionObject) {
         addIdFunctionProperty(ctor, DATE_TAG, ConstructorId_now, "now", 0)

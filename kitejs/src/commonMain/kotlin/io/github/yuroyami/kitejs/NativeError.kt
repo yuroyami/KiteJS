@@ -15,8 +15,8 @@ class NativeError : IdScriptableObject() {
         addIdFunctionProperty(ctor, ERROR_TAG, ConstructorId_isError, "isError", 1)
         val protoProps = ProtoProps()
         associateValue(ProtoProps.KEY, protoProps)
-        ctor.defineProperty("stackTraceLimit", { protoProps.getStackTraceLimit() }, { protoProps.setStackTraceLimit(it) }, 0)
-        ctor.defineProperty("prepareStackTrace", { protoProps.getPrepareStackTrace() }, { protoProps.setPrepareStackTrace(it) }, 0)
+        ctor.defineProperty("stackTraceLimit", { protoProps.stackTraceLimit }, { protoProps.setStackTraceLimit(it) }, 0)
+        ctor.defineProperty("prepareStackTrace", { protoProps.prepareStackTrace }, { protoProps.setPrepareStackTrace(it) }, 0)
         super.fillConstructorProperties(ctor)
     }
 
@@ -77,8 +77,8 @@ class NativeError : IdScriptableObject() {
         val cons = prototype as NativeError
         val pp = cons.getAssociatedValue(ProtoProps.KEY) as ProtoProps?
         if (pp != null) {
-            limit = pp.stackTraceLimit
-            prepare = pp.prepareStackTrace
+            limit = pp.limit
+            prepare = pp.prepare
         }
         val hideFunc = getAssociatedValue(STACK_HIDE_KEY) as String?
         val stackTrace = provider.getScriptStack(limit, hideFunc)
@@ -117,23 +117,24 @@ class NativeError : IdScriptableObject() {
 
     /** `Error.stackTraceLimit` and `Error.prepareStackTrace`, kept on the prototype. */
     private class ProtoProps {
-        var stackTraceLimit = DEFAULT_STACK_LIMIT
-        var prepareStackTrace: Function? = null
+        /** -1 stands for no limit, which scripts see as Infinity. */
+        var limit = DEFAULT_STACK_LIMIT
+        var prepare: Function? = null
 
-        fun getStackTraceLimit(): Any = if (stackTraceLimit >= 0) stackTraceLimit else Double.POSITIVE_INFINITY
+        val stackTraceLimit: Any get() = if (limit >= 0) limit else Double.POSITIVE_INFINITY
 
         fun setStackTraceLimit(value: Any?) {
-            val limit = Context.toNumber(value)
-            stackTraceLimit = if (limit.isNaN() || limit.isInfinite()) -1 else limit.toInt()
+            val n = Context.toNumber(value)
+            limit = if (n.isNaN() || n.isInfinite()) -1 else n.toInt()
         }
 
-        fun getPrepareStackTrace(): Any = prepareStackTrace ?: Undefined.instance
+        val prepareStackTrace: Any get() = prepare ?: Undefined.instance
 
         fun setPrepareStackTrace(value: Any?) {
             if (value == null || Undefined.isUndefined(value)) {
-                prepareStackTrace = null
+                prepare = null
             } else if (value is Function) {
-                prepareStackTrace = value
+                prepare = value
             }
         }
 

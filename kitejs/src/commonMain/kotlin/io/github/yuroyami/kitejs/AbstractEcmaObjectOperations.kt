@@ -29,8 +29,8 @@ object AbstractEcmaObjectOperations {
         val ids = obj.startCompoundOp(false).use { obj.getIds(it, true, true) }
         for (name in ids) {
             val desc = obj.getOwnPropertyDescriptor(cx, name)!!
-            if (desc.isConfigurable()) return false
-            if (level == INTEGRITY_LEVEL.FROZEN && desc.isDataDescriptor() && desc.isWritable()) return false
+            if (desc.isConfigurable) return false
+            if (level == INTEGRITY_LEVEL.FROZEN && desc.isDataDescriptor && desc.isWritable) return false
         }
         return true
     }
@@ -43,13 +43,13 @@ object AbstractEcmaObjectOperations {
         for (key in ids) {
             val desc = obj.getOwnPropertyDescriptor(cx, key)!!
             if (level == INTEGRITY_LEVEL.SEALED) {
-                if (desc.isConfigurable()) {
+                if (desc.isConfigurable) {
                     desc.configurable = false
                     obj.defineOwnProperty(cx, key, desc, false)
                 }
             } else {
-                if (desc.isDataDescriptor() && desc.isWritable()) desc.writable = false
-                if (desc.isConfigurable()) desc.configurable = false
+                if (desc.isDataDescriptor && desc.isWritable) desc.writable = false
+                if (desc.isConfigurable) desc.configurable = false
                 obj.defineOwnProperty(cx, key, desc, false)
             }
         }
@@ -212,15 +212,15 @@ object AbstractEcmaObjectOperations {
             return true
         }
         if (current.isConfigurable(false)) {
-            if (desc.isConfigurable()) return false
+            if (desc.isConfigurable) return false
             if (desc.hasEnumerable() && desc.enumerable != current.enumerable) return false
         }
-        if (desc.isGenericDescriptor()) return true
-        if (current.isDataDescriptor() != desc.isDataDescriptor()) {
+        if (desc.isGenericDescriptor) return true
+        if (current.isDataDescriptor != desc.isDataDescriptor) {
             if (current.isConfigurable(false)) return false
-        } else if (current.isDataDescriptor() && desc.isDataDescriptor()) {
+        } else if (current.isDataDescriptor && desc.isDataDescriptor) {
             if (current.isConfigurable(false) && current.isWritable(false)) {
-                if (desc.isWritable()) return false
+                if (desc.isWritable) return false
                 if (desc.hasValue() && desc.value != current.value) return false
                 return true
             }

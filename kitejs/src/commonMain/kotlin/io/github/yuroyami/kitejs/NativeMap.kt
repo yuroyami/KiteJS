@@ -43,7 +43,7 @@ class NativeMap : ScriptableObject() {
         if (arg1 !is Callable) {
             throw ScriptRuntime.typeErrorById("msg.isnt.function", arg1, ScriptRuntime.typeOf(arg1))
         }
-        val isStrict = cx.isStrictMode()
+        val isStrict = cx.isStrictMode
         for (entry in entries) {
             // The spec re-converts on every step, so a primitive `this` is rebuilt each time.
             var thisObj = ScriptRuntime.toObjectOrNull(cx, arg2, scope)
@@ -137,7 +137,7 @@ class NativeMap : ScriptableObject() {
             if (Undefined.instance == ito) return
 
             val proto = getClassPrototype(scope, map.className)
-            val set = ScriptRuntime.getPropAndThis(proto, "set", cx, scope)!!.getCallable()
+            val set = ScriptRuntime.getPropAndThis(proto, "set", cx, scope)!!.callable
             ScriptRuntime.loadFromIterable(cx, scope, arg1) { k, v ->
                 set.call(cx, scope, map, arrayOf(k, v))
             }

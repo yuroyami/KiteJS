@@ -109,7 +109,7 @@ class AstSourceTest {
         val noArgs = FunctionCall(0, 3)
         noArgs.target = name(0, "f")
         assertEquals("f()", noArgs.toSource())
-        assertEquals(emptyList(), noArgs.getArguments())
+        assertEquals(emptyList(), noArgs.arguments)
     }
 
     @Test

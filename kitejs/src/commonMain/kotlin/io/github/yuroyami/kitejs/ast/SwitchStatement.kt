@@ -31,7 +31,7 @@ class SwitchStatement(pos: Int = -1) : Scope() {
     var rp: Int = -1
 
     /** The case clauses, or an empty list if none were added. */
-    fun getCases(): List<SwitchCase> = caseList ?: NO_CASES
+    val cases: List<SwitchCase> get() = caseList ?: NO_CASES
 
     fun setCases(cases: List<SwitchCase>?) {
         if (cases == null) {
@@ -70,7 +70,7 @@ class SwitchStatement(pos: Int = -1) : Scope() {
     override fun visit(visitor: NodeVisitor) {
         if (visitor.visit(this)) {
             expression!!.visit(visitor)
-            for (sc in getCases()) {
+            for (sc in cases) {
                 sc.visit(visitor)
             }
         }

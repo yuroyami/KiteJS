@@ -21,8 +21,8 @@ class IteratorLikeIterable(
 
     init {
         val nextCall = ScriptRuntime.getPropAndThis(target, ES6Iterator.NEXT_METHOD, cx, scope)!!
-        next = nextCall.getCallable()
-        iterator = nextCall.getThis()
+        next = nextCall.callable
+        iterator = nextCall.thisObj
         val retObj = ScriptRuntime.getObjectPropNoWarn(target, ES6Iterator.RETURN_PROPERTY, cx, scope)
         returnFunc =
             if (retObj != null && !Undefined.isUndefined(retObj)) {

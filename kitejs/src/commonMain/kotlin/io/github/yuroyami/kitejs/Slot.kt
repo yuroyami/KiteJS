@@ -65,7 +65,7 @@ open class Slot {
         }
 
     fun setValue(value: Any?, owner: Scriptable, start: Scriptable): Boolean =
-        setValue(value, owner, start, Context.isCurrentContextStrict())
+        setValue(value, owner, start, Context.isCurrentContextStrict)
 
     open fun setValue(value: Any?, owner: Scriptable, start: Scriptable, isThrow: Boolean): Boolean {
         if ((attributes and ScriptableObject.READONLY) != 0) {
@@ -87,7 +87,7 @@ open class Slot {
     protected fun throwNoSetterException(start: Scriptable, newValue: Any?) {
         val cx = Context.getContext()
         // TC39 ES3.1 draft of 9 Feb 2009, 8.12.4 step 2 says this is a TypeError.
-        if (cx.isStrictMode() || cx.hasFeature(Context.FEATURE_STRICT_MODE)) {
+        if (cx.isStrictMode || cx.hasFeature(Context.FEATURE_STRICT_MODE)) {
             val prop = if (name != null) "[${start.className}].$name" else ""
             throw ScriptRuntime.typeErrorById(
                 "msg.set.prop.no.setter",

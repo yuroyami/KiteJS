@@ -28,7 +28,7 @@ class UnhandledRejectionTracker {
         while (it.hasNext()) {
             val p = it.next()
             try {
-                handler(p.getResult())
+                handler(p.result)
             } finally {
                 // Removed even when the handler throws.
                 it.remove()
@@ -37,7 +37,7 @@ class UnhandledRejectionTracker {
     }
 
     /** The rejections so far, left in place. [process] is what clears them. */
-    fun enumerate(): List<Any?> = unhandled.map { it.getResult() }
+    fun enumerate(): List<Any?> = unhandled.map { it.result }
 
     internal fun enable(enabled: Boolean) {
         this.enabled = enabled

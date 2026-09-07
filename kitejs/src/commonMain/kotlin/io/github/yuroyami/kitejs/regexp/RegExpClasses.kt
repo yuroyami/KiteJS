@@ -66,42 +66,42 @@ internal object NativeRegExpCtor {
 
         ctor.defineProperty(
             cx, "multiline",
-            ScriptableObject.LambdaGetterFunction { getImpl().multiline },
-            ScriptableObject.LambdaSetterFunction { _, v -> getImpl().multiline = ScriptRuntime.toBoolean(v) },
+            ScriptableObject.LambdaGetterFunction { impl.multiline },
+            ScriptableObject.LambdaSetterFunction { _, v -> impl.multiline = ScriptRuntime.toBoolean(v) },
             ScriptableObject.PERMANENT,
         )
         ctor.defineProperty(
             cx, "\$*",
-            ScriptableObject.LambdaGetterFunction { getImpl().multiline },
-            ScriptableObject.LambdaSetterFunction { _, v -> getImpl().multiline = ScriptRuntime.toBoolean(v) },
+            ScriptableObject.LambdaGetterFunction { impl.multiline },
+            ScriptableObject.LambdaSetterFunction { _, v -> impl.multiline = ScriptRuntime.toBoolean(v) },
             ScriptableObject.PERMANENT,
         )
         ctor.defineProperty(
             cx, "input",
-            ScriptableObject.LambdaGetterFunction { toStr(getImpl().input) },
-            ScriptableObject.LambdaSetterFunction { _, v -> getImpl().input = ScriptRuntime.toString(v) },
+            ScriptableObject.LambdaGetterFunction { toStr(impl.input) },
+            ScriptableObject.LambdaSetterFunction { _, v -> impl.input = ScriptRuntime.toString(v) },
             ScriptableObject.PERMANENT,
         )
         ctor.defineProperty(
             cx, "\$_",
-            ScriptableObject.LambdaGetterFunction { toStr(getImpl().input) },
-            ScriptableObject.LambdaSetterFunction { _, v -> getImpl().input = ScriptRuntime.toString(v) },
+            ScriptableObject.LambdaGetterFunction { toStr(impl.input) },
+            ScriptableObject.LambdaSetterFunction { _, v -> impl.input = ScriptRuntime.toString(v) },
             ScriptableObject.PERMANENT,
         )
-        ctor.defineProperty(cx, "lastMatch", ScriptableObject.LambdaGetterFunction { toStr(getImpl().lastMatch) }, ScriptableObject.PERMANENT)
-        ctor.defineProperty(cx, "\$&", ScriptableObject.LambdaGetterFunction { toStr(getImpl().lastMatch) }, ScriptableObject.PERMANENT)
-        ctor.defineProperty(cx, "lastParen", ScriptableObject.LambdaGetterFunction { toStr(getImpl().lastParen) }, ScriptableObject.PERMANENT)
-        ctor.defineProperty(cx, "\$+", ScriptableObject.LambdaGetterFunction { toStr(getImpl().lastParen) }, ScriptableObject.PERMANENT)
-        ctor.defineProperty(cx, "leftContext", ScriptableObject.LambdaGetterFunction { toStr(getImpl().leftContext) }, ScriptableObject.PERMANENT)
-        ctor.defineProperty(cx, "\$`", ScriptableObject.LambdaGetterFunction { toStr(getImpl().leftContext) }, ScriptableObject.PERMANENT)
-        ctor.defineProperty(cx, "rightContext", ScriptableObject.LambdaGetterFunction { toStr(getImpl().rightContext) }, ScriptableObject.PERMANENT)
-        ctor.defineProperty(cx, "\$'", ScriptableObject.LambdaGetterFunction { toStr(getImpl().rightContext) }, ScriptableObject.PERMANENT)
+        ctor.defineProperty(cx, "lastMatch", ScriptableObject.LambdaGetterFunction { toStr(impl.lastMatch) }, ScriptableObject.PERMANENT)
+        ctor.defineProperty(cx, "\$&", ScriptableObject.LambdaGetterFunction { toStr(impl.lastMatch) }, ScriptableObject.PERMANENT)
+        ctor.defineProperty(cx, "lastParen", ScriptableObject.LambdaGetterFunction { toStr(impl.lastParen) }, ScriptableObject.PERMANENT)
+        ctor.defineProperty(cx, "\$+", ScriptableObject.LambdaGetterFunction { toStr(impl.lastParen) }, ScriptableObject.PERMANENT)
+        ctor.defineProperty(cx, "leftContext", ScriptableObject.LambdaGetterFunction { toStr(impl.leftContext) }, ScriptableObject.PERMANENT)
+        ctor.defineProperty(cx, "\$`", ScriptableObject.LambdaGetterFunction { toStr(impl.leftContext) }, ScriptableObject.PERMANENT)
+        ctor.defineProperty(cx, "rightContext", ScriptableObject.LambdaGetterFunction { toStr(impl.rightContext) }, ScriptableObject.PERMANENT)
+        ctor.defineProperty(cx, "\$'", ScriptableObject.LambdaGetterFunction { toStr(impl.rightContext) }, ScriptableObject.PERMANENT)
 
         for (i in 1 until 10) {
             val c = i - 1
             ctor.defineProperty(
                 cx, "\$$i",
-                ScriptableObject.LambdaGetterFunction { toStr(getImpl().getParenSubString(c)) },
+                ScriptableObject.LambdaGetterFunction { toStr(impl.getParenSubString(c)) },
                 null,
                 ScriptableObject.PERMANENT,
             )
@@ -128,8 +128,7 @@ internal object NativeRegExpCtor {
         return re
     }
 
-    private fun getImpl(): RegExpImpl =
-        ScriptRuntime.getRegExpProxy(Context.getCurrentContext()!!) as RegExpImpl
+    private val impl: RegExpImpl get() = ScriptRuntime.getRegExpProxy(Context.getCurrentContext()!!) as RegExpImpl
 }
 
 /** What `String.prototype.matchAll` hands back: one `exec` result per step. */
@@ -186,7 +185,7 @@ class NativeRegExpStringIterator : ES6Iterator {
 
     override fun nextValue(cx: Context, scope: Scriptable): Any? = next
 
-    override fun getTag(): String = ITERATOR_TAG
+    override val tag: String get() = ITERATOR_TAG
 
     companion object {
         private const val ITERATOR_TAG = "RegExpStringIterator"

@@ -79,7 +79,7 @@ abstract class SlotMapOwner {
         ): S? {
             val newSlot = compute.compute(key, index, null, mutableMap, owner)
             if (newSlot != null) {
-                if (!mutableMap.isTouched()) {
+                if (!mutableMap.isTouched) {
                     owner!!.map = SingleEntrySlotMap(newSlot)
                 } else {
                     // The map already moved on, so hand the add over instead of computing again,

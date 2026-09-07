@@ -25,7 +25,8 @@ class NativeArray : ScriptableObject {
     private var lengthAttr = DONTENUM or PERMANENT
     private var modCount = 0
     private var dense: Array<Any?>? = null
-    private var denseOnly = false
+    internal var denseOnly = false
+        private set
 
     constructor(lengthArg: Long) : super() {
         denseOnly = lengthArg <= maximumInitialCapacity
@@ -186,7 +187,9 @@ class NativeArray : ScriptableObject {
         return ids
     }
 
-    fun getIndexIds(): List<Int> {
+    val indexIds: List<Int>
+
+        get() {
         val ids = getIds()
         val indices = ArrayList<Int>(ids.size)
         for (id in ids) {
@@ -271,8 +274,6 @@ class NativeArray : ScriptableObject {
         if (denseOnly && !this.denseOnly) throw IllegalArgumentException()
         this.denseOnly = denseOnly
     }
-
-    internal fun getDenseOnly(): Boolean = denseOnly
 
     private fun setLength(compoundOp: CompoundOperationMap, d: Double): Boolean {
         val longVal = ScriptRuntime.toUint32(d)
@@ -467,12 +468,6 @@ class NativeArray : ScriptableObject {
                     target.call(cx, s, realThis, realArgs)
                 },
             )
-        }
-
-        internal fun getMaximumInitialCapacity(): Int = maximumInitialCapacity
-
-        internal fun setMaximumInitialCapacity(value: Int) {
-            maximumInitialCapacity = value
         }
 
         private fun makeUnscopables(cx: Context, scope: Scriptable): Any? {
@@ -1774,7 +1769,7 @@ class NativeArray : ScriptableObject {
             return result
         }
 
-        private var maximumInitialCapacity = 10000
+        internal var maximumInitialCapacity = 10000
         private const val DEFAULT_INITIAL_CAPACITY = 10
         private const val GROW_FACTOR = 1.5
         private val MAX_PRE_GROW_SIZE = (Int.MAX_VALUE / GROW_FACTOR).toInt()

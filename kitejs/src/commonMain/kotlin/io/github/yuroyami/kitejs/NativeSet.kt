@@ -46,7 +46,7 @@ class NativeSet : ScriptableObject() {
 
     private fun js_forEach(cx: Context, scope: Scriptable, arg1: Any?, arg2: Any?): Any {
         if (arg1 !is Callable) throw ScriptRuntime.notFunctionError(arg1)
-        val isStrict = cx.isStrictMode()
+        val isStrict = cx.isStrictMode
         for (entry in entries) {
             // The spec re-converts on every step, so a primitive `this` is rebuilt each time.
             var thisObj = ScriptRuntime.toObjectOrNull(cx, arg2, scope)
@@ -260,7 +260,7 @@ class NativeSet : ScriptableObject() {
 
             // The set is not finished being built, so a throwaway instance provides the prototype.
             val dummy = ensureScriptableObject(cx.newObject(scope, set.className))
-            val add = ScriptRuntime.getPropAndThis(dummy.prototype, "add", cx, scope)!!.getCallable()
+            val add = ScriptRuntime.getPropAndThis(dummy.prototype, "add", cx, scope)!!.callable
 
             IteratorLikeIterable(cx, scope, ito).use { it ->
                 for (value in it) {

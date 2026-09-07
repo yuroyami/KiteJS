@@ -21,7 +21,7 @@ class ObjectLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len), Destructur
     }
 
     /** The properties, or an empty list if none were added. */
-    fun getElements(): List<AbstractObjectProperty> = elementList ?: NO_ELEMS
+    val elements: List<AbstractObjectProperty> get() = elementList ?: NO_ELEMS
 
     fun setElements(elements: List<AbstractObjectProperty>?) {
         if (elements == null) {
@@ -62,7 +62,7 @@ class ObjectLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len), Destructur
 
     override fun visit(visitor: NodeVisitor) {
         if (visitor.visit(this)) {
-            for (prop in getElements()) {
+            for (prop in elements) {
                 prop.visit(visitor)
             }
         }

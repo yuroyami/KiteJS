@@ -87,7 +87,7 @@ class ObjectModelTest {
 
         // Only DONTENUM keeps a property out of getIds. Readonly on its own does not.
         assertEquals(listOf("ro", "perm"), o.getIds().toList())
-        assertEquals(3, o.getAllIds().size)
+        assertEquals(3, o.allIds.size)
 
         o.delete("perm")
         assertTrue(o.has("perm", o), "a permanent property should not be deletable")

@@ -74,7 +74,7 @@ class IdScriptableObjectOracleTest {
         var x: Any? = 1
         var y: Any? = 2
         override val className get() = "Point"
-        override fun getMaxInstanceId() = 2
+        override val maxInstanceId get() = 2
         override fun findInstanceIdInfo(name: String): Int = when (name) {
             "x" -> instanceIdInfo(PERMANENT, 1)
             "y" -> instanceIdInfo(READONLY, 2)
@@ -135,7 +135,7 @@ class IdScriptableObjectOracleTest {
             assertEquals(UScriptableObject.hasProperty(u, name), ScriptableObject.hasProperty(k, name), "has $name")
         }
         assertEquals(uProto.ids.map { it.toString() }, kProto.getIds().map { it.toString() })
-        assertEquals(uProto.allIds.map { it.toString() }.sorted(), kProto.getAllIds().map { it.toString() }.sorted())
+        assertEquals(uProto.allIds.map { it.toString() }.sorted(), kProto.allIds.map { it.toString() }.sorted())
         assertEquals(u.ids.map { it.toString() }, k.getIds().map { it.toString() })
         assertEquals(u.getAttributes("x"), k.getAttributes("x"))
         assertEquals(u.getAttributes("y"), k.getAttributes("y"))
@@ -189,6 +189,6 @@ class IdScriptableObjectOracleTest {
         assertEquals(uProto.has("tag", uProto), kProto.has("tag", kProto))
         uProto.put("sum", uProto, "replaced"); kProto.put("sum", kProto, "replaced")
         assertEquals(render(uProto.get("sum", uProto)), render(kProto.get("sum", kProto)))
-        assertEquals(uProto.allIds.map { it.toString() }.sorted(), kProto.getAllIds().map { it.toString() }.sorted())
+        assertEquals(uProto.allIds.map { it.toString() }.sorted(), kProto.allIds.map { it.toString() }.sorted())
     }
 }

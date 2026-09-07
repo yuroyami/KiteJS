@@ -42,7 +42,14 @@ open class Context internal constructor(val factory: ContextFactory) : AutoClose
     private var generatingSource: Boolean = true
     internal var useDynamicScope: Boolean = false
     private var interpretedMode: Boolean = true
-    private var maximumInterpreterStackDepth: Int = Int.MAX_VALUE
+    /** How deep the interpreter's call frames may go before it gives up. */
+    var maximumInterpreterStackDepth: Int = Int.MAX_VALUE
+        set(value) {
+            if (isSealed) onSealedMutation()
+            check(interpretedMode) { "Cannot set maximumInterpreterStackDepth outside interpreted mode" }
+            require(value >= 1) { "Cannot set maximumInterpreterStackDepth to less than 1" }
+            field = value
+        }
     private var enterCount: Int = 0
     private var threadLocalMap: MutableMap<Any, Any?>? = null
 
@@ -226,7 +233,7 @@ open class Context internal constructor(val factory: ContextFactory) : AutoClose
         scope, source, sourceName, lineno, securityDomain, true, compiler, compilationErrorReporter, null,
     ) as Function
 
-    fun decompileScript(script: Script, indent: Int): String? = (script as JSScript).descriptor.getRawSource()
+    fun decompileScript(script: Script, indent: Int): String? = (script as JSScript).descriptor.rawSource
 
     fun decompileFunction(fun_: Function, indent: Int): String {
         if (fun_ is BaseFunction) return fun_.decompile(indent, emptySet())
@@ -269,7 +276,7 @@ open class Context internal constructor(val factory: ContextFactory) : AutoClose
 
     // ---- Settings ------------------------------------------------------------------------------
 
-    fun isGeneratingDebug(): Boolean = generatingDebug
+    val isGeneratingDebug: Boolean get() = generatingDebug
 
     fun setGeneratingDebug(generatingDebug: Boolean) {
         if (isSealed) onSealedMutation()
@@ -277,9 +284,9 @@ open class Context internal constructor(val factory: ContextFactory) : AutoClose
         this.generatingDebug = generatingDebug
     }
 
-    fun isGeneratingDebugChanged(): Boolean = generatingDebugChanged
+    val isGeneratingDebugChanged: Boolean get() = generatingDebugChanged
 
-    fun isGeneratingSource(): Boolean = generatingSource
+    val isGeneratingSource: Boolean get() = generatingSource
 
     fun setGeneratingSource(generatingSource: Boolean) {
         if (isSealed) onSealedMutation()
@@ -287,20 +294,11 @@ open class Context internal constructor(val factory: ContextFactory) : AutoClose
     }
 
     /** Always true: there is no bytecode compiler in this port (D-15). */
-    fun isInterpretedMode(): Boolean = interpretedMode
+    val isInterpretedMode: Boolean get() = interpretedMode
 
     fun setInterpretedMode(interpretedMode: Boolean) {
         if (isSealed) onSealedMutation()
         this.interpretedMode = interpretedMode
-    }
-
-    fun getMaximumInterpreterStackDepth(): Int = maximumInterpreterStackDepth
-
-    fun setMaximumInterpreterStackDepth(max: Int) {
-        if (isSealed) onSealedMutation()
-        check(interpretedMode) { "Cannot set maximumInterpreterStackDepth outside interpreted mode" }
-        require(max >= 1) { "Cannot set maximumInterpreterStackDepth to less than 1" }
-        maximumInterpreterStackDepth = max
     }
 
     /** A value an embedder parks on the context under [key]. */
@@ -320,7 +318,7 @@ open class Context internal constructor(val factory: ContextFactory) : AutoClose
     /** Whether an optional engine behaviour is on. The [factory] decides. */
     open fun hasFeature(featureIndex: Int): Boolean = factory.hasFeature(this, featureIndex)
 
-    fun getInstructionObserverThreshold(): Int = instructionThreshold
+    val instructionObserverThreshold: Int get() = instructionThreshold
 
     /**
      * How many instructions the interpreter runs between calls to
@@ -337,7 +335,7 @@ open class Context internal constructor(val factory: ContextFactory) : AutoClose
         this.generateObserverCount = generateObserverCount
     }
 
-    open fun isGenerateObserverCount(): Boolean = generateObserverCount
+    open val isGenerateObserverCount: Boolean get() = generateObserverCount
 
     protected open fun observeInstructionCount(instructionCount: Int) {
         factory.observeInstructionCount(this, instructionCount)
@@ -432,11 +430,10 @@ open class Context internal constructor(val factory: ContextFactory) : AutoClose
     }
 
     /** True unless the script pinned a language version older than 1.3. */
-    internal fun isVersionECMA1(): Boolean = version == VERSION_DEFAULT || version >= VERSION_1_3
+    internal val isVersionECMA1: Boolean get() = version == VERSION_DEFAULT || version >= VERSION_1_3
 
     /** Whether the code running right now is in strict mode. */
-    fun isStrictMode(): Boolean =
-        isTopLevelStrict || (currentActivationCall?.isStrict == true)
+    val isStrictMode: Boolean get() = isTopLevelStrict || (currentActivationCall?.isStrict == true)
 
     companion object {
 
@@ -596,7 +593,7 @@ open class Context internal constructor(val factory: ContextFactory) : AutoClose
             reportRuntimeError(ScriptRuntime.getMessageById(messageId, *args))
 
         /** The value of `undefined`. */
-        fun getUndefinedValue(): Any = Undefined.instance
+        val undefinedValue: Any get() = Undefined.instance
 
         fun toBoolean(value: Any?): Boolean = ScriptRuntime.toBoolean(value)
 
@@ -630,6 +627,6 @@ open class Context internal constructor(val factory: ContextFactory) : AutoClose
         }
 
         /** Whether the code running right now is in strict mode. False when there is no context. */
-        fun isCurrentContextStrict(): Boolean = currentContext?.isStrictMode() ?: false
+        val isCurrentContextStrict: Boolean get() = currentContext?.isStrictMode ?: false
     }
 }

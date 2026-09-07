@@ -23,33 +23,33 @@ class NativeSymbol internal constructor(internal val key: SymbolKey) : Scriptabl
      * False for every instance in this version: a wrapper made from a symbol is an object, not a
      * symbol. Upstream keeps the hook because the checks below read better with it.
      */
-    fun isSymbol(): Boolean = false
+    val isSymbol: Boolean get() = false
 
     override val typeOf: String
-        get() = if (isSymbol()) TYPE_NAME else super.typeOf
+        get() = if (isSymbol) TYPE_NAME else super.typeOf
 
     // A real symbol takes no properties. A wrapper does, so these all reach super today.
 
     override fun put(name: String, start: Scriptable, value: Any?) {
-        if (!isSymbol()) {
+        if (!isSymbol) {
             super.put(name, start, value)
-        } else if (isStrictMode()) {
+        } else if (isStrictMode) {
             throw ScriptRuntime.typeErrorById("msg.no.assign.symbol.strict")
         }
     }
 
     override fun put(index: Int, start: Scriptable, value: Any?) {
-        if (!isSymbol()) {
+        if (!isSymbol) {
             super.put(index, start, value)
-        } else if (isStrictMode()) {
+        } else if (isStrictMode) {
             throw ScriptRuntime.typeErrorById("msg.no.assign.symbol.strict")
         }
     }
 
     override fun put(key: Symbol, start: Scriptable, value: Any?) {
-        if (!isSymbol()) {
+        if (!isSymbol) {
             super.put(key, start, value)
-        } else if (isStrictMode()) {
+        } else if (isStrictMode) {
             throw ScriptRuntime.typeErrorById("msg.no.assign.symbol.strict")
         }
     }
@@ -122,7 +122,7 @@ class NativeSymbol internal constructor(internal val key: SymbolKey) : Scriptabl
         private fun getSelf(thisObj: Scriptable?): NativeSymbol =
             LambdaConstructor.convertThisObject<NativeSymbol>(thisObj)
 
-        private fun isStrictMode(): Boolean = Context.getCurrentContext()?.isStrictMode() ?: false
+        private val isStrictMode: Boolean get() = Context.getCurrentContext()?.isStrictMode ?: false
 
         private fun js_constructorCall(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val desc = if (args.isNotEmpty() && !Undefined.isUndefined(args[0])) {

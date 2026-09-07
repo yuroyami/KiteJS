@@ -29,7 +29,7 @@ open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(pos) {
             value?.parent = this
         }
 
-    private var params: MutableList<AstNode>? = null
+    private var paramList: MutableList<AstNode>? = null
 
     private var bodyNode: AstNode? = null
 
@@ -133,24 +133,24 @@ open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(pos) {
         get() = functionName?.identifier ?: ""
 
     /** The parameter list, or an empty list if there are no parameters. */
-    fun getParams(): List<AstNode> = params ?: NO_PARAMS
+    val params: List<AstNode> get() = paramList ?: NO_PARAMS
 
     /** Sets the parameter list and reparents every element. Null means no parameters. */
     fun setParams(params: List<AstNode>?) {
         if (params == null) {
-            this.params = null
+            paramList = null
         } else {
-            this.params?.clear()
+            paramList?.clear()
             for (param in params) addParam(param)
         }
     }
 
     /** Adds a parameter and reparents it to this node. */
     fun addParam(param: AstNode) {
-        if (params == null) {
-            params = mutableListOf()
+        if (paramList == null) {
+            paramList = mutableListOf()
         }
-        params!!.add(param)
+        paramList!!.add(param)
         param.parent = this
     }
 
@@ -300,7 +300,7 @@ open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(pos) {
     override fun visit(visitor: NodeVisitor) {
         if (visitor.visit(this)) {
             functionName?.visit(visitor)
-            for (param in getParams()) {
+            for (param in params) {
                 param.visit(visitor)
             }
             body!!.visit(visitor)
@@ -344,7 +344,7 @@ open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(pos) {
                 if (defaultParams != null && defaultParams.isNotEmpty()) {
                     // defaultParams holds pairs: [paramName (String), defaultValue (AstNode)].
                     // Count up to the first parameter that has a default value.
-                    val params = scriptOrFn.getParams()
+                    val params = scriptOrFn.params
                     if (params.isNotEmpty()) {
                         var i = 0
                         while (i < defaultParams.size) {

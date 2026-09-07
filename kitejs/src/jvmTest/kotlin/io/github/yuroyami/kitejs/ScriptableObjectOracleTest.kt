@@ -69,7 +69,7 @@ class ScriptableObjectOracleTest {
     private fun renderPorted(o: ScriptableObject): String = buildString {
         append("size=").append(o.size()).append('\n')
         append("extensible=").append(o.isExtensible).append(" sealed=").append(o.isSealed).append('\n')
-        for (id in o.getAllIds()) {
+        for (id in o.allIds) {
             append(id).append('=')
             val v = when (id) {
                 is Int -> o.get(id, o)

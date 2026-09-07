@@ -175,9 +175,9 @@ class AstContainerOracleTest {
 
         assertEquals(u.toSource(0), k.toSource(0))
         assertEquals(u.toSource(1), k.toSource(1))
-        assertEquals(u.getCases().size, k.getCases().size)
-        assertTrue(USwitchStatement(0).getCases().isEmpty())
-        assertTrue(SwitchStatement(0).getCases().isEmpty())
+        assertEquals(u.cases.size, k.cases.size)
+        assertTrue(USwitchStatement(0).cases.isEmpty())
+        assertTrue(SwitchStatement(0).cases.isEmpty())
     }
 
     @Test
@@ -194,8 +194,8 @@ class AstContainerOracleTest {
 
         assertEquals(u.toSource(0), k.toSource(0))
         assertEquals(u.hasSideEffects(), k.hasSideEffects())
-        assertEquals(u.getFirstLabel().getName(), k.firstLabel.name)
-        assertEquals(u.getLabelByName("inner")?.getName(), k.getLabelByName("inner")?.name)
+        assertEquals(u.getFirstLabel().name, k.firstLabel.name)
+        assertEquals(u.getLabelByName("inner")?.name, k.getLabelByName("inner")?.name)
         assertNull(u.getLabelByName("nope"))
         assertNull(k.getLabelByName("nope"))
     }

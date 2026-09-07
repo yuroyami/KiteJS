@@ -328,7 +328,7 @@ class AstLeafOracleTest {
         val u = ULabel(0, 6, "outer")
         val k = Label(0, 6, "outer")
         assertEquals(u.toSource(0), k.toSource(0))
-        assertEquals(u.getName(), k.name)
+        assertEquals(u.name, k.name)
         assertFailsWith<IllegalArgumentException> { Label(0, 1, "  ") }
     }
 

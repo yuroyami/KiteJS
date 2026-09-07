@@ -201,7 +201,7 @@ class Interpreter : Evaluator {
             this.parentPC = if (parentFrame == null) (previousInterpreterFrame?.pcSourceLineStart ?: -1) else parentFrame.pcSourceLineStart
             this.previousInterpreterFrame = previousInterpreterFrame
             frameIndex = if (parentFrame == null) 0 else parentFrame.frameIndex + 1
-            if (frameIndex > cx.getMaximumInterpreterStackDepth()) throw Context.reportRuntimeError("Exceeded maximum stack depth")
+            if (frameIndex > cx.maximumInterpreterStackDepth) throw Context.reportRuntimeError("Exceeded maximum stack depth")
             pcSourceLineStart = idata.firstLinePC
             savedStackTop = emptyStackTop
         }
@@ -303,9 +303,9 @@ class Interpreter : Evaluator {
                 scope = callerScope
                 ScriptRuntime.initScript(fnOrScript, thisObj, cx, scope!!, desc.isEvalFunction)
             }
-            if (desc.getFunctionCount() != 0 && !desc.isES6Generator) {
+            if (desc.functionCount != 0 && !desc.isES6Generator) {
                 if (desc.functionType != 0 && !desc.requiresActivationFrame) throw Kit.codeBug()
-                for (i in 0 until desc.getFunctionCount()) {
+                for (i in 0 until desc.functionCount) {
                     if (desc.getFunction(i).functionType == FunctionNode.FUNCTION_STATEMENT) {
                         initFunction(cx, scope!!, desc, i)
                     }
@@ -1490,16 +1490,16 @@ class Interpreter : Evaluator {
                     val store = stack[state.stackTop] as NewLiteralStorage
                     --state.stackTop
                     val obj = stack[state.stackTop] as Scriptable
-                    ScriptRuntime.fillObjectLiteral(obj, store.getKeys(), store.getValues(), store.getGetterSetters(), cx, frame.scope!!)
+                    ScriptRuntime.fillObjectLiteral(obj, store.keys, store.values, store.getterSetters, cx, frame.scope!!)
                     return null
                 }
                 Token.ARRAYLIT, Icode_SPARE_ARRAYLIT -> {
                     val store = stack[state.stackTop] as NewLiteralStorage
                     var skipIndexes: IntArray? = null
                     if (op == Icode_SPARE_ARRAYLIT) {
-                        skipIndexes = store.getAdjustedSkipIndexes() ?: frame.idata.literalIds!![state.indexReg] as IntArray
+                        skipIndexes = store.adjustedSkipIndexes ?: frame.idata.literalIds!![state.indexReg] as IntArray
                     }
-                    stack[state.stackTop] = ScriptRuntime.newArrayLiteral(store.getValues(), skipIndexes, cx, frame.scope!!)
+                    stack[state.stackTop] = ScriptRuntime.newArrayLiteral(store.values, skipIndexes, cx, frame.scope!!)
                     return null
                 }
                 Icode_DEBUGGER -> return null
@@ -1729,9 +1729,9 @@ class Interpreter : Evaluator {
                 state.stackTop -= state.indexReg
                 val result = stack[state.stackTop] as ScriptRuntime.LookupResult?
                 val outArgs = getArgsArray(stack, sDbl, state.stackTop + 1, state.indexReg)
-                val function = result?.getCallable()
+                val function = result?.callable
                 stack[state.stackTop] = ScriptRuntime.callSpecial(
-                    cx, function, result?.getThis(), outArgs, frame.scope!!, frame.thisObj, callType,
+                    cx, function, result?.thisObj, outArgs, frame.scope!!, frame.thisObj, callType,
                     frame.fnOrScript.descriptor!!.sourceName, sourceLine, isOptionalChainingCall,
                 )
             }
@@ -1746,8 +1746,8 @@ class Interpreter : Evaluator {
             if (state.instructionCounting) cx.instructionCount += INVOCATION_COST
             state.stackTop -= state.indexReg
             val result = stack[state.stackTop] as ScriptRuntime.LookupResult
-            var fun_: Callable? = result.getCallable()
-            var funThisObj: Scriptable? = result.getThis()
+            var fun_: Callable? = result.callable
+            var funThisObj: Scriptable? = result.thisObj
             val funHomeObj = if (fun_ is BaseFunction) fun_.homeObject else null
             if (op == Icode_CALL_ON_SUPER) funThisObj = frame.thisObj
             if (op == Token.REF_CALL) {
@@ -1794,9 +1794,9 @@ class Interpreter : Evaluator {
                     break
                 } else if (fun_ is BoundFunction) {
                     val bfun = fun_
-                    fun_ = bfun.getTargetFunction()
+                    fun_ = bfun.targetFunction
                     funThisObj = bfun.getCallThis(cx, calleeScope)
-                    val bArgs = bfun.getBoundArgs()
+                    val bArgs = bfun.boundArgs
                     boundArgs = addBoundArgs(boundArgs, bArgs)
                     blen += bArgs.size
                     state.indexReg += bArgs.size
@@ -2031,7 +2031,7 @@ class Interpreter : Evaluator {
                     !d.isNaN() && d != 0.0
                 }
                 x == null || x === Undefined.instance -> false
-                x is KBigInt -> !x.isZero()
+                x is KBigInt -> !x.isZero
                 x is Number -> {
                     val d = x.toDouble()
                     !d.isNaN() && d != 0.0

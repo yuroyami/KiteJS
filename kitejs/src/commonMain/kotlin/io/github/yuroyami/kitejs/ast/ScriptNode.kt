@@ -24,7 +24,7 @@ open class ScriptNode(pos: Int = -1) : Scope(pos) {
     /** The raw source, or null if it was not recorded. Used by the code generator. */
     var rawSource: String? = null
 
-    private var functions: MutableList<FunctionNode>? = null
+    private var functionList: MutableList<FunctionNode>? = null
     private var regexps: MutableList<RegExpLiteral>? = null
     private var templateLiterals: MutableList<TemplateLiteral>? = null
 
@@ -75,11 +75,11 @@ open class ScriptNode(pos: Int = -1) : Scope(pos) {
         }
 
     val functionCount: Int
-        get() = functions?.size ?: 0
+        get() = functionList?.size ?: 0
 
-    fun getFunctionNode(i: Int): FunctionNode = functions!![i]
+    fun getFunctionNode(i: Int): FunctionNode = functionList!![i]
 
-    fun getFunctions(): List<FunctionNode> = functions ?: emptyList()
+    val functions: List<FunctionNode> get() = functionList ?: emptyList()
 
     /**
      * Adds a [FunctionNode] to the functions table for codegen. Does not set the parent of
@@ -88,9 +88,9 @@ open class ScriptNode(pos: Int = -1) : Scope(pos) {
      * @return the index of the function within its parent
      */
     open fun addFunction(fnNode: FunctionNode): Int {
-        if (functions == null) functions = mutableListOf()
-        functions!!.add(fnNode)
-        return functions!!.size - 1
+        if (functionList == null) functionList = mutableListOf()
+        functionList!!.add(fnNode)
+        return functionList!!.size - 1
     }
 
     val regexpCount: Int

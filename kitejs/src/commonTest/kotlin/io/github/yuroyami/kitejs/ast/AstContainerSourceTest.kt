@@ -101,7 +101,7 @@ class AstContainerSourceTest {
         switch.addCase(default)
 
         assertEquals("switch (x) {\n  case a:\n    b;\n  default:\n    c;\n}\n", switch.toSource())
-        assertTrue(SwitchStatement(0).getCases().isEmpty())
+        assertTrue(SwitchStatement(0).cases.isEmpty())
     }
 
     @Test

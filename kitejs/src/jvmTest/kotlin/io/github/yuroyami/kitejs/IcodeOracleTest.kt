@@ -124,7 +124,7 @@ class IcodeOracleTest {
             sb.append(pad).append("code=null\n")
         }
         sb.append(pad).append("ctor=").append(desc.constructor === code).append('\n')
-        for (i in 0 until desc.getFunctionCount()) renderPorted(desc.getFunction(i), sb, depth + 1)
+        for (i in 0 until desc.functionCount) renderPorted(desc.getFunction(i), sb, depth + 1)
     }
 
     private fun renderLiterals(ids: Array<*>?): String {

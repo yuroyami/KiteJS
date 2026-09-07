@@ -102,7 +102,7 @@ abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
                 // accessor, so a descriptor that says otherwise is refused.
                 if (desc.isConfigurable(false)) return false
                 if (desc.isEnumerable(false)) return false
-                if (desc.isAccessorDescriptor()) return false
+                if (desc.isAccessorDescriptor) return false
                 if (desc.isWritable(false)) return false
                 if (desc.hasValue()) js_set(idx, desc.value)
                 return true
@@ -112,21 +112,20 @@ abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
     }
 
     /** True when the index is not usable. */
-    protected fun checkIndex(index: Int): Boolean = isTypedArrayOutOfBounds() || index < 0 || index >= length
+    protected fun checkIndex(index: Int): Boolean = isTypedArrayOutOfBounds || index < 0 || index >= length
 
-    abstract fun getBytesPerElement(): Int
-
+    abstract val bytesPerElement: Int
     protected abstract fun js_get(index: Int): Any?
 
     protected abstract fun js_set(index: Int, c: Any?): Any?
 
     protected open fun toNumeric(num: Any?): Any? = ScriptRuntime.toNumber(num)
 
-    fun isTypedArrayOutOfBounds(): Boolean = arrayBuffer.isDetached() || outOfRange
+    val isTypedArrayOutOfBounds: Boolean get() = arrayBuffer.isDetached || outOfRange
 
     /** The spec's ValidateTypedArray, reduced to the length it hands back. */
     private fun validateAndGetLength(): Long {
-        if (isTypedArrayOutOfBounds()) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
+        if (isTypedArrayOutOfBounds) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
         return length.toLong()
     }
 
@@ -138,14 +137,14 @@ abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
         js_set(index, value)
     }
 
-    override fun getArrayLength(): Int = length
+    override val arrayLength: Int get() = length
 
     // ---- Copying between views -----------------------------------------------------------------
 
     private fun setRange(source: NativeTypedArrayView, dbloff: Double) {
-        if (isTypedArrayOutOfBounds()) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
+        if (isTypedArrayOutOfBounds) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
         val targetLength = length
-        if (source.isTypedArrayOutOfBounds()) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
+        if (source.isTypedArrayOutOfBounds) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
 
         val srcLength = source.length
         if (dbloff > targetLength) throw ScriptRuntime.rangeErrorById("msg.typed.array.bad.offset", dbloff)
@@ -169,7 +168,7 @@ abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
     }
 
     private fun setRange(cx: Context, scope: Scriptable, source: Scriptable, dbloff: Double) {
-        if (isTypedArrayOutOfBounds()) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
+        if (isTypedArrayOutOfBounds) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
         val targetLength = length
         val src = ScriptRuntime.toObject(scope, source)
         val srcLength = AbstractEcmaObjectOperations.lengthOfArrayLike(cx, src)
@@ -232,7 +231,7 @@ abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
     private fun sameTypeCopy(cx: Context, scope: Scriptable): Scriptable = cx.newObject(
         scope,
         className,
-        arrayOf<Any?>(NativeArrayBuffer(length * getBytesPerElement()), 0, length, getBytesPerElement()),
+        arrayOf<Any?>(NativeArrayBuffer(length * bytesPerElement), 0, length, bytesPerElement),
     )
 
     companion object {
@@ -341,17 +340,17 @@ abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
 
         private fun js_byteLength(thisObj: Scriptable?): Any {
             val o = realThis(thisObj)
-            return if (o.isTypedArrayOutOfBounds()) 0 else o.byteLength
+            return if (o.isTypedArrayOutOfBounds) 0 else o.byteLength
         }
 
         private fun js_byteOffset(thisObj: Scriptable?): Any {
             val o = realThis(thisObj)
-            return if (o.isTypedArrayOutOfBounds()) 0 else o.offset
+            return if (o.isTypedArrayOutOfBounds) 0 else o.offset
         }
 
         private fun js_length(thisObj: Scriptable?): Any {
             val o = realThis(thisObj)
-            return if (o.isTypedArrayOutOfBounds()) 0 else o.length
+            return if (o.isTypedArrayOutOfBounds) 0 else o.length
         }
 
         private fun makeArrayBuffer(cx: Context, scope: Scriptable, length: Int, bytesPerElement: Int): NativeArrayBuffer =
@@ -393,7 +392,7 @@ abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
                 var newLength = 0
                 if (NativeArrayBuffer.isArg(args, 2)) newLength = ScriptRuntime.toIndex(args[2])
 
-                if (arg0.isDetached()) throw ScriptRuntime.typeErrorById("msg.arraybuf.detached")
+                if (arg0.isDetached) throw ScriptRuntime.typeErrorById("msg.arraybuf.detached")
                 val bufferByteLength = arg0.length
 
                 val newByteLength: Int
@@ -469,13 +468,13 @@ abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
 
         private fun js_iteratorOf(scope: Scriptable, thisObj: Scriptable?, type: NativeArrayIterator.ARRAY_ITERATOR_TYPE): Any {
             val self = realThis(thisObj)
-            if (self.isTypedArrayOutOfBounds()) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
+            if (self.isTypedArrayOutOfBounds) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
             return NativeArrayIterator(scope, self, type)
         }
 
         private fun js_toStringInternal(cx: Context, scope: Scriptable, thisObj: Scriptable?, useLocale: Boolean): String {
             val self = realThis(thisObj)
-            if (self.isTypedArrayOutOfBounds()) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
+            if (self.isTypedArrayOutOfBounds) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
 
             val builder = StringBuilder()
             if (self.length > 0) builder.append(ScriptRuntime.toString(self.getElemForToString(cx, scope, 0, useLocale)))
@@ -598,7 +597,7 @@ abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
             val a = self.typedArraySpeciesCreate(cx, scope, arrayOf<Any?>(count), "slice")
 
             if (count > 0) {
-                if (self.isTypedArrayOutOfBounds()) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
+                if (self.isTypedArrayOutOfBounds) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
                 end = minOf(end, self.length.toLong())
                 var n = 0
                 for (i in begin.toInt() until end.toInt()) {
@@ -653,7 +652,7 @@ abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
             if (args.size > 2 && !Undefined.isUndefined(args[2])) relativeEnd = ScriptRuntime.toInteger(args[2]).toLong()
             val fin = if (relativeEnd < 0) maxOf(len + relativeEnd, 0) else minOf(relativeEnd, len)
 
-            if (self.isTypedArrayOutOfBounds()) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
+            if (self.isTypedArrayOutOfBounds) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
 
             for (i in k.toInt() until fin.toInt()) self.js_set(i, value)
             return self
@@ -686,7 +685,7 @@ abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
 
             var count = minOf(fin - from, len - to)
             if (count > 0) {
-                if (self.isTypedArrayOutOfBounds()) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
+                if (self.isTypedArrayOutOfBounds) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
                 var direction = 1
                 // Overlapping ranges have to be walked backwards or the copy eats its own source.
                 if (from < to && to < from + count) {
@@ -722,7 +721,7 @@ abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
                 throw ScriptRuntime.constructError("Error", "invalid arguments")
             }
             val self = realThis(thisObj)
-            val srcLength = if (self.isTypedArrayOutOfBounds()) 0 else self.length
+            val srcLength = if (self.isTypedArrayOutOfBounds) 0 else self.length
 
             var start = if (NativeArrayBuffer.isArg(args, 0)) ScriptRuntime.toInt32(args[0]) else 0
             var end = if (NativeArrayBuffer.isArg(args, 1)) ScriptRuntime.toInt32(args[1]) else srcLength
@@ -733,7 +732,7 @@ abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
             start = minOf(start, srcLength)
             end = minOf(srcLength, end)
             val len = maxOf(0, end - start)
-            val byteOff = self.offset + start * self.getBytesPerElement()
+            val byteOff = self.offset + start * self.bytesPerElement
 
             return self.typedArraySpeciesCreate(cx, scope, arrayOf<Any?>(self.arrayBuffer, byteOff, len), "subarray")
         }

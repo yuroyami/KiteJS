@@ -34,7 +34,7 @@ class TryStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
     var finallyPosition: Int = -1
 
     /** The catch clauses, or an empty list if there are none. */
-    fun getCatchClauses(): List<CatchClause> = catchClauseList ?: NO_CATCHES
+    val catchClauses: List<CatchClause> get() = catchClauseList ?: NO_CATCHES
 
     fun setCatchClauses(catchClauses: List<CatchClause>?) {
         if (catchClauses == null) {
@@ -59,7 +59,7 @@ class TryStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         sb.append("try ")
         inlineComment?.let { sb.append(it.toSource(depth + 1)).append("\n") }
         sb.append(tryBlock!!.toSource(depth).trim())
-        for (cc in getCatchClauses()) {
+        for (cc in catchClauses) {
             sb.append(cc.toSource(depth))
         }
         finallyBlock?.let {
@@ -72,7 +72,7 @@ class TryStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
     override fun visit(visitor: NodeVisitor) {
         if (visitor.visit(this)) {
             tryBlock!!.visit(visitor)
-            for (cc in getCatchClauses()) {
+            for (cc in catchClauses) {
                 cc.visit(visitor)
             }
             finallyBlock?.visit(visitor)

@@ -105,11 +105,11 @@ abstract class NewLiteralStorage protected constructor(ids: Array<Any?>?, length
         }
     }
 
-    fun getKeys(): Array<Any?>? = keysField
+    val keys: Array<Any?>? get() = keysField
 
-    fun getGetterSetters(): IntArray = getterSettersField
+    val getterSetters: IntArray get() = getterSettersField
 
-    fun getValues(): Array<Any?> = valuesField
+    val values: Array<Any?> get() = valuesField
 
     fun setSkipIndexes(skipIndexes: IntArray?) {
         this.skipIndexesField = skipIndexes
@@ -119,7 +119,8 @@ abstract class NewLiteralStorage protected constructor(ids: Array<Any?>?, length
     fun hasSkipIndexes(): Boolean = skipIndexesField != null
 
     /** The holes' positions once every spread before them has been counted in. */
-    fun getAdjustedSkipIndexes(): IntArray? {
+    val adjustedSkipIndexes: IntArray?
+        get() {
         val skips = skipIndexesField ?: return null
         val adj = spreadAdjustments
         return IntArray(skips.size) { i ->

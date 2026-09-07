@@ -41,7 +41,7 @@ class NewExpression(pos: Int = -1, len: Int = 1) : FunctionCall(pos, len) {
     override fun visit(visitor: NodeVisitor) {
         if (visitor.visit(this)) {
             target!!.visit(visitor)
-            for (arg in getArguments()) {
+            for (arg in arguments) {
                 arg.visit(visitor)
             }
             initializer?.visit(visitor)

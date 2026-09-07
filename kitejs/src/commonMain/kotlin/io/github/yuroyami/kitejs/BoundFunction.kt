@@ -8,9 +8,9 @@ package io.github.yuroyami.kitejs
 class BoundFunction(
     cx: Context,
     scope: Scriptable,
-    private val targetFunction: Callable,
+    internal val targetFunction: Callable,
     private val boundThis: Scriptable?,
-    private val boundArgs: Array<Any?>,
+    internal val boundArgs: Array<Any?>,
 ) : BaseFunction() {
 
     final override val length: Int
@@ -43,10 +43,6 @@ class BoundFunction(
 
     override val functionName: String
         get() = if (targetFunction is BaseFunction) "bound " + targetFunction.functionName else ""
-
-    internal fun getTargetFunction(): Callable = targetFunction
-
-    internal fun getBoundArgs(): Array<Any?> = boundArgs
 
     internal fun getCallThis(cx: Context, scope: Scriptable): Scriptable {
         var callThis = boundThis

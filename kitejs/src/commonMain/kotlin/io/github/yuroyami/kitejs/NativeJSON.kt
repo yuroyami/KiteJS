@@ -141,7 +141,7 @@ class NativeJSON private constructor() : ScriptableObject() {
                 replacerFunction = replacer
             } else if (replacer is NativeArray) {
                 val propertySet = LinkedHashSet<Any?>()
-                for (i in replacer.getIndexIds()) {
+                for (i in replacer.indexIds) {
                     val v = replacer.get(i, replacer)
                     if (v is String) {
                         propertySet.add(v)

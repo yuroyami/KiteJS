@@ -229,7 +229,8 @@ internal class TokenStream(
             c in '0'.code..'9'.code || c in 'a'.code..'f'.code || c in 'A'.code..'F'.code
 
         /* As defined in ECMA. jsscan.c uses C isspace() (which allows \v, I think.) note
-         * that code in getChar() implicitly accepts '\r' == as well.
+         * that code in getChar() implicitly accepts '\r' ==
+ as well.
          */
         private fun isJSSpace(c: Int): Boolean {
             if (c <= 127) {
@@ -1599,10 +1600,10 @@ internal class TokenStream(
         // KMP: only meaningful with the Reader source path, which is not ported (D-2).
     }
 
-    private fun isMarkingComment(): Boolean = commentCursor != -1
+    private val isMarkingComment: Boolean get() = commentCursor != -1
 
     fun getAndResetCurrentComment(): String {
-        if (isMarkingComment()) Kit.codeBug()
+        if (isMarkingComment) Kit.codeBug()
         return sourceString.substring(tokenBeg, tokenEnd)
     }
 

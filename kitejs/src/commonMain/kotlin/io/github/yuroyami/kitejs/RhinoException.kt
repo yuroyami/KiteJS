@@ -111,7 +111,7 @@ abstract class RhinoException : RuntimeException {
     internal var interpreterLineData: Int = 0
 
     /** The script frames at the time of the throw, innermost first. */
-    fun getScriptStack(): Array<ScriptStackElement> = getScriptStack(-1, null)
+    val scriptStack: Array<ScriptStackElement> get() = getScriptStack(-1, null)
 
     fun getScriptStack(limit: Int, hideFunction: String?): Array<ScriptStackElement> {
         if (interpreterStackInfo == null) return emptyArray()
@@ -131,7 +131,7 @@ abstract class RhinoException : RuntimeException {
         return list.toTypedArray()
     }
 
-    fun getScriptStackTrace(): String = getScriptStackTrace(DEFAULT_STACK_LIMIT, null)
+    val scriptStackTrace: String get() = getScriptStackTrace(DEFAULT_STACK_LIMIT, null)
 
     fun getScriptStackTrace(limit: Int, functionName: String?): String =
         formatStackTrace(getScriptStack(limit, functionName), details())

@@ -167,7 +167,7 @@ class KBigIntTest {
         assertEquals(1, a.signum())
         assertEquals(-1, b.signum())
         assertEquals(0, KBigInt.ZERO.signum())
-        assertTrue(KBigInt.ZERO.isZero())
+        assertTrue(KBigInt.ZERO.isZero)
         eq("98765432109876543210987654321", b.abs())
         assertEquals(a, KBigInt.parse("123456789012345678901234567890123456789012345678901234567890"))
         assertEquals(a.hashCode(), KBigInt.parse(a.toString()).hashCode())

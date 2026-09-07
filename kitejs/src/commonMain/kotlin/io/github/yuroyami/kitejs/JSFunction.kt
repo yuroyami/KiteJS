@@ -25,7 +25,7 @@ open class JSFunction(
     override val declarationScope: Scriptable?
         get() = parentScope
 
-    override fun decompile(indent: Int, flags: Set<DecompilerFlag>): String = descriptor.getRawSource()
+    override fun decompile(indent: Int, flags: Set<DecompilerFlag>): String = descriptor.rawSource
 
     val isShorthand: Boolean
         get() = descriptor.isShorthand
@@ -35,23 +35,25 @@ open class JSFunction(
 
     override val arity: Int get() = descriptor.arity
 
-    protected fun getLanguageVersion(): Int = descriptor.languageVersion
+    protected val languageVersion: Int get() = descriptor.languageVersion
 
     override fun hasPrototypeProperty(): Boolean = true
 
-    override fun isGeneratorFunction(): Boolean = descriptor.isES6Generator
+    override val isGeneratorFunction: Boolean get() = descriptor.isES6Generator
 
     override val length: Int
         get() {
             val declared = descriptor.arity
-            if (getLanguageVersion() != Context.VERSION_1_2) return declared
+            if (languageVersion != Context.VERSION_1_2) return declared
             val activation = ScriptRuntime.findFunctionActivation(Context.getContext(), this) ?: return declared
             return activation.originalArgs.size
         }
 
-    internal fun getParamAndVarCount(): Int = descriptor.paramAndVarCount
+    internal val paramAndVarCount: Int get() = descriptor.paramAndVarCount
 
-    internal fun getParamCount(): Int {
+    internal val paramCount: Int
+
+        get() {
         val count = descriptor.paramCount
         return if (descriptor.hasRestArg) count - 1 else count
     }
@@ -60,7 +62,7 @@ open class JSFunction(
 
     internal fun getParamOrVarName(index: Int): String = descriptor.getParamOrVarName(index)
 
-    fun getRawSource(): String = descriptor.getRawSource()
+    val rawSource: String get() = descriptor.rawSource
 
     override fun createPrototypeProperty() {
         if (descriptor.hasPrototype) super.createPrototypeProperty()

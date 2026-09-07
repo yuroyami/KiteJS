@@ -82,7 +82,7 @@ class RegExpImpl : RegExpProxy {
                 var search: String? = null
                 if (useRE) {
                     re = createRegExp(cx, scope, args, 2, true)
-                    if (RegExpProxy.RA_REPLACE_ALL == actionType && (re.getFlags() and NativeRegExp.JSREG_GLOB) == 0) {
+                    if (RegExpProxy.RA_REPLACE_ALL == actionType && (re.flags and NativeRegExp.JSREG_GLOB) == 0) {
                         throw ScriptRuntime.typeErrorById("msg.str.replace.all.no.global.flag")
                     }
                 } else {
@@ -314,7 +314,7 @@ class RegExpImpl : RegExpProxy {
         /** The one loop behind match, search, replace and replaceAll. */
         private fun matchOrReplace(cx: Context, scope: Scriptable, reImpl: RegExpImpl, data: GlobData, re: NativeRegExp): Any? {
             val str = data.str!!
-            data.global = (re.getFlags() and NativeRegExp.JSREG_GLOB) != 0
+            data.global = (re.flags and NativeRegExp.JSREG_GLOB) != 0
             val indexp = intArrayOf(0)
             var result: Any? = null
 

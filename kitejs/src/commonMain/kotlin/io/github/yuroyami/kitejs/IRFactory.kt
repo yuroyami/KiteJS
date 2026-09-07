@@ -325,7 +325,7 @@ class IRFactory(
         if (node.isDestructuring) {
             return node
         }
-        val elems = node.getElements()
+        val elems = node.elements
         val array = Node(Token.ARRAYLIT)
         var skipIndexes: MutableList<Int>? = null
         for (i in elems.indices) {
@@ -623,7 +623,7 @@ class IRFactory(
             val transformedTarget = transform(node.target!!)
             val call = createCallOrNew(Token.CALL, transformedTarget)
             call.setLineColumnNumber(node.lineno, node.column)
-            for (arg in node.getArguments()) {
+            for (arg in node.arguments) {
                 call.addChildToBack(transform(arg))
             }
             if (node.isOptionalCall) {
@@ -829,7 +829,7 @@ class IRFactory(
     private fun transformNewExpr(node: NewExpression): Node {
         val nx = createCallOrNew(Token.NEW, transform(node.target!!))
         nx.setLineColumnNumber(node.lineno, node.column)
-        for (arg in node.getArguments()) {
+        for (arg in node.arguments) {
             nx.addChildToBack(transform(arg))
         }
         node.initializer?.let { nx.addChildToBack(transformObjectLiteral(it)) }
@@ -844,7 +844,7 @@ class IRFactory(
         }
         // The literal is rewritten into object creation plus property entries, so the later
         // compiler stages never see an object literal.
-        val elems = node.getElements()
+        val elems = node.elements
         val object_ = Node(Token.OBJECTLIT)
         object_.setLineColumnNumber(node.lineno, node.column)
         val properties: Array<Any?>
@@ -1026,7 +1026,7 @@ class IRFactory(
             val switchExpr = transform(node.expression!!)
             node.addChildToBack(switchExpr)
 
-            for (sc in node.getCases()) {
+            for (sc in node.cases) {
                 val expr = sc.expression
                 var caseExpr: Node? = null
 
@@ -1058,7 +1058,7 @@ class IRFactory(
         val tryBlock = transform(node.tryBlock!!)
 
         val catchBlocks: Node = Block()
-        for (cc in node.getCatchClauses()) {
+        for (cc in node.catchClauses) {
             val varName = cc.varName
             var catchCond: Node? = null
             var varNameNode: Node? = null
@@ -1881,7 +1881,7 @@ class IRFactory(
             }
 
             // A nested lambda that needs arguments forces the outer function to need them too.
-            val toVisit = ArrayDeque(fnNode.getFunctions())
+            val toVisit = ArrayDeque(fnNode.functions)
             while (toVisit.isNotEmpty()) {
                 val nestedFunction = toVisit.removeFirst()
                 if (nestedFunction.functionType == FunctionNode.ARROW_FUNCTION) {
@@ -1891,7 +1891,7 @@ class IRFactory(
                     }
 
                     // Every nested arrow function, recursively.
-                    toVisit.addAll(nestedFunction.getFunctions())
+                    toVisit.addAll(nestedFunction.functions)
                 }
             }
         }

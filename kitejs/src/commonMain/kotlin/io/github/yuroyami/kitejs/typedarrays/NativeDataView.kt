@@ -27,8 +27,10 @@ class NativeDataView : NativeArrayBufferView {
     override val className: String
         get() = CLASS_NAME
 
-    fun isDataViewOutOfBounds(): Boolean {
-        if (arrayBuffer.isDetached()) return true
+    val isDataViewOutOfBounds: Boolean
+
+        get() {
+        if (arrayBuffer.isDetached) return true
         val bufferByteLength = arrayBuffer.length
         return offset > bufferByteLength || offset + byteLength > bufferByteLength
     }
@@ -37,7 +39,7 @@ class NativeDataView : NativeArrayBufferView {
         val pos = ScriptRuntime.toIndex(if (isArg(args, 0)) args[0] else Undefined.instance)
         val littleEndian = isArg(args, 1) && bytes > 1 && ScriptRuntime.toBoolean(args[1])
 
-        if (isDataViewOutOfBounds()) throw ScriptRuntime.typeErrorById("msg.dataview.bounds")
+        if (isDataViewOutOfBounds) throw ScriptRuntime.typeErrorById("msg.dataview.bounds")
         if (pos.toLong() + bytes > byteLength) throw ScriptRuntime.rangeErrorById("msg.dataview.offset.range")
 
         val buf = arrayBuffer.buffer!!
@@ -53,7 +55,7 @@ class NativeDataView : NativeArrayBufferView {
         val pos = ScriptRuntime.toIndex(if (isArg(args, 0)) args[0] else Undefined.instance)
         val littleEndian = isArg(args, 1) && bytes > 1 && ScriptRuntime.toBoolean(args[1])
 
-        if (isDataViewOutOfBounds()) throw ScriptRuntime.typeErrorById("msg.dataview.bounds")
+        if (isDataViewOutOfBounds) throw ScriptRuntime.typeErrorById("msg.dataview.bounds")
         if (pos.toLong() + bytes > byteLength) throw ScriptRuntime.rangeErrorById("msg.dataview.offset.range")
 
         val buf = arrayBuffer.buffer!!
@@ -69,7 +71,7 @@ class NativeDataView : NativeArrayBufferView {
         val value: Any = if (isArg(args, 1)) ScriptRuntime.toNumber(args[1]) else ScriptRuntime.zeroObj
         val littleEndian = isArg(args, 2) && bytes > 1 && ScriptRuntime.toBoolean(args[2])
 
-        if (isDataViewOutOfBounds()) throw ScriptRuntime.typeErrorById("msg.dataview.bounds")
+        if (isDataViewOutOfBounds) throw ScriptRuntime.typeErrorById("msg.dataview.bounds")
         if (pos.toLong() + bytes > byteLength) throw ScriptRuntime.rangeErrorById("msg.dataview.offset.range")
 
         val buf = arrayBuffer.buffer!!
@@ -98,7 +100,7 @@ class NativeDataView : NativeArrayBufferView {
         val value = if (isArg(args, 1)) ScriptRuntime.toNumber(args[1]) else Double.NaN
         val littleEndian = isArg(args, 2) && bytes > 1 && ScriptRuntime.toBoolean(args[2])
 
-        if (isDataViewOutOfBounds()) throw ScriptRuntime.typeErrorById("msg.dataview.bounds")
+        if (isDataViewOutOfBounds) throw ScriptRuntime.typeErrorById("msg.dataview.bounds")
         if (pos.toLong() + bytes > byteLength) throw ScriptRuntime.rangeErrorById("msg.dataview.offset.range")
 
         val buf = arrayBuffer.buffer!!
@@ -125,12 +127,12 @@ class NativeDataView : NativeArrayBufferView {
             constructor.definePrototypeProperty(cx, "buffer", LambdaGetterFunction { realThis(it).arrayBuffer })
             constructor.definePrototypeProperty(cx, "byteLength", LambdaGetterFunction {
                 val self = realThis(it)
-                if (self.isDataViewOutOfBounds()) throw ScriptRuntime.typeErrorById("msg.dataview.bounds")
+                if (self.isDataViewOutOfBounds) throw ScriptRuntime.typeErrorById("msg.dataview.bounds")
                 self.byteLength
             })
             constructor.definePrototypeProperty(cx, "byteOffset", LambdaGetterFunction {
                 val self = realThis(it)
-                if (self.isDataViewOutOfBounds()) throw ScriptRuntime.typeErrorById("msg.dataview.bounds")
+                if (self.isDataViewOutOfBounds) throw ScriptRuntime.typeErrorById("msg.dataview.bounds")
                 self.offset
             })
             constructor.definePrototypeProperty(SymbolKey.TO_STRING_TAG, CLASS_NAME, DONTENUM or READONLY)
@@ -187,7 +189,7 @@ class NativeDataView : NativeArrayBufferView {
             val ab = args[0] as NativeArrayBuffer
             val pos = ScriptRuntime.toIndex(if (isArg(args, 1)) args[1] else Undefined.instance)
 
-            if (ab.isDetached()) throw ScriptRuntime.typeErrorById("msg.arraybuf.detached")
+            if (ab.isDetached) throw ScriptRuntime.typeErrorById("msg.arraybuf.detached")
 
             var bufferByteLength = ab.length
             if (pos > bufferByteLength) throw ScriptRuntime.rangeErrorById("msg.dataview.offset.range")
@@ -202,7 +204,7 @@ class NativeDataView : NativeArrayBufferView {
 
             // Converting the arguments can run script, which could have detached the buffer, so
             // the checks run a second time.
-            if (ab.isDetached()) throw ScriptRuntime.typeErrorById("msg.arraybuf.detached")
+            if (ab.isDetached) throw ScriptRuntime.typeErrorById("msg.arraybuf.detached")
             bufferByteLength = ab.length
             if (pos > bufferByteLength) throw ScriptRuntime.rangeErrorById("msg.dataview.offset.range")
             if (isArg(args, 2) && pos.toLong() + len > bufferByteLength) {

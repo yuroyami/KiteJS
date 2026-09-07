@@ -499,11 +499,11 @@ object ScriptRuntime {
 
     /** True for a symbol, either a well-known [SymbolKey] or a script-made one. */
     internal fun isSymbol(obj: Any?): Boolean =
-        (obj is NativeSymbol && obj.isSymbol()) || obj is SymbolKey
+        (obj is NativeSymbol && obj.isSymbol) || obj is SymbolKey
 
     /** True for a symbol the constructor or the spec made, but not one `Symbol.for` registered. */
     internal fun isUnregisteredSymbol(obj: Any?): Boolean = when (obj) {
-        is NativeSymbol -> obj.isSymbol() && obj.kind != Symbol.Kind.REGISTERED
+        is NativeSymbol -> obj.isSymbol && obj.kind != Symbol.Kind.REGISTERED
         is Symbol -> obj.kind != Symbol.Kind.REGISTERED
         else -> false
     }
@@ -727,14 +727,14 @@ object ScriptRuntime {
                 v is Boolean -> return v
                 v == null || Undefined.isUndefined(v) -> return false
                 v is CharSequence -> return v.isNotEmpty()
-                v is KBigInt -> return !v.isZero()
+                v is KBigInt -> return !v.isZero
                 v is Number -> {
                     val d = v.toDouble()
                     return !d.isNaN() && d != 0.0
                 }
                 v is Scriptable -> {
                     if (v is ScriptableObject && v.avoidObjectDetection()) return false
-                    if (Context.getContext().isVersionECMA1()) return true
+                    if (Context.getContext().isVersionECMA1) return true
                     // The pre-ECMA extension: ask the object for a primitive first.
                     v = v.getDefaultValue(BooleanClass)
                     if (v is Scriptable && !isSymbol(v)) {
@@ -1237,7 +1237,7 @@ object ScriptRuntime {
                         value = thisObj.get(strId, thisObj)
                         if (value === Scriptable.NOT_FOUND) continue // a property has been removed
                         if (i > 0) result.append(", ")
-                        if (isValidIdentifierName(strId, cx, cx.isStrictMode())) {
+                        if (isValidIdentifierName(strId, cx, cx.isStrictMode)) {
                             result.append(strId)
                         } else {
                             result.append('\'')
@@ -1633,7 +1633,7 @@ object ScriptRuntime {
 
     fun divide(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> {
-            if (val2.isZero()) throw rangeErrorById("msg.division.zero")
+            if (val2.isZero) throw rangeErrorById("msg.division.zero")
             val1.divide(val2)
         }
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
@@ -1642,7 +1642,7 @@ object ScriptRuntime {
 
     fun remainder(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> {
-            if (val2.isZero()) throw rangeErrorById("msg.division.zero")
+            if (val2.isZero) throw rangeErrorById("msg.division.zero")
             val1.remainder(val2)
         }
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
@@ -1942,7 +1942,7 @@ object ScriptRuntime {
         toObjectOrNull(cx, obj, scope) ?: throw undefWriteError(obj, elem, value)
 
     private fun verifyIsScriptableOrComplainWriteErrorInEs5Strict(obj: Any?, elem: Any?, value: Any?, cx: Context) {
-        if (obj !is Scriptable && cx.isStrictMode() && cx.languageVersion >= Context.VERSION_1_8) {
+        if (obj !is Scriptable && cx.isStrictMode && cx.languageVersion >= Context.VERSION_1_8) {
             throw undefWriteError(obj, elem, value)
         }
     }
@@ -2389,12 +2389,15 @@ object ScriptRuntime {
     // ---- Function lookups for calls ------------------------------------------------------------
 
     /** What a call site needs: the callee and the `this` it goes with. */
-    class LookupResult internal constructor(private val result: Any?, private val thisObj: Scriptable?, private val name: Any?) {
-        fun getResult(): Any? = result
-        fun getThis(): Scriptable? = thisObj
-        fun getName(): String = name?.toString() ?: "null"
-        fun getCallable(): Callable = result as? Callable ?: throw notFunctionError(result, name)
-        fun call(cx: Context, scope: Scriptable, args: Array<Any?>): Any? = getCallable().call(cx, scope, thisObj, args)
+    class LookupResult internal constructor(
+        val result: Any?,
+        /** The `this` the callee is called with. */
+        val thisObj: Scriptable?,
+        private val nameOrIndex: Any?,
+    ) {
+        val name: String get() = nameOrIndex?.toString() ?: "null"
+        val callable: Callable get() = result as? Callable ?: throw notFunctionError(result, name)
+        fun call(cx: Context, scope: Scriptable, args: Array<Any?>): Any? = callable.call(cx, scope, thisObj, args)
     }
 
     /** Stands in for a missing method when the object has a `__noSuchMethod__` hook. */
@@ -2490,9 +2493,9 @@ object ScriptRuntime {
             val s = toStringIdOrIndex(elem)
             if (s.stringId != null) {
                 val r = getPropAndThisHelper(obj, s.stringId, cx, toObjectOrNull(cx, obj, scope), false)!!
-                val f = r.getResult()
-                if (f !is Callable) throw notFunctionError(r.getThis(), f, s.stringId)
-                storeScriptable(cx, r.getThis())
+                val f = r.result
+                if (f !is Callable) throw notFunctionError(r.thisObj, f, s.stringId)
+                storeScriptable(cx, r.thisObj)
                 return f
             }
             thisObj = toObjectOrNull(cx, obj, scope) ?: throw undefCallError(obj, elem.toString())
@@ -2564,10 +2567,10 @@ object ScriptRuntime {
         val sourceName = makeUrlForGeneratedScript(true, filename, lineNumber)
         val reporter = DefaultErrorReporter.forEval(cx.errorReporter)
         val evaluator = Context.createInterpreter()
-        val homeObject = if (scope is NativeCall) scope.getHomeObject() else null
+        val homeObject = if (scope is NativeCall) scope.homeObject else null
         val script = cx.compileString(x.toString(), evaluator, reporter, sourceName, 1, null) { compilerEnvs ->
-            compilerEnvs.strictMode = cx.isStrictMode()
-            val isInsideMethod = scope is NativeCall && scope.getHomeObject() != null
+            compilerEnvs.strictMode = cx.isStrictMode
+            val isInsideMethod = scope is NativeCall && scope.homeObject != null
             compilerEnvs.allowSuper = isInsideMethod
             compilerEnvs.inEval = true
             compilerEnvs.setHomeObject(homeObject)

@@ -263,7 +263,7 @@ class KBigIntOracleTest {
     fun algebraicIdentitiesHold() {
         for (x in all) {
             val a = k(x)
-            assertTrue(a.subtract(a).isZero(), "$x - $x")
+            assertTrue(a.subtract(a).isZero, "$x - $x")
             check("negate twice", x, a.negate().negate())
             check("double negate through not", x, a.not().not())
         }

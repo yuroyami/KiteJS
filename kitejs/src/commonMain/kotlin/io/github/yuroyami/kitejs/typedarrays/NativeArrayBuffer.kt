@@ -22,7 +22,9 @@ import io.github.yuroyami.kitejs.Undefined
  */
 class NativeArrayBuffer : ScriptableObject {
 
-    internal var buffer: ByteArray? = EMPTY_BUF
+    /** The real bytes, not a copy: a write here shows up in every view. */
+    var buffer: ByteArray? = EMPTY_BUF
+        internal set
 
     override val className: String
         get() = CLASS_NAME
@@ -51,14 +53,11 @@ class NativeArrayBuffer : ScriptableObject {
     val length: Int
         get() = buffer?.size ?: 0
 
-    /** The real bytes, not a copy: a write here shows up in every view. */
-    fun getBuffer(): ByteArray? = buffer
-
     fun detach() {
         buffer = null
     }
 
-    fun isDetached(): Boolean = buffer == null
+    val isDetached: Boolean get() = buffer == null
 
     /**
      * A copy of the bytes between [s] and [e], with both clamped into range the way the spec says.
@@ -93,7 +92,7 @@ class NativeArrayBuffer : ScriptableObject {
             constructor.definePrototypeMethod(scope, "transfer", 0, SerializableCallable { icx, s, thisObj, args -> js_transfer(icx, s, thisObj, args) })
             constructor.definePrototypeMethod(scope, "transferToFixedLength", 0, SerializableCallable { icx, s, thisObj, args -> js_transfer(icx, s, thisObj, args) })
             constructor.definePrototypeProperty(cx, "byteLength", LambdaGetterFunction { thisObj -> getSelf(thisObj).length })
-            constructor.definePrototypeProperty(cx, "detached", LambdaGetterFunction { thisObj -> getSelf(thisObj).isDetached() })
+            constructor.definePrototypeProperty(cx, "detached", LambdaGetterFunction { thisObj -> getSelf(thisObj).isDetached })
             constructor.definePrototypeProperty(SymbolKey.TO_STRING_TAG, "ArrayBuffer", DONTENUM or READONLY)
 
             if (sealed) {
@@ -115,7 +114,7 @@ class NativeArrayBuffer : ScriptableObject {
 
         private fun js_slice(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): NativeArrayBuffer {
             val self = getSelf(thisObj)
-            if (self.isDetached()) throw ScriptRuntime.typeErrorById("msg.arraybuf.detached")
+            if (self.isDetached) throw ScriptRuntime.typeErrorById("msg.arraybuf.detached")
 
             val start = if (isArg(args, 0)) ScriptRuntime.toNumber(args[0]) else 0.0
             val end = if (isArg(args, 1)) ScriptRuntime.toNumber(args[1]) else self.length.toDouble()
@@ -137,7 +136,7 @@ class NativeArrayBuffer : ScriptableObject {
         /** `transfer` and `transferToFixedLength` do the same thing here: copy, then detach. */
         private fun js_transfer(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Scriptable {
             val self = getSelf(thisObj)
-            if (self.isDetached()) throw ScriptRuntime.typeErrorById("msg.arraybuf.detached")
+            if (self.isDetached) throw ScriptRuntime.typeErrorById("msg.arraybuf.detached")
 
             val newByteLength = validateNewByteLength(args, self.length)
             val newBuffer = constructNew(cx, scope, thisObj!!, newByteLength)
@@ -208,7 +207,7 @@ abstract class NativeArrayBufferView : ScriptableObject {
         outOfRange = offset > bufferByteLength || byteOffsetEnd > bufferByteLength
     }
 
-    fun getBuffer(): NativeArrayBuffer = arrayBuffer
+    val buffer: NativeArrayBuffer get() = arrayBuffer
 
     companion object {
         private var useLittleEndianCache: Boolean? = null

@@ -24,7 +24,7 @@ open class CompoundOperationMap(protected val owner: SlotMapOwner) : SlotMap, Au
         }
     }
 
-    fun isTouched(): Boolean = touched
+    val isTouched: Boolean get() = touched
 
     override fun add(owner: SlotMapOwner?, newSlot: Slot) {
         map.add(owner, newSlot)

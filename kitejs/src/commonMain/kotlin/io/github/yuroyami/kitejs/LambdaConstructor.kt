@@ -71,14 +71,12 @@ open class LambdaConstructor : LambdaFunction {
                 (if (targetConstructor != null) CONSTRUCTOR_NEW else 0)
     }
 
-    protected fun getTargetConstructor(): Constructable? = targetConstructor
-
     override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
         if ((flags and CONSTRUCTOR_FUNCTION) == 0) {
             throw ScriptRuntime.typeErrorById("msg.constructor.no.function", functionName)
         }
         val declScope = declarationScope!!
-        val t = getTarget()
+        val t = target
         return t?.call(cx, declScope, thisObj, args) ?: fireConstructor(cx, declScope, args)
     }
 
@@ -91,7 +89,7 @@ open class LambdaConstructor : LambdaFunction {
 
     private fun fireConstructor(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable {
         val obj = targetConstructor!!.construct(cx, scope, args)
-        obj.prototype = getClassPrototype()
+        obj.prototype = classPrototype
         obj.parentScope = scope
         return obj
     }
@@ -108,7 +106,7 @@ open class LambdaConstructor : LambdaFunction {
     ) {
         val f = LambdaFunction(scope, name, length, target, false)
         f.setStandardPropertyAttributes(propertyAttributes)
-        getPrototypeScriptable().defineProperty(name, f, attributes)
+        prototypeScriptable.defineProperty(name, f, attributes)
     }
 
     fun definePrototypeMethod(
@@ -121,7 +119,7 @@ open class LambdaConstructor : LambdaFunction {
     ) {
         val f = LambdaFunction(scope, "[" + name.name + "]", length, target, false)
         f.setStandardPropertyAttributes(propertyAttributes)
-        getPrototypeScriptable().defineProperty(name, f, attributes)
+        prototypeScriptable.defineProperty(name, f, attributes)
     }
 
     fun definePrototypeMethod(
@@ -135,7 +133,7 @@ open class LambdaConstructor : LambdaFunction {
     ) {
         val f = LambdaFunction(scope, name, length, prototype, target)
         f.setStandardPropertyAttributes(propertyAttributes)
-        getPrototypeScriptable().defineProperty(name, f, attributes)
+        prototypeScriptable.defineProperty(name, f, attributes)
     }
 
     fun definePrototypeMethod(
@@ -149,7 +147,7 @@ open class LambdaConstructor : LambdaFunction {
     ) {
         val f = LambdaFunction(scope, "[" + name.name + "]", length, prototype, target)
         f.setStandardPropertyAttributes(propertyAttributes)
-        getPrototypeScriptable().defineProperty(name, f, attributes)
+        prototypeScriptable.defineProperty(name, f, attributes)
     }
 
     /** Same as [definePrototypeMethod], but the engine can recognise the result by its tag. */
@@ -165,25 +163,25 @@ open class LambdaConstructor : LambdaFunction {
     ) {
         val f = KnownBuiltInFunction(tag, scope, name, length, prototype, target)
         f.setStandardPropertyAttributes(propertyAttributes)
-        getPrototypeScriptable().defineProperty(name, f, attributes)
+        prototypeScriptable.defineProperty(name, f, attributes)
     }
 
     // ---- Prototype properties -------------------------------------------------------------------
 
     fun definePrototypeProperty(name: String, value: Any?, attributes: Int) {
-        getPrototypeScriptable().defineProperty(name, value, attributes)
+        prototypeScriptable.defineProperty(name, value, attributes)
     }
 
     fun definePrototypeProperty(key: Symbol, value: Any?, attributes: Int) {
-        getPrototypeScriptable().defineProperty(key, value, attributes)
+        prototypeScriptable.defineProperty(key, value, attributes)
     }
 
     fun definePrototypeProperty(cx: Context, name: String, descriptor: ScriptableObject) {
-        getPrototypeScriptable().defineOwnProperty(cx, name, descriptor)
+        prototypeScriptable.defineOwnProperty(cx, name, descriptor)
     }
 
     fun definePrototypeProperty(cx: Context, key: Symbol, descriptor: ScriptableObject) {
-        getPrototypeScriptable().defineOwnProperty(cx, key, descriptor)
+        prototypeScriptable.defineOwnProperty(cx, key, descriptor)
     }
 
     /**
@@ -196,7 +194,7 @@ open class LambdaConstructor : LambdaFunction {
         getter: LambdaGetterFunction,
         attributes: Int = DONTENUM or READONLY,
     ) {
-        getPrototypeScriptable().defineProperty(cx, name, getter, null, attributes)
+        prototypeScriptable.defineProperty(cx, name, getter, null, attributes)
     }
 
     fun definePrototypeProperty(
@@ -205,7 +203,7 @@ open class LambdaConstructor : LambdaFunction {
         getter: LambdaGetterFunction,
         attributes: Int,
     ) {
-        getPrototypeScriptable().defineProperty(cx, key, getter, null, attributes)
+        prototypeScriptable.defineProperty(cx, key, getter, null, attributes)
     }
 
     /** The getter and setter pair version of [definePrototypeProperty]. */
@@ -216,7 +214,7 @@ open class LambdaConstructor : LambdaFunction {
         setter: LambdaSetterFunction?,
         attributes: Int = DONTENUM,
     ) {
-        getPrototypeScriptable().defineProperty(cx, name, getter, setter, attributes)
+        prototypeScriptable.defineProperty(cx, name, getter, setter, attributes)
     }
 
     fun definePrototypeProperty(
@@ -226,17 +224,17 @@ open class LambdaConstructor : LambdaFunction {
         setter: LambdaSetterFunction?,
         attributes: Int = DONTENUM,
     ) {
-        getPrototypeScriptable().defineProperty(cx, key, getter, setter, attributes)
+        prototypeScriptable.defineProperty(cx, key, getter, setter, attributes)
     }
 
     /** Gives [alias] the same value as the property already named [name]. */
     fun definePrototypeAlias(name: String, alias: SymbolKey, attributes: Int) {
-        val proto = getPrototypeScriptable()
+        val proto = prototypeScriptable
         proto.defineProperty(alias, proto.get(name, proto), attributes)
     }
 
     fun definePrototypeAlias(name: String, alias: String, attributes: Int) {
-        val proto = getPrototypeScriptable()
+        val proto = prototypeScriptable
         proto.defineProperty(alias, proto.get(name, proto), attributes)
     }
 
@@ -293,8 +291,7 @@ open class LambdaConstructor : LambdaFunction {
         proto.defineProperty("constructor", this, DONTENUM)
     }
 
-    private fun getPrototypeScriptable(): ScriptableObject =
-        prototypeProperty as? ScriptableObject
+    private val prototypeScriptable: ScriptableObject get() = prototypeProperty as? ScriptableObject
             ?: throw ScriptRuntime.typeError("Not properly a lambda constructor")
 
     companion object {

@@ -20,5 +20,5 @@ interface ExternalArrayData {
     fun setArrayElement(index: Int, value: Any?)
 
     /** How many elements there are. */
-    fun getArrayLength(): Int
+    val arrayLength: Int
 }

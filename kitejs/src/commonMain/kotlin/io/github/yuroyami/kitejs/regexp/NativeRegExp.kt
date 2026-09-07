@@ -96,7 +96,7 @@ open class NativeRegExp : IdScriptableObject {
         if ((flags and JSREG_UNICODE) != 0) buf.append('u')
     }
 
-    internal fun getFlags(): Int = re!!.flags
+    internal val flags: Int get() = re!!.flags
 
     internal fun execSub(cx: Context, scopeObj: Scriptable, args: Array<Any?>, matchType: Int): Any? {
         val reImpl = getImpl(cx)
@@ -257,7 +257,7 @@ open class NativeRegExp : IdScriptableObject {
 
     // ---- The id-based property surface ---------------------------------------------------------
 
-    override fun getMaxInstanceId(): Int = MAX_INSTANCE_ID
+    override val maxInstanceId: Int get() = MAX_INSTANCE_ID
 
     override fun findInstanceIdInfo(s: String): Int {
         val id = when (s) {
@@ -2685,7 +2685,7 @@ open class NativeRegExp : IdScriptableObject {
                 if (!anchor) return false
             }
 
-            val instructionCounting = cx.getInstructionObserverThreshold() != 0
+            val instructionCounting = cx.instructionObserverThreshold != 0
             mainLoop@ while (true) {
                 if (instructionCounting) ScriptRuntime.addInstructionCount(cx, 5)
 

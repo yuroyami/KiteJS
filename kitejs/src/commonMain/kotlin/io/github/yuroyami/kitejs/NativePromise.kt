@@ -18,7 +18,8 @@ class NativePromise : ScriptableObject() {
     private enum class ReactionType { FULFILL, REJECT }
 
     private var state = State.PENDING
-    private var result: Any? = null
+    internal var result: Any? = null
+        private set
     private var handled = false
 
     private var fulfillReactions = ArrayList<Reaction>()
@@ -26,8 +27,6 @@ class NativePromise : ScriptableObject() {
 
     override val className: String
         get() = "Promise"
-
-    internal fun getResult(): Any? = result
 
     private fun markHandled(cx: Context) {
         if (!handled) {
@@ -417,7 +416,7 @@ class NativePromise : ScriptableObject() {
             val resolving = ResolvingFunctions(scope, promise)
 
             var thisObj: Scriptable = Undefined.SCRIPTABLE_UNDEFINED
-            if (!cx.isStrictMode()) {
+            if (!cx.isStrictMode) {
                 cx.topCallScope?.let { thisObj = it }
             }
 

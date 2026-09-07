@@ -35,7 +35,7 @@ open class FunctionCall(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         private set
 
     /** The call arguments, or an empty list if there are none. */
-    fun getArguments(): List<AstNode> = argumentList ?: NO_ARGS
+    val arguments: List<AstNode> get() = argumentList ?: NO_ARGS
 
     /** Replaces the argument list and reparents every element. Null means no arguments. */
     fun setArguments(arguments: List<AstNode>?) {
@@ -82,7 +82,7 @@ open class FunctionCall(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
     override fun visit(visitor: NodeVisitor) {
         if (visitor.visit(this)) {
             target!!.visit(visitor)
-            for (arg in getArguments()) {
+            for (arg in arguments) {
                 arg.visit(visitor)
             }
         }

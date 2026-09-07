@@ -27,7 +27,7 @@ class ArrayLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len), Destructuri
     }
 
     /** The elements, or an empty list if none were added. */
-    fun getElements(): List<AstNode> = elementList ?: NO_ELEMS
+    val elements: List<AstNode> get() = elementList ?: NO_ELEMS
 
     fun setElements(elements: List<AstNode>?) {
         if (elements == null) {
@@ -63,7 +63,7 @@ class ArrayLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len), Destructuri
 
     override fun visit(visitor: NodeVisitor) {
         if (visitor.visit(this)) {
-            for (e in getElements()) {
+            for (e in elements) {
                 e.visit(visitor)
             }
         }

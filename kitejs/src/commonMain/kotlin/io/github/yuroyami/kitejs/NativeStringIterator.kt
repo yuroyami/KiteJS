@@ -29,7 +29,7 @@ class NativeStringIterator : ES6Iterator {
         return value
     }
 
-    override fun getTag(): String = ITERATOR_TAG
+    override val tag: String get() = ITERATOR_TAG
 
     companion object {
         private const val ITERATOR_TAG = "StringIterator"

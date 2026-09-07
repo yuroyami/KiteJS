@@ -20,7 +20,7 @@ class JSDescriptor<T : ScriptOrFn<T>> private constructor(
     private val paramIsConst: BooleanArray,
     private val flags: Int,
     val sourceName: String?,
-    private val rawSource: String?,
+    private val wholeSource: String?,
     private val rawSourceStart: Int,
     private val rawSourceEnd: Int,
     val name: String,
@@ -50,7 +50,7 @@ class JSDescriptor<T : ScriptOrFn<T>> private constructor(
     val requiresArgumentObject: Boolean get() = (flags and REQUIRES_ARGUMENT_OBJECT_FLAG) != 0
     val declaredAsFunctionExpression: Boolean get() = (flags and DECLARED_AS_FUNCTION_EXPRESSION_FLAG) != 0
 
-    fun getRawSource(): String = rawSource!!.substring(rawSourceStart, rawSourceEnd)
+    val rawSource: String get() = wholeSource!!.substring(rawSourceStart, rawSourceEnd)
 
     fun getParamOrVarConst(index: Int): Boolean = paramIsConst[index]
 
@@ -58,14 +58,14 @@ class JSDescriptor<T : ScriptOrFn<T>> private constructor(
 
     /** False when a nested function declaration (not expression) is named [name]. */
     fun hasFunctionNamed(name: String): Boolean {
-        for (f in 0 until getFunctionCount()) {
+        for (f in 0 until functionCount) {
             val functionData = getFunction(f)
             if (!functionData.declaredAsFunctionExpression && name == functionData.name) return false
         }
         return true
     }
 
-    fun getFunctionCount(): Int = nestedFunctions?.size ?: 0
+    val functionCount: Int get() = nestedFunctions?.size ?: 0
 
     fun getFunction(index: Int): JSDescriptor<JSFunction> = nestedFunctions!![index]
 
@@ -75,7 +75,7 @@ class JSDescriptor<T : ScriptOrFn<T>> private constructor(
     val isGeneratedScript: Boolean
         get() = ScriptRuntime.isGeneratedScript(sourceName!!)
 
-    fun getLineNumbers(): IntArray = Interpreter.getLineNumbers(this)
+    val lineNumbers: IntArray get() = Interpreter.getLineNumbers(this)
 
     /** Collects what the code generator learns, then makes the descriptor. */
     class Builder<T : ScriptOrFn<T>> {

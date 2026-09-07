@@ -28,7 +28,7 @@ class NativeInt8Array : NativeTypedArrayView {
     override val className: String
         get() = CLASS_NAME
 
-    override fun getBytesPerElement(): Int = 1
+    override val bytesPerElement: Int get() = 1
 
     override fun js_get(index: Int): Any? {
         if (checkIndex(index)) return Undefined.instance
@@ -84,7 +84,7 @@ class NativeUint8Array : NativeTypedArrayView {
     override val className: String
         get() = CLASS_NAME
 
-    override fun getBytesPerElement(): Int = 1
+    override val bytesPerElement: Int get() = 1
 
     override fun js_get(index: Int): Any? {
         if (checkIndex(index)) return Undefined.instance
@@ -140,7 +140,7 @@ class NativeUint8ClampedArray : NativeTypedArrayView {
     override val className: String
         get() = CLASS_NAME
 
-    override fun getBytesPerElement(): Int = 1
+    override val bytesPerElement: Int get() = 1
 
     override fun js_get(index: Int): Any? {
         if (checkIndex(index)) return Undefined.instance
@@ -196,7 +196,7 @@ class NativeInt16Array : NativeTypedArrayView {
     override val className: String
         get() = CLASS_NAME
 
-    override fun getBytesPerElement(): Int = 2
+    override val bytesPerElement: Int get() = 2
 
     override fun js_get(index: Int): Any? {
         if (checkIndex(index)) return Undefined.instance
@@ -252,7 +252,7 @@ class NativeUint16Array : NativeTypedArrayView {
     override val className: String
         get() = CLASS_NAME
 
-    override fun getBytesPerElement(): Int = 2
+    override val bytesPerElement: Int get() = 2
 
     override fun js_get(index: Int): Any? {
         if (checkIndex(index)) return Undefined.instance
@@ -308,7 +308,7 @@ class NativeInt32Array : NativeTypedArrayView {
     override val className: String
         get() = CLASS_NAME
 
-    override fun getBytesPerElement(): Int = 4
+    override val bytesPerElement: Int get() = 4
 
     override fun js_get(index: Int): Any? {
         if (checkIndex(index)) return Undefined.instance
@@ -364,7 +364,7 @@ class NativeUint32Array : NativeTypedArrayView {
     override val className: String
         get() = CLASS_NAME
 
-    override fun getBytesPerElement(): Int = 4
+    override val bytesPerElement: Int get() = 4
 
     override fun js_get(index: Int): Any? {
         if (checkIndex(index)) return Undefined.instance
@@ -420,7 +420,7 @@ class NativeFloat32Array : NativeTypedArrayView {
     override val className: String
         get() = CLASS_NAME
 
-    override fun getBytesPerElement(): Int = 4
+    override val bytesPerElement: Int get() = 4
 
     override fun js_get(index: Int): Any? {
         if (checkIndex(index)) return Undefined.instance
@@ -476,7 +476,7 @@ class NativeFloat64Array : NativeTypedArrayView {
     override val className: String
         get() = CLASS_NAME
 
-    override fun getBytesPerElement(): Int = 8
+    override val bytesPerElement: Int get() = 8
 
     override fun js_get(index: Int): Any? {
         if (checkIndex(index)) return Undefined.instance

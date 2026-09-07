@@ -28,7 +28,7 @@ class NativeArrayIterator : ES6Iterator {
 
     override fun isDone(cx: Context, scope: Scriptable): Boolean {
         val typedArray = arrayLike
-        if (typedArray is NativeTypedArrayView && typedArray.isTypedArrayOutOfBounds()) {
+        if (typedArray is NativeTypedArrayView && typedArray.isTypedArrayOutOfBounds) {
             throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
         }
         return index >= NativeArray.getLengthProperty(cx, arrayLike!!)
@@ -48,7 +48,7 @@ class NativeArrayIterator : ES6Iterator {
         return value
     }
 
-    override fun getTag(): String = ITERATOR_TAG
+    override val tag: String get() = ITERATOR_TAG
 
     companion object {
         private const val ITERATOR_TAG = "ArrayIterator"

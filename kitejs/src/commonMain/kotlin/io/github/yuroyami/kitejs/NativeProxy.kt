@@ -216,10 +216,10 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
     /** A `get` trap may not contradict a non-configurable property on the target. */
     private fun checkGetInvariants(targetDesc: DescriptorInfo?, trapResult: Any?) {
         if (targetDesc == null || !targetDesc.isConfigurable(false)) return
-        if (targetDesc.isDataDescriptor() && targetDesc.isWritable(false)) {
+        if (targetDesc.isDataDescriptor && targetDesc.isWritable(false)) {
             if (trapResult != targetDesc.value) throw ScriptRuntime.typeError(GET_MUST_MATCH)
         }
-        if (targetDesc.isAccessorDescriptor() && Undefined.isUndefined(targetDesc.getter)) {
+        if (targetDesc.isAccessorDescriptor && Undefined.isUndefined(targetDesc.getter)) {
             if (!Undefined.isUndefined(trapResult)) throw ScriptRuntime.typeError(GET_MUST_MATCH)
         }
     }
@@ -266,12 +266,12 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
     /** A `set` trap that claims success may not contradict a non-configurable property. */
     private fun checkSetInvariants(targetDesc: DescriptorInfo?, value: Any?) {
         if (targetDesc == null || !targetDesc.isConfigurable(false)) return
-        if (targetDesc.isDataDescriptor() && targetDesc.isWritable(false)) {
+        if (targetDesc.isDataDescriptor && targetDesc.isWritable(false)) {
             if (value != targetDesc.value) {
                 throw ScriptRuntime.typeError("proxy set has to use the same value as the plain call")
             }
         }
-        if (targetDesc.isAccessorDescriptor() && Undefined.isUndefined(targetDesc.setter)) {
+        if (targetDesc.isAccessorDescriptor && Undefined.isUndefined(targetDesc.setter)) {
             throw ScriptRuntime.typeError("proxy set has to be available")
         }
     }
@@ -404,11 +404,11 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
                     throw ScriptRuntime.typeError(INCOMPATIBLE_DESCRIPTOR)
                 }
 
-                if (settingConfigFalse && targetDesc.isConfigurable()) {
+                if (settingConfigFalse && targetDesc.isConfigurable) {
                     throw ScriptRuntime.typeError(INCOMPATIBLE_DESCRIPTOR)
                 }
 
-                if (targetDesc.isDataDescriptor() && targetDesc.isConfigurable(false) && targetDesc.isWritable()) {
+                if (targetDesc.isDataDescriptor && targetDesc.isConfigurable(false) && targetDesc.isWritable) {
                     if (desc.isWritable(false)) {
                         throw ScriptRuntime.typeError(INCOMPATIBLE_DESCRIPTOR)
                     }
@@ -576,9 +576,9 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
                 SerializableConstructable { icx, s, args -> constructorImpl(icx, s, args) },
             ) {
                 override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable {
-                    val obj = getTargetConstructor()!!.construct(cx, scope, args) as NativeProxy
+                    val obj = targetConstructor!!.construct(cx, scope, args) as NativeProxy
                     // Assigning through the property would hit the setPrototypeOf trap.
-                    obj.setPrototypeDirect(getClassPrototype())
+                    obj.setPrototypeDirect(classPrototype)
                     obj.parentScope = scope
                     return obj
                 }

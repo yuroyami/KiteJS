@@ -36,7 +36,7 @@ class KBigInt private constructor(
     /** -1, 0 or 1. */
     fun signum(): Int = sign
 
-    fun isZero(): Boolean = sign == 0
+    val isZero: Boolean get() = sign == 0
 
     fun negate(): KBigInt = if (sign == 0) this else KBigInt(-sign, mag)
 

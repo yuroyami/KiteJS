@@ -62,7 +62,7 @@ class ParserSmokeTest {
         val root = parse("function f(a, b) { return a + b; }")
         val fn = root.firstChild as FunctionNode
         assertEquals("f", fn.name)
-        assertEquals(2, fn.getParams().size)
+        assertEquals(2, fn.params.size)
         assertEquals("function f(a, b) {\n  return a + b;\n}\n", root.toSource())
     }
 

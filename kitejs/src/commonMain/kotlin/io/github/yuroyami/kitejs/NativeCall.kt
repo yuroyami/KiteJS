@@ -37,8 +37,8 @@ class NativeCall : IdScriptableObject {
         this.isStrict = isStrict
         val a = this.originalArgs
 
-        val paramAndVarCount = function.getParamAndVarCount()
-        val paramCount = function.getParamCount()
+        val paramAndVarCount = function.paramAndVarCount
+        val paramCount = function.paramCount
         if (paramAndVarCount != 0) {
             if (argsHasRest) {
                 val vals: Array<Any?> =
@@ -97,7 +97,7 @@ class NativeCall : IdScriptableObject {
         throw IllegalArgumentException("$id")
     }
 
-    fun getHomeObject(): Scriptable? = function!!.homeObject
+    val homeObject: Scriptable? get() = function!!.homeObject
 
     companion object {
         private val CALL_TAG: Any = "Call"

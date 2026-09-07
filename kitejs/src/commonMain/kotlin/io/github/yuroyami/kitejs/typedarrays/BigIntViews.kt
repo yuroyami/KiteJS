@@ -40,7 +40,7 @@ class NativeBigInt64Array : NativeBigIntArrayView {
     override val className: String
         get() = CLASS_NAME
 
-    override fun getBytesPerElement(): Int = BYTES_PER_ELEMENT
+    override val bytesPerElement: Int get() = BYTES_PER_ELEMENT
 
     override fun js_get(index: Int): Any? {
         if (checkIndex(index)) return Undefined.instance
@@ -112,7 +112,7 @@ class NativeBigUint64Array : NativeBigIntArrayView {
     override val className: String
         get() = CLASS_NAME
 
-    override fun getBytesPerElement(): Int = BYTES_PER_ELEMENT
+    override val bytesPerElement: Int get() = BYTES_PER_ELEMENT
 
     override fun js_get(index: Int): Any? {
         if (checkIndex(index)) return Undefined.instance

@@ -57,7 +57,7 @@ open class BaseFunction : ScriptableObject, Function {
         }
     }
 
-    protected open fun includeNonStandardProps(): Boolean = !Context.isCurrentContextStrict()
+    protected open fun includeNonStandardProps(): Boolean = !Context.isCurrentContextStrict
 
     /** Sets the name past every readonly check. */
     internal fun setFunctionName(name: String) {
@@ -92,10 +92,10 @@ open class BaseFunction : ScriptableObject, Function {
     }
 
     override val className: String
-        get() = if (isGeneratorFunction()) GENERATOR_FUNCTION_CLASS else FUNCTION_CLASS
+        get() = if (isGeneratorFunction) GENERATOR_FUNCTION_CLASS else FUNCTION_CLASS
 
     /** Generated code overrides this. */
-    protected open fun isGeneratorFunction(): Boolean = isGeneratorFunctionField
+    protected open val isGeneratorFunction: Boolean get() = isGeneratorFunctionField
 
     /** Generated code overrides this. */
     internal open fun hasDefaultParameters(): Boolean = false
@@ -122,8 +122,7 @@ open class BaseFunction : ScriptableObject, Function {
         setAttributes(PROTOTYPE_PROPERTY_NAME, DONTENUM or PERMANENT or READONLY)
     }
 
-    protected open fun getClassPrototype(): Scriptable? =
-        prototypeProperty as? Scriptable ?: getObjectPrototype(this)
+    protected open val classPrototype: Scriptable? get() = prototypeProperty as? Scriptable ?: getObjectPrototype(this)
 
     /** Subclasses override this. The base does nothing. */
     override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
@@ -143,7 +142,7 @@ open class BaseFunction : ScriptableObject, Function {
             }
             result = value
             if (result.prototype == null) {
-                val proto = getClassPrototype()
+                val proto = classPrototype
                 if (result !== proto) result.prototype = proto
             }
             if (result.parentScope == null) {
@@ -163,7 +162,7 @@ open class BaseFunction : ScriptableObject, Function {
      */
     open fun createObject(cx: Context, scope: Scriptable): Scriptable? {
         val newInstance = NativeObject()
-        newInstance.prototype = getClassPrototype()
+        newInstance.prototype = classPrototype
         newInstance.parentScope = parentScope
         return newInstance
     }
@@ -231,7 +230,7 @@ open class BaseFunction : ScriptableObject, Function {
         // Object() does not send this into an endless loop.
         prototypePropertyValue = obj
 
-        val proto: Scriptable? = if (isGeneratorFunction()) {
+        val proto: Scriptable? = if (isGeneratorFunction) {
             // A generator function's prototype hangs off %GeneratorPrototype%, not Object.prototype.
             val top = getTopLevelScope(scope)
             getTopScopeValue(top, ES6Generator.GENERATOR_TAG) as? Scriptable ?: getObjectPrototype(this)
@@ -264,7 +263,7 @@ open class BaseFunction : ScriptableObject, Function {
         private fun arityGetter(function: BaseFunction, start: Scriptable?): Any = function.arity
 
         private fun argumentsGetter(function: BaseFunction, start: Scriptable?): Any? =
-            function.getArguments()
+            function.arguments
 
         private fun argumentsSetter(
             function: BaseFunction,
@@ -390,7 +389,7 @@ open class BaseFunction : ScriptableObject, Function {
         private fun js_hasInstance(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             if (thisObj !is Callable) return false
             val protoProp =
-                if (thisObj is BoundFunction) (thisObj.getTargetFunction() as JSFunction).prototypeProperty
+                if (thisObj is BoundFunction) (thisObj.targetFunction as JSFunction).prototypeProperty
                 else getProperty(thisObj, PROTOTYPE_PROPERTY_NAME)
             if (ScriptRuntime.isObject(protoProp)) {
                 val obj = args.getOrNull(0)
@@ -454,7 +453,7 @@ open class BaseFunction : ScriptableObject, Function {
 
         /** The Function constructor compiles sloppy code even when called from strict code. */
         private inline fun withoutStrictMode(cx: Context, block: () -> Scriptable): Scriptable {
-            if (!cx.isStrictMode()) return block()
+            if (!cx.isStrictMode) return block()
             val activation = cx.currentActivationCall
             val strictMode = cx.isTopLevelStrict
             try {
@@ -510,7 +509,8 @@ open class BaseFunction : ScriptableObject, Function {
      * `<function>.arguments`, which is deprecated. Reading it walks the activation stack rather
      * than costing anything on every call.
      */
-    private fun getArguments(): Any? {
+    private val arguments: Any?
+        get() {
         // A value assigned to .arguments wins over the live activation. This assumes the activation
         // should not stay reachable after that assignment.
         if (argumentsObj !== Scriptable.NOT_FOUND) return argumentsObj

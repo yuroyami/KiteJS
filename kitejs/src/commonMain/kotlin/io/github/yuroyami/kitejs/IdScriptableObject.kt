@@ -18,7 +18,7 @@ abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
     private var prototypeValues: PrototypeValues? = null
 
     /** The prototype's id-indexed slots, built lazily one id at a time. */
-    private class PrototypeValues(private val obj: IdScriptableObject, private val maxId: Int) {
+    private class PrototypeValues(private val obj: IdScriptableObject, val maxId: Int) {
 
         private var valueArray: Array<Any?>? = null
         private var attributeArray: ShortArray? = null
@@ -29,8 +29,6 @@ abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
         init {
             require(maxId >= 1) { "maxId < 1" }
         }
-
-        fun getMaxId(): Int = maxId
 
         fun initValue(id: Int, name: String, value: Any?, attributes: Int) {
             require(id in 1..maxId) { "!(1 <= id && id <= maxId)" }
@@ -124,7 +122,7 @@ abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
             ensureId(id)
             val attr = attributeArray!![id - 1].toInt()
             if ((attr and PERMANENT) != 0) {
-                if (Context.getContext().isStrictMode()) {
+                if (Context.getContext().isStrictMode) {
                     val name = when (val n = valueArray!![(id - 1) * SLOT_SPAN + NAME_SLOT]) {
                         is String -> n
                         is Symbol -> n.toString()
@@ -335,7 +333,7 @@ abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
             if (!isSealed) {
                 val attr = info ushr 16
                 if ((attr and PERMANENT) != 0) {
-                    if (Context.getContext().isStrictMode()) {
+                    if (Context.getContext().isStrictMode) {
                         throw ScriptRuntime.typeErrorById("msg.delete.property.with.configurable.false", name)
                     }
                 } else {
@@ -360,7 +358,7 @@ abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
             if (!isSealed) {
                 val attr = info ushr 16
                 if ((attr and PERMANENT) != 0) {
-                    if (Context.getContext().isStrictMode()) {
+                    if (Context.getContext().isStrictMode) {
                         throw ScriptRuntime.typeErrorById("msg.delete.property.with.configurable.false")
                     }
                 } else {
@@ -420,7 +418,7 @@ abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
     override fun getIds(map: CompoundOperationMap, getNonEnumerable: Boolean, getSymbols: Boolean): Array<Any?> {
         var result = super.getIds(map, getNonEnumerable, getSymbols)
         prototypeValues?.let { result = it.getNames(getNonEnumerable, getSymbols, result)!! }
-        val maxInstanceId = getMaxInstanceId()
+        val maxInstanceId = maxInstanceId
         if (maxInstanceId != 0) {
             var ids: Array<Any?>? = null
             var count = 0
@@ -456,7 +454,7 @@ abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
     }
 
     /** The largest id [findInstanceIdInfo] can return. */
-    protected open fun getMaxInstanceId(): Int = 0
+    protected open val maxInstanceId: Int get() = 0
 
     /** Maps a name to its instance id, or 0. The result comes from [instanceIdInfo]. */
     protected open fun findInstanceIdInfo(name: String): Int = 0
@@ -575,7 +573,7 @@ abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
             val info = findInstanceIdInfo(name)
             if (info != 0) {
                 val instanceId = info and 0xFFFF
-                if (desc.isAccessorDescriptor()) {
+                if (desc.isAccessorDescriptor) {
                     // Upstream passes the id where an index is expected. Copied as written.
                     delete(instanceId)
                 } else {
@@ -596,7 +594,7 @@ abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
             prototypeValues?.let { pv ->
                 val pid = pv.findId(name)
                 if (pid != 0) {
-                    if (desc.isAccessorDescriptor()) {
+                    if (desc.isAccessorDescriptor) {
                         pv.delete(pid)
                     } else {
                         checkPropertyDefinition(desc)

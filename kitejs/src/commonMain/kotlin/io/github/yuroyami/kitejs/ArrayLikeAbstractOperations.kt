@@ -189,7 +189,7 @@ object ArrayLikeAbstractOperations {
     }
 
     internal fun defineElem(cx: Context, target: Scriptable, index: Long, value: Any?) {
-        if (!(target is NativeArray && target.getDenseOnly()) && target is ScriptableObject) {
+        if (!(target is NativeArray && target.denseOnly) && target is ScriptableObject) {
             val desc = DescriptorInfo(true, true, true, value)
             target.defineOwnProperty(cx, index, desc)
             return
@@ -262,8 +262,8 @@ object ArrayLikeAbstractOperations {
 
     fun getSortComparatorFromArguments(cx: Context, scope: Scriptable, args: Array<Any?>): ElementComparator {
         val compareFunc = ScriptRuntime.getValueAndThis(args[0], cx)!!
-        val compare = compareFunc.getCallable()
-        val compareThis = compareFunc.getThis()
+        val compare = compareFunc.callable
+        val compareThis = compareFunc.thisObj
         val cmpBuf = arrayOfNulls<Any?>(2) // Buffer for cmp arguments
         return ElementComparator(
             Comparator { x, y ->

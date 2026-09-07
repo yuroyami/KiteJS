@@ -4449,7 +4449,7 @@ class Parser(
         var iteratorName: String? = null
         var lastResultName: String? = null
 
-        for (n in array.getElements()) {
+        for (n in array.elements) {
             if (n.type == Token.EMPTY) {
                 index++
                 continue
@@ -4706,7 +4706,7 @@ class Parser(
         val setOp = if (variableType == Token.CONST) Token.SETCONST else Token.SETNAME
         var defaultValuesSetup = false
 
-        for (abstractProp in node.getElements()) {
+        for (abstractProp in node.elements) {
             if (abstractProp is SpreadObjectProperty) {
                 reportError("msg.no.object.rest")
                 return false
