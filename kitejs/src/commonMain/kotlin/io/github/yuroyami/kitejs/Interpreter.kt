@@ -107,7 +107,7 @@ import kotlin.math.pow
  *
  * Continuations (`NativeContinuation`, `captureContinuation`) are not ported (D-31).
  */
-class Interpreter : Evaluator {
+public class Interpreter : Evaluator {
 
     /** What [compile] hands back and the create methods take. */
     internal class CompilationResult<T : ScriptOrFn<T>>(val descriptor: JSDescriptor<T>, val homeObject: Scriptable?)
@@ -390,7 +390,7 @@ class Interpreter : Evaluator {
         var throwable: Any? = null
     }
 
-    companion object {
+    public companion object {
         // The layout of one entry in the exception table.
         internal const val EXCEPTION_TRY_START_SLOT = 0
         internal const val EXCEPTION_TRY_END_SLOT = 1
@@ -1834,7 +1834,7 @@ class Interpreter : Evaluator {
             }
             frame.savedCallOp = op
             frame.savedStackTop = state.stackTop
-            stack[state.stackTop] = fun_!!.call(cx, calleeScope, funThisObj, getArgsArray(stack, sDbl, boundArgs, blen, state.stackTop + 1, state.indexReg))
+            stack[state.stackTop] = fun_.call(cx, calleeScope, funThisObj, getArgsArray(stack, sDbl, boundArgs, blen, state.stackTop + 1, state.indexReg))
             return null
         }
 
@@ -1980,7 +1980,8 @@ class Interpreter : Evaluator {
                 // So the chain is walked down until the call is found.
                 while (scope is NativeWith) {
                     val parent = scope.parentScope
-                    if (parent == null || (frame.parentFrame != null && frame.parentFrame?.scope === parent)) {
+                    val caller = frame.parentFrame
+                    if (parent == null || (caller != null && caller.scope === parent)) {
                         // No NativeCall before the caller's own scope, which should not happen.
                         throw Kit.codeBug()
                     }

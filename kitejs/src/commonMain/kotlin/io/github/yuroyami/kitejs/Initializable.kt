@@ -5,7 +5,7 @@
 package io.github.yuroyami.kitejs
 
 /** A one-method interface so a lambda can stand in for the lazy setup of a native class. */
-fun interface Initializable {
+public fun interface Initializable {
     /** Builds the class and returns its new constructor. */
-    fun initialize(cx: Context, scope: Scriptable, sealed: Boolean): Any?
+    public fun initialize(cx: Context, scope: Scriptable, sealed: Boolean): Any?
 }

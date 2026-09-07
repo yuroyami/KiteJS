@@ -8,15 +8,15 @@ package io.github.yuroyami.kitejs
  * A reference to a place a value can be read from, written to or deleted, for the cases the plain
  * property protocol does not cover.
  */
-abstract class Ref {
+public abstract class Ref {
 
-    open fun has(cx: Context): Boolean = true
+    public open fun has(cx: Context): Boolean = true
 
-    abstract fun get(cx: Context): Any?
+    public abstract fun get(cx: Context): Any?
 
-    abstract fun set(cx: Context, value: Any?): Any?
+    public abstract fun set(cx: Context, value: Any?): Any?
 
-    open fun set(cx: Context, scope: Scriptable?, value: Any?): Any? = set(cx, value)
+    public open fun set(cx: Context, scope: Scriptable?, value: Any?): Any? = set(cx, value)
 
-    open fun delete(cx: Context): Boolean = false
+    public open fun delete(cx: Context): Boolean = false
 }

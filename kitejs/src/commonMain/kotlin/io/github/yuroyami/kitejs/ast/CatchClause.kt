@@ -10,7 +10,7 @@ import io.github.yuroyami.kitejs.Token
  * One catch clause of a try statement. Node type is [Token.CATCH]. The [catchCondition] is the
  * SpiderMonkey `catch (e if cond)` extension.
  */
-class CatchClause(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
+public class CatchClause(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     init {
         typeField = Token.CATCH
@@ -20,21 +20,21 @@ class CatchClause(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
      * The caught binding: a [Name], or an [ArrayLiteral] or [ObjectLiteral] for a destructuring
      * catch. Setting it reparents the node.
      */
-    var varName: AstNode? = null
+    public var varName: AstNode? = null
         set(value) {
             field = value
             value?.parent = this
         }
 
     /** The guard expression of a conditional catch, or null. Setting it reparents. */
-    var catchCondition: AstNode? = null
+    public var catchCondition: AstNode? = null
         set(value) {
             field = value
             value?.parent = this
         }
 
     /** The catch body. Setting it reparents the block. */
-    var body: Scope? = null
+    public var body: Scope? = null
         set(value) {
             val newBody = value!!
             field = newBody
@@ -42,16 +42,16 @@ class CatchClause(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         }
 
     /** Position of the `if` keyword in a conditional catch, relative to this node. */
-    var ifPosition: Int = -1
+    public var ifPosition: Int = -1
 
     /** Position of the left paren, relative to this node. */
-    var lp: Int = -1
+    public var lp: Int = -1
 
     /** Position of the right paren, relative to this node. */
-    var rp: Int = -1
+    public var rp: Int = -1
 
     /** Sets both paren positions. */
-    fun setParens(lp: Int, rp: Int) {
+    public fun setParens(lp: Int, rp: Int) {
         this.lp = lp
         this.rp = rp
     }

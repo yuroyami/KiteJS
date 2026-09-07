@@ -5,11 +5,11 @@
 package io.github.yuroyami.kitejs
 
 /** Implemented by objects that can hold `const` bindings. */
-interface ConstProperties {
+public interface ConstProperties {
 
-    fun putConst(name: String, start: Scriptable, value: Any?)
+    public fun putConst(name: String, start: Scriptable, value: Any?)
 
-    fun defineConst(name: String, start: Scriptable)
+    public fun defineConst(name: String, start: Scriptable)
 
-    fun isConst(name: String): Boolean
+    public fun isConst(name: String): Boolean
 }

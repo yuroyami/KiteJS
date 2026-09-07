@@ -5,4 +5,4 @@
 package io.github.yuroyami.kitejs
 
 /** The [Constructable] counterpart of [SerializableCallable]. */
-fun interface SerializableConstructable : Constructable
+public fun interface SerializableConstructable : Constructable

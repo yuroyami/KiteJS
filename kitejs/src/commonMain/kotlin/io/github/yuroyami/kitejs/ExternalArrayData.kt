@@ -5,20 +5,20 @@
 package io.github.yuroyami.kitejs
 
 /** Implement this to back a [ScriptableObject] with data that lives outside the engine. */
-interface ExternalArrayData {
+public interface ExternalArrayData {
 
     /**
      * The element at [index]. It has to be a type script understands: a number, a string or a
      * [Scriptable]. Never called with an out-of-range index.
      */
-    fun getArrayElement(index: Int): Any?
+    public fun getArrayElement(index: Int): Any?
 
     /**
      * Writes [value] at [index]. Never called with an out-of-range index. The implementation checks
      * the type of [value] and converts it if it has to.
      */
-    fun setArrayElement(index: Int, value: Any?)
+    public fun setArrayElement(index: Int, value: Any?)
 
     /** How many elements there are. */
-    val arrayLength: Int
+    public val arrayLength: Int
 }

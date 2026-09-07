@@ -5,13 +5,13 @@
 package io.github.yuroyami.kitejs
 
 /** Something compiled from source: a script or a function. [T] is the concrete type itself. */
-interface ScriptOrFn<T : ScriptOrFn<T>> {
-    val homeObject: Scriptable?
+public interface ScriptOrFn<T : ScriptOrFn<T>> {
+    public val homeObject: Scriptable?
         get() = null
 
-    val descriptor: JSDescriptor<T>?
+    public val descriptor: JSDescriptor<T>?
         get() = null
 
-    val declarationScope: Scriptable?
+    public val declarationScope: Scriptable?
         get() = null
 }

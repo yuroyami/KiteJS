@@ -5,7 +5,7 @@
 package io.github.yuroyami.kitejs
 
 /** The owner of a set of id-based functions: it knows their properties and how to run them. */
-interface IdFunctionCall {
+public interface IdFunctionCall {
     /** [thisObj] is null when called as a constructor, and then the result has to be a Scriptable. */
-    fun execIdCall(f: IdFunctionObject, cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any?
+    public fun execIdCall(f: IdFunctionObject, cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any?
 }

@@ -132,7 +132,7 @@ internal object NativeRegExpCtor {
 }
 
 /** What `String.prototype.matchAll` hands back: one `exec` result per step. */
-class NativeRegExpStringIterator : ES6Iterator {
+public class NativeRegExpStringIterator : ES6Iterator {
 
     private var regexp: Scriptable? = null
     private var string: String = ""
@@ -144,7 +144,7 @@ class NativeRegExpStringIterator : ES6Iterator {
     /** Only for building the prototype object. */
     private constructor() : super()
 
-    constructor(scope: Scriptable, regexp: Scriptable, string: String, global: Boolean, fullUnicode: Boolean) :
+    public constructor(scope: Scriptable, regexp: Scriptable, string: String, global: Boolean, fullUnicode: Boolean) :
         super(scope, ITERATOR_TAG) {
         this.regexp = regexp
         this.string = string
@@ -187,10 +187,10 @@ class NativeRegExpStringIterator : ES6Iterator {
 
     override val tag: String get() = ITERATOR_TAG
 
-    companion object {
+    public companion object {
         private const val ITERATOR_TAG = "RegExpStringIterator"
 
-        fun init(scope: ScriptableObject, sealed: Boolean) {
+        public fun init(scope: ScriptableObject, sealed: Boolean) {
             ES6Iterator.init(scope, sealed, NativeRegExpStringIterator(), ITERATOR_TAG)
         }
     }

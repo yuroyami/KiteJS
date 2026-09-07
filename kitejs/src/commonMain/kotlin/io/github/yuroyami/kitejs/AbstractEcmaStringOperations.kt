@@ -5,10 +5,10 @@
 package io.github.yuroyami.kitejs
 
 /** GetSubstitution: the `$1`, `$&`, `$<name>` patterns a replacement string can carry. */
-object AbstractEcmaStringOperations {
+public object AbstractEcmaStringOperations {
 
     /** Compiles a replacement template into the pieces [getSubstitution] stitches together. */
-    fun buildReplacementList(replacementTemplate: String): List<ReplacementOperation> {
+    public fun buildReplacementList(replacementTemplate: String): List<ReplacementOperation> {
         val ops = ArrayList<ReplacementOperation>()
         var position = 0
         var start = 0
@@ -81,7 +81,7 @@ object AbstractEcmaStringOperations {
         return ops
     }
 
-    fun <T> getSubstitution(
+    public fun <T> getSubstitution(
         cx: Context,
         scope: Scriptable,
         matched: String,
@@ -101,8 +101,9 @@ object AbstractEcmaStringOperations {
 
     private fun isAsciiDigit(c: Char): Boolean = c in '0'..'9'
 
-    abstract class ReplacementOperation {
-        abstract fun <T> replacement(
+    /** What `String.prototype.replace` puts in place of each match. */
+    public abstract class ReplacementOperation {
+        public abstract fun <T> replacement(
             cx: Context,
             scope: Scriptable,
             matched: String,

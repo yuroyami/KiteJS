@@ -7,32 +7,32 @@ package io.github.yuroyami.kitejs.ast
 import io.github.yuroyami.kitejs.Token
 
 /** A throw statement. Node type is [Token.THROW]. */
-class ThrowStatement : AstNode {
+public class ThrowStatement : AstNode {
 
     init {
         typeField = Token.THROW
     }
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(pos: Int) : super(pos)
+    public constructor(pos: Int) : super(pos)
 
-    constructor(pos: Int, len: Int) : super(pos, len)
+    public constructor(pos: Int, len: Int) : super(pos, len)
 
-    constructor(expr: AstNode) : super() {
+    public constructor(expr: AstNode) : super() {
         expression = expr
     }
 
-    constructor(pos: Int, expr: AstNode) : super(pos, expr.length) {
+    public constructor(pos: Int, expr: AstNode) : super(pos, expr.length) {
         expression = expr
     }
 
-    constructor(pos: Int, len: Int, expr: AstNode) : super(pos, len) {
+    public constructor(pos: Int, len: Int, expr: AstNode) : super(pos, len) {
         expression = expr
     }
 
     /** The thrown expression. Setting it reparents the expression. */
-    var expression: AstNode? = null
+    public var expression: AstNode? = null
         set(value) {
             val newExpression = value!!
             field = newExpression

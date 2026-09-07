@@ -12,7 +12,7 @@ package io.github.yuroyami.kitejs
  * [EmbeddedSlotMap], and finally a [HashSlotMap] once there are enough properties for hash
  * collisions to matter.
  */
-abstract class SlotMapOwner {
+public abstract class SlotMapOwner {
 
     /**
      * The table. It changes shape as the object grows.
@@ -146,7 +146,7 @@ abstract class SlotMapOwner {
         }
     }
 
-    companion object {
+    public companion object {
         /**
          * How big an [EmbeddedSlotMap] gets before it becomes a [HashSlotMap]. It has to be three
          * quarters of a power of two: the embedded map's table is a power of two and grows when it

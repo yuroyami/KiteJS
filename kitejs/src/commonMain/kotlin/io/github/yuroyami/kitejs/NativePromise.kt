@@ -11,7 +11,7 @@ package io.github.yuroyami.kitejs
  * script's synchronous part finishes. That queue, not a thread, is what makes the ordering rules
  * work: `then` never runs before the code that registered it has returned.
  */
-class NativePromise : ScriptableObject() {
+public class NativePromise : ScriptableObject() {
 
     private enum class State { PENDING, FULFILLED, REJECTED }
 
@@ -372,7 +372,7 @@ class NativePromise : ScriptableObject() {
         }
     }
 
-    companion object {
+    public companion object {
 
         internal fun init(cx: Context, scope: Scriptable, sealed: Boolean): Any {
             val constructor = LambdaConstructor(

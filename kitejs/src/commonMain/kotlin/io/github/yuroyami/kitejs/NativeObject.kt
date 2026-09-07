@@ -12,25 +12,25 @@ import io.github.yuroyami.kitejs.ScriptableObject.DescriptorInfo
  *
  * Upstream also makes every NativeObject a `java.util.Map`; that view is not ported.
  */
-open class NativeObject : ScriptableObject {
+public open class NativeObject : ScriptableObject {
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(scope: Scriptable, prototype: Scriptable?) : super(scope, prototype)
+    public constructor(scope: Scriptable, prototype: Scriptable?) : super(scope, prototype)
 
     override val className: String
         get() = "Object"
 
     override fun toString(): String = ScriptRuntime.defaultObjectToString(this)
 
-    companion object {
+    public companion object {
         private const val OBJECT_TAG = "Object"
 
-        const val CLASS_NAME = "Object"
+        public const val CLASS_NAME: String = "Object"
 
-        const val PROTO_PROPERTY = "__proto__"
+        public const val PROTO_PROPERTY: String = "__proto__"
 
-        const val PARENT_PROPERTY = "__parent__"
+        public const val PARENT_PROPERTY: String = "__parent__"
 
         internal fun init(cx: Context, s: Scriptable, sealed: Boolean): LambdaConstructor {
             val ctor = object : LambdaConstructor(s, CLASS_NAME, 1, ::js_constructorCall, ::js_constructor) {
@@ -177,7 +177,7 @@ open class NativeObject : ScriptableObject {
                     }
                 } catch (ee: EvaluatorException) {
                     val prefix = ScriptRuntime.getMessageById("msg.prop.not.found", s.stringId ?: s.index.toString())
-                    if (ee.message?.startsWith(prefix) == true) {
+                    if (ee.message.startsWith(prefix)) {
                         result = false
                     } else {
                         throw ee
@@ -212,7 +212,7 @@ open class NativeObject : ScriptableObject {
         }
 
         /** `obj.__proto__ = proto` with the spec's checks. */
-        fun js_protoSetter(thisObj: Scriptable?, proto: Any?) {
+        public fun js_protoSetter(thisObj: Scriptable?, proto: Any?) {
             // 1. Let O be ? RequireObjectCoercible(this value).
             // 2. If proto is not an Object and proto is not null, return undefined.
             // 3. If O is not an Object, return undefined.
@@ -221,7 +221,7 @@ open class NativeObject : ScriptableObject {
             if (proto !is Scriptable && proto != null) return
             if (ScriptRuntime.isSymbol(proto)) return
             if (o !is Scriptable || ScriptRuntime.isSymbol(o)) return
-            setPrototypeOf(o, proto as Scriptable?)
+            setPrototypeOf(o, proto)
         }
 
         private fun js_defineGetter(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =

@@ -7,7 +7,7 @@ package io.github.yuroyami.kitejs.ast
 import io.github.yuroyami.kitejs.Token
 
 /** A try statement with its catch clauses and optional finally block. Node type is [Token.TRY]. */
-class TryStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
+public class TryStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     private var catchClauseList: MutableList<CatchClause>? = null
 
@@ -16,7 +16,7 @@ class TryStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
     }
 
     /** The try block. Setting it reparents the block. */
-    var tryBlock: AstNode? = null
+    public var tryBlock: AstNode? = null
         set(value) {
             val newBlock = value!!
             field = newBlock
@@ -24,19 +24,19 @@ class TryStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         }
 
     /** The finally block, or null. Setting it reparents the block. */
-    var finallyBlock: AstNode? = null
+    public var finallyBlock: AstNode? = null
         set(value) {
             field = value
             value?.parent = this
         }
 
     /** Position of the `finally` keyword, relative to this node. -1 if there is none. */
-    var finallyPosition: Int = -1
+    public var finallyPosition: Int = -1
 
     /** The catch clauses, or an empty list if there are none. */
-    val catchClauses: List<CatchClause> get() = catchClauseList ?: NO_CATCHES
+    public val catchClauses: List<CatchClause> get() = catchClauseList ?: NO_CATCHES
 
-    fun setCatchClauses(catchClauses: List<CatchClause>?) {
+    public fun setCatchClauses(catchClauses: List<CatchClause>?) {
         if (catchClauses == null) {
             this.catchClauseList = null
         } else {
@@ -47,7 +47,7 @@ class TryStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         }
     }
 
-    fun addCatchClause(clause: CatchClause) {
+    public fun addCatchClause(clause: CatchClause) {
         val list = catchClauseList ?: mutableListOf<CatchClause>().also { catchClauseList = it }
         list.add(clause)
         clause.parent = this
@@ -79,7 +79,7 @@ class TryStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         }
     }
 
-    companion object {
+    public companion object {
         private val NO_CATCHES: List<CatchClause> = emptyList()
     }
 }

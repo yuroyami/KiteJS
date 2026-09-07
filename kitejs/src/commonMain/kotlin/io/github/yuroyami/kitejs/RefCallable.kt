@@ -5,7 +5,7 @@
 package io.github.yuroyami.kitejs
 
 /** A callable that can also produce a [Ref], for `delete f(x)` and friends. */
-interface RefCallable : Callable {
+public interface RefCallable : Callable {
 
-    fun refCall(cx: Context, thisObj: Scriptable?, args: Array<Any?>): Ref
+    public fun refCall(cx: Context, thisObj: Scriptable?, args: Array<Any?>): Ref
 }

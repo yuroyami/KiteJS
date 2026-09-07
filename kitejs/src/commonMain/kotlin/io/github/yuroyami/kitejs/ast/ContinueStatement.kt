@@ -12,7 +12,7 @@ import io.github.yuroyami.kitejs.Token
  * The constructors set position and length directly instead of delegating to [Jump], which is
  * how upstream does it too. Note the single-argument form leaves the length at -1.
  */
-class ContinueStatement : Jump {
+public class ContinueStatement : Jump {
 
     private var loopTarget: Loop? = null
 
@@ -20,24 +20,24 @@ class ContinueStatement : Jump {
         typeField = Token.CONTINUE
     }
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(pos: Int) : this(pos, -1)
+    public constructor(pos: Int) : this(pos, -1)
 
-    constructor(pos: Int, len: Int) : super() {
+    public constructor(pos: Int, len: Int) : super() {
         position = pos
         length = len
     }
 
-    constructor(label: Name?) : super() {
+    public constructor(label: Name?) : super() {
         this.label = label
     }
 
-    constructor(pos: Int, label: Name?) : this(pos) {
+    public constructor(pos: Int, label: Name?) : this(pos) {
         this.label = label
     }
 
-    constructor(pos: Int, len: Int, label: Name?) : this(pos, len) {
+    public constructor(pos: Int, len: Int, label: Name?) : this(pos, len) {
         this.label = label
     }
 
@@ -48,7 +48,7 @@ class ContinueStatement : Jump {
      * KMP: upstream calls this `target`, but [Jump.target] is a public field there and a
      * property here, so the two would collide (D-11).
      */
-    var targetLoop: Loop?
+    public var targetLoop: Loop?
         get() = loopTarget
         set(value) {
             val loop = value!!
@@ -57,7 +57,7 @@ class ContinueStatement : Jump {
         }
 
     /** The label, or null for a plain `continue`. Setting it reparents the label. */
-    var label: Name? = null
+    public var label: Name? = null
         set(value) {
             field = value
             value?.parent = this

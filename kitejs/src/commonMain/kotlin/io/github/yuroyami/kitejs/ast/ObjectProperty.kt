@@ -10,7 +10,7 @@ import io.github.yuroyami.kitejs.Token
  * One `key: value` entry of an object literal, or a getter, setter or method definition. The
  * node type is [Token.COLON], [Token.GET], [Token.SET] or [Token.METHOD].
  */
-class ObjectProperty(pos: Int = -1, len: Int = 1) : AbstractObjectProperty(pos, len) {
+public class ObjectProperty(pos: Int = -1, len: Int = 1) : AbstractObjectProperty(pos, len) {
 
     private var keyNode: AstNode? = null
     private var valueNode: AstNode? = null
@@ -23,7 +23,7 @@ class ObjectProperty(pos: Int = -1, len: Int = 1) : AbstractObjectProperty(pos, 
     }
 
     /** Sets the node type, rejecting anything that is not a valid property form. */
-    fun setNodeType(nodeType: Int) {
+    public fun setNodeType(nodeType: Int) {
         if (nodeType != Token.COLON &&
             nodeType != Token.GET &&
             nodeType != Token.SET &&
@@ -38,7 +38,7 @@ class ObjectProperty(pos: Int = -1, len: Int = 1) : AbstractObjectProperty(pos, 
      * Sets both halves at once, computing this node's bounds from the children while their
      * positions are still absolute.
      */
-    fun setKeyAndValue(key: AstNode, value: AstNode) {
+    public fun setKeyAndValue(key: AstNode, value: AstNode) {
         keyNode = key
         valueNode = value
         val beg = key.position
@@ -51,34 +51,34 @@ class ObjectProperty(pos: Int = -1, len: Int = 1) : AbstractObjectProperty(pos, 
         value.parent = this
     }
 
-    fun setIsGetterMethod() {
+    public fun setIsGetterMethod() {
         typeField = Token.GET
     }
 
-    val isGetterMethod: Boolean
+    public val isGetterMethod: Boolean
         get() = typeField == Token.GET
 
-    fun setIsSetterMethod() {
+    public fun setIsSetterMethod() {
         typeField = Token.SET
     }
 
-    val isSetterMethod: Boolean
+    public val isSetterMethod: Boolean
         get() = typeField == Token.SET
 
-    fun setIsNormalMethod() {
+    public fun setIsNormalMethod() {
         typeField = Token.METHOD
     }
 
-    val isNormalMethod: Boolean
+    public val isNormalMethod: Boolean
         get() = typeField == Token.METHOD
 
-    val isMethod: Boolean
+    public val isMethod: Boolean
         get() = isGetterMethod || isSetterMethod || isNormalMethod
 
-    val key: AstNode?
+    public val key: AstNode?
         get() = keyNode
 
-    val value: AstNode?
+    public val value: AstNode?
         get() = valueNode
 
     override fun toSource(depth: Int): String {

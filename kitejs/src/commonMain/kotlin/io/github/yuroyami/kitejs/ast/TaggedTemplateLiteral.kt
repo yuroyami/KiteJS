@@ -10,21 +10,21 @@ import io.github.yuroyami.kitejs.Token
  * A tagged template such as ``tag`a${b}c` ``. Node type is
  * [Token.TAGGED_TEMPLATE_LITERAL].
  */
-class TaggedTemplateLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
+public class TaggedTemplateLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     init {
         typeField = Token.TAGGED_TEMPLATE_LITERAL
     }
 
     /** The tag function expression. Setting it reparents the node. */
-    var target: AstNode? = null
+    public var target: AstNode? = null
         set(value) {
             field = value
             value!!.parent = this
         }
 
     /** The template literal being tagged. Setting it reparents the node. */
-    var templateLiteral: AstNode? = null
+    public var templateLiteral: AstNode? = null
         set(value) {
             field = value
             value!!.parent = this

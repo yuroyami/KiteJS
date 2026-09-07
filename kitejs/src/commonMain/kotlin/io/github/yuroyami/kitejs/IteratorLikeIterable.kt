@@ -8,7 +8,7 @@ package io.github.yuroyami.kitejs
  * Drives a script iterator from Kotlin: `next()` until `done`, and `return()` on close if the
  * iterator has one. Close it when done, or hand it to `use`.
  */
-class IteratorLikeIterable(
+public class IteratorLikeIterable(
     private val cx: Context,
     private val scope: Scriptable,
     target: Any?,
@@ -41,9 +41,9 @@ class IteratorLikeIterable(
 
     override fun iterator(): Itr = Itr()
 
-    inner class Itr : Iterator<Any?> {
+    public inner class Itr : Iterator<Any?> {
         private var nextVal: Any? = null
-        var isDone: Boolean = false
+        public var isDone: Boolean = false
 
         override fun hasNext(): Boolean {
             if (isDone) return false

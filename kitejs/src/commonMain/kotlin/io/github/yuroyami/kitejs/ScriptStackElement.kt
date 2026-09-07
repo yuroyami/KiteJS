@@ -5,23 +5,23 @@
 package io.github.yuroyami.kitejs
 
 /** One frame of a script stack trace. */
-class ScriptStackElement(val fileName: String, val functionName: String?, val lineNumber: Int) {
+public class ScriptStackElement(public val fileName: String, public val functionName: String?, public val lineNumber: Int) {
 
     override fun toString(): String = buildString { renderMozillaStyle(this) }
 
-    fun renderJavaStyle(sb: StringBuilder) {
+    public fun renderJavaStyle(sb: StringBuilder) {
         sb.append("\tat ").append(fileName)
         if (lineNumber > -1) sb.append(':').append(lineNumber)
         if (functionName != null) sb.append(" (").append(functionName).append(')')
     }
 
-    fun renderMozillaStyle(sb: StringBuilder) {
+    public fun renderMozillaStyle(sb: StringBuilder) {
         if (functionName != null) sb.append(functionName).append("()")
         sb.append('@').append(fileName)
         if (lineNumber > -1) sb.append(':').append(lineNumber)
     }
 
-    fun renderV8Style(sb: StringBuilder) {
+    public fun renderV8Style(sb: StringBuilder) {
         sb.append("    at ")
         if (functionName == null || functionName == "anonymous" || functionName == "undefined") {
             appendV8Location(sb)

@@ -20,7 +20,7 @@ import io.github.yuroyami.kitejs.Token
  *
  * @param len the length including the delimiters
  */
-class Comment(
+public class Comment(
     pos: Int,
     len: Int,
     type: Token.CommentType,
@@ -28,10 +28,10 @@ class Comment(
 ) : AstNode(pos, len) {
 
     /** The comment style. */
-    var commentType: Token.CommentType = type
+    public var commentType: Token.CommentType = type
 
     /** The comment text. Setting it also updates the node length. */
-    var value: String = value
+    public var value: String = value
         set(value) {
             field = value
             length = value.length

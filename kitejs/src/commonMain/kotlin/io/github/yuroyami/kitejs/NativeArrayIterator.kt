@@ -7,9 +7,10 @@ package io.github.yuroyami.kitejs
 import io.github.yuroyami.kitejs.typedarrays.NativeTypedArrayView
 
 /** The iterator behind `array.keys()`, `entries()` and `values()`, and `for (x of array)`. */
-class NativeArrayIterator : ES6Iterator {
+public class NativeArrayIterator : ES6Iterator {
 
-    enum class ARRAY_ITERATOR_TYPE { ENTRIES, KEYS, VALUES }
+    /** Which of `entries`, `keys` and `values` this iterator answers. */
+    public enum class ARRAY_ITERATOR_TYPE { ENTRIES, KEYS, VALUES }
 
     private var type: ARRAY_ITERATOR_TYPE = ARRAY_ITERATOR_TYPE.VALUES
     private var arrayLike: Scriptable? = null
@@ -17,7 +18,7 @@ class NativeArrayIterator : ES6Iterator {
 
     private constructor() : super()
 
-    constructor(scope: Scriptable, arrayLike: Scriptable, type: ARRAY_ITERATOR_TYPE) : super(scope, ITERATOR_TAG) {
+    public constructor(scope: Scriptable, arrayLike: Scriptable, type: ARRAY_ITERATOR_TYPE) : super(scope, ITERATOR_TAG) {
         this.index = 0
         this.arrayLike = arrayLike
         this.type = type
@@ -50,7 +51,7 @@ class NativeArrayIterator : ES6Iterator {
 
     override val tag: String get() = ITERATOR_TAG
 
-    companion object {
+    public companion object {
         private const val ITERATOR_TAG = "ArrayIterator"
 
         internal fun init(scope: ScriptableObject, sealed: Boolean) {

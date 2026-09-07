@@ -10,21 +10,21 @@ import io.github.yuroyami.kitejs.Token
  * One `name = value` entry of a [VariableDeclaration]. The target is a [Name], or an array or
  * object literal for a destructuring binding. Node type matches the declaration keyword.
  */
-class VariableInitializer(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
+public class VariableInitializer(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     init {
         typeField = Token.VAR
     }
 
     /** Sets the node type, rejecting anything that is not a declaration keyword. */
-    fun setNodeType(nodeType: Int) {
+    public fun setNodeType(nodeType: Int) {
         if (nodeType != Token.VAR && nodeType != Token.CONST && nodeType != Token.LET) {
             throw IllegalArgumentException("invalid node type")
         }
         type = nodeType
     }
 
-    val isDestructuring: Boolean
+    public val isDestructuring: Boolean
         get() = targetNode !is Name
 
     private var targetNode: AstNode? = null
@@ -33,7 +33,7 @@ class VariableInitializer(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
      * The binding target. Setting it reparents the node. An "invalid" node type is allowed on
      * purpose: see mozilla/js/tests/js1_7/block/regress-350279.js.
      */
-    var target: AstNode?
+    public var target: AstNode?
         get() = targetNode
         set(value) {
             if (value == null) throw IllegalArgumentException("invalid target arg")
@@ -42,7 +42,7 @@ class VariableInitializer(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         }
 
     /** The initial value, or null for a bare declaration. Setting it reparents. */
-    var initializer: AstNode? = null
+    public var initializer: AstNode? = null
         set(value) {
             field = value
             value?.parent = this

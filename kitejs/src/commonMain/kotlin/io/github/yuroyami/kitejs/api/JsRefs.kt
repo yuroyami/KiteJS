@@ -37,34 +37,34 @@ internal inline fun <T> topCall(cx: Context, scope: Scriptable, crossinline body
  * A JavaScript object seen from Kotlin. Reading and writing goes straight through to the engine,
  * so a change here is a change the script sees.
  */
-open class JsObject internal constructor(internal val target: Scriptable) {
+public open class JsObject internal constructor(internal val target: Scriptable) {
 
     /** The value this wrapper holds, for handing back to the engine. */
-    val value: JsValue get() = JsValue(target)
+    public val value: JsValue get() = JsValue(target)
 
-    operator fun get(name: String): JsValue = JsValue(unwrapNotFound(ScriptableObject.getProperty(target, name)))
+    public operator fun get(name: String): JsValue = JsValue(unwrapNotFound(ScriptableObject.getProperty(target, name)))
 
-    operator fun get(index: Int): JsValue = JsValue(unwrapNotFound(ScriptableObject.getProperty(target, index)))
+    public operator fun get(index: Int): JsValue = JsValue(unwrapNotFound(ScriptableObject.getProperty(target, index)))
 
-    operator fun set(name: String, value: Any?) {
+    public operator fun set(name: String, value: Any?) {
         ScriptableObject.putProperty(target, name, Converters.toEngine(value, liveContext(), target))
     }
 
-    operator fun set(index: Int, value: Any?) {
+    public operator fun set(index: Int, value: Any?) {
         ScriptableObject.putProperty(target, index, Converters.toEngine(value, liveContext(), target))
     }
 
-    fun has(name: String): Boolean = ScriptableObject.hasProperty(target, name)
+    public fun has(name: String): Boolean = ScriptableObject.hasProperty(target, name)
 
-    fun delete(name: String) {
+    public fun delete(name: String) {
         target.delete(name)
     }
 
     /** The object's own enumerable string keys, in the order a script would see them. */
-    val keys: List<String> get() = target.getIds().filterIsInstance<String>()
+    public val keys: List<String> get() = target.getIds().filterIsInstance<String>()
 
     /** Calls a method on this object, the way `obj.name(...)` does in a script. */
-    fun call(name: String, vararg args: Any?): JsValue {
+    public fun call(name: String, vararg args: Any?): JsValue {
         val cx = liveContext()
         val f = ScriptableObject.getProperty(target, name) as? Function
             ?: throw jsTypeError("$name is not a function")
@@ -74,7 +74,7 @@ open class JsObject internal constructor(internal val target: Scriptable) {
     }
 
     /** A plain Kotlin map, all the way down. Cycles come back as the [JsObject] that closed them. */
-    fun toMap(): Map<String, Any?> {
+    public fun toMap(): Map<String, Any?> {
         @Suppress("UNCHECKED_CAST")
         return Converters.toKotlin(target, HashSet()) as Map<String, Any?>
     }
@@ -87,34 +87,34 @@ open class JsObject internal constructor(internal val target: Scriptable) {
 }
 
 /** A JavaScript array seen from Kotlin. */
-class JsArray internal constructor(private val array: NativeArray) : JsObject(array) {
+public class JsArray internal constructor(private val array: NativeArray) : JsObject(array) {
 
-    val size: Int get() = array.length.toInt()
+    public val size: Int get() = array.length.toInt()
 
-    fun add(value: Any?) {
+    public fun add(value: Any?) {
         this[size] = value
     }
 
-    fun toList(): List<Any?> {
+    public fun toList(): List<Any?> {
         @Suppress("UNCHECKED_CAST")
         return Converters.toKotlin(array, HashSet()) as List<Any?>
     }
 
     /** Every element as a [JsValue], without converting anything. */
-    fun values(): List<JsValue> = (0 until size).map { this[it] }
+    public fun values(): List<JsValue> = (0 until size).map { this[it] }
 }
 
 /** A JavaScript function seen from Kotlin. */
-class JsFunction internal constructor(private val function: Function) : JsObject(function) {
+public class JsFunction internal constructor(private val function: Function) : JsObject(function) {
 
     /** The declared argument count, which is what `f.length` answers. */
-    val arity: Int get() = ScriptRuntime.toInt32(ScriptableObject.getProperty(function, "length"))
+    public val arity: Int get() = ScriptRuntime.toInt32(ScriptableObject.getProperty(function, "length"))
 
     /** Calls the function with `this` set to the global scope. */
-    operator fun invoke(vararg args: Any?): JsValue = callOn(null, *args)
+    public operator fun invoke(vararg args: Any?): JsValue = callOn(null, *args)
 
     /** Calls the function with an explicit `this`. */
-    fun callOn(thisArg: Any?, vararg args: Any?): JsValue {
+    public fun callOn(thisArg: Any?, vararg args: Any?): JsValue {
         val cx = liveContext()
         val scope = scopeOf(function)
         val self = when (thisArg) {
@@ -127,7 +127,7 @@ class JsFunction internal constructor(private val function: Function) : JsObject
     }
 
     /** Calls it with `new`. */
-    fun construct(vararg args: Any?): JsObject {
+    public fun construct(vararg args: Any?): JsObject {
         val cx = liveContext()
         val scope = scopeOf(function)
         val ctor = function as? Constructable ?: throw jsTypeError("this function is not a constructor")
@@ -136,7 +136,7 @@ class JsFunction internal constructor(private val function: Function) : JsObject
     }
 
     /** A new function with `this` and the leading arguments fixed, as `Function.prototype.bind` does. */
-    fun bind(thisArg: Any?, vararg args: Any?): JsFunction {
+    public fun bind(thisArg: Any?, vararg args: Any?): JsFunction {
         val cx = liveContext()
         val scope = scopeOf(function)
         val self = if (thisArg is JsObject) thisArg.target else Converters.toEngine(thisArg, cx, scope) as? Scriptable

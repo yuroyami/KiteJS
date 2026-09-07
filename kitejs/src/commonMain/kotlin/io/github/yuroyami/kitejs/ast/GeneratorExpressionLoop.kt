@@ -8,7 +8,7 @@ package io.github.yuroyami.kitejs.ast
  * One `for` clause inside a generator expression. Unlike [ArrayComprehensionLoop] it does not
  * support the `for each` form.
  */
-class GeneratorExpressionLoop(pos: Int = -1, len: Int = 1) : ForInLoop(pos, len) {
+public class GeneratorExpressionLoop(pos: Int = -1, len: Int = 1) : ForInLoop(pos, len) {
 
     override var isForEach: Boolean
         get() = false

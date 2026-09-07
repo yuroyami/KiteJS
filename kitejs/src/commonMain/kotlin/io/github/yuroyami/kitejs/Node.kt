@@ -21,20 +21,20 @@ import io.github.yuroyami.kitejs.ast.ScriptNode
  * The port keeps both halves: `typeField`/`linenoField`/`columnField` are the raw
  * storage, `type`/`lineno`/`column` are the (overridable) accessors.
  */
-open class Node : Iterable<Node> {
+public open class Node : Iterable<Node> {
 
-    constructor(nodeType: Int) {
+    public constructor(nodeType: Int) {
         typeField = nodeType
     }
 
-    constructor(nodeType: Int, child: Node) {
+    public constructor(nodeType: Int, child: Node) {
         typeField = nodeType
         first = child
         last = child
         child.next = null
     }
 
-    constructor(nodeType: Int, left: Node, right: Node) {
+    public constructor(nodeType: Int, left: Node, right: Node) {
         typeField = nodeType
         first = left
         last = right
@@ -42,7 +42,7 @@ open class Node : Iterable<Node> {
         right.next = null
     }
 
-    constructor(nodeType: Int, left: Node, mid: Node, right: Node) {
+    public constructor(nodeType: Int, left: Node, mid: Node, right: Node) {
         typeField = nodeType
         first = left
         last = right
@@ -51,15 +51,15 @@ open class Node : Iterable<Node> {
         right.next = null
     }
 
-    constructor(nodeType: Int, line: Int, column: Int) : this(nodeType) {
+    public constructor(nodeType: Int, line: Int, column: Int) : this(nodeType) {
         setLineColumnNumber(line, column)
     }
 
-    constructor(nodeType: Int, child: Node, line: Int, column: Int) : this(nodeType, child) {
+    public constructor(nodeType: Int, child: Node, line: Int, column: Int) : this(nodeType, child) {
         setLineColumnNumber(line, column)
     }
 
-    constructor(
+    public constructor(
         nodeType: Int,
         left: Node,
         right: Node,
@@ -69,7 +69,7 @@ open class Node : Iterable<Node> {
         setLineColumnNumber(line, column)
     }
 
-    constructor(
+    public constructor(
         nodeType: Int,
         left: Node,
         mid: Node,
@@ -102,32 +102,32 @@ open class Node : Iterable<Node> {
     }
 
     /** The node type, e.g. [Token.NAME]. */
-    open var type: Int
+    public open var type: Int
         get() = typeField
         set(value) {
             typeField = value
         }
 
     /** The JsDoc comment string attached to this node, or null. */
-    val jsDoc: String?
+    public val jsDoc: String?
         get() = jsDocNode?.value
 
     /** The JsDoc [Comment] attached to this node, or null. */
-    var jsDocNode: Comment?
+    public var jsDocNode: Comment?
         get() = getProp(JSDOC_PROP) as Comment?
         set(value) {
             putProp(JSDOC_PROP, value)
         }
 
-    fun hasChildren(): Boolean = first != null
+    public fun hasChildren(): Boolean = first != null
 
-    val firstChild: Node?
+    public val firstChild: Node?
         get() = first
 
-    val lastChild: Node?
+    public val lastChild: Node?
         get() = last
 
-    fun getChildBefore(child: Node): Node? {
+    public fun getChildBefore(child: Node): Node? {
         if (child === first) return null
         var n = first
         while (n!!.next !== child) {
@@ -137,7 +137,7 @@ open class Node : Iterable<Node> {
         return n
     }
 
-    val lastSibling: Node
+    public val lastSibling: Node
         get() {
             var n: Node = this
             while (n.next != null) {
@@ -146,7 +146,7 @@ open class Node : Iterable<Node> {
             return n
         }
 
-    fun addChildToFront(child: Node) {
+    public fun addChildToFront(child: Node) {
         child.next = first
         first = child
         if (last == null) {
@@ -154,7 +154,7 @@ open class Node : Iterable<Node> {
         }
     }
 
-    fun addChildToBack(child: Node) {
+    public fun addChildToBack(child: Node) {
         child.next = null
         if (last == null) {
             first = child
@@ -165,7 +165,7 @@ open class Node : Iterable<Node> {
         last = child
     }
 
-    fun addChildrenToFront(children: Node) {
+    public fun addChildrenToFront(children: Node) {
         val lastSib = children.lastSibling
         lastSib.next = first
         first = children
@@ -174,7 +174,7 @@ open class Node : Iterable<Node> {
         }
     }
 
-    fun addChildrenToBack(children: Node) {
+    public fun addChildrenToBack(children: Node) {
         last?.next = children
         last = children.lastSibling
         if (first == null) {
@@ -183,7 +183,7 @@ open class Node : Iterable<Node> {
     }
 
     /** Add [newChild] before [node]. */
-    fun addChildBefore(newChild: Node, node: Node) {
+    public fun addChildBefore(newChild: Node, node: Node) {
         if (newChild.next != null) {
             throw RuntimeException("newChild had siblings in addChildBefore")
         }
@@ -197,7 +197,7 @@ open class Node : Iterable<Node> {
     }
 
     /** Add [newChild] after [node]. */
-    fun addChildAfter(newChild: Node, node: Node) {
+    public fun addChildAfter(newChild: Node, node: Node) {
         if (newChild.next != null) {
             throw RuntimeException("newChild had siblings in addChildAfter")
         }
@@ -206,14 +206,14 @@ open class Node : Iterable<Node> {
         if (last === node) last = newChild
     }
 
-    fun removeChild(child: Node) {
+    public fun removeChild(child: Node) {
         val prev = getChildBefore(child)
         if (prev == null) first = first!!.next else prev.next = child.next
         if (child === last) last = prev
         child.next = null
     }
 
-    fun replaceChild(child: Node, newChild: Node) {
+    public fun replaceChild(child: Node, newChild: Node) {
         if (child === newChild) return
         newChild.next = child.next
         if (child === first) {
@@ -225,7 +225,7 @@ open class Node : Iterable<Node> {
         child.next = null
     }
 
-    fun replaceChildAfter(prevChild: Node, newChild: Node) {
+    public fun replaceChildAfter(prevChild: Node, newChild: Node) {
         val child = prevChild.next!!
         newChild.next = child.next
         prevChild.next = newChild
@@ -233,7 +233,7 @@ open class Node : Iterable<Node> {
         child.next = null
     }
 
-    fun removeChildren() {
+    public fun removeChildren() {
         first = null
         last = null
     }
@@ -243,7 +243,7 @@ open class Node : Iterable<Node> {
      * anyone changes the child list before the iterator finishes, the results are undefined
      * and probably bad.
      */
-    inner class NodeIterator : MutableIterator<Node> {
+    public inner class NodeIterator : MutableIterator<Node> {
         private var cursor: Node? = this@Node.first
         private var prev: Node? = NOT_SET
         private var prev2: Node? = null
@@ -295,7 +295,7 @@ open class Node : Iterable<Node> {
         return item
     }
 
-    fun removeProp(propType: Int) {
+    public fun removeProp(propType: Int) {
         var x = propListHead ?: return
         var prev: PropListItem? = null
         while (x.type != propType) {
@@ -305,15 +305,15 @@ open class Node : Iterable<Node> {
         if (prev == null) propListHead = x.next else prev.next = x.next
     }
 
-    fun getProp(propType: Int): Any? = lookupProperty(propType)?.objectValue
+    public fun getProp(propType: Int): Any? = lookupProperty(propType)?.objectValue
 
-    fun getIntProp(propType: Int, defaultValue: Int): Int =
+    public fun getIntProp(propType: Int, defaultValue: Int): Int =
         lookupProperty(propType)?.intValue ?: defaultValue
 
-    fun getExistingIntProp(propType: Int): Int =
+    public fun getExistingIntProp(propType: Int): Int =
         (lookupProperty(propType) ?: throw Kit.codeBug()).intValue
 
-    fun putProp(propType: Int, prop: Any?) {
+    public fun putProp(propType: Int, prop: Any?) {
         if (prop == null) {
             removeProp(propType)
         } else {
@@ -321,49 +321,49 @@ open class Node : Iterable<Node> {
         }
     }
 
-    fun putIntProp(propType: Int, prop: Int) {
+    public fun putIntProp(propType: Int, prop: Int) {
         ensureProperty(propType).intValue = prop
     }
 
     /** The line number recorded for this node. */
-    open val lineno: Int
+    public open val lineno: Int
         get() = linenoField
 
     /**
      * The column where this node is defined in source, one-based. -1 means it was never
      * initialized. May be overridden by subclasses.
      */
-    open val column: Int
+    public open val column: Int
         get() = columnField
 
-    fun setLineColumnNumber(lineno: Int, column: Int) {
+    public fun setLineColumnNumber(lineno: Int, column: Int) {
         this.linenoField = lineno
         this.columnField = column
     }
 
     /** Only valid when `type == Token.NUMBER`. */
-    var double: Double
+    public var double: Double
         get() = (this as NumberLiteral).number
         set(value) {
             (this as NumberLiteral).number = value
         }
 
     /** Only valid when `type == Token.BIGINT`. */
-    open var bigInt: KBigInt?
+    public open var bigInt: KBigInt?
         get() = throw UnsupportedOperationException("Can only be called when Token.BIGINT")
         set(value) {
             throw UnsupportedOperationException("Can only be called when Token.BIGINT")
         }
 
     /** Only valid when the node has String context. */
-    var string: String?
+    public var string: String?
         get() = (this as Name).identifier
         set(value) {
             (this as Name).identifier = value
         }
 
     /** Only valid when the node has String context. */
-    open var scope: Scope?
+    public open var scope: Scope?
         get() = (this as Name).scope
         set(value) {
             if (value == null) Kit.codeBug()
@@ -371,7 +371,7 @@ open class Node : Iterable<Node> {
             this.scope = value
         }
 
-    fun labelId(): Int {
+    public fun labelId(): Int {
         if (typeField != Token.TARGET &&
             typeField != Token.YIELD &&
             typeField != Token.YIELD_STAR
@@ -381,7 +381,7 @@ open class Node : Iterable<Node> {
         return getIntProp(LABEL_ID_PROP, -1)
     }
 
-    fun labelId(labelId: Int) {
+    public fun labelId(labelId: Int) {
         if (typeField != Token.TARGET &&
             typeField != Token.YIELD &&
             typeField != Token.YIELD_STAR
@@ -395,7 +395,7 @@ open class Node : Iterable<Node> {
      * Checks that every return usage in a function body is consistent with strict mode.
      * See the END_* flags for what the analysis reports.
      */
-    fun hasConsistentReturnUsage(): Boolean {
+    public fun hasConsistentReturnUsage(): Boolean {
         val n = endCheck()
         return (n and END_RETURNS_VALUE) == 0 ||
             (n and (END_DROPS_OFF or END_RETURNS or END_YIELDS)) == 0
@@ -511,7 +511,7 @@ open class Node : Iterable<Node> {
         else -> END_DROPS_OFF
     }
 
-    open fun hasSideEffects(): Boolean = when (typeField) {
+    public open fun hasSideEffects(): Boolean = when (typeField) {
         Token.EXPR_VOID, Token.COMMA -> last?.hasSideEffects() ?: true
 
         Token.HOOK -> {
@@ -602,7 +602,7 @@ open class Node : Iterable<Node> {
      * Recursively unlabel every TARGET or YIELD node in the tree. Used only for inlining
      * finally blocks where jsr instructions used to be.
      */
-    fun resetTargets() {
+    public fun resetTargets() {
         if (typeField == Token.FINALLY) {
             resetTargetsRecursive()
         } else {
@@ -773,19 +773,19 @@ open class Node : Iterable<Node> {
         }
     }
 
-    fun toStringTree(treeTop: ScriptNode): String? {
+    public fun toStringTree(treeTop: ScriptNode): String? {
         if (!Token.printTrees) return null
         val sb = StringBuilder()
         toStringTreeHelper(treeTop, this, null, 0, sb)
         return sb.toString()
     }
 
-    companion object {
-        const val FUNCTION_PROP = 1
-        const val LOCAL_PROP = 2
-        const val LOCAL_BLOCK_PROP = 3
-        const val REGEXP_PROP = 4
-        const val CASEARRAY_PROP = 5
+    public companion object {
+        public const val FUNCTION_PROP: Int = 1
+        public const val LOCAL_PROP: Int = 2
+        public const val LOCAL_BLOCK_PROP: Int = 3
+        public const val REGEXP_PROP: Int = 4
+        public const val CASEARRAY_PROP: Int = 5
 
         // The following properties are defined and manipulated by the optimizer:
         // TARGETBLOCK_PROP - the block referenced by a branch node
@@ -794,54 +794,54 @@ open class Node : Iterable<Node> {
         //                 Number result (as opposed to Objects)
         // DIRECTCALL_PROP - this call node should emit code to test the function object
         //                   against the known class and call direct if it matches.
-        const val TARGETBLOCK_PROP = 6
-        const val VARIABLE_PROP = 7
-        const val ISNUMBER_PROP = 8
-        const val DIRECTCALL_PROP = 9
-        const val SPECIALCALL_PROP = 10
-        const val SKIP_INDEXES_PROP = 11 // array of skipped indexes of array literal
-        const val OBJECT_IDS_PROP = 12 // array of properties for object literal
-        const val INCRDECR_PROP = 13 // pre or post type of increment/decrement
-        const val CATCH_SCOPE_PROP = 14 // index of catch scope block in catch
-        const val LABEL_ID_PROP = 15 // label id: code generation uses it
-        const val MEMBER_TYPE_PROP = 16 // type of element access operation
-        const val NAME_PROP = 17 // property name
-        const val CONTROL_BLOCK_PROP = 18 // flags a control block that can drop off
-        const val PARENTHESIZED_PROP = 19 // expression is parenthesized
-        const val GENERATOR_END_PROP = 20
-        const val DESTRUCTURING_ARRAY_LENGTH = 21
-        const val DESTRUCTURING_NAMES = 22
-        const val DESTRUCTURING_PARAMS = 23
-        const val JSDOC_PROP = 24
-        const val EXPRESSION_CLOSURE_PROP = 25 // JS 1.8 expression closure pseudo-return
-        const val ARROW_FUNCTION_PROP = 26
-        const val TEMPLATE_LITERAL_PROP = 27
-        const val TRAILING_COMMA = 28
-        const val OBJECT_LITERAL_DESTRUCTURING = 29
-        const val OPTIONAL_CHAINING = 30
-        const val SUPER_PROPERTY_ACCESS = 31
-        const val NUMBER_OF_SPREAD = 32
-        const val LAST_PROP = NUMBER_OF_SPREAD
-        const val FIRST_PROP = FUNCTION_PROP
+        public const val TARGETBLOCK_PROP: Int = 6
+        public const val VARIABLE_PROP: Int = 7
+        public const val ISNUMBER_PROP: Int = 8
+        public const val DIRECTCALL_PROP: Int = 9
+        public const val SPECIALCALL_PROP: Int = 10
+        public const val SKIP_INDEXES_PROP: Int = 11 // array of skipped indexes of array literal
+        public const val OBJECT_IDS_PROP: Int = 12 // array of properties for object literal
+        public const val INCRDECR_PROP: Int = 13 // pre or post type of increment/decrement
+        public const val CATCH_SCOPE_PROP: Int = 14 // index of catch scope block in catch
+        public const val LABEL_ID_PROP: Int = 15 // label id: code generation uses it
+        public const val MEMBER_TYPE_PROP: Int = 16 // type of element access operation
+        public const val NAME_PROP: Int = 17 // property name
+        public const val CONTROL_BLOCK_PROP: Int = 18 // flags a control block that can drop off
+        public const val PARENTHESIZED_PROP: Int = 19 // expression is parenthesized
+        public const val GENERATOR_END_PROP: Int = 20
+        public const val DESTRUCTURING_ARRAY_LENGTH: Int = 21
+        public const val DESTRUCTURING_NAMES: Int = 22
+        public const val DESTRUCTURING_PARAMS: Int = 23
+        public const val JSDOC_PROP: Int = 24
+        public const val EXPRESSION_CLOSURE_PROP: Int = 25 // JS 1.8 expression closure pseudo-return
+        public const val ARROW_FUNCTION_PROP: Int = 26
+        public const val TEMPLATE_LITERAL_PROP: Int = 27
+        public const val TRAILING_COMMA: Int = 28
+        public const val OBJECT_LITERAL_DESTRUCTURING: Int = 29
+        public const val OPTIONAL_CHAINING: Int = 30
+        public const val SUPER_PROPERTY_ACCESS: Int = 31
+        public const val NUMBER_OF_SPREAD: Int = 32
+        public const val LAST_PROP: Int = NUMBER_OF_SPREAD
+        public const val FIRST_PROP: Int = FUNCTION_PROP
 
         // Values of ISNUMBER_PROP: which of the children are Number types.
-        const val BOTH = 0
-        const val LEFT = 1
-        const val RIGHT = 2
+        public const val BOTH: Int = 0
+        public const val LEFT: Int = 1
+        public const val RIGHT: Int = 2
 
         // Values for SPECIALCALL_PROP.
-        const val NON_SPECIALCALL = 0
-        const val SPECIALCALL_EVAL = 1
-        const val SPECIALCALL_WITH = 2
+        public const val NON_SPECIALCALL: Int = 0
+        public const val SPECIALCALL_EVAL: Int = 1
+        public const val SPECIALCALL_WITH: Int = 2
 
         // Flags for INCRDECR_PROP.
-        const val DECR_FLAG = 0x1
-        const val POST_FLAG = 0x2
+        public const val DECR_FLAG: Int = 0x1
+        public const val POST_FLAG: Int = 0x2
 
         // Flags for MEMBER_TYPE_PROP.
-        const val PROPERTY_FLAG = 0x1 // property access: element is valid name
-        const val ATTRIBUTE_FLAG = 0x2 // x.@y or x..@y
-        const val DESCENDANTS_FLAG = 0x4 // x..y or x..@i
+        public const val PROPERTY_FLAG: Int = 0x1 // property access: element is valid name
+        public const val ATTRIBUTE_FLAG: Int = 0x2 // x.@y or x..@y
+        public const val DESCENDANTS_FLAG: Int = 0x4 // x..y or x..@i
 
         /**
          * These flags enumerate the ways a statement or function can terminate. END_UNREACHED
@@ -849,30 +849,30 @@ open class Node : Iterable<Node> {
          * END_DROPS_OFF means the statement can transfer control to the next one.
          * END_RETURNS means it can return without arguments, END_RETURNS_VALUE with one.
          */
-        const val END_UNREACHED = 0
-        const val END_DROPS_OFF = 1
-        const val END_RETURNS = 2
-        const val END_RETURNS_VALUE = 4
-        const val END_YIELDS = 8
+        public const val END_UNREACHED: Int = 0
+        public const val END_DROPS_OFF: Int = 1
+        public const val END_RETURNS: Int = 2
+        public const val END_RETURNS_VALUE: Int = 4
+        public const val END_YIELDS: Int = 8
 
         private val NOT_SET = Node(Token.ERROR)
 
-        fun newNumber(number: Double): Node {
+        public fun newNumber(number: Double): Node {
             val n = NumberLiteral()
             n.number = number
             return n
         }
 
-        fun newString(str: String): Node = newString(Token.STRING, str)
+        public fun newString(str: String): Node = newString(Token.STRING, str)
 
-        fun newString(type: Int, str: String): Node {
+        public fun newString(type: Int, str: String): Node {
             val name = Name()
             name.identifier = str
             name.type = type
             return name
         }
 
-        fun newTarget(): Node = Node(Token.TARGET)
+        public fun newTarget(): Node = Node(Token.TARGET)
 
         private fun propToString(propType: Int): String? =
             // When Token.printTrees is false the compiler can drop all these strings.

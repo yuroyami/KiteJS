@@ -15,9 +15,9 @@ import io.github.yuroyami.kitejs.Token
  * KMP: `getFinally`, `getContinue` and `getDefault` become `finallyTarget`,
  * `continueTarget` and `defaultTarget`, since `finally` and `continue` are Kotlin keywords.
  */
-open class Jump(nodeType: Int = Token.ERROR) : AstNode() {
+public open class Jump(nodeType: Int = Token.ERROR) : AstNode() {
 
-    var target: Node? = null
+    public var target: Node? = null
     private var target2: Node? = null
     private var jumpNode: Jump? = null
 
@@ -25,11 +25,11 @@ open class Jump(nodeType: Int = Token.ERROR) : AstNode() {
         typeField = nodeType
     }
 
-    constructor(nodeType: Int, child: Node) : this(nodeType) {
+    public constructor(nodeType: Int, child: Node) : this(nodeType) {
         addChildToBack(child)
     }
 
-    var jumpStatement: Jump?
+    public var jumpStatement: Jump?
         get() {
             if (typeField != Token.BREAK && typeField != Token.CONTINUE) codeBug()
             return jumpNode
@@ -41,7 +41,7 @@ open class Jump(nodeType: Int = Token.ERROR) : AstNode() {
             jumpNode = value
         }
 
-    var defaultTarget: Node?
+    public var defaultTarget: Node?
         get() {
             if (typeField != Token.SWITCH) codeBug()
             return target2
@@ -53,7 +53,7 @@ open class Jump(nodeType: Int = Token.ERROR) : AstNode() {
             target2 = value
         }
 
-    var finallyTarget: Node?
+    public var finallyTarget: Node?
         get() {
             if (typeField != Token.TRY) codeBug()
             return target2
@@ -65,7 +65,7 @@ open class Jump(nodeType: Int = Token.ERROR) : AstNode() {
             target2 = value
         }
 
-    var loop: Jump?
+    public var loop: Jump?
         get() {
             if (typeField != Token.LABEL) codeBug()
             return jumpNode
@@ -77,7 +77,7 @@ open class Jump(nodeType: Int = Token.ERROR) : AstNode() {
             jumpNode = value
         }
 
-    var continueTarget: Node?
+    public var continueTarget: Node?
         get() {
             if (typeField != Token.LOOP) codeBug()
             return target2

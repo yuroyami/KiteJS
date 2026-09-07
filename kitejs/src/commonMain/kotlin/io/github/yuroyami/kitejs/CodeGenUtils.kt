@@ -11,9 +11,9 @@ import io.github.yuroyami.kitejs.ast.Scope
 import io.github.yuroyami.kitejs.ast.ScriptNode
 
 /** Fills a [JSDescriptor.Builder] from the IR tree. Shared by every code generator. */
-object CodeGenUtils {
+public object CodeGenUtils {
 
-    fun fillInForNestedFunction(builder: JSDescriptor.Builder<JSFunction>, parent: JSDescriptor.Builder<*>, fn: FunctionNode) {
+    public fun fillInForNestedFunction(builder: JSDescriptor.Builder<JSFunction>, parent: JSDescriptor.Builder<*>, fn: FunctionNode) {
         val fnParent = fn.parent
         if (!(fnParent is AstRoot || fnParent is Scope || fnParent is Block)) {
             builder.declaredAsFunctionExpression = true
@@ -40,13 +40,13 @@ object CodeGenUtils {
         fillInCommon(builder, fn)
     }
 
-    fun fillInForTopLevelFunction(builder: JSDescriptor.Builder<*>, fn: FunctionNode, rawSource: String?, compilerEnv: CompilerEnvirons) {
+    public fun fillInForTopLevelFunction(builder: JSDescriptor.Builder<*>, fn: FunctionNode, rawSource: String?, compilerEnv: CompilerEnvirons) {
         builder.hasPrototype = true
         fillInTopLevelCommon(builder, fn, rawSource, compilerEnv)
         fillInForFunction(builder, fn)
     }
 
-    fun fillInForScript(builder: JSDescriptor.Builder<*>, scriptOrFn: ScriptNode, rawSource: String?, compilerEnv: CompilerEnvirons) {
+    public fun fillInForScript(builder: JSDescriptor.Builder<*>, scriptOrFn: ScriptNode, rawSource: String?, compilerEnv: CompilerEnvirons) {
         builder.hasPrototype = false
         fillInTopLevelCommon(builder, scriptOrFn, rawSource, compilerEnv)
         fillInCommon(builder, scriptOrFn)
@@ -75,7 +75,7 @@ object CodeGenUtils {
         builder.rawSourceEnd = scriptOrFn.rawSourceEnd
     }
 
-    fun <T : ScriptOrFn<T>> setConstructor(builder: JSDescriptor.Builder<T>, scriptOrFn: ScriptNode) {
+    public fun <T : ScriptOrFn<T>> setConstructor(builder: JSDescriptor.Builder<T>, scriptOrFn: ScriptNode) {
         if (scriptOrFn is FunctionNode) {
             val isArrow = scriptOrFn.functionType == FunctionNode.ARROW_FUNCTION
             builder.constructor =

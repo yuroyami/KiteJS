@@ -10,15 +10,15 @@ import io.github.yuroyami.kitejs.Token
  * A keyword literal: `this`, `super`, `null`, `undefined`, `true`, `false` or `debugger`. The
  * node type is the keyword's own token, and setting it rejects anything else.
  */
-class KeywordLiteral : AstNode {
+public class KeywordLiteral : AstNode {
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(pos: Int) : super(pos)
+    public constructor(pos: Int) : super(pos)
 
-    constructor(pos: Int, len: Int) : super(pos, len)
+    public constructor(pos: Int, len: Int) : super(pos, len)
 
-    constructor(pos: Int, len: Int, nodeType: Int) : super(pos, len) {
+    public constructor(pos: Int, len: Int, nodeType: Int) : super(pos, len) {
         type = nodeType
     }
 
@@ -38,7 +38,7 @@ class KeywordLiteral : AstNode {
             typeField = value
         }
 
-    val isBooleanLiteral: Boolean
+    public val isBooleanLiteral: Boolean
         get() = typeField == Token.TRUE || typeField == Token.FALSE
 
     override fun toSource(depth: Int): String {

@@ -10,11 +10,11 @@ package io.github.yuroyami.kitejs
  *
  * A problem inside the engine throws a plain runtime exception instead.
  */
-class EcmaError internal constructor(
+public class EcmaError internal constructor(
     /** Which of the standard error names this is. */
-    val name: String,
+    public val name: String,
     /** The text describing what went wrong. Not specified, so it can change between releases. */
-    val errorMessage: String,
+    public val errorMessage: String,
     sourceName: String?,
     lineNumber: Int,
     lineSource: String?,

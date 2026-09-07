@@ -8,7 +8,7 @@ package io.github.yuroyami.kitejs
  * This interface defines a protocol for the reporting of errors during JavaScript
  * translation or execution.
  */
-interface ErrorReporter {
+public interface ErrorReporter {
 
     /**
      * Report a warning. The implementing class may choose to ignore the warning.
@@ -19,18 +19,18 @@ interface ErrorReporter {
      * @param lineSource the text of the line (may be null)
      * @param lineOffset the offset into lineSource where the problem was detected
      */
-    fun warning(message: String, sourceName: String?, line: Int, lineSource: String?, lineOffset: Int)
+    public fun warning(message: String, sourceName: String?, line: Int, lineSource: String?, lineOffset: Int)
 
     /**
      * Report an error. The implementing class is free to throw an exception.
      */
-    fun error(message: String, sourceName: String?, line: Int, lineSource: String?, lineOffset: Int)
+    public fun error(message: String, sourceName: String?, line: Int, lineSource: String?, lineOffset: Int)
 
     /**
      * Creates an EvaluatorException that may be thrown. runtimeErrors, unlike errors,
      * will always terminate the current script.
      */
-    fun runtimeError(
+    public fun runtimeError(
         message: String, sourceName: String?, line: Int, lineSource: String?, lineOffset: Int,
     ): EvaluatorException
 }

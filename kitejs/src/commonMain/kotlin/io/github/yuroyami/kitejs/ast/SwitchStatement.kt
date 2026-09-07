@@ -7,7 +7,7 @@ package io.github.yuroyami.kitejs.ast
 import io.github.yuroyami.kitejs.Token
 
 /** A switch statement. Node type is [Token.SWITCH]. It introduces a scope. */
-class SwitchStatement(pos: Int = -1) : Scope() {
+public class SwitchStatement(pos: Int = -1) : Scope() {
 
     private var caseList: MutableList<SwitchCase>? = null
 
@@ -17,7 +17,7 @@ class SwitchStatement(pos: Int = -1) : Scope() {
     }
 
     /** The switch expression. Setting it reparents the expression. */
-    var expression: AstNode? = null
+    public var expression: AstNode? = null
         set(value) {
             val newExpression = value!!
             field = newExpression
@@ -25,15 +25,15 @@ class SwitchStatement(pos: Int = -1) : Scope() {
         }
 
     /** Position of the left paren, relative to this node. */
-    var lp: Int = -1
+    public var lp: Int = -1
 
     /** Position of the right paren, relative to this node. */
-    var rp: Int = -1
+    public var rp: Int = -1
 
     /** The case clauses, or an empty list if none were added. */
-    val cases: List<SwitchCase> get() = caseList ?: NO_CASES
+    public val cases: List<SwitchCase> get() = caseList ?: NO_CASES
 
-    fun setCases(cases: List<SwitchCase>?) {
+    public fun setCases(cases: List<SwitchCase>?) {
         if (cases == null) {
             this.caseList = null
         } else {
@@ -42,14 +42,14 @@ class SwitchStatement(pos: Int = -1) : Scope() {
         }
     }
 
-    fun addCase(switchCase: SwitchCase) {
+    public fun addCase(switchCase: SwitchCase) {
         val list = caseList ?: mutableListOf<SwitchCase>().also { caseList = it }
         list.add(switchCase)
         switchCase.parent = this
     }
 
     /** Sets both paren positions. */
-    fun setParens(lp: Int, rp: Int) {
+    public fun setParens(lp: Int, rp: Int) {
         this.lp = lp
         this.rp = rp
     }
@@ -76,7 +76,7 @@ class SwitchStatement(pos: Int = -1) : Scope() {
         }
     }
 
-    companion object {
+    public companion object {
         private val NO_CASES: List<SwitchCase> = emptyList()
     }
 }

@@ -12,7 +12,7 @@ import io.github.yuroyami.kitejs.Token
  * The constructors set position and length directly instead of delegating to [Jump], which is
  * how upstream does it too.
  */
-class BreakStatement(pos: Int = -1, len: Int = 1) : Jump() {
+public class BreakStatement(pos: Int = -1, len: Int = 1) : Jump() {
 
     private var targetNode: AstNode? = null
 
@@ -23,18 +23,18 @@ class BreakStatement(pos: Int = -1, len: Int = 1) : Jump() {
     }
 
     /** The label this break jumps to, or null for a plain `break`. Setting it reparents. */
-    var breakLabel: Name? = null
+    public var breakLabel: Name? = null
         set(value) {
             field = value
             value?.parent = this
         }
 
     /** The statement this break jumps out of. */
-    val breakTarget: AstNode?
+    public val breakTarget: AstNode?
         get() = targetNode
 
     /** Records the jump target. Also sets the jump statement, so it can only be called once. */
-    fun setBreakTarget(target: Jump) {
+    public fun setBreakTarget(target: Jump) {
         targetNode = target
         jumpStatement = target
     }

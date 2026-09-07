@@ -8,7 +8,7 @@ package io.github.yuroyami.kitejs
  * The pre-ES6 generator object from JavaScript 1.7: `send`, `next`, `throw`, `close` and the legacy
  * `__iterator__`. Language versions at or above ES6 get [ES6Generator] instead.
  */
-class NativeGenerator : IdScriptableObject {
+public class NativeGenerator : IdScriptableObject {
 
     private var function: JSFunction? = null
     private var savedState: Any? = null
@@ -19,7 +19,7 @@ class NativeGenerator : IdScriptableObject {
     /** Only for building the prototype object. */
     private constructor() : super()
 
-    constructor(scope: Scriptable, function: JSFunction, savedState: Any?) : super() {
+    public constructor(scope: Scriptable, function: JSFunction, savedState: Any?) : super() {
         this.function = function
         this.savedState = savedState
         // There is no Generator constructor in the top scope, so the prototype is read from the
@@ -109,14 +109,14 @@ class NativeGenerator : IdScriptableObject {
     }
 
     /** Thrown into a generator to run its `finally` blocks when it is closed early. */
-    class GeneratorClosedException(val value: Any? = Undefined.instance) : RuntimeException()
+    public class GeneratorClosedException(public val value: Any? = Undefined.instance) : RuntimeException()
 
-    companion object {
+    public companion object {
         private val GENERATOR_TAG: Any = "Generator"
 
-        const val GENERATOR_SEND: Int = 0
-        const val GENERATOR_THROW: Int = 1
-        const val GENERATOR_CLOSE: Int = 2
+        public const val GENERATOR_SEND: Int = 0
+        public const val GENERATOR_THROW: Int = 1
+        public const val GENERATOR_CLOSE: Int = 2
 
         private const val Id_close = 1
         private const val Id_next = 2

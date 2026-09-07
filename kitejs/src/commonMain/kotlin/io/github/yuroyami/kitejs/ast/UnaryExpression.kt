@@ -10,19 +10,19 @@ import io.github.yuroyami.kitejs.Token
  * A prefix unary expression such as `!a`, `-a`, `typeof a` or `void a`. The node type is the
  * operator token. Increment and decrement live in [UpdateExpression].
  */
-class UnaryExpression : AstNode {
+public class UnaryExpression : AstNode {
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(pos: Int) : super(pos)
+    public constructor(pos: Int) : super(pos)
 
-    constructor(pos: Int, len: Int) : super(pos, len)
+    public constructor(pos: Int, len: Int) : super(pos, len)
 
     /**
      * @param operatorPosition the operator position, kept for API parity; the bounds come from
      *     the operand alone, as upstream does it.
      */
-    constructor(operator: Int, operatorPosition: Int, operand: AstNode) : super() {
+    public constructor(operator: Int, operatorPosition: Int, operand: AstNode) : super() {
         val beg = operand.position
         val end = operand.position + operand.length
         setBounds(beg, end)
@@ -31,7 +31,7 @@ class UnaryExpression : AstNode {
     }
 
     /** The operator token. Setting it rejects tokens that are not real token codes. */
-    var operator: Int
+    public var operator: Int
         get() = typeField
         set(value) {
             if (!Token.isValidToken(value)) {
@@ -41,7 +41,7 @@ class UnaryExpression : AstNode {
         }
 
     /** The operand. Setting it reparents the node. */
-    var operand: AstNode? = null
+    public var operand: AstNode? = null
         set(value) {
             val newOperand = value!!
             field = newOperand

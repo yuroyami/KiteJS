@@ -10,13 +10,13 @@ import io.github.yuroyami.kitejs.Token
  * A placeholder the parser leaves where an expression failed to parse, in error-recovery
  * mode. Node type is [Token.ERROR]. It renders as the empty string.
  */
-class ErrorNode(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
+public class ErrorNode(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     init {
         typeField = Token.ERROR
     }
 
-    var message: String? = null
+    public var message: String? = null
 
     override fun toSource(depth: Int): String = ""
 

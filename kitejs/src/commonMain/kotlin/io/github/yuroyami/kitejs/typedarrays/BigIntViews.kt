@@ -18,7 +18,7 @@ import io.github.yuroyami.kitejs.Undefined
  * The two 64-bit views. They hold bigints rather than doubles, which is the whole reason they wait
  * for [KBigInt]: no double can carry 64 bits of integer without losing some.
  */
-abstract class NativeBigIntArrayView : NativeTypedArrayView {
+public abstract class NativeBigIntArrayView : NativeTypedArrayView {
 
     protected constructor() : super()
 
@@ -29,13 +29,13 @@ abstract class NativeBigIntArrayView : NativeTypedArrayView {
 }
 
 /** `BigInt64Array`: eight bytes per element, read back as a signed bigint. */
-class NativeBigInt64Array : NativeBigIntArrayView {
+public class NativeBigInt64Array : NativeBigIntArrayView {
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * BYTES_PER_ELEMENT)
+    public constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * BYTES_PER_ELEMENT)
 
-    constructor(len: Int) : this(NativeArrayBuffer(len * BYTES_PER_ELEMENT), 0, len)
+    public constructor(len: Int) : this(NativeArrayBuffer(len * BYTES_PER_ELEMENT), 0, len)
 
     override val className: String
         get() = CLASS_NAME
@@ -65,7 +65,7 @@ class NativeBigInt64Array : NativeBigIntArrayView {
         return null
     }
 
-    companion object {
+    public companion object {
         private const val CLASS_NAME = "BigInt64Array"
         private const val BYTES_PER_ELEMENT = 8
 
@@ -101,13 +101,13 @@ class NativeBigInt64Array : NativeBigIntArrayView {
 }
 
 /** `BigUint64Array`: the same eight bytes, read back as a bigint that is never negative. */
-class NativeBigUint64Array : NativeBigIntArrayView {
+public class NativeBigUint64Array : NativeBigIntArrayView {
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * BYTES_PER_ELEMENT)
+    public constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * BYTES_PER_ELEMENT)
 
-    constructor(len: Int) : this(NativeArrayBuffer(len * BYTES_PER_ELEMENT), 0, len)
+    public constructor(len: Int) : this(NativeArrayBuffer(len * BYTES_PER_ELEMENT), 0, len)
 
     override val className: String
         get() = CLASS_NAME
@@ -140,7 +140,7 @@ class NativeBigUint64Array : NativeBigIntArrayView {
         return null
     }
 
-    companion object {
+    public companion object {
         private const val CLASS_NAME = "BigUint64Array"
         private const val BYTES_PER_ELEMENT = 8
 

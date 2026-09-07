@@ -10,21 +10,21 @@ import io.github.yuroyami.kitejs.Token
  * An increment or decrement expression, prefix or postfix. The node type is [Token.INC] or
  * [Token.DEC].
  */
-class UpdateExpression : AstNode {
+public class UpdateExpression : AstNode {
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(pos: Int) : super(pos)
+    public constructor(pos: Int) : super(pos)
 
-    constructor(pos: Int, len: Int) : super(pos, len)
+    public constructor(pos: Int, len: Int) : super(pos, len)
 
-    constructor(
+    public constructor(
         operator: Int,
         operatorPosition: Int,
         operand: AstNode,
     ) : this(operator, operatorPosition, operand, false)
 
-    constructor(
+    public constructor(
         operator: Int,
         operatorPosition: Int,
         operand: AstNode,
@@ -40,7 +40,7 @@ class UpdateExpression : AstNode {
     }
 
     /** The operator token. Setting it rejects tokens that are not real token codes. */
-    var operator: Int
+    public var operator: Int
         get() = typeField
         set(value) {
             if (!Token.isValidToken(value)) {
@@ -50,16 +50,16 @@ class UpdateExpression : AstNode {
         }
 
     /** The operand. Setting it reparents the node. */
-    var operand: AstNode? = null
+    public var operand: AstNode? = null
         set(value) {
             val newOperand = value!!
             field = newOperand
             newOperand.parent = this
         }
 
-    var isPostfix: Boolean = false
+    public var isPostfix: Boolean = false
 
-    val isPrefix: Boolean
+    public val isPrefix: Boolean
         get() = !isPostfix
 
     override fun toSource(depth: Int): String {

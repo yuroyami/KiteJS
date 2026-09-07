@@ -18,16 +18,16 @@ import io.github.yuroyami.kitejs.Undefined
  * `DataView`: reads and writes numbers at byte positions in a buffer, in either endianness, with no
  * alignment rules. The typed array views fix an element type and an endianness; this one does not.
  */
-class NativeDataView : NativeArrayBufferView {
+public class NativeDataView : NativeArrayBufferView {
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(ab: NativeArrayBuffer, offset: Int, length: Int) : super(ab, offset, length)
+    public constructor(ab: NativeArrayBuffer, offset: Int, length: Int) : super(ab, offset, length)
 
     override val className: String
         get() = CLASS_NAME
 
-    val isDataViewOutOfBounds: Boolean
+    public val isDataViewOutOfBounds: Boolean
 
         get() {
         if (arrayBuffer.isDetached) return true
@@ -111,8 +111,8 @@ class NativeDataView : NativeArrayBufferView {
         }
     }
 
-    companion object {
-        const val CLASS_NAME: String = "DataView"
+    public companion object {
+        public const val CLASS_NAME: String = "DataView"
 
         internal fun init(cx: Context, scope: Scriptable, sealed: Boolean): Any {
             val constructor = LambdaConstructor(

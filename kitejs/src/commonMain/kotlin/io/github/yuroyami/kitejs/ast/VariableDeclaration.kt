@@ -10,12 +10,12 @@ import io.github.yuroyami.kitejs.Token
  * A `var`, `const` or `let` declaration holding one or more [VariableInitializer] entries. The
  * node type is the declaration keyword's token, and setting it rejects anything else.
  */
-class VariableDeclaration(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
+public class VariableDeclaration(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     private val variableList: MutableList<VariableInitializer> = mutableListOf()
 
     /** True when this is a statement rather than the head of a for loop. */
-    var isStatement: Boolean = false
+    public var isStatement: Boolean = false
 
     init {
         typeField = Token.VAR
@@ -30,28 +30,28 @@ class VariableDeclaration(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
             typeField = value
         }
 
-    val variables: List<VariableInitializer>
+    public val variables: List<VariableInitializer>
         get() = variableList
 
-    fun setVariables(variables: List<VariableInitializer>) {
+    public fun setVariables(variables: List<VariableInitializer>) {
         variableList.clear()
         for (vi in variables) {
             addVariable(vi)
         }
     }
 
-    fun addVariable(v: VariableInitializer) {
+    public fun addVariable(v: VariableInitializer) {
         variableList.add(v)
         v.parent = this
     }
 
-    val isVar: Boolean
+    public val isVar: Boolean
         get() = typeField == Token.VAR
 
-    val isConst: Boolean
+    public val isConst: Boolean
         get() = typeField == Token.CONST
 
-    val isLet: Boolean
+    public val isLet: Boolean
         get() = typeField == Token.LET
 
     private fun declTypeName(): String = Token.typeToName(typeField).lowercase()

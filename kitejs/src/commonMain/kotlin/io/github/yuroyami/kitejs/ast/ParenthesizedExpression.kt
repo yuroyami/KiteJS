@@ -7,26 +7,26 @@ package io.github.yuroyami.kitejs.ast
 import io.github.yuroyami.kitejs.Token
 
 /** A parenthesized expression. Node type is [Token.LP]. */
-class ParenthesizedExpression : AstNode {
+public class ParenthesizedExpression : AstNode {
 
     init {
         typeField = Token.LP
     }
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(pos: Int) : super(pos)
+    public constructor(pos: Int) : super(pos)
 
-    constructor(pos: Int, len: Int) : super(pos, len)
+    public constructor(pos: Int, len: Int) : super(pos, len)
 
-    constructor(expr: AstNode) : this(expr.position, expr.length, expr)
+    public constructor(expr: AstNode) : this(expr.position, expr.length, expr)
 
-    constructor(pos: Int, len: Int, expr: AstNode) : super(pos, len) {
+    public constructor(pos: Int, len: Int, expr: AstNode) : super(pos, len) {
         expression = expr
     }
 
     /** The wrapped expression. Setting it reparents the expression. */
-    var expression: AstNode? = null
+    public var expression: AstNode? = null
         set(value) {
             val newExpression = value!!
             field = newExpression

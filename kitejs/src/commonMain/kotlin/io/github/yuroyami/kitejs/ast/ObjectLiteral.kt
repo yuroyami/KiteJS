@@ -10,7 +10,7 @@ import io.github.yuroyami.kitejs.Token
  * An object literal, which doubles as an object destructuring target. Node type is
  * [Token.OBJECTLIT].
  */
-class ObjectLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len), DestructuringForm {
+public class ObjectLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len), DestructuringForm {
 
     private var elementList: MutableList<AbstractObjectProperty>? = null
 
@@ -21,9 +21,9 @@ class ObjectLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len), Destructur
     }
 
     /** The properties, or an empty list if none were added. */
-    val elements: List<AbstractObjectProperty> get() = elementList ?: NO_ELEMS
+    public val elements: List<AbstractObjectProperty> get() = elementList ?: NO_ELEMS
 
-    fun setElements(elements: List<AbstractObjectProperty>?) {
+    public fun setElements(elements: List<AbstractObjectProperty>?) {
         if (elements == null) {
             this.elementList = null
         } else {
@@ -32,7 +32,7 @@ class ObjectLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len), Destructur
         }
     }
 
-    fun addElement(element: AbstractObjectProperty) {
+    public fun addElement(element: AbstractObjectProperty) {
         val list = elementList
             ?: mutableListOf<AbstractObjectProperty>().also { elementList = it }
         list.add(element)
@@ -68,7 +68,7 @@ class ObjectLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len), Destructur
         }
     }
 
-    companion object {
+    public companion object {
         private val NO_ELEMS: List<AbstractObjectProperty> = emptyList()
     }
 }

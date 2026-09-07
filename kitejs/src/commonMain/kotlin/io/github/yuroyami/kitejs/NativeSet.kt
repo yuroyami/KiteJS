@@ -5,7 +5,7 @@
 package io.github.yuroyami.kitejs
 
 /** The `Set` builtin, including the ES2025 set algebra methods. */
-class NativeSet : ScriptableObject() {
+public class NativeSet : ScriptableObject() {
 
     private val entries = Hashtable()
 
@@ -181,7 +181,7 @@ class NativeSet : ScriptableObject() {
         return result
     }
 
-    companion object {
+    public companion object {
         private const val CLASS_NAME = "Set"
         internal const val ITERATOR_TAG = "Set Iterator"
 

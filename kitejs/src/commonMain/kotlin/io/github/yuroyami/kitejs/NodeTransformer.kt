@@ -18,17 +18,17 @@ import io.github.yuroyami.kitejs.ast.ScriptNode
  * flattens block scopes into variable slots or turns them into `with` objects, depending on
  * whether the enclosing function needs an activation.
  */
-open class NodeTransformer {
+public open class NodeTransformer {
 
     private var loops: ArrayDeque<Node> = ArrayDeque()
     private var loopEnds: ArrayDeque<Node> = ArrayDeque()
     private var hasFinally = false
 
-    fun transform(tree: ScriptNode, env: CompilerEnvirons) {
+    public fun transform(tree: ScriptNode, env: CompilerEnvirons) {
         transform(tree, false, env)
     }
 
-    fun transform(tree: ScriptNode, inStrictMode: Boolean, env: CompilerEnvirons) {
+    public fun transform(tree: ScriptNode, inStrictMode: Boolean, env: CompilerEnvirons) {
         var useStrictMode = inStrictMode
         // Strict mode inside a function is only supported from the ES6 language level up.
         // Below that it would break plenty of existing scripts.
@@ -97,7 +97,7 @@ open class NodeTransformer {
                 }
             }
 
-            var n = node!!
+            var n = node
 
             when (type) {
                 Token.LABEL, Token.SWITCH, Token.LOOP -> {
@@ -239,7 +239,7 @@ open class NodeTransformer {
                                 tree.type != Token.FUNCTION ||
                                     (tree as FunctionNode).requiresActivation
                             node = visitLet(createWith, parent, previous, n)
-                            n = node!!
+                            n = node
                             handled = true
                         }
                         // Otherwise fall through and process it as a let declaration.
@@ -270,7 +270,7 @@ open class NodeTransformer {
                             result.addChildToBack(pop)
                         }
                         node = replaceCurrent(parent, previous, n, result)
-                        n = node!!
+                        n = node
                     }
                 }
 
@@ -358,7 +358,7 @@ open class NodeTransformer {
                                             n,
                                             Node(Token.FALSE),
                                         )
-                                        n = node!!
+                                        n = node
                                     }
                                     else -> throw Kit.codeBug()
                                 }
@@ -503,7 +503,7 @@ open class NodeTransformer {
         return result
     }
 
-    companion object {
+    public companion object {
         private fun addBeforeCurrent(
             parent: Node,
             previous: Node?,

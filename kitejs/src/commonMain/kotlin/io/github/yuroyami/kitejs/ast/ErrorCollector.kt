@@ -10,10 +10,10 @@ import io.github.yuroyami.kitejs.EvaluatorException
  * An error reporter that records problems instead of throwing, for IDE-mode parsing. Only the
  * offset-and-length overloads are supported; the line-based ones throw.
  */
-class ErrorCollector : IdeErrorReporter {
+public class ErrorCollector : IdeErrorReporter {
 
     /** Every error and warning recorded so far, in the order they arrived. */
-    val errors: MutableList<ParseProblem> = mutableListOf()
+    public val errors: MutableList<ParseProblem> = mutableListOf()
 
     override fun warning(
         message: String,

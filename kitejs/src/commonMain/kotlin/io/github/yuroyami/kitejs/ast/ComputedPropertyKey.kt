@@ -10,14 +10,14 @@ import io.github.yuroyami.kitejs.Token
  * A computed property key such as the `[a + b]` in `{ [a + b]: 1 }`. Node type is
  * [Token.COMPUTED_PROPERTY].
  */
-class ComputedPropertyKey(pos: Int, len: Int) : AstNode(pos, len) {
+public class ComputedPropertyKey(pos: Int, len: Int) : AstNode(pos, len) {
 
     init {
         typeField = Token.COMPUTED_PROPERTY
     }
 
     /** The key expression. Setting it reparents the expression. */
-    var expression: AstNode? = null
+    public var expression: AstNode? = null
         set(value) {
             val newExpression = value!!
             field = newExpression

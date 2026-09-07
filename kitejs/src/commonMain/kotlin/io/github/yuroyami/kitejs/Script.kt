@@ -10,16 +10,16 @@ package io.github.yuroyami.kitejs
  * The scope holds the global variables and functions the script can see. For a spec-compliant
  * script that scope has to be a global object built by `Context.initStandardObjects`.
  */
-interface Script {
+public interface Script {
 
     /**
      * Runs the script with [thisObj] as its `this` value.
      *
      * [cx] has to be the Context associated with the calling thread.
      */
-    fun exec(cx: Context, scope: Scriptable, thisObj: Scriptable): Any?
+    public fun exec(cx: Context, scope: Scriptable, thisObj: Scriptable): Any?
 
     /** Kept from upstream, where it exists for scripts compiled by an older release. */
     @Deprecated("Use exec(cx, scope, thisObj)", ReplaceWith("exec(cx, scope, scope)"))
-    fun exec(cx: Context, scope: Scriptable): Any? = exec(cx, scope, scope)
+    public fun exec(cx: Context, scope: Scriptable): Any? = exec(cx, scope, scope)
 }

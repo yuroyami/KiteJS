@@ -13,7 +13,7 @@ package io.github.yuroyami.kitejs
  * `Context.trackUnhandledPromiseRejections` starts collecting them here, and it is then the
  * embedder's job to drain them, or they simply pile up.
  */
-class UnhandledRejectionTracker {
+public class UnhandledRejectionTracker {
 
     private var enabled = false
 
@@ -23,7 +23,7 @@ class UnhandledRejectionTracker {
     /**
      * Hands every rejection so far to [handler] and forgets it, so each one is reported once.
      */
-    fun process(handler: (Any?) -> Unit) {
+    public fun process(handler: (Any?) -> Unit) {
         val it = unhandled.iterator()
         while (it.hasNext()) {
             val p = it.next()
@@ -37,7 +37,7 @@ class UnhandledRejectionTracker {
     }
 
     /** The rejections so far, left in place. [process] is what clears them. */
-    fun enumerate(): List<Any?> = unhandled.map { it.result }
+    public fun enumerate(): List<Any?> = unhandled.map { it.result }
 
     internal fun enable(enabled: Boolean) {
         this.enabled = enabled

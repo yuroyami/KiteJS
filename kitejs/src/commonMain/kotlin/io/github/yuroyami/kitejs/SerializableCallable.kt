@@ -9,4 +9,4 @@ package io.github.yuroyami.kitejs
  * `Serializable`; there is no serialization here, so the name is kept for parity and the marker is
  * empty (D-22).
  */
-fun interface SerializableCallable : Callable
+public fun interface SerializableCallable : Callable

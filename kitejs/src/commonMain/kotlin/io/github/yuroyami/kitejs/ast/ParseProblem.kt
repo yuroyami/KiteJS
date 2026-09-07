@@ -5,15 +5,16 @@
 package io.github.yuroyami.kitejs.ast
 
 /** One error or warning recorded by an [ErrorCollector] during a parse. */
-class ParseProblem(
-    var type: Type,
-    var message: String?,
-    var sourceName: String?,
-    var fileOffset: Int,
-    var length: Int,
+public class ParseProblem(
+    public var type: Type,
+    public var message: String?,
+    public var sourceName: String?,
+    public var fileOffset: Int,
+    public var length: Int,
 ) {
 
-    enum class Type {
+    /** Whether the parser could carry on past this. */
+    public enum class Type {
         Error,
         Warning,
     }

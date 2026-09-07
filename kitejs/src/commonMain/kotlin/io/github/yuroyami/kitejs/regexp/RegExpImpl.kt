@@ -19,7 +19,7 @@ import io.github.yuroyami.kitejs.Undefined
  * What `String.prototype.match`, `search`, `replace` and `split` go through, and where the legacy
  * `RegExp.$1` statics live.
  */
-class RegExpImpl : RegExpProxy {
+public class RegExpImpl : RegExpProxy {
 
     /** The input string, perl's `$_`. */
     internal var input: String? = null
@@ -290,7 +290,7 @@ class RegExpImpl : RegExpProxy {
         return result
     }
 
-    companion object {
+    public companion object {
 
         private fun createRegExp(cx: Context, scope: Scriptable, args: Array<Any?>, optarg: Int, forceFlat: Boolean): NativeRegExp {
             val topScope = ScriptableObject.getTopLevelScope(scope)

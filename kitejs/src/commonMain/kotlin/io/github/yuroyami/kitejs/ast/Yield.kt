@@ -9,27 +9,27 @@ import io.github.yuroyami.kitejs.Token
 /**
  * A yield expression. Node type is [Token.YIELD], or [Token.YIELD_STAR] for `yield*`.
  */
-class Yield : AstNode {
+public class Yield : AstNode {
 
-    constructor() : super() {
+    public constructor() : super() {
         typeField = Token.YIELD
     }
 
-    constructor(pos: Int) : super(pos) {
+    public constructor(pos: Int) : super(pos) {
         typeField = Token.YIELD
     }
 
-    constructor(pos: Int, len: Int) : super(pos, len) {
+    public constructor(pos: Int, len: Int) : super(pos, len) {
         typeField = Token.YIELD
     }
 
-    constructor(pos: Int, len: Int, value: AstNode?, isStar: Boolean) : super(pos, len) {
+    public constructor(pos: Int, len: Int, value: AstNode?, isStar: Boolean) : super(pos, len) {
         typeField = if (isStar) Token.YIELD_STAR else Token.YIELD
         this.value = value
     }
 
     /** The yielded expression, or null for a bare `yield`. Setting it reparents. */
-    var value: AstNode? = null
+    public var value: AstNode? = null
         set(value) {
             field = value
             value?.parent = this

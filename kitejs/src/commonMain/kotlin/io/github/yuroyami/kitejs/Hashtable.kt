@@ -13,7 +13,7 @@ package io.github.yuroyami.kitejs
  * going from where it was. A deleted node keeps its `next` pointer so any iterator sitting on it
  * can still walk forward; only the `prev` pointers are unlinked, so new iterators never see it.
  */
-class Hashtable : Iterable<Hashtable.Entry> {
+public class Hashtable : Iterable<Hashtable.Entry> {
 
     private val map = HashMap<Entry, Entry>()
     private var first: Entry? = null
@@ -23,7 +23,7 @@ class Hashtable : Iterable<Hashtable.Entry> {
      * One entry, and at the same time one node of the list. `equals` and `hashCode` follow
      * JavaScript's SameValueZero, not Java's rules.
      */
-    class Entry {
+    public class Entry {
         internal var key: Any?
         internal var value: Any?
         internal var deleted: Boolean = false
@@ -57,9 +57,9 @@ class Hashtable : Iterable<Hashtable.Entry> {
             this.value = value
         }
 
-        fun key(): Any? = key
+        public fun key(): Any? = key
 
-        fun value(): Any? = value
+        public fun value(): Any? = value
 
         /** Blanks the node so any iterator standing on it skips past. */
         internal fun clear() {
@@ -76,10 +76,10 @@ class Hashtable : Iterable<Hashtable.Entry> {
         }
     }
 
-    val size: Int
+    public val size: Int
         get() = map.size
 
-    fun put(key: Any?, value: Any?) {
+    public fun put(key: Any?, value: Any?) {
         val nv = Entry(key, value)
         val existing = map[nv]
         if (existing == null) {
@@ -100,11 +100,11 @@ class Hashtable : Iterable<Hashtable.Entry> {
         }
     }
 
-    fun getEntry(key: Any?): Entry? = map[Entry(key, null)]
+    public fun getEntry(key: Any?): Entry? = map[Entry(key, null)]
 
-    fun has(key: Any?): Boolean = map.containsKey(Entry(key, null))
+    public fun has(key: Any?): Boolean = map.containsKey(Entry(key, null))
 
-    fun deleteEntry(key: Any?): Boolean {
+    public fun deleteEntry(key: Any?): Boolean {
         val v = map.remove(Entry(key, null)) ?: return false
         unlink(v)
         // Blanked even though it is unlinked, in case an iterator is standing on it.
@@ -137,7 +137,7 @@ class Hashtable : Iterable<Hashtable.Entry> {
         }
     }
 
-    fun clear() {
+    public fun clear() {
         // Blank every node so live iterators walk straight past them.
         for (entry in this) entry.clear()
 
@@ -186,7 +186,7 @@ class Hashtable : Iterable<Hashtable.Entry> {
         }
     }
 
-    companion object {
+    public companion object {
         private fun makeDummy(): Entry {
             val d = Entry()
             d.clear()

@@ -11,15 +11,15 @@ package io.github.yuroyami.kitejs
  * An embedder subclasses this to change those answers. Upstream also hangs class loaders and
  * thread-safety defaults here; neither exists in this port.
  */
-open class ContextFactory {
+public open class ContextFactory {
 
     /** Told when a context is made and when it is released. */
-    interface Listener {
-        fun contextCreated(cx: Context)
-        fun contextReleased(cx: Context)
+    public interface Listener {
+        public fun contextCreated(cx: Context)
+        public fun contextReleased(cx: Context)
     }
 
-    var isSealed: Boolean = false
+    public var isSealed: Boolean = false
         private set
 
     private val listeners = mutableListOf<Listener>()
@@ -31,7 +31,7 @@ open class ContextFactory {
      * Whether an optional engine behaviour is on. These are the defaults; a subclass changes them
      * by overriding this. Thread-safe objects are always off (D-3).
      */
-    open fun hasFeature(cx: Context, featureIndex: Int): Boolean = when (featureIndex) {
+    public open fun hasFeature(cx: Context, featureIndex: Int): Boolean = when (featureIndex) {
         // Kept only for scripts that pin an old language version.
         Context.FEATURE_NON_ECMA_GET_YEAR ->
             cx.languageVersion == Context.VERSION_1_0 ||
@@ -63,7 +63,7 @@ open class ContextFactory {
     }
 
     /** Wraps every top-level call. The default flattens a lazy string result. */
-    open fun doTopCall(
+    public open fun doTopCall(
         callable: Callable,
         cx: Context,
         scope: Scriptable,
@@ -74,29 +74,29 @@ open class ContextFactory {
         return if (result is ConsString) result.toString() else result
     }
 
-    open fun doTopCall(script: Script, cx: Context, scope: Scriptable, thisObj: Scriptable): Any? {
+    public open fun doTopCall(script: Script, cx: Context, scope: Scriptable, thisObj: Scriptable): Any? {
         val result = script.exec(cx, scope, thisObj)
         return if (result is ConsString) result.toString() else result
     }
 
     /** Called every time the interpreter has run [instructionCount] more instructions. */
-    open fun observeInstructionCount(cx: Context, instructionCount: Int) {}
+    public open fun observeInstructionCount(cx: Context, instructionCount: Int) {}
 
-    open fun onContextCreated(cx: Context) {
+    public open fun onContextCreated(cx: Context) {
         for (l in listeners.toList()) l.contextCreated(cx)
     }
 
-    open fun onContextReleased(cx: Context) {
+    public open fun onContextReleased(cx: Context) {
         for (l in listeners.toList()) l.contextReleased(cx)
     }
 
-    fun addListener(listener: Listener) {
+    public fun addListener(listener: Listener) {
         checkNotSealed()
         check(!disabledListening)
         listeners.add(listener)
     }
 
-    fun removeListener(listener: Listener) {
+    public fun removeListener(listener: Listener) {
         checkNotSealed()
         check(!disabledListening)
         listeners.remove(listener)
@@ -108,7 +108,7 @@ open class ContextFactory {
         listeners.clear()
     }
 
-    fun seal() {
+    public fun seal() {
         checkNotSealed()
         isSealed = true
     }
@@ -118,23 +118,23 @@ open class ContextFactory {
     }
 
     /** Runs [action] with a context entered, entering one if none is. */
-    fun <T> call(action: ContextAction<T>): T = Context.call(this, action)
+    public fun <T> call(action: ContextAction<T>): T = Context.call(this, action)
 
-    fun enterContext(): Context = enterContext(null)
+    public fun enterContext(): Context = enterContext(null)
 
-    fun enterContext(cx: Context?): Context = Context.enter(cx, this)
+    public fun enterContext(cx: Context?): Context = Context.enter(cx, this)
 
-    companion object {
+    public companion object {
         private var globalField: ContextFactory = ContextFactory()
         private var hasCustomGlobal = false
 
         /** The factory used when nothing names one. */
-        fun getGlobal(): ContextFactory = globalField
+        public fun getGlobal(): ContextFactory = globalField
 
-        fun hasExplicitGlobal(): Boolean = hasCustomGlobal
+        public fun hasExplicitGlobal(): Boolean = hasCustomGlobal
 
         /** Replaces the global factory. Allowed once, before it is first used. */
-        fun initGlobal(factory: ContextFactory) {
+        public fun initGlobal(factory: ContextFactory) {
             check(!hasCustomGlobal)
             hasCustomGlobal = true
             globalField = factory

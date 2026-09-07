@@ -8,7 +8,7 @@ package io.github.yuroyami.kitejs
  * A [Slot] whose value is produced by a getter and consumed by a setter. Unlike [LambdaSlot], the
  * property descriptor shows that this is what is happening.
  */
-class AccessorSlot : Slot {
+public class AccessorSlot : Slot {
 
     internal constructor(name: Any?, index: Int) : super(name, index, 0)
 

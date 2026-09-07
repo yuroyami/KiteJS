@@ -9,9 +9,9 @@ import io.github.yuroyami.kitejs.ScriptableObject.Companion.PERMANENT
 import io.github.yuroyami.kitejs.ScriptableObject.Companion.READONLY
 
 /** The global functions and values: `eval`, `parseInt`, `isNaN`, `NaN`, the error constructors and the rest. */
-object NativeGlobal {
+public object NativeGlobal {
 
-    fun init(cx: Context, scope: Scriptable, sealed: Boolean) {
+    public fun init(cx: Context, scope: Scriptable, sealed: Boolean) {
         defineGlobalFunction(scope, sealed, "decodeURI", 1, ::js_decodeURI)
         defineGlobalFunction(scope, sealed, "decodeURIComponent", 1, ::js_decodeURIComponent)
         defineGlobalFunction(scope, sealed, "encodeURI", 1, ::js_encodeURI)

@@ -5,7 +5,7 @@
 package io.github.yuroyami.kitejs
 
 /** What `Function.prototype.bind` returns. ECMAScript 5 section 15.3.4.5. */
-class BoundFunction(
+public class BoundFunction(
     cx: Context,
     scope: Scriptable,
     internal val targetFunction: Callable,

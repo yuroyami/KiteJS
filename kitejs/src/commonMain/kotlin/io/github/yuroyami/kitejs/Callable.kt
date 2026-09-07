@@ -5,7 +5,7 @@
 package io.github.yuroyami.kitejs
 
 /** Anything that can be called from JavaScript. */
-interface Callable {
+public interface Callable {
 
-    fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any?
+    public fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any?
 }

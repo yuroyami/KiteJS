@@ -13,7 +13,7 @@ import kotlin.reflect.KMutableProperty1
 import kotlin.reflect.KProperty1
 
 /** How a property behaves. The defaults match what `obj.x = 1` gives you in a script. */
-class PropertyFlags(val writable: Boolean = true, val enumerable: Boolean = true, val configurable: Boolean = true)
+public class PropertyFlags(public val writable: Boolean = true, public val enumerable: Boolean = true, public val configurable: Boolean = true)
 
 private fun PropertyFlags.attributes(): Int {
     var a = 0
@@ -29,19 +29,19 @@ private fun JsObject.asScriptableObject(): ScriptableObject =
 // ---- Values ---------------------------------------------------------------------------------
 
 /** Puts a value on the object. */
-fun JsObject.property(name: String, value: Any?, flags: PropertyFlags = PropertyFlags()) {
+public fun JsObject.property(name: String, value: Any?, flags: PropertyFlags = PropertyFlags()) {
     asScriptableObject().defineProperty(name, Converters.toEngine(value, liveContext(), target), flags.attributes())
 }
 
 /** Puts a value that a script can read but not change. */
-fun JsObject.constant(name: String, value: Any?) {
+public fun JsObject.constant(name: String, value: Any?) {
     property(name, value, PropertyFlags(writable = false, configurable = false))
 }
 
 // ---- Accessors ------------------------------------------------------------------------------
 
 /** A property computed on every read. */
-fun JsObject.getter(name: String, flags: PropertyFlags = PropertyFlags(), read: () -> Any?) {
+public fun JsObject.getter(name: String, flags: PropertyFlags = PropertyFlags(), read: () -> Any?) {
     val scope = target
     asScriptableObject().defineProperty(
         name,
@@ -52,12 +52,12 @@ fun JsObject.getter(name: String, flags: PropertyFlags = PropertyFlags(), read: 
 }
 
 /** A property that only accepts writes. */
-fun JsObject.setter(name: String, flags: PropertyFlags = PropertyFlags(), write: (JsValue) -> Unit) {
+public fun JsObject.setter(name: String, flags: PropertyFlags = PropertyFlags(), write: (JsValue) -> Unit) {
     asScriptableObject().defineProperty(name, null, { v -> write(JsValue(v)) }, flags.attributes())
 }
 
 /** A property with both halves. */
-fun JsObject.accessor(
+public fun JsObject.accessor(
     name: String,
     flags: PropertyFlags = PropertyFlags(),
     read: () -> Any?,
@@ -75,7 +75,7 @@ fun JsObject.accessor(
 // ---- Functions ------------------------------------------------------------------------------
 
 /** A host function that takes the arguments as they came. */
-fun JsObject.function(
+public fun JsObject.function(
     name: String,
     arity: Int = 0,
     flags: PropertyFlags = PropertyFlags(enumerable = false),
@@ -93,7 +93,7 @@ fun JsObject.function(
 }
 
 /** A host function that also wants the `this` it was called on. */
-fun JsObject.method(
+public fun JsObject.method(
     name: String,
     arity: Int = 0,
     flags: PropertyFlags = PropertyFlags(enumerable = false),
@@ -113,7 +113,7 @@ fun JsObject.method(
 }
 
 /** A host constructor, callable with `new`. [build] fills in the object it is given. */
-fun JsObject.constructor(
+public fun JsObject.constructor(
     name: String,
     arity: Int = 0,
     flags: PropertyFlags = PropertyFlags(enumerable = false),
@@ -137,7 +137,7 @@ fun JsObject.constructor(
 // ---- Nesting --------------------------------------------------------------------------------
 
 /** A nested object, built by [build]. Returns it so you can keep a handle. */
-fun JsObject.obj(name: String, build: JsObject.() -> Unit = {}): JsObject {
+public fun JsObject.obj(name: String, build: JsObject.() -> Unit = {}): JsObject {
     val child = JsObject(liveContext().newObject(scopeOf(target)))
     child.build()
     property(name, child)
@@ -147,20 +147,20 @@ fun JsObject.obj(name: String, build: JsObject.() -> Unit = {}): JsObject {
 // ---- Binding a Kotlin object ----------------------------------------------------------------
 
 /** What [bind] gives you: a place to name the members a script should see. */
-class BindScope<T : Any> internal constructor(private val obj: JsObject, private val instance: T) {
+public class BindScope<T : Any> internal constructor(private val obj: JsObject, private val instance: T) {
 
     /** Exposes a read-only Kotlin property under its own name. */
-    fun property(name: String, prop: KProperty1<T, Any?>) {
+    public fun property(name: String, prop: KProperty1<T, Any?>) {
         obj.getter(name) { prop.get(instance) }
     }
 
     /** Exposes a Kotlin property a script can also write. */
-    fun property(name: String, prop: KMutableProperty1<T, Any?>) {
+    public fun property(name: String, prop: KMutableProperty1<T, Any?>) {
         obj.accessor(name, read = { prop.get(instance) }, write = { v -> prop.set(instance, v.toKotlin()) })
     }
 
     /** Exposes a Kotlin function under [name]. */
-    fun method(name: String, arity: Int = 0, body: T.(List<JsValue>) -> Any?) {
+    public fun method(name: String, arity: Int = 0, body: T.(List<JsValue>) -> Any?) {
         obj.function(name, arity) { args -> instance.body(args) }
     }
 }
@@ -175,7 +175,7 @@ class BindScope<T : Any> internal constructor(private val obj: JsObject, private
  * }
  * ```
  */
-fun <T : Any> JsObject.bind(name: String, instance: T, build: BindScope<T>.() -> Unit): JsObject {
+public fun <T : Any> JsObject.bind(name: String, instance: T, build: BindScope<T>.() -> Unit): JsObject {
     val child = obj(name)
     BindScope(child, instance).build()
     return child
@@ -184,7 +184,7 @@ fun <T : Any> JsObject.bind(name: String, instance: T, build: BindScope<T>.() ->
 // ---- Typed function shapes -------------------------------------------------------------------
 
 /** Reads a [JsValue] as [T], coercing the way JavaScript would where that makes sense. */
-inline fun <reified T> JsValue.convertTo(): T {
+public inline fun <reified T> JsValue.convertTo(): T {
     val out: Any? = when (T::class) {
         JsValue::class -> this
         Boolean::class -> asBoolean()
@@ -206,13 +206,13 @@ inline fun <reified T> JsValue.convertTo(): T {
 private fun List<JsValue>.at(i: Int): JsValue = getOrElse(i) { JsValue.undefined }
 
 /** A one-argument host function, with the argument and the answer converted for you. */
-inline fun <reified A, reified R> JsObject.function(
+public inline fun <reified A, reified R> JsObject.function(
     name: String,
     crossinline body: (A) -> R,
 ): JsFunction = function(name, 1) { args -> body(args.getOrElse(0) { JsValue.undefined }.convertTo<A>()) }
 
 /** A two-argument host function. */
-inline fun <reified A, reified B, reified R> JsObject.function(
+public inline fun <reified A, reified B, reified R> JsObject.function(
     name: String,
     crossinline body: (A, B) -> R,
 ): JsFunction = function(name, 2) { args ->
@@ -223,7 +223,7 @@ inline fun <reified A, reified B, reified R> JsObject.function(
 }
 
 /** A three-argument host function. */
-inline fun <reified A, reified B, reified C, reified R> JsObject.function(
+public inline fun <reified A, reified B, reified C, reified R> JsObject.function(
     name: String,
     crossinline body: (A, B, C) -> R,
 ): JsFunction = function(name, 3) { args ->

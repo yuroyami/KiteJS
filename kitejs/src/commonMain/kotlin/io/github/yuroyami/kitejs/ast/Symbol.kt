@@ -8,13 +8,13 @@ import io.github.yuroyami.kitejs.Node
 import io.github.yuroyami.kitejs.Token
 
 /** A symbol-table entry. */
-class Symbol() {
+public class Symbol() {
 
     /**
      * Symbol declaration type: one of [Token.FUNCTION], [Token.LP] (for parameters),
      * [Token.VAR], [Token.LET] or [Token.CONST].
      */
-    var declType: Int = 0
+    public var declType: Int = 0
         set(value) {
             if (!(value == Token.FUNCTION ||
                     value == Token.LP ||
@@ -28,23 +28,23 @@ class Symbol() {
         }
 
     /** Symbol name. */
-    var name: String? = null
+    public var name: String? = null
 
     /** The node associated with this identifier. */
-    var node: Node? = null
+    public var node: Node? = null
 
     /** The symbol's index in its scope. */
-    var index: Int = -1
+    public var index: Int = -1
 
     /** The scope in which this symbol is entered. */
-    var containingTable: Scope? = null
+    public var containingTable: Scope? = null
 
-    constructor(declType: Int, name: String?) : this() {
+    public constructor(declType: Int, name: String?) : this() {
         this.name = name
         this.declType = declType
     }
 
-    val declTypeName: String
+    public val declTypeName: String
         get() = Token.typeToName(declType)
 
     override fun toString(): String {

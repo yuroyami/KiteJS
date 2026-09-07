@@ -7,14 +7,14 @@ package io.github.yuroyami.kitejs.ast
 import io.github.yuroyami.kitejs.Token
 
 /** A C-style `for (init; cond; incr)` loop. Node type is [Token.FOR]. */
-class ForLoop(pos: Int = -1, len: Int = 1) : Loop(pos, len) {
+public class ForLoop(pos: Int = -1, len: Int = 1) : Loop(pos, len) {
 
     init {
         typeField = Token.FOR
     }
 
     /** The initializer clause. Setting it reparents the node. */
-    var initializer: AstNode? = null
+    public var initializer: AstNode? = null
         set(value) {
             val newInitializer = value!!
             field = newInitializer
@@ -22,7 +22,7 @@ class ForLoop(pos: Int = -1, len: Int = 1) : Loop(pos, len) {
         }
 
     /** The condition clause. Setting it reparents the node. */
-    var condition: AstNode? = null
+    public var condition: AstNode? = null
         set(value) {
             val newCondition = value!!
             field = newCondition
@@ -30,7 +30,7 @@ class ForLoop(pos: Int = -1, len: Int = 1) : Loop(pos, len) {
         }
 
     /** The increment clause. Setting it reparents the node. */
-    var increment: AstNode? = null
+    public var increment: AstNode? = null
         set(value) {
             val newIncrement = value!!
             field = newIncrement

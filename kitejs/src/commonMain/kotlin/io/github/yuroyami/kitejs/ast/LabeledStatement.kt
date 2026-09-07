@@ -10,7 +10,7 @@ import io.github.yuroyami.kitejs.Token
  * A labeled statement. A statement can carry several labels, as in `a: b: c: while (...) {}`.
  * Node type is [Token.EXPR_VOID].
  */
-class LabeledStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
+public class LabeledStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     /** Always holds at least one label once the parser is done. */
     private val labelList: MutableList<Label> = mutableListOf()
@@ -19,32 +19,32 @@ class LabeledStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         typeField = Token.EXPR_VOID
     }
 
-    val labels: List<Label>
+    public val labels: List<Label>
         get() = labelList
 
-    fun setLabels(labels: List<Label>) {
+    public fun setLabels(labels: List<Label>) {
         labelList.clear()
         for (l in labels) {
             addLabel(l)
         }
     }
 
-    fun addLabel(label: Label) {
+    public fun addLabel(label: Label) {
         labelList.add(label)
         label.parent = this
     }
 
     /** The labeled statement. Setting it reparents the statement. */
-    var statement: AstNode? = null
+    public var statement: AstNode? = null
         set(value) {
             val newStatement = value!!
             field = newStatement
             newStatement.parent = this
         }
 
-    fun getLabelByName(name: String): Label? = labelList.firstOrNull { name == it.name }
+    public fun getLabelByName(name: String): Label? = labelList.firstOrNull { name == it.name }
 
-    val firstLabel: Label
+    public val firstLabel: Label
         get() = labelList[0]
 
     override fun hasSideEffects(): Boolean =

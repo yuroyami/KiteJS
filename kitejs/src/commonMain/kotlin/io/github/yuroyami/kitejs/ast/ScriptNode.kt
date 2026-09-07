@@ -10,29 +10,29 @@ import io.github.yuroyami.kitejs.Token
 /**
  * Base type for [AstRoot] and [FunctionNode], which collect much of the same information.
  */
-open class ScriptNode(pos: Int = -1) : Scope(pos) {
+public open class ScriptNode(pos: Int = -1) : Scope(pos) {
 
     /** The URI, path or descriptive text naming the origin of this script's source. */
-    var sourceName: String? = null
+    public var sourceName: String? = null
 
     /** Start offset of the raw source. Only valid when [rawSource] is non-null. */
-    var rawSourceStart: Int = -1
+    public var rawSourceStart: Int = -1
 
     /** End offset of the raw source. Only valid when [rawSource] is non-null. */
-    var rawSourceEnd: Int = -1
+    public var rawSourceEnd: Int = -1
 
     /** The raw source, or null if it was not recorded. Used by the code generator. */
-    var rawSource: String? = null
+    public var rawSource: String? = null
 
     private var functionList: MutableList<FunctionNode>? = null
     private var regexps: MutableList<RegExpLiteral>? = null
     private var templateLiterals: MutableList<TemplateLiteral>? = null
 
     /** Every symbol in this script or function, in declaration order. */
-    var symbols: MutableList<Symbol> = ArrayList(4)
+    public var symbols: MutableList<Symbol> = ArrayList(4)
 
     /** Number of parameters, counted as [Token.LP] symbols arrive. */
-    var paramCount: Int = 0
+    public var paramCount: Int = 0
         private set
 
     private var variableNames: Array<String>? = null
@@ -40,9 +40,9 @@ open class ScriptNode(pos: Int = -1) : Scope(pos) {
 
     private var tempNumber = 0
 
-    var isInStrictMode: Boolean = false
+    public var isInStrictMode: Boolean = false
 
-    var isMethodDefinition: Boolean = false
+    public var isMethodDefinition: Boolean = false
 
     init {
         // During parsing a ScriptNode or FunctionNode's top scope is itself.
@@ -51,7 +51,7 @@ open class ScriptNode(pos: Int = -1) : Scope(pos) {
     }
 
     /** Used by the code generator. */
-    fun setRawSourceBounds(start: Int, end: Int) {
+    public fun setRawSourceBounds(start: Int, end: Int) {
         this.rawSourceStart = start
         this.rawSourceEnd = end
     }
@@ -60,26 +60,26 @@ open class ScriptNode(pos: Int = -1) : Scope(pos) {
      * Base (starting) line number for this script or function. Setting it is a one-time
      * operation and fails if the line number is already set.
      */
-    var baseLineno: Int
+    public var baseLineno: Int
         get() = linenoField
         set(value) {
             if (value < 0 || linenoField >= 0) codeBug()
             linenoField = value
         }
 
-    var endLineno: Int = -1
+    public var endLineno: Int = -1
         set(value) {
             // One time action.
             if (value < 0 || field >= 0) codeBug()
             field = value
         }
 
-    val functionCount: Int
+    public val functionCount: Int
         get() = functionList?.size ?: 0
 
-    fun getFunctionNode(i: Int): FunctionNode = functionList!![i]
+    public fun getFunctionNode(i: Int): FunctionNode = functionList!![i]
 
-    val functions: List<FunctionNode> get() = functionList ?: emptyList()
+    public val functions: List<FunctionNode> get() = functionList ?: emptyList()
 
     /**
      * Adds a [FunctionNode] to the functions table for codegen. Does not set the parent of
@@ -87,40 +87,40 @@ open class ScriptNode(pos: Int = -1) : Scope(pos) {
      *
      * @return the index of the function within its parent
      */
-    open fun addFunction(fnNode: FunctionNode): Int {
+    public open fun addFunction(fnNode: FunctionNode): Int {
         if (functionList == null) functionList = mutableListOf()
         functionList!!.add(fnNode)
         return functionList!!.size - 1
     }
 
-    val regexpCount: Int
+    public val regexpCount: Int
         get() = regexps?.size ?: 0
 
-    fun getRegexpString(index: Int): String? = regexps!![index].value
+    public fun getRegexpString(index: Int): String? = regexps!![index].value
 
-    fun getRegexpFlags(index: Int): String? = regexps!![index].flags
+    public fun getRegexpFlags(index: Int): String? = regexps!![index].flags
 
     /** Called by IRFactory to add a RegExp to the regexp table. */
-    fun addRegExp(re: RegExpLiteral) {
+    public fun addRegExp(re: RegExpLiteral) {
         if (regexps == null) regexps = mutableListOf()
         regexps!!.add(re)
         re.putIntProp(REGEXP_PROP, regexps!!.size - 1)
     }
 
-    val templateLiteralCount: Int
+    public val templateLiteralCount: Int
         get() = templateLiterals?.size ?: 0
 
-    fun getTemplateLiteralStrings(index: Int): List<TemplateCharacters> =
+    public fun getTemplateLiteralStrings(index: Int): List<TemplateCharacters> =
         templateLiterals!![index].templateStrings
 
     /** Called by IRFactory to add a template literal to the table. */
-    fun addTemplateLiteral(templateLiteral: TemplateLiteral) {
+    public fun addTemplateLiteral(templateLiteral: TemplateLiteral) {
         if (templateLiterals == null) templateLiterals = mutableListOf()
         templateLiterals!!.add(templateLiteral)
         templateLiteral.putIntProp(TEMPLATE_LITERAL_PROP, templateLiterals!!.size - 1)
     }
 
-    fun getIndexForNameNode(nameNode: Node): Int {
+    public fun getIndexForNameNode(nameNode: Node): Int {
         if (variableNames == null) codeBug()
         val node = nameNode.scope
         var symbol: Symbol? = null
@@ -130,43 +130,43 @@ open class ScriptNode(pos: Int = -1) : Scope(pos) {
         return symbol?.index ?: -1
     }
 
-    fun getParamOrVarName(index: Int): String {
+    public fun getParamOrVarName(index: Int): String {
         if (variableNames == null) codeBug()
         return variableNames!![index]
     }
 
-    val paramAndVarCount: Int
+    public val paramAndVarCount: Int
         get() {
             if (variableNames == null) codeBug()
             return symbols.size
         }
 
-    val paramAndVarNames: Array<String>
+    public val paramAndVarNames: Array<String>
         get() {
             if (variableNames == null) codeBug()
             return variableNames!!
         }
 
-    val paramAndVarConst: BooleanArray
+    public val paramAndVarConst: BooleanArray
         get() {
             if (variableNames == null) codeBug()
             return isConsts!!
         }
 
-    open val hasRestParameter: Boolean
+    public open val hasRestParameter: Boolean
         get() = false
 
-    open val defaultParams: List<Any?>?
+    public open val defaultParams: List<Any?>?
         get() = null
 
-    open val destructuringRvalues: List<Array<Node>>?
+    public open val destructuringRvalues: List<Array<Node>>?
         get() = null
 
-    open val isShorthand: Boolean
+    public open val isShorthand: Boolean
         get() = false
 
     // Overridden in FunctionNode.
-    open fun putDestructuringRvalues(left: Node, right: Node) {}
+    public open fun putDestructuringRvalues(left: Node, right: Node) {}
 
     internal fun addSymbol(symbol: Symbol) {
         if (variableNames != null) codeBug()
@@ -183,7 +183,7 @@ open class ScriptNode(pos: Int = -1) : Scope(pos) {
      * @param flattenAllTables true to flatten nested block-scope symbol tables too, false to
      *     flatten just this script's or function's own table.
      */
-    fun flattenSymbolTable(flattenAllTables: Boolean) {
+    public fun flattenSymbolTable(flattenAllTables: Boolean) {
         if (!flattenAllTables) {
             val newSymbols = mutableListOf<Symbol>()
             if (this.symbolTable != null) {
@@ -204,7 +204,7 @@ open class ScriptNode(pos: Int = -1) : Scope(pos) {
         }
     }
 
-    var compilerData: Any? = null
+    public var compilerData: Any? = null
         set(value) {
             if (value == null) throw IllegalArgumentException("arg cannot be null")
             // Can only be set once.
@@ -212,7 +212,7 @@ open class ScriptNode(pos: Int = -1) : Scope(pos) {
             field = value
         }
 
-    fun getNextTempName(): String = "$" + tempNumber++
+    public fun getNextTempName(): String = "$" + tempNumber++
 
     override fun visit(visitor: NodeVisitor) {
         if (visitor.visit(this)) {

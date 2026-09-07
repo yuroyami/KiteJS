@@ -10,15 +10,15 @@ import io.github.yuroyami.kitejs.Token
  * An array literal, which doubles as an array destructuring target. Node type is
  * [Token.ARRAYLIT].
  */
-class ArrayLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len), DestructuringForm {
+public class ArrayLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len), DestructuringForm {
 
     private var elementList: MutableList<AstNode>? = null
 
     /** Number of targets in a destructuring pattern, including the elisions. */
-    var destructuringLength: Int = 0
+    public var destructuringLength: Int = 0
 
     /** Number of elided elements, as in `[a, , b]`. */
-    var skipCount: Int = 0
+    public var skipCount: Int = 0
 
     override var isDestructuring: Boolean = false
 
@@ -27,9 +27,9 @@ class ArrayLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len), Destructuri
     }
 
     /** The elements, or an empty list if none were added. */
-    val elements: List<AstNode> get() = elementList ?: NO_ELEMS
+    public val elements: List<AstNode> get() = elementList ?: NO_ELEMS
 
-    fun setElements(elements: List<AstNode>?) {
+    public fun setElements(elements: List<AstNode>?) {
         if (elements == null) {
             this.elementList = null
         } else {
@@ -38,16 +38,16 @@ class ArrayLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len), Destructuri
         }
     }
 
-    fun addElement(element: AstNode) {
+    public fun addElement(element: AstNode) {
         val list = elementList ?: mutableListOf<AstNode>().also { elementList = it }
         list.add(element)
         element.parent = this
     }
 
-    val size: Int
+    public val size: Int
         get() = elementList?.size ?: 0
 
-    fun getElement(index: Int): AstNode {
+    public fun getElement(index: Int): AstNode {
         val list = elementList ?: throw IndexOutOfBoundsException("no elements")
         return list[index]
     }
@@ -69,7 +69,7 @@ class ArrayLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len), Destructuri
         }
     }
 
-    companion object {
+    public companion object {
         private val NO_ELEMS: List<AstNode> = emptyList()
     }
 }

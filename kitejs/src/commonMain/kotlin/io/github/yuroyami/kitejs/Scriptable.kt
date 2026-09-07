@@ -12,44 +12,44 @@ import kotlin.reflect.KClass
  * KMP: `getDefaultValue` takes a [KClass] rather than a `java.lang.Class`. The hint is only ever
  * compared by identity against the sentinels on [ScriptRuntime], so the mapping is exact (D-20).
  */
-interface Scriptable {
+public interface Scriptable {
 
     /** The class name, as `Object.prototype.toString` reports it. */
-    val className: String
+    public val className: String
 
     /** Gets a named property, or [NOT_FOUND] when there is none. */
-    fun get(name: String, start: Scriptable): Any?
+    public fun get(name: String, start: Scriptable): Any?
 
     /** Gets an indexed property, or [NOT_FOUND] when there is none. */
-    fun get(index: Int, start: Scriptable): Any?
+    public fun get(index: Int, start: Scriptable): Any?
 
-    fun has(name: String, start: Scriptable): Boolean
+    public fun has(name: String, start: Scriptable): Boolean
 
-    fun has(index: Int, start: Scriptable): Boolean
+    public fun has(index: Int, start: Scriptable): Boolean
 
-    fun put(name: String, start: Scriptable, value: Any?)
+    public fun put(name: String, start: Scriptable, value: Any?)
 
-    fun put(index: Int, start: Scriptable, value: Any?)
+    public fun put(index: Int, start: Scriptable, value: Any?)
 
-    fun delete(name: String)
+    public fun delete(name: String)
 
-    fun delete(index: Int)
+    public fun delete(index: Int)
 
-    var prototype: Scriptable?
+    public var prototype: Scriptable?
 
-    var parentScope: Scriptable?
+    public var parentScope: Scriptable?
 
     /** Every property name of this object alone, ignoring the prototype chain. */
-    fun getIds(): Array<Any?>
+    public fun getIds(): Array<Any?>
 
     /** Converts this object to a primitive, guided by [hint]. */
-    fun getDefaultValue(hint: KClass<*>?): Any?
+    public fun getDefaultValue(hint: KClass<*>?): Any?
 
     /** Backs the `instanceof` operator. */
-    fun hasInstance(instance: Scriptable): Boolean
+    public fun hasInstance(instance: Scriptable): Boolean
 
-    companion object {
+    public companion object {
         /** Returned by [get] and friends when the property is absent. */
-        val NOT_FOUND: Any = UniqueTag.NOT_FOUND
+        public val NOT_FOUND: Any = UniqueTag.NOT_FOUND
     }
 }

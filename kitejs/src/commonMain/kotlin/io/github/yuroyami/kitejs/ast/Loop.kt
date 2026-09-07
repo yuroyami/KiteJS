@@ -10,18 +10,18 @@ package io.github.yuroyami.kitejs.ast
  * KMP: upstream's protected `body` field stays as [bodyField], because
  * [ArrayComprehensionLoop] overrides the accessor to report no body at all.
  */
-abstract class Loop(pos: Int = -1, len: Int = 1) : Scope(pos, len) {
+public abstract class Loop(pos: Int = -1, len: Int = 1) : Scope(pos, len) {
 
     protected var bodyField: AstNode? = null
 
     /** Left paren position, -1 if missing. */
-    var lp: Int = -1
+    public var lp: Int = -1
 
     /** Right paren position, -1 if missing. */
-    var rp: Int = -1
+    public var rp: Int = -1
 
     /** The loop body. Setting it reparents the body and grows this node to include it. */
-    open var body: AstNode?
+    public open var body: AstNode?
         get() = bodyField
         set(value) {
             val newBody = value!!
@@ -32,7 +32,7 @@ abstract class Loop(pos: Int = -1, len: Int = 1) : Scope(pos, len) {
         }
 
     /** Sets both paren positions. */
-    fun setParens(lp: Int, rp: Int) {
+    public fun setParens(lp: Int, rp: Int) {
         this.lp = lp
         this.rp = rp
     }

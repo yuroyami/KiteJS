@@ -8,12 +8,12 @@ package io.github.yuroyami.kitejs
  * Collects the pieces of an object or array literal while the interpreter evaluates them, then
  * hands the runtime the keysField, valuesField and getter/setter flags in one go.
  */
-abstract class NewLiteralStorage protected constructor(ids: Array<Any?>?, length: Int, createKeys: Boolean) {
+public abstract class NewLiteralStorage protected constructor(ids: Array<Any?>?, length: Int, createKeys: Boolean) {
 
     protected var keysField: Array<Any?>?
     protected var getterSettersField: IntArray
     protected var valuesField: Array<Any?>
-    protected var index = 0
+    protected var index: Int = 0
     protected var skipIndexesField: IntArray? = null
 
     /** How many extra elements each spread at a source position produced. */
@@ -32,27 +32,27 @@ abstract class NewLiteralStorage protected constructor(ids: Array<Any?>?, length
         valuesField = arrayOfNulls(l)
     }
 
-    fun pushValue(value: Any?) {
+    public fun pushValue(value: Any?) {
         valuesField[index] = value
         attemptToInferFunctionName(value)
         ++index
     }
 
-    fun pushGetter(value: Any?) {
+    public fun pushGetter(value: Any?) {
         getterSettersField[index] = -1
         pushValue(value)
     }
 
-    fun pushSetter(value: Any?) {
+    public fun pushSetter(value: Any?) {
         getterSettersField[index] = 1
         pushValue(value)
     }
 
-    fun pushKey(key: Any?) {
+    public fun pushKey(key: Any?) {
         keysField!![index] = if (key is Symbol) key else ScriptRuntime.toString(key)
     }
 
-    fun spread(cx: Context, scope: Scriptable, source: Any?, sourcePosition: Int) {
+    public fun spread(cx: Context, scope: Scriptable, source: Any?, sourcePosition: Int) {
         val indexBefore = index
         if (keysField == null) spreadArray(cx, scope, source) else spreadObject(cx, scope, source)
         val adj = spreadAdjustments
@@ -105,21 +105,21 @@ abstract class NewLiteralStorage protected constructor(ids: Array<Any?>?, length
         }
     }
 
-    val keys: Array<Any?>? get() = keysField
+    public val keys: Array<Any?>? get() = keysField
 
-    val getterSetters: IntArray get() = getterSettersField
+    public val getterSetters: IntArray get() = getterSettersField
 
-    val values: Array<Any?> get() = valuesField
+    public val values: Array<Any?> get() = valuesField
 
-    fun setSkipIndexes(skipIndexes: IntArray?) {
+    public fun setSkipIndexes(skipIndexes: IntArray?) {
         this.skipIndexesField = skipIndexes
         if (skipIndexes != null && skipIndexes.isNotEmpty()) spreadAdjustments = IntArray(valuesField.size + skipIndexes.size)
     }
 
-    fun hasSkipIndexes(): Boolean = skipIndexesField != null
+    public fun hasSkipIndexes(): Boolean = skipIndexesField != null
 
     /** The holes' positions once every spread before them has been counted in. */
-    val adjustedSkipIndexes: IntArray?
+    public val adjustedSkipIndexes: IntArray?
         get() {
         val skips = skipIndexesField ?: return null
         val adj = spreadAdjustments
@@ -175,11 +175,11 @@ abstract class NewLiteralStorage protected constructor(ids: Array<Any?>?, length
         }
     }
 
-    companion object {
-        fun create(cx: Context, ids: Array<Any?>?): NewLiteralStorage =
+    public companion object {
+        public fun create(cx: Context, ids: Array<Any?>?): NewLiteralStorage =
             if (cx.languageVersion >= Context.VERSION_ES6) NameInference(ids, -1, false) else NoInference(ids, -1, false)
 
-        fun create(cx: Context, length: Int, createKeys: Boolean): NewLiteralStorage =
+        public fun create(cx: Context, length: Int, createKeys: Boolean): NewLiteralStorage =
             if (cx.languageVersion >= Context.VERSION_ES6) NameInference(null, length, createKeys) else NoInference(null, length, createKeys)
     }
 }

@@ -8,7 +8,7 @@ package io.github.yuroyami.kitejs
  * A [Slot] that builds its value the first time it is read. The built-in objects use it so they are
  * not all constructed up front.
  */
-class LazyLoadSlot : Slot {
+public class LazyLoadSlot : Slot {
 
     internal constructor(name: Any?, index: Int) : super(name, index, 0)
 

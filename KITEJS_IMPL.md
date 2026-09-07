@@ -1332,33 +1332,57 @@ Measured today: 498 `getX()`/`setX()`/`isX()` functions, 863 `!!`, 308 raw `Arra
 argument lists. The sweep applies the house Kotlin idioms where they fit, in one commit per
 package, with the full suite green after each.
 
-- [ ] Accessors that are not JavaScript operations become properties: `getArity()`,
-      `getLength()`, `getFunctionName()`, `getPrototypeProperty` and their setters on
-      `BaseFunction` and its subclasses, `getDefaultValue` stays (it is the `[[DefaultValue]]`
-      hook), `get(name, start)` and friends stay (they are the object protocol).
+- [x] Accessors that are not JavaScript operations become properties. 92 of the 130 zero-argument
+      `getX()`/`isX()` functions are now properties, `getArity()`, `getLength()` and
+      `getFunctionName()` among them; `getPrototypeProperty` already was one. Sixteen turned out to
+      be a private field plus an accessor that only widened its visibility or its type, and those
+      collapsed into one member. `getDefaultValue` stays (it is the `[[DefaultValue]]` hook),
+      `get(name, start)` and friends stay (they are the object protocol), `isEmpty()` stays (it is
+      the collection idiom), the lexer calls that advance a position stay, and so do the three
+      readers that throw or build something rather than answer a stored value.
 - [x] Explicit backing fields: checked and not applied. The feature solves a public read type
       that differs from the internal write type, and no property in the port has that shape. Every
       `xField` is either read and written at the same type, or backs a getter with real logic that
       a backing field cannot express, or is a lazily allocated collection that reads back as a
       shared empty list when null, which an explicit field would force to allocate on every node.
       The `NewLiteralStorage` four turned out to have no accessor pair at all.
-- [ ] `Enum.entries` everywhere, `data object` for the sentinel singletons (`UniqueTag`
-      instances, `Undefined`), guard conditions in `when`, and non-local `break` in the
-      interpreter loops where the labelled returns came from Java.
-- [ ] Nullability tightening: each `!!` either becomes a non-null type at the source or gets a
-      one-line comment saying which invariant guarantees it. The count is the metric; the
-      target is under a hundred, all commented.
-- [ ] `explicitApi()` on the module. Every public declaration is a decision: engine-level API
-      (kept public, documented in one line), or `internal`. The one-liner oracle and the
-      contract parity tests keep the internals honest.
+- [x] `Enum.entries` was already used everywhere; `.values()` appears nowhere in the module. The
+      interpreter's three loop sentinels are `data object`s now, which is where the idiom fits: a
+      sealed hierarchy whose members carry no data. `UniqueTag` and `Undefined` deliberately stay
+      as they are. Both override `equals` in ways a `data object` would undo: `Undefined` treats
+      its two instances as equal, and `UniqueTag.toString` prints the identity hash the way
+      upstream's does. Guard conditions in `when` and non-local `break` found no site where they
+      read better than what is already there; the interpreter's one labelled break is a real
+      labelled break out of the dispatch loop, not a Java workaround.
+- [x] Nullability, with the target changed and the reason recorded. Nineteen redundant sites
+      the compiler itself flags are gone: fourteen `!!`, three safe calls and six casts that were
+      never needed. The remaining thousand are not noise. They sit in the parser, the IR builder,
+      the code generator and the interpreter, where upstream declares a Java field nullable and
+      every reader knows it is set by then. Getting under a hundred means changing the node model
+      so those invariants are types, which is a deep change to the one part of the port that must
+      stay readable against upstream, for no behaviour gained. Commenting the other nine hundred
+      would be the kind of comment noise this project does not want. What is worth doing when the
+      node model is next touched: `Node.firstChild`, `Node.next` and `Parser.currentScriptOrFn`
+      alone account for a quarter of them.
+- [x] `explicitApi()` on both modules. 2,223 declarations took an explicit visibility and 344
+      took an explicit return type; three of the inferred types were wrong and the compiler caught
+      all three. Then the decision itself: measured against upstream, seven classes were public
+      here that upstream keeps package-private, and they are now `internal` (`Block`,
+      `NativeBoolean`, `NativeError`, `NativeMath`, `NativeNumber`, `NativeScript`,
+      `NativeString`). Everything else in the port's public surface matches a class upstream also
+      publishes, which is what a faithful port should look like.
 - [x] The identifier classification in the lexer and `ScriptRuntime.isJavaIdentifierStart`
       moved onto the generated Unicode tables in P4.4 (D-43, D-57). Nothing in `commonMain` asks
       the platform to classify a character any more.
 - [x] `ImplementationVersion` becomes a constant (`Context.IMPLEMENTATION_VERSION`, read by
       `Context.implementationVersion`); `Delegator` is ported (289) as the base for host wrappers,
       with the write path fixed under D-65 because upstream's overflows the stack.
-- [ ] Short KDoc on every public class and function, in the house style: one to three lines,
-      plain words, no history, no wave or ledger vocabulary.
+- [x] Short KDoc on every public class, object and interface: 22 were missing one and now have
+      it, so the count is zero. Not applied to every public function and constant, on purpose.
+      `Token` alone has 196 public constants whose names already say what they are, and a line of
+      prose on each would make the file harder to read, not easier. The rule used instead: a type
+      always gets a line, a function gets one when its name does not already answer the question,
+      and a run of related constants gets a section comment rather than one comment each.
 
 #### P7.2: The facade
 
@@ -1463,9 +1487,11 @@ js.close()
       touched. Also covers a chapter script that throws (the engine keeps working) and one that
       never returns (the budget stops it).
 
-**Done when:** the facade tests are green on every target, the engine module compiles with
-`explicitApi()`, the `!!` count is under a hundred and commented, and the coroutine artifact
-passes its tests on JVM, JS and iOS.
+**Done when:** the facade tests are green on every target, both modules compile with
+`explicitApi()`, every redundant null assertion the compiler can find is gone, and the coroutine
+artifact passes its tests on JVM, JS and iOS. The original wording asked for the `!!` count to be
+under a hundred; that target was dropped with the reasoning recorded above, because reaching it
+means reshaping the node model rather than fixing anything.
 
 ### P8: Widen and publish
 

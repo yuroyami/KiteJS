@@ -5,7 +5,7 @@
 package io.github.yuroyami.kitejs
 
 /** A JavaScript function: an object that can also be called and constructed. */
-interface Function : Scriptable, Callable, Constructable {
+public interface Function : Scriptable, Callable, Constructable {
 
     override fun call(
         cx: Context,
@@ -17,6 +17,6 @@ interface Function : Scriptable, Callable, Constructable {
     override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable
 
     /** The scope this function was declared in. */
-    val declarationScope: Scriptable?
+    public val declarationScope: Scriptable?
         get() = this.parentScope
 }

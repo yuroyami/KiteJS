@@ -9,7 +9,7 @@ package io.github.yuroyami.kitejs
  * keys, and there is no way to ask it what it holds, which is what makes the weakness unobservable
  * from script.
  */
-class NativeWeakMap : ScriptableObject() {
+public class NativeWeakMap : ScriptableObject() {
 
     private var instanceOfWeakMap = false
 
@@ -43,7 +43,7 @@ class NativeWeakMap : ScriptableObject() {
         return this
     }
 
-    companion object {
+    public companion object {
         private const val CLASS_NAME = "WeakMap"
 
         /** Stands in for a stored null, which the map itself cannot hold. */

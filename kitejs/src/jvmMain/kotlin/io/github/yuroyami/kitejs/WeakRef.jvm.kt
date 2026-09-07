@@ -20,15 +20,15 @@
 package io.github.yuroyami.kitejs
 
 // The jvmMain and androidMain copies are identical; there is no source set shared by the two.
-actual class WeakRef<T : Any> actual constructor(referred: T) {
+public actual class WeakRef<T : Any> actual constructor(referred: T) {
 
     private val ref = java.lang.ref.WeakReference(referred)
 
-    actual fun get(): T? = ref.get()
+    public actual fun get(): T? = ref.get()
 
-    actual fun clear(): Unit = ref.clear()
+    public actual fun clear(): Unit = ref.clear()
 
-    actual companion object {
-        actual val isWeakSupported: Boolean = true
+    public actual companion object {
+        public actual val isWeakSupported: Boolean = true
     }
 }

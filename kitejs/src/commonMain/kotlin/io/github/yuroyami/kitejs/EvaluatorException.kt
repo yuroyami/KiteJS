@@ -8,14 +8,14 @@ package io.github.yuroyami.kitejs
  * The class of exceptions thrown by the JavaScript engine for translation or
  * evaluation problems.
  */
-open class EvaluatorException : RhinoException {
+public open class EvaluatorException : RhinoException {
 
-    constructor(detail: String) : super(detail)
+    public constructor(detail: String) : super(detail)
 
-    constructor(detail: String, sourceName: String?, lineNumber: Int) :
+    public constructor(detail: String, sourceName: String?, lineNumber: Int) :
         this(detail, sourceName, lineNumber, null, 0)
 
-    constructor(
+    public constructor(
         detail: String,
         sourceName: String?,
         lineNumber: Int,

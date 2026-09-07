@@ -7,14 +7,14 @@ package io.github.yuroyami.kitejs.ast
 import io.github.yuroyami.kitejs.Token
 
 /** A spread element `...expr`. Node type is [Token.DOTDOTDOT]. */
-class Spread(pos: Int, len: Int) : AstNode(pos, len) {
+public class Spread(pos: Int, len: Int) : AstNode(pos, len) {
 
     init {
         typeField = Token.DOTDOTDOT
     }
 
     /** The spread expression. Setting it reparents the expression. */
-    var expression: AstNode? = null
+    public var expression: AstNode? = null
         set(value) {
             val newExpression = value!!
             field = newExpression

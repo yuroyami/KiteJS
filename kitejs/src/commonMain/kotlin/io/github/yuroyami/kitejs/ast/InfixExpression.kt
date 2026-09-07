@@ -10,10 +10,10 @@ import io.github.yuroyami.kitejs.Token
  * A binary expression: `left op right`. The node type is the operator token, so a plus
  * expression has type [Token.ADD].
  */
-open class InfixExpression(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
+public open class InfixExpression(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     /** The left operand. Setting it copies the operand's line and column and reparents it. */
-    var left: AstNode? = null
+    public var left: AstNode? = null
         set(value) {
             val newLeft = value!!
             field = newLeft
@@ -23,7 +23,7 @@ open class InfixExpression(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         }
 
     /** The right operand. Setting it reparents the operand. */
-    var right: AstNode? = null
+    public var right: AstNode? = null
         set(value) {
             val newRight = value!!
             field = newRight
@@ -31,18 +31,18 @@ open class InfixExpression(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         }
 
     /** Operator position, relative to this node. -1 if unknown. */
-    var operatorPosition: Int = -1
+    public var operatorPosition: Int = -1
 
-    constructor(pos: Int, len: Int, left: AstNode, right: AstNode) : this(pos, len) {
+    public constructor(pos: Int, len: Int, left: AstNode, right: AstNode) : this(pos, len) {
         this.left = left
         this.right = right
     }
 
-    constructor(left: AstNode, right: AstNode) : this() {
+    public constructor(left: AstNode, right: AstNode) : this() {
         setLeftAndRight(left, right)
     }
 
-    constructor(
+    public constructor(
         operator: Int,
         left: AstNode,
         right: AstNode,
@@ -53,7 +53,7 @@ open class InfixExpression(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         setLeftAndRight(left, right)
     }
 
-    fun setLeftAndRight(left: AstNode, right: AstNode) {
+    public fun setLeftAndRight(left: AstNode, right: AstNode) {
         // Compute our bounds while the children still have absolute positions.
         val beg = left.position
         val end = right.position + right.length
@@ -65,7 +65,7 @@ open class InfixExpression(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
     }
 
     /** The operator token. Setting it rejects tokens that are not real token codes. */
-    var operator: Int
+    public var operator: Int
         get() = type
         set(value) {
             if (!Token.isValidToken(value)) {

@@ -8,7 +8,7 @@ package io.github.yuroyami.kitejs
  * A [SlotMap] built on a hash table that holds the slots directly rather than wrapping each one in
  * another object. That saves an allocation per property, which measurably pays off.
  */
-open class EmbeddedSlotMap : SlotMap {
+public open class EmbeddedSlotMap : SlotMap {
 
     private var slots: Array<Slot?>? = null
 
@@ -19,9 +19,9 @@ open class EmbeddedSlotMap : SlotMap {
     private var count: Int = 0
     private var hasIndex: Boolean = false
 
-    constructor()
+    public constructor()
 
-    constructor(capacity: Int) {
+    public constructor(capacity: Int) {
         var n = -1 ushr (capacity - 1).countLeadingZeroBits()
         n = if (n < 0) 1 else n + 1
         slots = arrayOfNulls(n)
@@ -207,7 +207,7 @@ open class EmbeddedSlotMap : SlotMap {
         if (slot === lastAdded) lastAdded = prev
     }
 
-    companion object {
+    public companion object {
         /** The starting table size. Has to be a power of two. */
         private const val INITIAL_SLOT_SIZE = 4
 

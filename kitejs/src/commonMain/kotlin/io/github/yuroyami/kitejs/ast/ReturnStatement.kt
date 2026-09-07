@@ -10,18 +10,18 @@ import io.github.yuroyami.kitejs.Token
  * A return statement. Node type is [Token.RETURN]. The [returnValue] is null for a bare
  * `return;`.
  */
-class ReturnStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
+public class ReturnStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     init {
         typeField = Token.RETURN
     }
 
-    constructor(pos: Int, len: Int, returnValue: AstNode?) : this(pos, len) {
+    public constructor(pos: Int, len: Int, returnValue: AstNode?) : this(pos, len) {
         this.returnValue = returnValue
     }
 
     /** The returned expression, or null. Setting it reparents the expression. */
-    var returnValue: AstNode? = null
+    public var returnValue: AstNode? = null
         set(value) {
             field = value
             value?.parent = this

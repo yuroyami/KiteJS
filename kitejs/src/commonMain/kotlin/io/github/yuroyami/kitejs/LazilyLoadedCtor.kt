@@ -11,7 +11,7 @@ package io.github.yuroyami.kitejs
  * Upstream also has a constructor that finds an `init` method by reflection. There is no reflection
  * here, so only the lambda form exists.
  */
-class LazilyLoadedCtor(
+public class LazilyLoadedCtor(
     scope: ScriptableObject,
     private val propertyName: String,
     private val sealed: Boolean,

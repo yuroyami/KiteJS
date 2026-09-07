@@ -8,7 +8,7 @@ package io.github.yuroyami.kitejs.ast
  * One `for` clause inside an [ArrayComprehension] or a generator expression. It carries no
  * body: the comprehension result plays that role.
  */
-class ArrayComprehensionLoop(pos: Int = -1, len: Int = 1) : ForInLoop(pos, len) {
+public class ArrayComprehensionLoop(pos: Int = -1, len: Int = 1) : ForInLoop(pos, len) {
 
     override var body: AstNode?
         get() = null

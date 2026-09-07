@@ -10,17 +10,17 @@ import kotlin.time.TimeSource
  * The `console` object: `log`, `warn`, `error` and friends, plus the counters and timers. Where
  * the output goes is the embedder's choice, through a [ConsolePrinter].
  */
-class NativeConsole private constructor(private val printer: ConsolePrinter) : ScriptableObject() {
+public class NativeConsole private constructor(private val printer: ConsolePrinter) : ScriptableObject() {
 
     private val timers = HashMap<String, TimeSource.Monotonic.ValueTimeMark>()
     private val counters = HashMap<String, Int>()
 
     /** How loud a message is. */
-    enum class Level { TRACE, DEBUG, INFO, WARN, ERROR }
+    public enum class Level { TRACE, DEBUG, INFO, WARN, ERROR }
 
     /** Where console output goes. [stack] is filled in only for `console.trace`. */
-    fun interface ConsolePrinter {
-        fun print(cx: Context, scope: Scriptable, level: Level, args: Array<Any?>, stack: Array<ScriptStackElement>?)
+    public fun interface ConsolePrinter {
+        public fun print(cx: Context, scope: Scriptable, level: Level, args: Array<Any?>, stack: Array<ScriptStackElement>?)
     }
 
     override val className: String get() = CLASS_NAME
@@ -107,7 +107,7 @@ class NativeConsole private constructor(private val printer: ConsolePrinter) : S
     private fun elapsedMillis(start: TimeSource.Monotonic.ValueTimeMark): Double =
         start.elapsedNow().inWholeNanoseconds / 1_000_000.0
 
-    companion object {
+    public companion object {
         private const val CLASS_NAME = "Console"
         private const val DEFAULT_LABEL = "default"
 
@@ -115,7 +115,7 @@ class NativeConsole private constructor(private val printer: ConsolePrinter) : S
         private val FORMAT_SPECIFIER = Regex("%[sfdioOc%]")
 
         /** Builds a `console` and puts it into [scope]. */
-        fun init(scope: Scriptable, sealed: Boolean, printer: ConsolePrinter) {
+        public fun init(scope: Scriptable, sealed: Boolean, printer: ConsolePrinter) {
             val obj = NativeConsole(printer)
             obj.prototype = getObjectPrototype(scope)
             obj.parentScope = scope
@@ -161,7 +161,7 @@ class NativeConsole private constructor(private val printer: ConsolePrinter) : S
          * may carry `%s`, `%d`, `%i`, `%f`, `%o`, `%O`, `%c` and `%%`, and anything left over is
          * appended separated by spaces.
          */
-        fun format(cx: Context, scope: Scriptable, args: Array<Any?>): String {
+        public fun format(cx: Context, scope: Scriptable, args: Array<Any?>): String {
             if (args.isEmpty()) return ""
             val buffer = StringBuilder()
             var argIndex = 0

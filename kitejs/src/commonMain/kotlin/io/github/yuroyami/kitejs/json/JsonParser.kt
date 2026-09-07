@@ -9,13 +9,13 @@ import io.github.yuroyami.kitejs.ScriptRuntime
 import io.github.yuroyami.kitejs.Scriptable
 
 /** The strict JSON reader behind `JSON.parse`. Builds script objects and arrays as it goes. */
-class JsonParser(private val cx: Context, private val scope: Scriptable) {
+public class JsonParser(private val cx: Context, private val scope: Scriptable) {
 
     private var pos = 0
     private var length = 0
     private var src = ""
 
-    fun parseValue(json: String?): Any? {
+    public fun parseValue(json: String?): Any? {
         if (json == null) throw ParseException("Input string may not be null")
         pos = 0
         length = json.length
@@ -280,5 +280,6 @@ class JsonParser(private val cx: Context, private val scope: Scriptable) {
         throw ParseException("Expected $token found $c")
     }
 
-    class ParseException(message: String) : Exception(message)
+    /** The JSON text did not parse. */
+    public class ParseException(message: String) : Exception(message)
 }

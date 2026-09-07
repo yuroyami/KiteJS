@@ -8,12 +8,12 @@ package io.github.yuroyami.kitejs.ast
  * Simple visitor for traversing the AST. Nodes are visited in an arbitrary order; the
  * visitor casts nodes to the right type based on their token type.
  */
-fun interface NodeVisitor {
+public fun interface NodeVisitor {
 
     /**
      * Visits an AST node. Never receives an [AstRoot], since that is where visiting begins.
      *
      * @return true to visit the children, false to skip the subtree rooted at [node].
      */
-    fun visit(node: AstNode): Boolean
+    public fun visit(node: AstNode): Boolean
 }

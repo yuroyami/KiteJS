@@ -7,7 +7,7 @@ package io.github.yuroyami.kitejs.ast
 import io.github.yuroyami.kitejs.Token
 
 /** An empty statement, a lone semicolon. Node type is [Token.EMPTY]. */
-class EmptyStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
+public class EmptyStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     init {
         typeField = Token.EMPTY

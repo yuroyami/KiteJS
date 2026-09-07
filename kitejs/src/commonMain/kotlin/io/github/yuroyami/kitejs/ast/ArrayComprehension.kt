@@ -10,10 +10,10 @@ import io.github.yuroyami.kitejs.Token
  * An array comprehension such as `[expr for (x in y) if (cond)]`. Node type is
  * [Token.ARRAYCOMP]. It introduces a scope, so it extends [Scope].
  */
-class ArrayComprehension(pos: Int = -1, len: Int = 1) : Scope(pos, len) {
+public class ArrayComprehension(pos: Int = -1, len: Int = 1) : Scope(pos, len) {
 
     /** The result expression. Setting it reparents the node. */
-    var result: AstNode? = null
+    public var result: AstNode? = null
         set(value) {
             val newResult = value!!
             field = newResult
@@ -23,36 +23,36 @@ class ArrayComprehension(pos: Int = -1, len: Int = 1) : Scope(pos, len) {
     private val loopList: MutableList<ArrayComprehensionLoop> = mutableListOf()
 
     /** The filter expression, or null when there is no `if` clause. */
-    var filter: AstNode? = null
+    public var filter: AstNode? = null
         set(value) {
             field = value
             value?.parent = this
         }
 
     /** Position of the `if` keyword, relative to this node. -1 if there is no filter. */
-    var ifPosition: Int = -1
+    public var ifPosition: Int = -1
 
     /** Position of the left paren of the filter condition. -1 if there is no filter. */
-    var filterLp: Int = -1
+    public var filterLp: Int = -1
 
     /** Position of the right paren of the filter condition. -1 if there is no filter. */
-    var filterRp: Int = -1
+    public var filterRp: Int = -1
 
     init {
         typeField = Token.ARRAYCOMP
     }
 
-    val loops: List<ArrayComprehensionLoop>
+    public val loops: List<ArrayComprehensionLoop>
         get() = loopList
 
-    fun setLoops(loops: List<ArrayComprehensionLoop>) {
+    public fun setLoops(loops: List<ArrayComprehensionLoop>) {
         loopList.clear()
         for (acl in loops) {
             addLoop(acl)
         }
     }
 
-    fun addLoop(acl: ArrayComprehensionLoop) {
+    public fun addLoop(acl: ArrayComprehensionLoop) {
         loopList.add(acl)
         acl.parent = this
     }

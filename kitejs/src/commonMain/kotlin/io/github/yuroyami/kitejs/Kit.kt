@@ -10,13 +10,13 @@ package io.github.yuroyami.kitejs
  * Ported subset: the class-loading, listener-bag and IO helpers are JVM-only concerns
  * and are not part of the port.
  */
-object Kit {
+public object Kit {
 
     /**
      * If character [c] is a hexadecimal digit, return [accumulator] * 16 plus the
      * corresponding number. Otherwise return -1.
      */
-    fun xDigitToInt(c: Int, accumulator: Int): Int {
+    public fun xDigitToInt(c: Int, accumulator: Int): Int {
         var v = c
         when {
             v <= '9'.code -> {
@@ -41,13 +41,13 @@ object Kit {
      * return type is RuntimeException only to be able to write `throw Kit.codeBug()` if plain
      * `Kit.codeBug()` triggers unreachable code error.
      */
-    fun codeBug(): RuntimeException {
+    public fun codeBug(): RuntimeException {
         val ex = IllegalStateException("FAILED ASSERTION")
         ex.printStackTrace()
         throw ex
     }
 
-    fun codeBug(msg: String): RuntimeException {
+    public fun codeBug(msg: String): RuntimeException {
         val ex = IllegalStateException("FAILED ASSERTION: $msg")
         ex.printStackTrace()
         throw ex
@@ -57,7 +57,7 @@ object Kit {
      * Puts [initialValue] under [key] unless something is already there, and returns whichever
      * value ended up in the map.
      */
-    fun initHash(h: MutableMap<Any, Any>, key: Any, initialValue: Any): Any {
+    public fun initHash(h: MutableMap<Any, Any>, key: Any, initialValue: Any): Any {
         val current = h[key]
         if (current == null) {
             h[key] = initialValue

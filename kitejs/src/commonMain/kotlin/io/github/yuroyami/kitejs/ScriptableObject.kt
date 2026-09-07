@@ -14,7 +14,7 @@ import kotlin.reflect.KClass
  * `Method`-based `defineProperty` overloads) that binds Java classes into script. That is
  * LiveConnect and this port does not have it, so those members are gone.
  */
-abstract class ScriptableObject :
+public abstract class ScriptableObject :
     SlotMapOwner, Scriptable, SymbolScriptable, ConstProperties {
 
     private var prototypeObject: Scriptable? = null
@@ -32,18 +32,18 @@ abstract class ScriptableObject :
      */
     protected var isExtensibleField: Boolean = true
 
-    var isSealed: Boolean = false
+    public var isSealed: Boolean = false
         private set
 
-    constructor() : super(0)
+    public constructor() : super(0)
 
-    constructor(scope: Scriptable, prototype: Scriptable?) : super(0) {
+    public constructor(scope: Scriptable, prototype: Scriptable?) : super(0) {
         parentScopeObject = scope
         prototypeObject = prototype
     }
 
     /** What `typeof` says about this object. */
-    open val typeOf: String
+    public open val typeOf: String
         get() = if (avoidObjectDetection()) "undefined" else "object"
 
     abstract override val className: String
@@ -172,30 +172,30 @@ abstract class ScriptableObject :
 
     // ---- Attributes ---------------------------------------------------------------------------
 
-    open fun getAttributes(name: String): Int = getAttributeSlot(name, 0).attributes
+    public open fun getAttributes(name: String): Int = getAttributeSlot(name, 0).attributes
 
-    open fun getAttributes(index: Int): Int = getAttributeSlot(null, index).attributes
+    public open fun getAttributes(index: Int): Int = getAttributeSlot(null, index).attributes
 
-    open fun getAttributes(sym: Symbol): Int = getAttributeSlot(sym).attributes
+    public open fun getAttributes(sym: Symbol): Int = getAttributeSlot(sym).attributes
 
-    open fun setAttributes(name: String, attributes: Int) {
+    public open fun setAttributes(name: String, attributes: Int) {
         checkNotSealed(name, 0)
         map.modify(this, name, 0, 0).attributes = attributes
     }
 
-    fun setAttributes(index: Int, attributes: Int) {
+    public fun setAttributes(index: Int, attributes: Int) {
         checkNotSealed(null, index)
         map.modify(this, null, index, 0).attributes = attributes
     }
 
-    fun setAttributes(key: Symbol, attributes: Int) {
+    public fun setAttributes(key: Symbol, attributes: Int) {
         checkNotSealed(key, 0)
         map.modify(this, key, 0, 0).attributes = attributes
     }
 
     // ---- Getters and setters ------------------------------------------------------------------
 
-    fun setGetterOrSetter(name: Any?, index: Int, getterOrSetter: Callable?, isSetter: Boolean) {
+    public fun setGetterOrSetter(name: Any?, index: Int, getterOrSetter: Callable?, isSetter: Boolean) {
         require(!(name != null && index != 0)) { name.toString() }
         checkNotSealed(name, index)
 
@@ -220,7 +220,7 @@ abstract class ScriptableObject :
         aSlot.value = Undefined.instance
     }
 
-    fun getGetterOrSetter(name: String?, index: Int, scope: Scriptable, isSetter: Boolean): Any? {
+    public fun getGetterOrSetter(name: String?, index: Int, scope: Scriptable, isSetter: Boolean): Any? {
         require(!(name != null && index != 0)) { name.toString() }
         val slot = map.query(name, index) ?: return null
         val getterOrSetter =
@@ -276,7 +276,7 @@ abstract class ScriptableObject :
      * no reflection here, so the same property is defined with a lambda getter (D-23). Both give a
      * read-only, non-enumerable `length` whose descriptor is an accessor.
      */
-    fun setExternalArrayData(array: ExternalArrayData?) {
+    public fun setExternalArrayData(array: ExternalArrayData?) {
         externalData = array
         if (array == null) {
             delete("length")
@@ -291,9 +291,9 @@ abstract class ScriptableObject :
         }
     }
 
-    val externalArrayData: ExternalArrayData? get() = externalData
+    public val externalArrayData: ExternalArrayData? get() = externalData
 
-    val externalArrayLength: Any get() = externalData?.arrayLength ?: 0
+    public val externalArrayLength: Any get() = externalData?.arrayLength ?: 0
 
     // ---- Prototype and scope ------------------------------------------------------------------
 
@@ -312,7 +312,7 @@ abstract class ScriptableObject :
     override fun getIds(): Array<Any?> = startCompoundOp(false).use { getIds(it, false, false) }
 
     /** Every property, enumerable or not. */
-    open val allIds: Array<Any?> get() = startCompoundOp(false).use { getIds(it, true, false) }
+    public open val allIds: Array<Any?> get() = startCompoundOp(false).use { getIds(it, true, false) }
 
     override fun getDefaultValue(hint: KClass<*>?): Any? = getDefaultValue(this, hint)
 
@@ -331,7 +331,7 @@ abstract class ScriptableObject :
     }
 
     /** True for an object that has to pretend it is `undefined`, which only `NativeWith` does. */
-    open fun avoidObjectDetection(): Boolean = false
+    public open fun avoidObjectDetection(): Boolean = false
 
     protected open fun equivalentValues(value: Any?): Any? =
         if (this === value) true else Scriptable.NOT_FOUND
@@ -340,20 +340,20 @@ abstract class ScriptableObject :
 
     // ---- Defining properties ------------------------------------------------------------------
 
-    fun defineProperty(propertyName: String, value: Any?, attributes: Int) {
+    public fun defineProperty(propertyName: String, value: Any?, attributes: Int) {
         checkNotSealed(propertyName, 0)
         put(propertyName, this, value)
         setAttributes(propertyName, attributes)
     }
 
-    fun defineProperty(key: Symbol, value: Any?, attributes: Int) {
+    public fun defineProperty(key: Symbol, value: Any?, attributes: Int) {
         checkNotSealed(key, 0)
         put(key, this, value)
         setAttributes(key, attributes)
     }
 
     /** Defines a method backed by a Kotlin lambda. */
-    fun defineProperty(
+    public fun defineProperty(
         scope: Scriptable,
         name: String,
         length: Int,
@@ -367,7 +367,7 @@ abstract class ScriptableObject :
     }
 
     /** Same as above for a built-in method, which does not get a `prototype` property. */
-    fun defineBuiltinProperty(
+    public fun defineBuiltinProperty(
         scope: Scriptable,
         name: String,
         length: Int,
@@ -381,7 +381,7 @@ abstract class ScriptableObject :
     }
 
     /** Defines a property whose value comes from a lambda that needs nothing but itself. */
-    fun defineProperty(name: String, getter: (() -> Any?)?, setter: ((Any?) -> Unit)?, attributes: Int) {
+    public fun defineProperty(name: String, getter: (() -> Any?)?, setter: ((Any?) -> Unit)?, attributes: Int) {
         val slot = map.compute(this, name, 0, ::ensureLambdaSlot)!!
         slot.attributes = attributes
         slot.getter = getter
@@ -389,16 +389,16 @@ abstract class ScriptableObject :
     }
 
     /** A getter that gets handed the object it is reading from. */
-    fun interface LambdaGetterFunction {
-        fun apply(scope: Scriptable?): Any?
+    public fun interface LambdaGetterFunction {
+        public fun apply(scope: Scriptable?): Any?
     }
 
     /** A setter that gets handed the object it is writing to. */
-    fun interface LambdaSetterFunction {
-        fun accept(scope: Scriptable?, value: Any?)
+    public fun interface LambdaSetterFunction {
+        public fun accept(scope: Scriptable?, value: Any?)
     }
 
-    fun defineProperty(
+    public fun defineProperty(
         cx: Context,
         name: String,
         getter: LambdaGetterFunction?,
@@ -411,11 +411,11 @@ abstract class ScriptableObject :
         replaceLambdaAccessorSlot(cx, name, createLambdaAccessorSlot(name, 0, getter, setter, attributes))
     }
 
-    fun defineProperty(cx: Context, name: String, getter: LambdaGetterFunction, attributes: Int) {
+    public fun defineProperty(cx: Context, name: String, getter: LambdaGetterFunction, attributes: Int) {
         defineProperty(cx, name, getter, null, attributes)
     }
 
-    fun defineProperty(
+    public fun defineProperty(
         cx: Context,
         key: Symbol,
         getter: LambdaGetterFunction?,
@@ -472,7 +472,7 @@ abstract class ScriptableObject :
 
     // ---- Property descriptors -----------------------------------------------------------------
 
-    fun defineOwnProperties(cx: Context, props: ScriptableObject) {
+    public fun defineOwnProperties(cx: Context, props: ScriptableObject) {
         val ids = props.startCompoundOp(false).use { props.getIds(it, false, true) }
         val descs = arrayOfNulls<DescriptorInfo>(ids.size)
         for (i in ids.indices) {
@@ -484,12 +484,12 @@ abstract class ScriptableObject :
         for (i in ids.indices) defineOwnProperty(cx, ids[i], descs[i]!!)
     }
 
-    fun defineOwnProperty(cx: Context, id: Any?, desc: ScriptableObject): Boolean {
+    public fun defineOwnProperty(cx: Context, id: Any?, desc: ScriptableObject): Boolean {
         checkPropertyDefinition(desc)
         return defineOwnProperty(cx, id, DescriptorInfo(desc), true)
     }
 
-    open fun defineOwnProperty(cx: Context, id: Any?, desc: DescriptorInfo): Boolean =
+    public open fun defineOwnProperty(cx: Context, id: Any?, desc: DescriptorInfo): Boolean =
         defineOwnProperty(cx, id, desc, true)
 
     internal open fun defineOwnProperty(
@@ -525,19 +525,19 @@ abstract class ScriptableObject :
      * A property descriptor in the form the engine works with, rather than as a script object.
      * Every field holds [Scriptable.NOT_FOUND] when the descriptor does not mention it.
      */
-    class DescriptorInfo {
+    public class DescriptorInfo {
 
-        var enumerable: Any? = Scriptable.NOT_FOUND
-        var writable: Any? = Scriptable.NOT_FOUND
-        var configurable: Any? = Scriptable.NOT_FOUND
-        var getter: Any? = Scriptable.NOT_FOUND
-        var setter: Any? = Scriptable.NOT_FOUND
-        var value: Any? = Scriptable.NOT_FOUND
+        public var enumerable: Any? = Scriptable.NOT_FOUND
+        public var writable: Any? = Scriptable.NOT_FOUND
+        public var configurable: Any? = Scriptable.NOT_FOUND
+        public var getter: Any? = Scriptable.NOT_FOUND
+        public var setter: Any? = Scriptable.NOT_FOUND
+        public var value: Any? = Scriptable.NOT_FOUND
 
         internal var accessorDescriptor: Boolean = false
 
         /** Reads a descriptor out of a script object. */
-        constructor(desc: ScriptableObject) {
+        public constructor(desc: ScriptableObject) {
             enumerable = getProperty(desc, "enumerable")
             writable = getProperty(desc, "writable")
             configurable = getProperty(desc, "configurable")
@@ -547,14 +547,14 @@ abstract class ScriptableObject :
             accessorDescriptor = getter !== Scriptable.NOT_FOUND || setter !== Scriptable.NOT_FOUND
         }
 
-        constructor(enumerable: Boolean, writable: Boolean, configurable: Boolean, value: Any?) {
+        public constructor(enumerable: Boolean, writable: Boolean, configurable: Boolean, value: Any?) {
             this.enumerable = enumerable
             this.writable = writable
             this.configurable = configurable
             this.value = value
         }
 
-        constructor(
+        public constructor(
             enumerable: Any?,
             writable: Any?,
             configurable: Any?,
@@ -578,35 +578,35 @@ abstract class ScriptableObject :
             configurable = (attributes and PERMANENT) == 0
         }
 
-        val isWritable: Boolean get() = writable == true
+        public val isWritable: Boolean get() = writable == true
 
-        fun isWritable(value: Boolean): Boolean = writable == value
+        public fun isWritable(value: Boolean): Boolean = writable == value
 
-        fun hasWritable(): Boolean = writable !== Scriptable.NOT_FOUND
+        public fun hasWritable(): Boolean = writable !== Scriptable.NOT_FOUND
 
-        val isEnumerable: Boolean get() = enumerable == true
+        public val isEnumerable: Boolean get() = enumerable == true
 
-        fun isEnumerable(value: Boolean): Boolean = enumerable == value
+        public fun isEnumerable(value: Boolean): Boolean = enumerable == value
 
-        fun hasEnumerable(): Boolean = enumerable !== Scriptable.NOT_FOUND
+        public fun hasEnumerable(): Boolean = enumerable !== Scriptable.NOT_FOUND
 
-        val isConfigurable: Boolean get() = configurable == true
+        public val isConfigurable: Boolean get() = configurable == true
 
-        fun isConfigurable(value: Boolean): Boolean = configurable == value
+        public fun isConfigurable(value: Boolean): Boolean = configurable == value
 
-        fun hasConfigurable(): Boolean = configurable !== Scriptable.NOT_FOUND
+        public fun hasConfigurable(): Boolean = configurable !== Scriptable.NOT_FOUND
 
-        fun hasValue(): Boolean = value !== Scriptable.NOT_FOUND
+        public fun hasValue(): Boolean = value !== Scriptable.NOT_FOUND
 
-        fun hasGetter(): Boolean = getter !== Scriptable.NOT_FOUND
+        public fun hasGetter(): Boolean = getter !== Scriptable.NOT_FOUND
 
-        fun hasSetter(): Boolean = setter !== Scriptable.NOT_FOUND
+        public fun hasSetter(): Boolean = setter !== Scriptable.NOT_FOUND
 
-        val isDataDescriptor: Boolean get() = hasValue() || hasWritable()
+        public val isDataDescriptor: Boolean get() = hasValue() || hasWritable()
 
-        val isAccessorDescriptor: Boolean get() = hasGetter() || hasSetter()
+        public val isAccessorDescriptor: Boolean get() = hasGetter() || hasSetter()
 
-        val isGenericDescriptor: Boolean get() = !isDataDescriptor && !isAccessorDescriptor
+        public val isGenericDescriptor: Boolean get() = !isDataDescriptor && !isAccessorDescriptor
 
         /** Renders this descriptor as the script object `Object.getOwnPropertyDescriptor` returns. */
         internal fun toObject(scope: Scriptable): Scriptable {
@@ -696,10 +696,10 @@ abstract class ScriptableObject :
 
     // ---- Extensibility and sealing -------------------------------------------------------------
 
-    open val isExtensible: Boolean
+    public open val isExtensible: Boolean
         get() = isExtensibleField
 
-    open fun preventExtensions(): Boolean {
+    public open fun preventExtensions(): Boolean {
         isExtensibleField = false
         return true
     }
@@ -710,7 +710,7 @@ abstract class ScriptableObject :
      * Anything still waiting to be lazily built is built first, outside the map iteration, because
      * building one can add more properties to this same object.
      */
-    fun sealObject() {
+    public fun sealObject() {
         val toInitialize = mutableListOf<Slot>()
         while (!isSealed) {
             for (slot in toInitialize) {
@@ -743,10 +743,10 @@ abstract class ScriptableObject :
     // ---- Associated values ---------------------------------------------------------------------
 
     /** A value another part of the engine parked on this object under [key]. */
-    fun getAssociatedValue(key: Any): Any? = associatedValues?.get(key)
+    public fun getAssociatedValue(key: Any): Any? = associatedValues?.get(key)
 
     /** Parks [value] under [key], or returns what is already there. */
-    fun associateValue(key: Any, value: Any): Any {
+    public fun associateValue(key: Any, value: Any): Any {
         val h = associatedValues ?: HashMap<Any, Any>().also { associatedValues = it }
         return Kit.initHash(h, key, value)
     }
@@ -860,11 +860,11 @@ abstract class ScriptableObject :
     // ---- Map-like helpers ----------------------------------------------------------------------
 
     /** Part of what `java.util.Map` needs. `NativeObject` finishes the job. */
-    open fun size(): Int = map.size()
+    public open fun size(): Int = map.size()
 
-    open fun isEmpty(): Boolean = map.isEmpty()
+    public open fun isEmpty(): Boolean = map.isEmpty()
 
-    operator fun get(key: Any?): Any? {
+    public operator fun get(key: Any?): Any? {
         val value = when (key) {
             is String -> get(key, this)
             is Symbol -> get(key, this)
@@ -887,24 +887,24 @@ abstract class ScriptableObject :
         return if (s.stringId == null) map.query(null, s.index) else map.query(s.stringId, 0)
     }
 
-    companion object {
+    public companion object {
 
         /** The property has no special attributes. */
-        const val EMPTY = 0x00
+        public const val EMPTY: Int = 0x00
 
         /** The property cannot be written to. */
-        const val READONLY = 0x01
+        public const val READONLY: Int = 0x01
 
         /** The property does not show up in a `for..in` loop. */
-        const val DONTENUM = 0x02
+        public const val DONTENUM: Int = 0x02
 
         /** The property cannot be deleted. */
-        const val PERMANENT = 0x04
+        public const val PERMANENT: Int = 0x04
 
         /** The const was declared but not yet given a value. */
-        const val UNINITIALIZED_CONST = 0x08
+        public const val UNINITIALIZED_CONST: Int = 0x08
 
-        const val CONST = PERMANENT or READONLY or UNINITIALIZED_CONST
+        public const val CONST: Int = PERMANENT or READONLY or UNINITIALIZED_CONST
 
         internal fun buildDataDescriptor(value: Any?, attributes: Int): DescriptorInfo =
             DescriptorInfo(value, attributes, true)
@@ -935,7 +935,7 @@ abstract class ScriptableObject :
             return null
         }
 
-        fun defineProperty(
+        public fun defineProperty(
             destination: Scriptable,
             propertyName: String,
             value: Any?,
@@ -948,7 +948,7 @@ abstract class ScriptableObject :
             destination.defineProperty(propertyName, value, attributes)
         }
 
-        fun defineConstProperty(destination: Scriptable, propertyName: String) {
+        public fun defineConstProperty(destination: Scriptable, propertyName: String) {
             if (destination is ConstProperties) {
                 destination.defineConst(propertyName, destination)
             } else {
@@ -1123,23 +1123,23 @@ abstract class ScriptableObject :
         internal fun isGenericDescriptor(desc: DescriptorInfo): Boolean =
             desc.isDataDescriptor && !desc.isAccessorDescriptor
 
-        fun ensureScriptable(arg: Any?): Scriptable =
+        public fun ensureScriptable(arg: Any?): Scriptable =
             arg as? Scriptable
                 ?: throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(arg))
 
-        fun ensureSymbolScriptable(arg: Any?): SymbolScriptable =
+        public fun ensureSymbolScriptable(arg: Any?): SymbolScriptable =
             arg as? SymbolScriptable
                 ?: throw ScriptRuntime.typeErrorById(
                     "msg.object.not.symbolscriptable",
                     ScriptRuntime.typeOf(arg),
                 )
 
-        fun ensureScriptableObject(arg: Any?): ScriptableObject =
+        public fun ensureScriptableObject(arg: Any?): ScriptableObject =
             // Upstream also unwraps a Delegator here. There is no Delegator in this port.
             arg as? ScriptableObject
                 ?: throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(arg))
 
-        fun ensureScriptableObjectButNotSymbol(arg: Any?): ScriptableObject {
+        public fun ensureScriptableObjectButNotSymbol(arg: Any?): ScriptableObject {
             if (arg is Symbol) {
                 throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(arg))
             }
@@ -1147,7 +1147,7 @@ abstract class ScriptableObject :
         }
 
         /** Checks that [obj] is a [T], and says which function complained if it is not. */
-        inline fun <reified T : Any> ensureType(obj: Any?, functionName: String): T {
+        public inline fun <reified T : Any> ensureType(obj: Any?, functionName: String): T {
             if (obj is T) return obj
             throw ScriptRuntime.typeErrorById(
                 "msg.incompat.call.details",
@@ -1159,22 +1159,22 @@ abstract class ScriptableObject :
 
         // ---- Well-known prototypes ---------------------------------------------------------
 
-        fun getObjectPrototype(scope: Scriptable): Scriptable? =
+        public fun getObjectPrototype(scope: Scriptable): Scriptable? =
             TopLevel.getBuiltinPrototype(getTopLevelScope(scope), TopLevel.Builtins.Object)
 
-        fun getFunctionPrototype(scope: Scriptable): Scriptable? =
+        public fun getFunctionPrototype(scope: Scriptable): Scriptable? =
             TopLevel.getBuiltinPrototype(getTopLevelScope(scope), TopLevel.Builtins.Function)
 
-        fun getGeneratorFunctionPrototype(scope: Scriptable): Scriptable? =
+        public fun getGeneratorFunctionPrototype(scope: Scriptable): Scriptable? =
             TopLevel.getBuiltinPrototype(
                 getTopLevelScope(scope),
                 TopLevel.Builtins.GeneratorFunction,
             )
 
-        fun getArrayPrototype(scope: Scriptable): Scriptable? =
+        public fun getArrayPrototype(scope: Scriptable): Scriptable? =
             TopLevel.getBuiltinPrototype(getTopLevelScope(scope), TopLevel.Builtins.Array)
 
-        fun getClassPrototype(scope: Scriptable, className: String): Scriptable? {
+        public fun getClassPrototype(scope: Scriptable, className: String): Scriptable? {
             val top = getTopLevelScope(scope)
             val proto = when (val ctor = getProperty(top, className)) {
                 is BaseFunction -> ctor.prototypeProperty
@@ -1185,7 +1185,7 @@ abstract class ScriptableObject :
         }
 
         /** Walks up the parent scopes to the global object. */
-        fun getTopLevelScope(obj: Scriptable): Scriptable {
+        public fun getTopLevelScope(obj: Scriptable): Scriptable {
             var o = obj
             while (true) {
                 o = o.parentScope ?: return o
@@ -1198,10 +1198,10 @@ abstract class ScriptableObject :
 
         // ---- Reading and writing through the prototype chain --------------------------------
 
-        fun getProperty(obj: Scriptable, name: String): Any? =
+        public fun getProperty(obj: Scriptable, name: String): Any? =
             getPropWalkingPrototypeChain(obj, name, obj)
 
-        fun getSuperProperty(superObj: Scriptable, thisObj: Scriptable, name: String): Any? =
+        public fun getSuperProperty(superObj: Scriptable, thisObj: Scriptable, name: String): Any? =
             getPropWalkingPrototypeChain(superObj, name, thisObj)
 
         private fun getPropWalkingPrototypeChain(
@@ -1219,10 +1219,10 @@ abstract class ScriptableObject :
             return result
         }
 
-        fun getProperty(obj: Scriptable, key: Symbol): Any? =
+        public fun getProperty(obj: Scriptable, key: Symbol): Any? =
             getPropWalkingPrototypeChain(obj, obj, key)
 
-        fun getSuperProperty(superObj: Scriptable, thisObj: Scriptable, key: Symbol): Any? =
+        public fun getSuperProperty(superObj: Scriptable, thisObj: Scriptable, key: Symbol): Any? =
             getPropWalkingPrototypeChain(superObj, thisObj, key)
 
         private fun getPropWalkingPrototypeChain(
@@ -1240,10 +1240,10 @@ abstract class ScriptableObject :
             return result
         }
 
-        fun getProperty(obj: Scriptable, index: Int): Any? =
+        public fun getProperty(obj: Scriptable, index: Int): Any? =
             getPropWalkingPrototypeChain(obj, index, obj)
 
-        fun getSuperProperty(superObj: Scriptable, thisObj: Scriptable, index: Int): Any? =
+        public fun getSuperProperty(superObj: Scriptable, thisObj: Scriptable, index: Int): Any? =
             getPropWalkingPrototypeChain(superObj, index, thisObj)
 
         private fun getPropWalkingPrototypeChain(
@@ -1261,13 +1261,13 @@ abstract class ScriptableObject :
             return result
         }
 
-        fun hasProperty(obj: Scriptable, name: String): Boolean = getBase(obj, name) != null
+        public fun hasProperty(obj: Scriptable, name: String): Boolean = getBase(obj, name) != null
 
-        fun hasProperty(obj: Scriptable, index: Int): Boolean = getBase(obj, index) != null
+        public fun hasProperty(obj: Scriptable, index: Int): Boolean = getBase(obj, index) != null
 
-        fun hasProperty(obj: Scriptable, key: Symbol): Boolean = getBase(obj, key) != null
+        public fun hasProperty(obj: Scriptable, key: Symbol): Boolean = getBase(obj, key) != null
 
-        fun redefineProperty(obj: Scriptable, name: String, isConst: Boolean) {
+        public fun redefineProperty(obj: Scriptable, name: String, isConst: Boolean) {
             val base = getBase(obj, name) ?: return
             if (base is ConstProperties && base.isConst(name)) {
                 throw ScriptRuntime.typeErrorById("msg.const.redecl", name)
@@ -1275,55 +1275,55 @@ abstract class ScriptableObject :
             if (isConst) throw ScriptRuntime.typeErrorById("msg.var.redecl", name)
         }
 
-        fun putProperty(obj: Scriptable, name: String, value: Any?) {
+        public fun putProperty(obj: Scriptable, name: String, value: Any?) {
             val base = getBase(obj, name) ?: obj
             base.put(name, obj, value)
         }
 
-        fun putSuperProperty(superObj: Scriptable, thisObj: Scriptable, name: String, value: Any?) {
+        public fun putSuperProperty(superObj: Scriptable, thisObj: Scriptable, name: String, value: Any?) {
             // Unlike putProperty, the search starts at superObj.
             val base = getBase(superObj, name) ?: superObj
             base.put(name, thisObj, value)
         }
 
-        fun putProperty(obj: Scriptable, key: Symbol, value: Any?) {
+        public fun putProperty(obj: Scriptable, key: Symbol, value: Any?) {
             val base = getBase(obj, key) ?: obj
             ensureSymbolScriptable(base).put(key, obj, value)
         }
 
-        fun putSuperProperty(superObj: Scriptable, thisObj: Scriptable, key: Symbol, value: Any?) {
+        public fun putSuperProperty(superObj: Scriptable, thisObj: Scriptable, key: Symbol, value: Any?) {
             val base = getBase(superObj, key) ?: superObj
             ensureSymbolScriptable(base).put(key, thisObj, value)
         }
 
-        fun putConstProperty(obj: Scriptable, name: String, value: Any?) {
+        public fun putConstProperty(obj: Scriptable, name: String, value: Any?) {
             val base = getBase(obj, name) ?: obj
             if (base is ConstProperties) base.putConst(name, obj, value)
         }
 
-        fun putProperty(obj: Scriptable, index: Int, value: Any?) {
+        public fun putProperty(obj: Scriptable, index: Int, value: Any?) {
             val base = getBase(obj, index) ?: obj
             base.put(index, obj, value)
         }
 
-        fun putSuperProperty(superObj: Scriptable, thisObj: Scriptable, index: Int, value: Any?) {
+        public fun putSuperProperty(superObj: Scriptable, thisObj: Scriptable, index: Int, value: Any?) {
             val base = getBase(superObj, index) ?: superObj
             base.put(index, thisObj, value)
         }
 
-        fun deleteProperty(obj: Scriptable, name: String): Boolean {
+        public fun deleteProperty(obj: Scriptable, name: String): Boolean {
             val base = getBase(obj, name) ?: return true
             base.delete(name)
             return !base.has(name, obj)
         }
 
-        fun deleteProperty(obj: Scriptable, index: Int): Boolean {
+        public fun deleteProperty(obj: Scriptable, index: Int): Boolean {
             val base = getBase(obj, index) ?: return true
             base.delete(index)
             return !base.has(index, obj)
         }
 
-        fun deleteProperty(obj: Scriptable, key: Symbol): Boolean {
+        public fun deleteProperty(obj: Scriptable, key: Symbol): Boolean {
             val base = getBase(obj, key) ?: return true
             val scriptable = ensureSymbolScriptable(base)
             scriptable.delete(key)
@@ -1331,7 +1331,7 @@ abstract class ScriptableObject :
         }
 
         /** Every property name on [obj] and everything in its prototype chain, without repeats. */
-        fun getPropertyIds(obj: Scriptable?): Array<Any?> {
+        public fun getPropertyIds(obj: Scriptable?): Array<Any?> {
             if (obj == null) return ScriptRuntime.emptyArgs
             var result = obj.getIds()
             var seen: LinkedHashSet<Any?>? = null
@@ -1355,7 +1355,7 @@ abstract class ScriptableObject :
             return seen?.toTypedArray() ?: result
         }
 
-        fun callMethod(cx: Context, obj: Scriptable, methodName: String, args: Array<Any?>): Any? {
+        public fun callMethod(cx: Context, obj: Scriptable, methodName: String, args: Array<Any?>): Any? {
             val funObj = getProperty(obj, methodName)
             if (funObj !is Function) throw ScriptRuntime.notFunctionError(obj, methodName)
             // The scope stored on the object is favoured over the function's own, which is more
@@ -1391,7 +1391,7 @@ abstract class ScriptableObject :
         }
 
         /** The value parked under [key] on the nearest scope in the chain that has one. */
-        fun getTopScopeValue(scope: Scriptable, key: Any): Any? {
+        public fun getTopScopeValue(scope: Scriptable, key: Any): Any? {
             var s: Scriptable? = getTopLevelScope(scope)
             while (s != null) {
                 if (s is ScriptableObject) {
@@ -1408,7 +1408,7 @@ abstract class ScriptableObject :
          * OrdinaryToPrimitive: tries `toString` and `valueOf` in the order the hint asks for, and
          * takes the first one that gives back a primitive.
          */
-        fun getDefaultValue(obj: Scriptable, typeHint: KClass<*>?): Any? {
+        public fun getDefaultValue(obj: Scriptable, typeHint: KClass<*>?): Any? {
             var cx: Context? = null
             for (i in 0..1) {
                 val tryToString =
@@ -1477,7 +1477,7 @@ abstract class ScriptableObject :
 
         // ---- Built-in properties -------------------------------------------------------------
 
-        fun <T : ScriptableObject> defineBuiltInProperty(
+        public fun <T : ScriptableObject> defineBuiltInProperty(
             owner: T,
             name: Any?,
             attributes: Int,
@@ -1486,7 +1486,7 @@ abstract class ScriptableObject :
             owner.map.add(owner, BuiltInSlot(name, 0, attributes, owner, getter))
         }
 
-        fun <T : ScriptableObject> defineBuiltInProperty(
+        public fun <T : ScriptableObject> defineBuiltInProperty(
             owner: T,
             name: String,
             attributes: Int,
@@ -1496,7 +1496,7 @@ abstract class ScriptableObject :
             owner.map.add(owner, BuiltInSlot(name, 0, attributes, owner, getter, setter))
         }
 
-        fun <T : ScriptableObject> defineBuiltInProperty(
+        public fun <T : ScriptableObject> defineBuiltInProperty(
             owner: T,
             name: Any?,
             attributes: Int,
@@ -1507,7 +1507,7 @@ abstract class ScriptableObject :
             owner.map.add(owner, BuiltInSlot(name, 0, attributes, owner, getter, setter, attrSetter))
         }
 
-        fun <T : ScriptableObject> defineBuiltInProperty(
+        public fun <T : ScriptableObject> defineBuiltInProperty(
             owner: T,
             name: String,
             attributes: Int,

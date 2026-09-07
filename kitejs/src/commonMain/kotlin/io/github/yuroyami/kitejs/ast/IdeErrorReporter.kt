@@ -11,7 +11,7 @@ import io.github.yuroyami.kitejs.ErrorReporter
  * implements this interface, these offset/length overloads are called instead of the
  * line-based [ErrorReporter] versions.
  */
-interface IdeErrorReporter : ErrorReporter {
+public interface IdeErrorReporter : ErrorReporter {
 
     /**
      * Report a warning.
@@ -21,7 +21,7 @@ interface IdeErrorReporter : ErrorReporter {
      * @param offset the warning's 0-indexed char position in the input stream
      * @param length the length of the region contributing to the warning
      */
-    fun warning(message: String, sourceName: String?, offset: Int, length: Int)
+    public fun warning(message: String, sourceName: String?, offset: Int, length: Int)
 
     /**
      * Report an error.
@@ -31,5 +31,5 @@ interface IdeErrorReporter : ErrorReporter {
      * @param offset 0-indexed char position of the error in the input stream
      * @param length the length of the region contributing to the error
      */
-    fun error(message: String, sourceName: String?, offset: Int, length: Int)
+    public fun error(message: String, sourceName: String?, offset: Int, length: Int)
 }

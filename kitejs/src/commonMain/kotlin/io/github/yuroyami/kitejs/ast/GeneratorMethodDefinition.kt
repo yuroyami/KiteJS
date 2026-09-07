@@ -9,10 +9,10 @@ import io.github.yuroyami.kitejs.Token
 /**
  * The `*name` part of a generator method in an object literal. Node type is [Token.MUL].
  */
-class GeneratorMethodDefinition(pos: Int, len: Int, methodName: AstNode) : AstNode(pos, len) {
+public class GeneratorMethodDefinition(pos: Int, len: Int, methodName: AstNode) : AstNode(pos, len) {
 
     /** The method name node. Setting it reparents the node. */
-    var methodName: AstNode? = null
+    public var methodName: AstNode? = null
         set(value) {
             val newName = value!!
             field = newName

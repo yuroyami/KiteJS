@@ -12,10 +12,10 @@ package io.github.yuroyami.kitejs.dtoa
  * (every double is a finite decimal) and rounds the digit string itself. Same results, same
  * shapes.
  */
-object DecimalFormatter {
+public object DecimalFormatter {
     private const val MAX_FIXED = 1E21
 
-    fun toExponential(v: Double, fractionDigits: Int): String {
+    public fun toExponential(v: Double, fractionDigits: Int): String {
         if (fractionDigits < 0) {
             return DoubleFormatter.toDecimal(v).toString(Decimal.Mode.TO_EXPONENTIAL)
         }
@@ -25,7 +25,7 @@ object DecimalFormatter {
         return toExponentialString(bd, exponent, fractionDigits, negative)
     }
 
-    fun toFixed(v: Double, fractionDigits: Int): String {
+    public fun toFixed(v: Double, fractionDigits: Int): String {
         val negative = v < 0
         val value = if (negative) -v else v
         if (value >= MAX_FIXED) {
@@ -38,7 +38,7 @@ object DecimalFormatter {
         return toFixedString(bd, fractionDigits, negative)
     }
 
-    fun toPrecision(v: Double, precision: Int): String {
+    public fun toPrecision(v: Double, precision: Int): String {
         val negative = v < 0
         val bd = Exact.of(if (negative) -v else v).roundToPrecision(precision)
         val scale = bd.scale

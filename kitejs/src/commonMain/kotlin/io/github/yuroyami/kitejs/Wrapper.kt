@@ -5,8 +5,8 @@
 package io.github.yuroyami.kitejs
 
 /** Wraps a value that came from outside the engine. */
-interface Wrapper {
+public interface Wrapper {
 
     /** The value this wrapper stands for. */
-    fun unwrap(): Any?
+    public fun unwrap(): Any?
 }

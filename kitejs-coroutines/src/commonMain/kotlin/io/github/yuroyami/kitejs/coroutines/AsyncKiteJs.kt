@@ -39,7 +39,7 @@ import kotlin.coroutines.coroutineContext
  * js.close()
  * ```
  */
-class AsyncKiteJs internal constructor(
+public class AsyncKiteJs internal constructor(
     private val dispatcher: CoroutineDispatcher,
     private val engine: KiteJs,
     private val state: EngineState,
@@ -48,7 +48,7 @@ class AsyncKiteJs internal constructor(
     private var closed = false
 
     /** Runs [block] on the engine's dispatcher with the engine in hand. */
-    suspend fun <T> onEngine(block: (KiteJs) -> T): T {
+    public suspend fun <T> onEngine(block: (KiteJs) -> T): T {
         check(!closed) { "this engine is closed" }
         val caller = coroutineContext[Job]
         return withContext(dispatcher) {
@@ -67,19 +67,19 @@ class AsyncKiteJs internal constructor(
     }
 
     /** Parses and runs [source] on the engine's dispatcher. */
-    suspend fun evaluate(source: String, fileName: String = "<eval>"): JsValue =
+    public suspend fun evaluate(source: String, fileName: String = "<eval>"): JsValue =
         onEngine { it.evaluate(source, fileName) }
 
     /** Parses [source] once, for running more than once. */
-    suspend fun compile(source: String, fileName: String = "<script>"): JsScript =
+    public suspend fun compile(source: String, fileName: String = "<script>"): JsScript =
         onEngine { it.compile(source, fileName) }
 
     /** Runs [source] and, if it answers a promise, waits for that promise to settle. */
-    suspend fun evaluateAwaiting(source: String, fileName: String = "<eval>"): JsValue =
+    public suspend fun evaluateAwaiting(source: String, fileName: String = "<eval>"): JsValue =
         await(evaluate(source, fileName))
 
     /** Waits for a JavaScript promise. A rejection comes back as the [JsError] it carries. */
-    suspend fun await(value: JsValue): JsValue {
+    public suspend fun await(value: JsValue): JsValue {
         val settled = CompletableDeferred<Result<JsValue>>()
         val registered = onEngine { js ->
             js.onSettled(value) { v, error ->
@@ -94,7 +94,7 @@ class AsyncKiteJs internal constructor(
     }
 
     /** Hands the script a promise that settles when [deferred] does. */
-    suspend fun <T> deferredToPromise(deferred: Deferred<T>, scope: CoroutineScope): JsObject {
+    public suspend fun <T> deferredToPromise(deferred: Deferred<T>, scope: CoroutineScope): JsObject {
         val handle = onEngine { it.newPromise() }
         scope.launch {
             val outcome = runCatching { deferred.await() }
@@ -113,7 +113,7 @@ class AsyncKiteJs internal constructor(
      * Binds a host function that suspends. The script sees a normal function returning a promise;
      * [body] runs on [scope] and settles it.
      */
-    suspend fun suspendFunction(
+    public suspend fun suspendFunction(
         target: JsObject,
         name: String,
         arity: Int = 0,
@@ -158,7 +158,7 @@ internal class EngineState {
  * budget to be set, so one is set for you when you do not name one.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-suspend fun asyncKiteJs(
+public suspend fun asyncKiteJs(
     dispatcher: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1),
     configure: KiteJsConfig.() -> Unit = {},
 ): AsyncKiteJs {

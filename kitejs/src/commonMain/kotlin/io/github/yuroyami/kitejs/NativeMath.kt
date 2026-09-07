@@ -30,12 +30,12 @@ import kotlin.math.tanh
 import kotlin.random.Random
 
 /** The JavaScript `Math` object. */
-class NativeMath private constructor() : ScriptableObject() {
+internal class NativeMath private constructor() : ScriptableObject() {
 
     override val className: String
         get() = "Math"
 
-    companion object {
+    public companion object {
         private const val MATH_TAG = "Math"
         private const val LOG2E = 1.4426950408889634
         private const val Double32 = 32.0

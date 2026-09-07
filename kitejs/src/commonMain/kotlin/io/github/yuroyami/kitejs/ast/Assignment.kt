@@ -8,19 +8,19 @@ package io.github.yuroyami.kitejs.ast
  * An assignment expression such as `a = b` or `a += b`. The node type is the assignment
  * operator token.
  */
-class Assignment : InfixExpression {
+public class Assignment : InfixExpression {
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(pos: Int) : super(pos)
+    public constructor(pos: Int) : super(pos)
 
-    constructor(pos: Int, len: Int) : super(pos, len)
+    public constructor(pos: Int, len: Int) : super(pos, len)
 
-    constructor(pos: Int, len: Int, left: AstNode, right: AstNode) : super(pos, len, left, right)
+    public constructor(pos: Int, len: Int, left: AstNode, right: AstNode) : super(pos, len, left, right)
 
-    constructor(left: AstNode, right: AstNode) : super(left, right)
+    public constructor(left: AstNode, right: AstNode) : super(left, right)
 
-    constructor(
+    public constructor(
         operator: Int,
         left: AstNode,
         right: AstNode,

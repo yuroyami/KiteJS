@@ -7,14 +7,14 @@ package io.github.yuroyami.kitejs.ast
 import io.github.yuroyami.kitejs.Token
 
 /** A `do ... while` loop. Node type is [Token.DO]. */
-class DoLoop(pos: Int = -1, len: Int = 1) : Loop(pos, len) {
+public class DoLoop(pos: Int = -1, len: Int = 1) : Loop(pos, len) {
 
     init {
         typeField = Token.DO
     }
 
     /** The loop condition. Setting it reparents the expression. */
-    var condition: AstNode? = null
+    public var condition: AstNode? = null
         set(value) {
             val newCondition = value!!
             field = newCondition
@@ -22,7 +22,7 @@ class DoLoop(pos: Int = -1, len: Int = 1) : Loop(pos, len) {
         }
 
     /** Position of the `while` keyword, relative to this node. */
-    var whilePosition: Int = -1
+    public var whilePosition: Int = -1
 
     override fun toSource(depth: Int): String {
         val sb = StringBuilder()

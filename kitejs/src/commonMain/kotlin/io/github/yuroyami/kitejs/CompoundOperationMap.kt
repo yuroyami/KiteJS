@@ -10,7 +10,7 @@ package io.github.yuroyami.kitejs
  *
  * Upstream also has a locking variant for thread-safe objects. This port has none (D-3).
  */
-open class CompoundOperationMap(protected val owner: SlotMapOwner) : SlotMap, AutoCloseable {
+public open class CompoundOperationMap(protected val owner: SlotMapOwner) : SlotMap, AutoCloseable {
 
     protected var map: SlotMap = owner.map
 
@@ -24,7 +24,7 @@ open class CompoundOperationMap(protected val owner: SlotMapOwner) : SlotMap, Au
         }
     }
 
-    val isTouched: Boolean get() = touched
+    public val isTouched: Boolean get() = touched
 
     override fun add(owner: SlotMapOwner?, newSlot: Slot) {
         map.add(owner, newSlot)

@@ -10,7 +10,7 @@ import io.github.yuroyami.kitejs.Token
  * One `case` or `default` clause of a switch. Node type is [Token.CASE]; a null [expression]
  * means it is the default clause.
  */
-class SwitchCase(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
+public class SwitchCase(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     private var statementList: MutableList<AstNode>? = null
 
@@ -19,20 +19,20 @@ class SwitchCase(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
     }
 
     /** The case expression, or null for the default clause. Setting it reparents. */
-    var expression: AstNode? = null
+    public var expression: AstNode? = null
         set(value) {
             field = value
             value?.parent = this
         }
 
-    val isDefault: Boolean
+    public val isDefault: Boolean
         get() = expression == null
 
     /** The statements in this clause, or null if none were added. */
-    val statements: List<AstNode>?
+    public val statements: List<AstNode>?
         get() = statementList
 
-    fun setStatements(statements: List<AstNode>) {
+    public fun setStatements(statements: List<AstNode>) {
         statementList?.clear()
         for (s in statements) {
             addStatement(s)
@@ -40,7 +40,7 @@ class SwitchCase(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
     }
 
     /** Adds a statement, reparents it and grows this node to include it. */
-    fun addStatement(statement: AstNode) {
+    public fun addStatement(statement: AstNode) {
         val list = statementList ?: mutableListOf<AstNode>().also { statementList = it }
         val end = statement.position + statement.length
         this.length = end - this.position

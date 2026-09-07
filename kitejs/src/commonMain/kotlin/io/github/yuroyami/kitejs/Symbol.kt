@@ -7,10 +7,10 @@ package io.github.yuroyami.kitejs
 /**
  * A JavaScript Symbol. This is an interface so that more than one implementation can exist.
  */
-interface Symbol {
+public interface Symbol {
 
     /** Whether the symbol is a regular one, a built-in, or a registered one. */
-    enum class Kind {
+    public enum class Kind {
         /** Made with the Symbol constructor. */
         REGULAR,
 
@@ -22,7 +22,7 @@ interface Symbol {
     }
 
     /** The symbol's name, or the empty string for an anonymous symbol from `Symbol()`. */
-    val name: String
+    public val name: String
 
-    val kind: Kind
+    public val kind: Kind
 }

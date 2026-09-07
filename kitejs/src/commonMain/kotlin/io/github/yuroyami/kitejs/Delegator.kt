@@ -10,15 +10,15 @@ import kotlin.reflect.KClass
  * Forwards every object operation to another object. Subclass it to wrap a host object: override
  * only what you want to change and the rest keeps working.
  */
-open class Delegator : Function, SymbolScriptable {
+public open class Delegator : Function, SymbolScriptable {
 
     /** The object every operation is forwarded to. */
-    open var delegee: Scriptable? = null
+    public open var delegee: Scriptable? = null
 
     /** A prototype-shaped delegator with nothing behind it yet. */
-    constructor()
+    public constructor()
 
-    constructor(obj: Scriptable?) {
+    public constructor(obj: Scriptable?) {
         this.delegee = obj
     }
 
@@ -76,9 +76,9 @@ open class Delegator : Function, SymbolScriptable {
     private fun receiverFor(start: Scriptable, delegee: Scriptable): Scriptable =
         if (start === this) delegee else start
 
-    override fun delete(name: String) = required().delete(name)
+    override fun delete(name: String): Unit = required().delete(name)
 
-    override fun delete(index: Int) = required().delete(index)
+    override fun delete(index: Int): Unit = required().delete(index)
 
     override fun delete(key: Symbol) {
         val d = required()

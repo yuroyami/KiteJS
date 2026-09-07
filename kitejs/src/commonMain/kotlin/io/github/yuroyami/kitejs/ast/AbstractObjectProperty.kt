@@ -5,7 +5,7 @@
 package io.github.yuroyami.kitejs.ast
 
 /** Base class for the entries of an object literal: [ObjectProperty] and [SpreadObjectProperty]. */
-abstract class AbstractObjectProperty protected constructor(
+public abstract class AbstractObjectProperty protected constructor(
     pos: Int = -1,
     len: Int = 1,
 ) : AstNode(pos, len)

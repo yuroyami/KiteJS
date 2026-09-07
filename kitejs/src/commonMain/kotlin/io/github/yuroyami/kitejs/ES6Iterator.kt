@@ -8,9 +8,9 @@ package io.github.yuroyami.kitejs
  * The base for the built-in iterators (array, string, map, set and the rest). A subclass says
  * when it is done and what the next value is; this class turns that into `{value, done}` results.
  */
-abstract class ES6Iterator : ScriptableObject {
+public abstract class ES6Iterator : ScriptableObject {
 
-    protected var exhausted = false
+    protected var exhausted: Boolean = false
     private var tagValue: String? = null
 
     protected constructor() : super()
@@ -40,12 +40,12 @@ abstract class ES6Iterator : ScriptableObject {
 
     protected open val tag: String? get() = tagValue
 
-    companion object {
-        const val NEXT_METHOD = "next"
-        const val DONE_PROPERTY = "done"
-        const val RETURN_PROPERTY = "return"
-        const val VALUE_PROPERTY = "value"
-        const val RETURN_METHOD = "return"
+    public companion object {
+        public const val NEXT_METHOD: String = "next"
+        public const val DONE_PROPERTY: String = "done"
+        public const val RETURN_PROPERTY: String = "return"
+        public const val VALUE_PROPERTY: String = "value"
+        public const val RETURN_METHOD: String = "return"
 
         /** Installs [prototype] as the shared prototype for iterators tagged [tag]. */
         internal fun init(scope: ScriptableObject?, sealed: Boolean, prototype: ScriptableObject, tag: String) {

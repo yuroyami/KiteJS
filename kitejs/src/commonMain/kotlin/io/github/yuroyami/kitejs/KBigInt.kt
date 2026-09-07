@@ -21,32 +21,32 @@ import kotlin.math.absoluteValue
  * Kotlin/JS `Number` is the JS primitive number type, so a class extending it fails `is Number`
  * and throws on `as Number`. The runtime tells a bigint apart with `is KBigInt` instead (D-54).
  */
-class KBigInt private constructor(
+public class KBigInt private constructor(
     private val sign: Int,
     private val mag: IntArray,
 ) : Comparable<KBigInt> {
 
     /** Parses [digits] in [radix]. This is the shape the lexer builds a `123n` literal with. */
-    constructor(digits: String, radix: Int) : this(parse(digits, radix))
+    public constructor(digits: String, radix: Int) : this(parse(digits, radix))
 
     private constructor(other: KBigInt) : this(other.sign, other.mag)
 
     // ---- Sign and size -------------------------------------------------------------------------
 
     /** -1, 0 or 1. */
-    fun signum(): Int = sign
+    public fun signum(): Int = sign
 
-    val isZero: Boolean get() = sign == 0
+    public val isZero: Boolean get() = sign == 0
 
-    fun negate(): KBigInt = if (sign == 0) this else KBigInt(-sign, mag)
+    public fun negate(): KBigInt = if (sign == 0) this else KBigInt(-sign, mag)
 
-    fun abs(): KBigInt = if (sign < 0) negate() else this
+    public fun abs(): KBigInt = if (sign < 0) negate() else this
 
     /**
      * The bits in the shortest two's complement spelling, not counting the sign bit, the same
      * count `java.math.BigInteger.bitLength` gives.
      */
-    fun bitLength(): Int {
+    public fun bitLength(): Int {
         if (sign == 0) return 0
         val len = magBitLength(mag)
         // A negative power of two needs one bit fewer than its magnitude does.
@@ -56,7 +56,7 @@ class KBigInt private constructor(
 
     // ---- Arithmetic ----------------------------------------------------------------------------
 
-    fun add(other: KBigInt): KBigInt {
+    public fun add(other: KBigInt): KBigInt {
         if (sign == 0) return other
         if (other.sign == 0) return this
         if (sign == other.sign) return make(sign, magAdd(mag, other.mag))
@@ -65,15 +65,15 @@ class KBigInt private constructor(
         return if (c > 0) make(sign, magSub(mag, other.mag)) else make(other.sign, magSub(other.mag, mag))
     }
 
-    fun subtract(other: KBigInt): KBigInt = add(other.negate())
+    public fun subtract(other: KBigInt): KBigInt = add(other.negate())
 
-    fun multiply(other: KBigInt): KBigInt {
+    public fun multiply(other: KBigInt): KBigInt {
         if (sign == 0 || other.sign == 0) return ZERO
         return make(sign * other.sign, magMultiply(mag, other.mag))
     }
 
     /** Truncates toward zero, which is what `/` does on BigInt. */
-    fun divide(other: KBigInt): KBigInt {
+    public fun divide(other: KBigInt): KBigInt {
         if (other.sign == 0) throw ArithmeticException("BigInt division by zero")
         if (sign == 0) return ZERO
         if (magCompare(mag, other.mag) < 0) return ZERO
@@ -81,14 +81,14 @@ class KBigInt private constructor(
     }
 
     /** Takes the sign of the dividend, which is what `%` does on BigInt. */
-    fun remainder(other: KBigInt): KBigInt {
+    public fun remainder(other: KBigInt): KBigInt {
         if (other.sign == 0) throw ArithmeticException("BigInt division by zero")
         if (sign == 0) return ZERO
         if (magCompare(mag, other.mag) < 0) return this
         return make(sign, magDivRem(mag, other.mag).second)
     }
 
-    fun divideAndRemainder(other: KBigInt): Pair<KBigInt, KBigInt> {
+    public fun divideAndRemainder(other: KBigInt): Pair<KBigInt, KBigInt> {
         if (other.sign == 0) throw ArithmeticException("BigInt division by zero")
         if (sign == 0) return ZERO to ZERO
         if (magCompare(mag, other.mag) < 0) return ZERO to this
@@ -97,13 +97,13 @@ class KBigInt private constructor(
     }
 
     /** The remainder that is never negative, so `(-7).mod(3)` is 2. */
-    fun mod(modulus: KBigInt): KBigInt {
+    public fun mod(modulus: KBigInt): KBigInt {
         if (modulus.sign <= 0) throw ArithmeticException("BigInt modulus must be positive")
         val r = remainder(modulus)
         return if (r.sign < 0) r.add(modulus) else r
     }
 
-    fun pow(exponent: Int): KBigInt {
+    public fun pow(exponent: Int): KBigInt {
         if (exponent < 0) throw ArithmeticException("BigInt negative exponent")
         if (exponent == 0) return ONE
         if (sign == 0) return ZERO
@@ -121,22 +121,22 @@ class KBigInt private constructor(
     // ---- Bit operations ------------------------------------------------------------------------
 
     /** `-x - 1`, which is what `~` means on an infinitely long two's complement number. */
-    fun not(): KBigInt = negate().subtract(ONE)
+    public fun not(): KBigInt = negate().subtract(ONE)
 
-    fun and(other: KBigInt): KBigInt = bitwise(other) { a, b -> a and b }
+    public fun and(other: KBigInt): KBigInt = bitwise(other) { a, b -> a and b }
 
-    fun or(other: KBigInt): KBigInt = bitwise(other) { a, b -> a or b }
+    public fun or(other: KBigInt): KBigInt = bitwise(other) { a, b -> a or b }
 
-    fun xor(other: KBigInt): KBigInt = bitwise(other) { a, b -> a xor b }
+    public fun xor(other: KBigInt): KBigInt = bitwise(other) { a, b -> a xor b }
 
-    fun shiftLeft(n: Int): KBigInt {
+    public fun shiftLeft(n: Int): KBigInt {
         if (n < 0) return shiftRight(-n)
         if (sign == 0 || n == 0) return this
         return make(sign, magShiftLeft(mag, n))
     }
 
     /** Arithmetic, so it floors: `-5 shr 1` is -3, not -2. */
-    fun shiftRight(n: Int): KBigInt {
+    public fun shiftRight(n: Int): KBigInt {
         if (n < 0) return shiftLeft(-n)
         if (sign == 0 || n == 0) return this
         val shifted = magShiftRight(mag, n)
@@ -145,7 +145,7 @@ class KBigInt private constructor(
         return if (magAnyBitsBelow(mag, n)) make(-1, magAdd(shifted, ONE_MAG)) else make(-1, shifted)
     }
 
-    fun testBit(n: Int): Boolean {
+    public fun testBit(n: Int): Boolean {
         if (n < 0) throw ArithmeticException("negative bit index")
         val limb = n ushr 5
         val bit = n and 31
@@ -153,7 +153,7 @@ class KBigInt private constructor(
     }
 
     /** `BigInt.asUintN`: the low [bits] bits, read as a number that is never negative. */
-    fun asUintN(bits: Int): KBigInt {
+    public fun asUintN(bits: Int): KBigInt {
         if (bits < 0) throw ArithmeticException("negative bit count")
         if (bits == 0) return ZERO
         if (sign >= 0 && magBitLength(mag) <= bits) return this
@@ -161,7 +161,7 @@ class KBigInt private constructor(
     }
 
     /** `BigInt.asIntN`: the low [bits] bits, read as a two's complement signed number. */
-    fun asIntN(bits: Int): KBigInt {
+    public fun asIntN(bits: Int): KBigInt {
         if (bits < 0) throw ArithmeticException("negative bit count")
         if (bits == 0) return ZERO
         val unsigned = asUintN(bits)
@@ -178,7 +178,7 @@ class KBigInt private constructor(
     }
 
     /** Compares against a finite [d] without losing anything to rounding. */
-    fun compareToDouble(d: Double): Int {
+    public fun compareToDouble(d: Double): Int {
         if (d.isNaN()) return 1
         if (d == Double.POSITIVE_INFINITY) return -1
         if (d == Double.NEGATIVE_INFINITY) return 1
@@ -202,7 +202,7 @@ class KBigInt private constructor(
 
     override fun toString(): String = toString(10)
 
-    fun toString(radix: Int): String {
+    public fun toString(radix: Int): String {
         if (radix < 2 || radix > 36) throw ArithmeticException("radix $radix out of range")
         if (sign == 0) return "0"
         val digits = magToString(mag, radix)
@@ -210,29 +210,29 @@ class KBigInt private constructor(
     }
 
     /** The low 32 bits, wrapping the way a cast does. */
-    fun toInt(): Int = toLong().toInt()
+    public fun toInt(): Int = toLong().toInt()
 
     /** The low 64 bits, wrapping the way a cast does. */
-    fun toLong(): Long {
+    public fun toLong(): Long {
         val low = twosLimb(0).toLong() and 0xFFFFFFFFL
         val high = twosLimb(1).toLong() and 0xFFFFFFFFL
         return (high shl 32) or low
     }
 
     /** The value as an [Int], or an error when it does not fit. */
-    fun intValueExact(): Int {
+    public fun intValueExact(): Int {
         if (bitLength() > 31) throw ArithmeticException("BigInt out of int range")
         return toInt()
     }
 
     /** The value as a [Long], or an error when it does not fit. */
-    fun longValueExact(): Long {
+    public fun longValueExact(): Long {
         if (bitLength() > 63) throw ArithmeticException("BigInt out of long range")
         return toLong()
     }
 
     /** The nearest double, rounded to even, and infinite once past the double range. */
-    fun toDouble(): Double {
+    public fun toDouble(): Double {
         if (sign == 0) return 0.0
         val bits = magBitLength(mag)
         if (bits > 1024) return if (sign > 0) Double.POSITIVE_INFINITY else Double.NEGATIVE_INFINITY
@@ -259,9 +259,9 @@ class KBigInt private constructor(
         return Double.fromBits(raw)
     }
 
-    fun toFloat(): Float = toDouble().toFloat()
-    fun toShort(): Short = toInt().toShort()
-    fun toByte(): Byte = toInt().toByte()
+    public fun toFloat(): Float = toDouble().toFloat()
+    public fun toShort(): Short = toInt().toShort()
+    public fun toByte(): Byte = toInt().toByte()
 
     // ---- Two's complement view -----------------------------------------------------------------
 
@@ -287,15 +287,15 @@ class KBigInt private constructor(
         return make(-1, magAdd(normalize(out), ONE_MAG))
     }
 
-    companion object {
-        val ZERO: KBigInt = KBigInt(0, IntArray(0))
-        val ONE: KBigInt = KBigInt(1, intArrayOf(1))
+    public companion object {
+        public val ZERO: KBigInt = KBigInt(0, IntArray(0))
+        public val ONE: KBigInt = KBigInt(1, intArrayOf(1))
         private val ONE_MAG = intArrayOf(1)
 
         /** Karatsuba pays off above this many limbs; below it schoolbook wins. */
         private const val KARATSUBA_LIMBS = 80
 
-        fun fromLong(value: Long): KBigInt {
+        public fun fromLong(value: Long): KBigInt {
             if (value == 0L) return ZERO
             val sign = if (value < 0) -1 else 1
             // Negating Long.MIN_VALUE overflows, so the magnitude is taken from the raw bits.
@@ -305,10 +305,10 @@ class KBigInt private constructor(
             return make(sign, if (high == 0) intArrayOf(low) else intArrayOf(low, high))
         }
 
-        fun fromInt(value: Int): KBigInt = fromLong(value.toLong())
+        public fun fromInt(value: Int): KBigInt = fromLong(value.toLong())
 
         /** Truncates toward zero. [value] must be finite. */
-        fun fromDouble(value: Double): KBigInt {
+        public fun fromDouble(value: Double): KBigInt {
             if (value.isNaN() || value.isInfinite()) throw ArithmeticException("not a finite number")
             val truncated = if (value < 0) kotlin.math.ceil(value) else kotlin.math.floor(value)
             if (truncated == 0.0) return ZERO
@@ -325,7 +325,7 @@ class KBigInt private constructor(
         }
 
         /** Reads [text] in [radix], with an optional leading sign. */
-        fun parse(text: String, radix: Int = 10): KBigInt {
+        public fun parse(text: String, radix: Int = 10): KBigInt {
             if (radix < 2 || radix > 36) throw ArithmeticException("radix $radix out of range")
             if (text.isEmpty()) throw ArithmeticException("empty BigInt literal")
 

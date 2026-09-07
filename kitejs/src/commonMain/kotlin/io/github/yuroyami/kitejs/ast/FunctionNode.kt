@@ -18,12 +18,12 @@ import io.github.yuroyami.kitejs.Token
  * JavaScript 1.8 also allows a "function closure" of the form `function ([params]) Expression`.
  * Such a node has no body but does have an expression.
  */
-open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(pos) {
+public open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(pos) {
 
     /**
      * Sets the function name and reparents it to this node. Null means an anonymous function.
      */
-    var functionName: Name? = null
+    public var functionName: Name? = null
         set(value) {
             field = value
             value?.parent = this
@@ -33,15 +33,15 @@ open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(pos) {
 
     private var bodyNode: AstNode? = null
 
-    var isExpressionClosure: Boolean = false
+    public var isExpressionClosure: Boolean = false
 
     private var functionForm: Form = Form.FUNCTION
 
     /** Left paren position, -1 if missing. */
-    var lp: Int = -1
+    public var lp: Int = -1
 
     /** Right paren position, -1 if missing. */
-    var rp: Int = -1
+    public var rp: Int = -1
 
     override var hasRestParameter: Boolean = false
 
@@ -59,20 +59,20 @@ open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(pos) {
     // Codegen variables.
 
     /** The function type: statement, expression, or expression statement. */
-    var functionType: Int = 0
+    public var functionType: Int = 0
 
     /**
      * True when this function requires an Ecma-262 Activation object. The activation is
      * expensive to create, so the interpreter uses a plain call frame when it can. A lexical
      * closure is one of several situations that force one.
      */
-    var requiresActivation: Boolean = false
+    public var requiresActivation: Boolean = false
 
-    var requiresArgumentObject: Boolean = false
+    public var requiresArgumentObject: Boolean = false
 
-    var isGenerator: Boolean = false
+    public var isGenerator: Boolean = false
 
-    var isES6Generator: Boolean = false
+    public var isES6Generator: Boolean = false
         set(value) {
             field = value
             if (value) {
@@ -87,7 +87,7 @@ open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(pos) {
     private var liveLocalsMap: MutableMap<Node, IntArray>? = null
 
     /** IR block for default parameter init in generators. */
-    var generatorParamInitBlock: Node? = null
+    public var generatorParamInitBlock: Node? = null
 
     /**
      * Rhino supports a nonstandard extension letting you write `function a.b.c(arg) {...}`,
@@ -95,7 +95,7 @@ open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(pos) {
      * expression other than a simple [Name] where the function name belongs, it records that
      * expression here. Enabled by the `allowMemberExprAsFunctionName` compiler option.
      */
-    var memberExprNode: AstNode? = null
+    public var memberExprNode: AstNode? = null
         set(value) {
             field = value
             value?.parent = this
@@ -106,14 +106,15 @@ open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(pos) {
         functionName = name
     }
 
-    enum class Form {
+    /** How the function was written: a plain function, an accessor, or a method. */
+    public enum class Form {
         FUNCTION,
         GETTER,
         SETTER,
         METHOD,
     }
 
-    fun putDefaultParams(left: Any?, right: Any?) {
+    public fun putDefaultParams(left: Any?, right: Any?) {
         if (defaultParamsList == null) {
             defaultParamsList = mutableListOf()
         }
@@ -129,14 +130,14 @@ open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(pos) {
     }
 
     /** The function name as a string, or "" if anonymous. */
-    val name: String
+    public val name: String
         get() = functionName?.identifier ?: ""
 
     /** The parameter list, or an empty list if there are no parameters. */
-    val params: List<AstNode> get() = paramList ?: NO_PARAMS
+    public val params: List<AstNode> get() = paramList ?: NO_PARAMS
 
     /** Sets the parameter list and reparents every element. Null means no parameters. */
-    fun setParams(params: List<AstNode>?) {
+    public fun setParams(params: List<AstNode>?) {
         if (params == null) {
             paramList = null
         } else {
@@ -146,7 +147,7 @@ open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(pos) {
     }
 
     /** Adds a parameter and reparents it to this node. */
-    fun addParam(param: AstNode) {
+    public fun addParam(param: AstNode) {
         if (paramList == null) {
             paramList = mutableListOf()
         }
@@ -158,7 +159,7 @@ open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(pos) {
      * True when [node] is a parameter of this function. Lets a traversal tell the function
      * name node apart from the parameter nodes.
      */
-    fun isParam(node: AstNode): Boolean = params?.contains(node) ?: false
+    public fun isParam(node: AstNode): Boolean = params.contains(node)
 
     /**
      * The function body: normally a [Block], or a plain [AstNode] for a function closure.
@@ -168,7 +169,7 @@ open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(pos) {
      * The function node's absolute position must already be set, along with the body node's
      * absolute position and length.
      */
-    var body: AstNode?
+    public var body: AstNode?
         get() = bodyNode
         set(value) {
             val newBody = value!!
@@ -183,23 +184,23 @@ open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(pos) {
         }
 
     /** Sets both paren positions. */
-    fun setParens(lp: Int, rp: Int) {
+    public fun setParens(lp: Int, rp: Int) {
         this.lp = lp
         this.rp = rp
     }
 
-    fun addResumptionPoint(target: Node) {
+    public fun addResumptionPoint(target: Node) {
         if (generatorResumePoints == null) generatorResumePoints = mutableListOf()
         generatorResumePoints!!.add(target)
     }
 
-    val resumptionPoints: List<Node>?
+    public val resumptionPoints: List<Node>?
         get() = generatorResumePoints
 
-    val liveLocals: Map<Node, IntArray>?
+    public val liveLocals: Map<Node, IntArray>?
         get() = liveLocalsMap
 
-    fun addLiveLocals(node: Node, locals: IntArray) {
+    public fun addLiveLocals(node: Node, locals: IntArray) {
         if (liveLocalsMap == null) liveLocalsMap = HashMap()
         liveLocalsMap!![node] = locals
     }
@@ -212,29 +213,29 @@ open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(pos) {
         return result
     }
 
-    val isMethod: Boolean
+    public val isMethod: Boolean
         get() = functionForm == Form.GETTER ||
             functionForm == Form.SETTER ||
             functionForm == Form.METHOD
 
-    val isGetterMethod: Boolean
+    public val isGetterMethod: Boolean
         get() = functionForm == Form.GETTER
 
-    val isSetterMethod: Boolean
+    public val isSetterMethod: Boolean
         get() = functionForm == Form.SETTER
 
-    val isNormalMethod: Boolean
+    public val isNormalMethod: Boolean
         get() = functionForm == Form.METHOD
 
-    fun setFunctionIsGetterMethod() {
+    public fun setFunctionIsGetterMethod() {
         functionForm = Form.GETTER
     }
 
-    fun setFunctionIsSetterMethod() {
+    public fun setFunctionIsSetterMethod() {
         functionForm = Form.SETTER
     }
 
-    fun setFunctionIsNormalMethod() {
+    public fun setFunctionIsNormalMethod() {
         functionForm = Form.METHOD
     }
 
@@ -310,20 +311,20 @@ open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(pos) {
         }
     }
 
-    companion object {
+    public companion object {
         /**
          * A function statement is a function appearing as a top-level statement, not nested
          * inside some other statement, in either a script or a function.
          */
-        const val FUNCTION_STATEMENT = 1
+        public const val FUNCTION_STATEMENT: Int = 1
 
         /** A function expression is a function appearing in an expression. */
-        const val FUNCTION_EXPRESSION = 2
+        public const val FUNCTION_EXPRESSION: Int = 2
 
         /** A function expression that is the top-level expression of an expression statement. */
-        const val FUNCTION_EXPRESSION_STATEMENT = 3
+        public const val FUNCTION_EXPRESSION_STATEMENT: Int = 3
 
-        const val ARROW_FUNCTION = 4
+        public const val ARROW_FUNCTION: Int = 4
 
         private val NO_PARAMS: List<AstNode> = emptyList()
 
@@ -334,7 +335,7 @@ open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(pos) {
          *
          * Ref: ECMA 2026, 15.1.5 Static Semantics: ExpectedArgumentCount
          */
-        fun calculateFunctionArity(scriptOrFn: ScriptNode): Int {
+        public fun calculateFunctionArity(scriptOrFn: ScriptNode): Int {
             val paramCount = scriptOrFn.paramCount
             var arity = paramCount
 

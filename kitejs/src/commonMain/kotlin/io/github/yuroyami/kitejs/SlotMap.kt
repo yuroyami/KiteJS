@@ -11,11 +11,11 @@ package io.github.yuroyami.kitejs
  * The shape of this interface is odd and its dealings with [ScriptableObject] are involved. Upstream
  * says plainly that tidier versions of it cost real performance, so it stays as it is.
  */
-interface SlotMap : Iterable<Slot> {
+public interface SlotMap : Iterable<Slot> {
 
     /** Decides what a key maps to, given whatever is already there. Returning null removes it. */
-    fun interface SlotComputer<S : Slot> {
-        fun compute(
+    public fun interface SlotComputer<S : Slot> {
+        public fun compute(
             key: Any?,
             index: Int,
             existing: Slot?,
@@ -25,20 +25,20 @@ interface SlotMap : Iterable<Slot> {
     }
 
     /** How many slots there are. */
-    fun size(): Int
+    public fun size(): Int
 
     /** Whether there are no slots at all. */
-    fun isEmpty(): Boolean
+    public fun isEmpty(): Boolean
 
     /**
      * The slot for [key], or for [index] when [key] is null, creating one if it is not there yet.
      *
      * [attributes] applies only to a slot this call creates. An existing slot is left alone.
      */
-    fun modify(owner: SlotMapOwner?, key: Any?, index: Int, attributes: Int): Slot
+    public fun modify(owner: SlotMapOwner?, key: Any?, index: Int, attributes: Int): Slot
 
     /** The slot for [key], or for [index] when [key] is null, or null if there is none. */
-    fun query(key: Any?, index: Int): Slot?
+    public fun query(key: Any?, index: Int): Slot?
 
     /**
      * Replaces what [key] maps to with whatever [compute] returns: null removes the mapping, and
@@ -46,7 +46,7 @@ interface SlotMap : Iterable<Slot> {
      *
      * This mirrors `Map.compute`, which keeps callers from making several calls in a row.
      */
-    fun <S : Slot> compute(
+    public fun <S : Slot> compute(
         owner: SlotMapOwner,
         key: Any?,
         index: Int,
@@ -55,7 +55,7 @@ interface SlotMap : Iterable<Slot> {
         mutableMap.compute(owner, mutableMap, key, index, compute)
     }
 
-    fun <S : Slot> compute(
+    public fun <S : Slot> compute(
         owner: SlotMapOwner?,
         mutableMap: CompoundOperationMap,
         key: Any?,
@@ -67,12 +67,12 @@ interface SlotMap : Iterable<Slot> {
      * Puts a slot straight in. Both its name and its index hash have to be set already.
      * [ScriptableObject] normally goes through [modify] instead.
      */
-    fun add(owner: SlotMapOwner?, newSlot: Slot)
+    public fun add(owner: SlotMapOwner?, newSlot: Slot)
 
     /** The size before any pending compound operation is folded back in. */
-    fun dirtySize(): Int = size()
+    public fun dirtySize(): Int = size()
 
     /** Opens a compound operation over this map. */
-    fun startCompoundOp(owner: SlotMapOwner, forWriting: Boolean): CompoundOperationMap =
+    public fun startCompoundOp(owner: SlotMapOwner, forWriting: Boolean): CompoundOperationMap =
         CompoundOperationMap(owner)
 }

@@ -5,7 +5,7 @@
 package io.github.yuroyami.kitejs
 
 /** The `Map` builtin, over the insertion-ordered [Hashtable]. */
-class NativeMap : ScriptableObject() {
+public class NativeMap : ScriptableObject() {
 
     private val entries = Hashtable()
 
@@ -54,7 +54,7 @@ class NativeMap : ScriptableObject() {
         return Undefined.instance
     }
 
-    companion object {
+    public companion object {
         private const val CLASS_NAME = "Map"
         internal const val ITERATOR_TAG = "Map Iterator"
 

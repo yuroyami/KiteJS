@@ -13,7 +13,7 @@ import io.github.yuroyami.kitejs.ScriptableObject
 import kotlinx.datetime.TimeZone
 
 /** Which JavaScript the engine speaks. */
-enum class LanguageVersion(internal val code: Int) {
+public enum class LanguageVersion(internal val code: Int) {
     /** ES6 and the parts of later editions this engine implements. The usual choice. */
     ES6(Context.VERSION_ES6),
 
@@ -25,45 +25,45 @@ enum class LanguageVersion(internal val code: Int) {
 }
 
 /** How to build an engine. Everything has a working default. */
-class KiteJsConfig internal constructor() {
+public class KiteJsConfig internal constructor() {
 
     /** Which JavaScript the engine speaks. */
-    var languageVersion: LanguageVersion = LanguageVersion.LATEST
+    public var languageVersion: LanguageVersion = LanguageVersion.LATEST
 
     /** The zone `Date` reads local time in. */
-    var timeZone: TimeZone = TimeZone.currentSystemDefault()
+    public var timeZone: TimeZone = TimeZone.currentSystemDefault()
 
     /** Where `Date.now()` reads the time from, in epoch milliseconds. Fix it to make tests stable. */
-    var clock: (() -> Double)? = null
+    public var clock: (() -> Double)? = null
 
     /** Where `console.log` and its neighbours go. Null leaves `console` out of the global scope. */
-    var console: ConsolePrinter? = null
+    public var console: ConsolePrinter? = null
 
     /**
      * How many interpreter instructions one call may run before the engine gives up. Zero, the
      * default, means no limit. This is how you stop a script that never returns.
      */
-    var instructionBudget: Int = 0
+    public var instructionBudget: Int = 0
 
     /**
      * Asked now and then while a script runs. Answer true, or throw, to stop it. This is how an
      * outside signal reaches a running script: a deadline, a cancelled coroutine, a stop button.
      * Setting it turns the instruction observer on even without a budget.
      */
-    var interruptWhen: (() -> Boolean)? = null
+    public var interruptWhen: (() -> Boolean)? = null
 
     /** Leaves out the built-ins a sandbox does not want. Today that is only the old `Packages` hooks. */
-    var safeBuiltins: Boolean = false
+    public var safeBuiltins: Boolean = false
 
     /** Makes the built-ins read-only, so a script cannot redefine `Array.prototype.push`. */
-    var sealBuiltins: Boolean = false
+    public var sealBuiltins: Boolean = false
 }
 
 /** A parsed script, ready to run more than once. */
-class JsScript internal constructor(private val engine: KiteJs, private val script: Script) {
+public class JsScript internal constructor(private val engine: KiteJs, private val script: Script) {
 
     /** Runs it in the engine's global scope. */
-    fun run(): JsValue = engine.runScript(script)
+    public fun run(): JsValue = engine.runScript(script)
 }
 
 /**
@@ -76,7 +76,7 @@ class JsScript internal constructor(private val engine: KiteJs, private val scri
  * }
  * ```
  */
-class KiteJs internal constructor(
+public class KiteJs internal constructor(
     internal val factory: EngineFactory,
     internal val cx: Context,
     private val scopeObject: ScriptableObject,
@@ -85,18 +85,18 @@ class KiteJs internal constructor(
     private var closed = false
 
     /** The global object. Bind host functions and values onto it. */
-    val global: JsObject = JsObject(scopeObject)
+    public val global: JsObject = JsObject(scopeObject)
 
     /** The engine's version string. */
-    val version: String get() = cx.implementationVersion
+    public val version: String get() = cx.implementationVersion
 
     /** Parses and runs [source]. The answer is the last expression's value. */
-    fun evaluate(source: String, fileName: String = "<eval>"): JsValue = guarded {
+    public fun evaluate(source: String, fileName: String = "<eval>"): JsValue = guarded {
         JsValue(cx.evaluateString(scopeObject, source, fileName, 1))
     }
 
     /** Parses [source] once so it can be run many times. */
-    fun compile(source: String, fileName: String = "<script>"): JsScript = guarded {
+    public fun compile(source: String, fileName: String = "<script>"): JsScript = guarded {
         JsScript(this, cx.compileString(source, fileName, 1))
     }
 
@@ -106,7 +106,7 @@ class KiteJs internal constructor(
      * Runs whatever the promise callbacks have queued. Evaluating already drains the queue at the
      * end of the call, so this is only for work queued from a host callback afterwards.
      */
-    fun runMicrotasks() {
+    public fun runMicrotasks() {
         checkOpen()
         try {
             cx.processMicrotasks()
@@ -116,13 +116,13 @@ class KiteJs internal constructor(
     }
 
     /** A Kotlin value as the engine sees it, collections and all. */
-    fun valueOf(value: Any?): JsValue = JsValue(Converters.toEngine(value, cx, scopeObject))
+    public fun valueOf(value: Any?): JsValue = JsValue(Converters.toEngine(value, cx, scopeObject))
 
     /** A fresh empty object, the same as `{}` in a script. */
-    fun newObject(): JsObject = JsObject(cx.newObject(scopeObject))
+    public fun newObject(): JsObject = JsObject(cx.newObject(scopeObject))
 
     /** A fresh array holding [elements]. */
-    fun newArray(vararg elements: Any?): JsArray =
+    public fun newArray(vararg elements: Any?): JsArray =
         JsValue(cx.newArray(scopeObject, Converters.toEngineAll(elements, cx, scopeObject))).asArray()
 
     /** Releases the engine. Using it afterwards throws. */
@@ -147,7 +147,7 @@ class KiteJs internal constructor(
         if (closed) throw JsEngineError("this engine is closed")
     }
 
-    companion object {
+    public companion object {
         /** How often the interrupt hook is asked when there is no budget to pace it. */
         private const val INTERRUPT_SLICE = 100_000
 
@@ -202,7 +202,7 @@ internal class EngineFactory(private val config: KiteJsConfig) : ContextFactory(
 }
 
 /** Builds an engine. See [KiteJsConfig] for what you can set. */
-fun KiteJs(configure: KiteJsConfig.() -> Unit = {}): KiteJs =
+public fun KiteJs(configure: KiteJsConfig.() -> Unit = {}): KiteJs =
     KiteJs.build(KiteJsConfig().apply(configure))
 
 internal fun scopeObjectOf(obj: Scriptable): Scriptable = ScriptableObject.getTopLevelScope(obj)

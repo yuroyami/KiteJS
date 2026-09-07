@@ -9,11 +9,11 @@ package io.github.yuroyami.kitejs
  * slot sits inside another object, but it copes far better with a lot of hash collisions, so it
  * takes over once an object has many properties.
  */
-class HashSlotMap : SlotMap {
+public class HashSlotMap : SlotMap {
 
     private val map: LinkedHashMap<Any, Slot>
 
-    constructor() {
+    public constructor() {
         map = LinkedHashMap()
     }
 
@@ -21,12 +21,12 @@ class HashSlotMap : SlotMap {
         map = LinkedHashMap(capacity)
     }
 
-    constructor(oldMap: SlotMap) {
+    public constructor(oldMap: SlotMap) {
         map = LinkedHashMap(oldMap.size())
         for (n in oldMap) add(null, n.copySlot())
     }
 
-    constructor(oldMap: SlotMap, newSlot: Slot) {
+    public constructor(oldMap: SlotMap, newSlot: Slot) {
         map = LinkedHashMap(oldMap.dirtySize() + 1)
         for (n in oldMap) add(null, n.copySlot())
         add(null, newSlot)

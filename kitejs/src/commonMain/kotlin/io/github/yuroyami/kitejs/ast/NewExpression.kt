@@ -10,14 +10,14 @@ import io.github.yuroyami.kitejs.Token
  * A `new` expression. Node type is [Token.NEW]. The [initializer] is Rhino's non-standard
  * `new Foo() {a: 1}` object-initializer extension.
  */
-class NewExpression(pos: Int = -1, len: Int = 1) : FunctionCall(pos, len) {
+public class NewExpression(pos: Int = -1, len: Int = 1) : FunctionCall(pos, len) {
 
     init {
         typeField = Token.NEW
     }
 
     /** The trailing object initializer, or null. Setting it reparents the literal. */
-    var initializer: ObjectLiteral? = null
+    public var initializer: ObjectLiteral? = null
         set(value) {
             field = value
             value?.parent = this

@@ -24,7 +24,7 @@ import io.github.yuroyami.kitejs.Undefined
  * `CharSequence` becomes a `String`, and `List`, `Array`, `Map` and `Set` become the matching
  * JavaScript objects. Anything already from the engine passes straight through.
  */
-object Converters {
+public object Converters {
 
     /** The largest integer a JavaScript number holds exactly. */
     private const val MAX_SAFE = 9007199254740991L
@@ -36,7 +36,7 @@ object Converters {
      * Teaches the table one more Kotlin type. [convert] answers the engine value, or null to let
      * the next rule try. Registering the same type twice keeps both; the first match wins.
      */
-    fun register(convert: (Any) -> Any?) {
+    public fun register(convert: (Any) -> Any?) {
         custom.add(convert)
     }
 
@@ -45,7 +45,7 @@ object Converters {
     }
 
     /** For a value that needs no scope: scalars only. Collections need [toEngine] with a context. */
-    fun toEngine(value: Any?): Any? = when (value) {
+    public fun toEngine(value: Any?): Any? = when (value) {
         null, Unit -> Undefined.instance
         is JsValue -> value.raw
         is JsObject -> value.target
@@ -62,7 +62,7 @@ object Converters {
     }
 
     /** The full table, including the collections, which need a scope to build their objects in. */
-    fun toEngine(value: Any?, cx: Context, scope: Scriptable): Any? = when (value) {
+    public fun toEngine(value: Any?, cx: Context, scope: Scriptable): Any? = when (value) {
         is List<*> -> cx.newArray(scope, value.map { toEngine(it, cx, scope) }.toTypedArray())
         is Array<*> -> cx.newArray(scope, value.map { toEngine(it, cx, scope) }.toTypedArray())
         is IntArray -> cx.newArray(scope, value.map { it.toDouble() as Any? }.toTypedArray())

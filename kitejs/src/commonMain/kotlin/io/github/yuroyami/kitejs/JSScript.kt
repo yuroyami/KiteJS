@@ -5,7 +5,7 @@
 package io.github.yuroyami.kitejs
 
 /** A compiled script. */
-class JSScript(
+public class JSScript(
     override val descriptor: JSDescriptor<JSScript>,
     override val homeObject: Scriptable?,
 ) : Script, ScriptOrFn<JSScript> {

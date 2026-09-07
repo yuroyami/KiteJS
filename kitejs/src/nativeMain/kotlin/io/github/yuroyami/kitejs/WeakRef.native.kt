@@ -21,17 +21,17 @@ package io.github.yuroyami.kitejs
 
 import kotlin.native.ref.WeakReference
 
-actual class WeakRef<T : Any> actual constructor(referred: T) {
+public actual class WeakRef<T : Any> actual constructor(referred: T) {
 
     private val ref = WeakReference(referred)
 
-    actual fun get(): T? = ref.get()
+    public actual fun get(): T? = ref.get()
 
-    actual fun clear() {
+    public actual fun clear() {
         ref.clear()
     }
 
-    actual companion object {
-        actual val isWeakSupported: Boolean = true
+    public actual companion object {
+        public actual val isWeakSupported: Boolean = true
     }
 }

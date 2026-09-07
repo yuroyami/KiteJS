@@ -5,7 +5,7 @@
 package io.github.yuroyami.kitejs
 
 /** One frame of a captured stack, as handed to `Error.prepareStackTrace`. */
-class NativeCallSite private constructor() : IdScriptableObject() {
+public class NativeCallSite private constructor() : IdScriptableObject() {
 
     private var element: ScriptStackElement? = null
 
@@ -78,7 +78,7 @@ class NativeCallSite private constructor() : IdScriptableObject() {
         else -> 0
     }
 
-    companion object {
+    public companion object {
         private const val CALLSITE_TAG = "CallSite"
 
         internal fun init(scope: Scriptable, sealed: Boolean) {
@@ -98,7 +98,7 @@ class NativeCallSite private constructor() : IdScriptableObject() {
         private fun realSite(obj: Scriptable?): NativeCallSite? {
             var o = obj
             while (o != null && o !is NativeCallSite) o = o.prototype
-            return o as NativeCallSite?
+            return o
         }
 
         private fun js_toString(obj: Scriptable?): Any? {

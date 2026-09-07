@@ -5,19 +5,19 @@
 package io.github.yuroyami.kitejs
 
 /** What the runtime needs from a regular expression engine. The engine itself lands in phase 4. */
-interface RegExpProxy {
+public interface RegExpProxy {
 
-    fun register(scope: ScriptableObject, sealed: Boolean)
+    public fun register(scope: ScriptableObject, sealed: Boolean)
 
-    fun isRegExp(obj: Scriptable?): Boolean
+    public fun isRegExp(obj: Scriptable?): Boolean
 
-    fun compileRegExp(cx: Context, source: String, flags: String?): Any
+    public fun compileRegExp(cx: Context, source: String, flags: String?): Any
 
-    fun wrapRegExp(cx: Context, scope: Scriptable, compiled: Any): Scriptable
+    public fun wrapRegExp(cx: Context, scope: Scriptable, compiled: Any): Scriptable
 
-    fun action(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>, actionType: Int): Any?
+    public fun action(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>, actionType: Int): Any?
 
-    fun find_split(
+    public fun find_split(
         cx: Context,
         scope: Scriptable,
         target: String,
@@ -29,12 +29,12 @@ interface RegExpProxy {
         parensp: Array<Array<String>?>,
     ): Int
 
-    fun js_split(cx: Context, scope: Scriptable, thisString: String, args: Array<Any?>): Any?
+    public fun js_split(cx: Context, scope: Scriptable, thisString: String, args: Array<Any?>): Any?
 
-    companion object {
-        const val RA_MATCH = 1
-        const val RA_REPLACE = 2
-        const val RA_REPLACE_ALL = 3
-        const val RA_SEARCH = 4
+    public companion object {
+        public const val RA_MATCH: Int = 1
+        public const val RA_REPLACE: Int = 2
+        public const val RA_REPLACE_ALL: Int = 3
+        public const val RA_SEARCH: Int = 4
     }
 }

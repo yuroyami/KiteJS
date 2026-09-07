@@ -16,14 +16,16 @@ package io.github.yuroyami.kitejs
  * That is a deliberate trade: the slot API does not pass the owning map's owner in, and keeping it
  * here avoids allocating anything per access.
  */
-class BuiltInSlot<T : ScriptableObject> : Slot {
+public class BuiltInSlot<T : ScriptableObject> : Slot {
 
-    fun interface Getter<U : ScriptableObject> {
-        fun apply(builtIn: U, start: Scriptable?): Any?
+    /** Reads a built-in property. */
+    public fun interface Getter<U : ScriptableObject> {
+        public fun apply(builtIn: U, start: Scriptable?): Any?
     }
 
-    fun interface Setter<U : ScriptableObject> {
-        fun apply(
+    /** Writes a built-in property, answering whether the write was accepted. */
+    public fun interface Setter<U : ScriptableObject> {
+        public fun apply(
             builtIn: U,
             value: Any?,
             owner: Scriptable,
@@ -32,12 +34,14 @@ class BuiltInSlot<T : ScriptableObject> : Slot {
         ): Boolean
     }
 
-    fun interface AttributeSetter<U : ScriptableObject> {
-        fun apply(builtIn: U, attributes: Int)
+    /** Changes a built-in property's attributes. */
+    public fun interface AttributeSetter<U : ScriptableObject> {
+        public fun apply(builtIn: U, attributes: Int)
     }
 
-    fun interface PropDescriptionSetter<U : ScriptableObject> {
-        fun apply(
+    /** Redefines a built-in property from a descriptor. */
+    public fun interface PropDescriptionSetter<U : ScriptableObject> {
+        public fun apply(
             builtIn: U,
             current: BuiltInSlot<U>,
             id: Any?,
@@ -98,7 +102,7 @@ class BuiltInSlot<T : ScriptableObject> : Slot {
     }
 
     /** Writing through a property descriptor skips the readonly check, so it gets its own path. */
-    fun setValueFromDescriptor(value: Any?, owner: Scriptable, start: Scriptable, isThrow: Boolean) {
+    public fun setValueFromDescriptor(value: Any?, owner: Scriptable, start: Scriptable, isThrow: Boolean) {
         setter.apply(builtIn, value, owner, start, isThrow)
     }
 
@@ -120,7 +124,7 @@ class BuiltInSlot<T : ScriptableObject> : Slot {
         index: Int,
     ): Boolean = propDescSetter.apply(builtIn, this, id, info, checkValid, key, index)
 
-    companion object {
+    public companion object {
         private fun <T : ScriptableObject> defaultPropDescSetter(): PropDescriptionSetter<T> =
             PropDescriptionSetter { builtIn, _, id, info, checkValid, key, index ->
                 builtIn.startCompoundOp(true).use { map ->

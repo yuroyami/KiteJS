@@ -17,7 +17,7 @@ import io.github.yuroyami.kitejs.Token
  * Common Kotlin has no sorted set, so the port keeps an insertion-sorted list with the same
  * ordering and the same drop-on-equal-position behavior a TreeSet has (D-8).
  */
-class AstRoot(pos: Int = -1) : ScriptNode(pos) {
+public class AstRoot(pos: Int = -1) : ScriptNode(pos) {
 
     private var commentList: MutableList<Comment>? = null
 
@@ -26,11 +26,11 @@ class AstRoot(pos: Int = -1) : ScriptNode(pos) {
     }
 
     /** Comments sorted by start position, or null if the script has none. */
-    val comments: List<Comment>?
+    public val comments: List<Comment>?
         get() = commentList
 
     /** Replaces the comment list and reparents every entry to this node. */
-    fun setComments(comments: Collection<Comment>?) {
+    public fun setComments(comments: Collection<Comment>?) {
         if (comments == null) {
             this.commentList = null
         } else {
@@ -40,7 +40,7 @@ class AstRoot(pos: Int = -1) : ScriptNode(pos) {
     }
 
     /** Adds a comment to the comment set. */
-    fun addComment(comment: Comment) {
+    public fun addComment(comment: Comment) {
         val list = commentList ?: mutableListOf<Comment>().also { commentList = it }
         val cmp = PositionComparator()
         var lo = 0
@@ -63,12 +63,12 @@ class AstRoot(pos: Int = -1) : ScriptNode(pos) {
      * Visits the comment nodes in source order. The comments are not visited by [visit], so
      * this is the only way to reach them. Return values are ignored.
      */
-    fun visitComments(visitor: NodeVisitor) {
+    public fun visitComments(visitor: NodeVisitor) {
         commentList?.forEach { visitor.visit(it) }
     }
 
     /** Visits the AST nodes, then the comment nodes. */
-    fun visitAll(visitor: NodeVisitor) {
+    public fun visitAll(visitor: NodeVisitor) {
         visit(visitor)
         visitComments(visitor)
     }
@@ -92,7 +92,7 @@ class AstRoot(pos: Int = -1) : ScriptNode(pos) {
     }
 
     /** Checks that the parser set the parent link for every node in the tree. */
-    fun checkParentLinks() {
+    public fun checkParentLinks() {
         this.visit { node ->
             if (node.type != Token.SCRIPT && node.parent == null) {
                 throw IllegalStateException("No parent for node: $node\n${node.toSource(0)}")

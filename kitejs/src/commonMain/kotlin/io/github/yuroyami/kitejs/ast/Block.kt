@@ -14,14 +14,14 @@ import io.github.yuroyami.kitejs.Token
  * Block : { Statement* }
  * ```
  */
-class Block(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
+internal class Block(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     init {
         typeField = Token.BLOCK
     }
 
     /** Alias for [addChild]. */
-    fun addStatement(statement: AstNode) {
+    public fun addStatement(statement: AstNode) {
         addChild(statement)
     }
 

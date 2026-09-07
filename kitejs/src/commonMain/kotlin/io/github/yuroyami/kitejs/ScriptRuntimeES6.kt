@@ -5,16 +5,16 @@
 package io.github.yuroyami.kitejs
 
 /** The ES6-only runtime helpers. */
-object ScriptRuntimeES6 {
+public object ScriptRuntimeES6 {
 
-    fun requireObjectCoercible(cx: Context?, value: Any?, idFuncObj: IdFunctionObject): Any? {
+    public fun requireObjectCoercible(cx: Context?, value: Any?, idFuncObj: IdFunctionObject): Any? {
         if (value == null || Undefined.isUndefined(value)) {
             throw ScriptRuntime.typeErrorById("msg.called.null.or.undefined", idFuncObj.tag, idFuncObj.functionName)
         }
         return value
     }
 
-    fun requireObjectCoercible(cx: Context?, value: Any?, tag: Any?, functionName: String): Any? {
+    public fun requireObjectCoercible(cx: Context?, value: Any?, tag: Any?, functionName: String): Any? {
         if (value == null || Undefined.isUndefined(value)) {
             throw ScriptRuntime.typeErrorById("msg.called.null.or.undefined", tag, functionName)
         }
@@ -22,7 +22,7 @@ object ScriptRuntimeES6 {
     }
 
     /** Adds the `get [Symbol.species]` accessor that just returns `this`. */
-    fun addSymbolSpecies(cx: Context, scope: Scriptable, constructor: ScriptableObject) {
+    public fun addSymbolSpecies(cx: Context, scope: Scriptable, constructor: ScriptableObject) {
         val getter = LambdaFunction(
             scope,
             "get [Symbol.species]",
@@ -41,7 +41,7 @@ object ScriptRuntimeES6 {
         constructor.defineOwnProperty(cx, SymbolKey.SPECIES, desc, false)
     }
 
-    fun addSymbolUnscopables(cx: Context, scope: Scriptable, constructor: ScriptableObject, value: LazilyLoadedCtor) {
+    public fun addSymbolUnscopables(cx: Context, scope: Scriptable, constructor: ScriptableObject, value: LazilyLoadedCtor) {
         constructor.addLazilyInitializedValue(
             SymbolKey.UNSCOPABLES,
             0,

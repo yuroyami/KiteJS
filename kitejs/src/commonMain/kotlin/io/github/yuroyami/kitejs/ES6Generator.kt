@@ -11,7 +11,7 @@ package io.github.yuroyami.kitejs
  * body; when the body hits `yield*` it hands back a [YieldStarResult] and everything from then on
  * is forwarded to the delegee until that iterator is done.
  */
-class ES6Generator : ScriptableObject {
+public class ES6Generator : ScriptableObject {
 
     private var function: JSFunction? = null
     private var savedState: Any? = null
@@ -23,7 +23,7 @@ class ES6Generator : ScriptableObject {
     /** Only for building the prototype object. */
     private constructor() : super()
 
-    constructor(scope: Scriptable, function: JSFunction, savedState: Any?) : super() {
+    public constructor(scope: Scriptable, function: JSFunction, savedState: Any?) : super() {
         this.function = function
         this.savedState = savedState
         val top = getTopLevelScope(scope)
@@ -261,9 +261,9 @@ class ES6Generator : ScriptableObject {
     }
 
     /** Marks a value yielded by `yield*`, which the generator forwards rather than wraps. */
-    class YieldStarResult(val result: Any?)
+    public class YieldStarResult(public val result: Any?)
 
-    companion object {
+    public companion object {
         /** The key `%GeneratorPrototype%` is cached under on the top scope. */
         internal val GENERATOR_TAG: Any = "Generator"
 

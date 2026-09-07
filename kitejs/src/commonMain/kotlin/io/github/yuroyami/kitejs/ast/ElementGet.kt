@@ -7,25 +7,25 @@ package io.github.yuroyami.kitejs.ast
 import io.github.yuroyami.kitejs.Token
 
 /** A bracketed element access such as `a[b]`. Node type is [Token.GETELEM]. */
-class ElementGet : AstNode {
+public class ElementGet : AstNode {
 
     init {
         typeField = Token.GETELEM
     }
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(pos: Int) : super(pos)
+    public constructor(pos: Int) : super(pos)
 
-    constructor(pos: Int, len: Int) : super(pos, len)
+    public constructor(pos: Int, len: Int) : super(pos, len)
 
-    constructor(target: AstNode, element: AstNode) : super() {
+    public constructor(target: AstNode, element: AstNode) : super() {
         this.target = target
         this.element = element
     }
 
     /** The object being indexed. Setting it reparents and copies the line and column. */
-    var target: AstNode? = null
+    public var target: AstNode? = null
         set(value) {
             val newTarget = value!!
             field = newTarget
@@ -34,7 +34,7 @@ class ElementGet : AstNode {
         }
 
     /** The index expression. Setting it reparents the expression. */
-    var element: AstNode? = null
+    public var element: AstNode? = null
         set(value) {
             val newElement = value!!
             field = newElement
@@ -42,13 +42,13 @@ class ElementGet : AstNode {
         }
 
     /** Position of the left bracket, relative to this node. */
-    var lb: Int = -1
+    public var lb: Int = -1
 
     /** Position of the right bracket, relative to this node. */
-    var rb: Int = -1
+    public var rb: Int = -1
 
     /** Sets both bracket positions. */
-    fun setParens(lb: Int, rb: Int) {
+    public fun setParens(lb: Int, rb: Int) {
         this.lb = lb
         this.rb = rb
     }

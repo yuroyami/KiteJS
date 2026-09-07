@@ -5,6 +5,6 @@
 package io.github.yuroyami.kitejs
 
 /** Work to run with a [Context] entered. See [ContextFactory.call]. */
-fun interface ContextAction<T> {
-    fun run(cx: Context): T
+public fun interface ContextAction<T> {
+    public fun run(cx: Context): T
 }

@@ -8,7 +8,7 @@ package io.github.yuroyami.kitejs
  * One property of a [ScriptableObject]. This base class is an ordinary property holding a value;
  * the subclasses cover the ones backed by getters and setters.
  */
-open class Slot {
+public open class Slot {
 
     /** The property key: a string, a [Symbol], or null when the property is an index. */
     internal var name: Any?
@@ -64,10 +64,10 @@ open class Slot {
             attributesField = value.toShort()
         }
 
-    fun setValue(value: Any?, owner: Scriptable, start: Scriptable): Boolean =
+    public fun setValue(value: Any?, owner: Scriptable, start: Scriptable): Boolean =
         setValue(value, owner, start, Context.isCurrentContextStrict)
 
-    open fun setValue(value: Any?, owner: Scriptable, start: Scriptable, isThrow: Boolean): Boolean {
+    public open fun setValue(value: Any?, owner: Scriptable, start: Scriptable, isThrow: Boolean): Boolean {
         if ((attributes and ScriptableObject.READONLY) != 0) {
             if (isThrow) throw ScriptRuntime.typeErrorById("msg.modify.readonly", name)
             return true
@@ -79,7 +79,7 @@ open class Slot {
         return false
     }
 
-    open fun getValue(start: Scriptable?): Any? = value
+    public open fun getValue(start: Scriptable?): Any? = value
 
     internal open fun getPropertyDescriptor(cx: Context, scope: Scriptable): ScriptableObject.DescriptorInfo =
         ScriptableObject.buildDataDescriptor(value, attributes)

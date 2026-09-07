@@ -5,26 +5,27 @@
 package io.github.yuroyami.kitejs
 
 /** The iterator `Map` and `Set` hand back from `keys`, `values` and `entries`. */
-class NativeCollectionIterator : ES6Iterator {
+public class NativeCollectionIterator : ES6Iterator {
 
     private var name: String
     private var type: Type
     private var iterator: Iterator<Hashtable.Entry>
 
-    enum class Type {
+    /** Whether the iterator answers keys, values, or both. */
+    public enum class Type {
         KEYS,
         VALUES,
         BOTH,
     }
 
     /** Only for building the prototype object. */
-    constructor(tag: String) : super() {
+    public constructor(tag: String) : super() {
         this.name = tag
         this.iterator = emptyList<Hashtable.Entry>().iterator()
         this.type = Type.BOTH
     }
 
-    constructor(scope: Scriptable, className: String, type: Type, iterator: Iterator<Hashtable.Entry>) : super(scope, className) {
+    public constructor(scope: Scriptable, className: String, type: Type, iterator: Iterator<Hashtable.Entry>) : super(scope, className) {
         this.name = className
         this.iterator = iterator
         this.type = type
@@ -44,7 +45,7 @@ class NativeCollectionIterator : ES6Iterator {
         }
     }
 
-    companion object {
+    public companion object {
         internal fun init(scope: ScriptableObject, tag: String, sealed: Boolean) {
             ES6Iterator.init(scope, sealed, NativeCollectionIterator(tag), tag)
         }

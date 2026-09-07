@@ -12,13 +12,13 @@ package io.github.yuroyami.kitejs
  * `IdScriptableObject` and 25% faster than the reflection-based `defineClass`, and the resulting
  * code reads much closer to the JavaScript it implements.
  */
-open class LambdaConstructor : LambdaFunction {
+public open class LambdaConstructor : LambdaFunction {
 
     protected val targetConstructor: SerializableConstructable?
     private val flags: Int
 
     /** Callable both with and without `new`, and either way it returns a wired-up new object. */
-    constructor(scope: Scriptable, name: String, length: Int, target: SerializableConstructable) :
+    public constructor(scope: Scriptable, name: String, length: Int, target: SerializableConstructable) :
         super(scope, name, length, null as SerializableCallable?) {
         this.targetConstructor = target
         this.flags = CONSTRUCTOR_DEFAULT
@@ -28,7 +28,7 @@ open class LambdaConstructor : LambdaFunction {
      * [flags] says which of `new` and a direct call are allowed. Whichever is allowed behaves the
      * same way; the other throws a TypeError.
      */
-    constructor(
+    public constructor(
         scope: Scriptable,
         name: String,
         length: Int,
@@ -43,7 +43,7 @@ open class LambdaConstructor : LambdaFunction {
      * Behaves differently with and without `new`: `new` returns a wired-up object, a direct call
      * does whatever [target] says. `Date` is the standard example.
      */
-    constructor(
+    public constructor(
         scope: Scriptable,
         name: String,
         length: Int,
@@ -56,7 +56,7 @@ open class LambdaConstructor : LambdaFunction {
                 (if (targetConstructor != null) CONSTRUCTOR_NEW else 0)
     }
 
-    constructor(
+    public constructor(
         scope: Scriptable,
         name: String,
         length: Int,
@@ -96,7 +96,7 @@ open class LambdaConstructor : LambdaFunction {
 
     // ---- Prototype methods ---------------------------------------------------------------------
 
-    fun definePrototypeMethod(
+    public fun definePrototypeMethod(
         scope: Scriptable,
         name: String,
         length: Int,
@@ -109,7 +109,7 @@ open class LambdaConstructor : LambdaFunction {
         prototypeScriptable.defineProperty(name, f, attributes)
     }
 
-    fun definePrototypeMethod(
+    public fun definePrototypeMethod(
         scope: Scriptable,
         name: SymbolKey,
         length: Int,
@@ -122,7 +122,7 @@ open class LambdaConstructor : LambdaFunction {
         prototypeScriptable.defineProperty(name, f, attributes)
     }
 
-    fun definePrototypeMethod(
+    public fun definePrototypeMethod(
         scope: Scriptable,
         name: String,
         length: Int,
@@ -136,7 +136,7 @@ open class LambdaConstructor : LambdaFunction {
         prototypeScriptable.defineProperty(name, f, attributes)
     }
 
-    fun definePrototypeMethod(
+    public fun definePrototypeMethod(
         scope: Scriptable,
         name: SymbolKey,
         length: Int,
@@ -151,7 +151,7 @@ open class LambdaConstructor : LambdaFunction {
     }
 
     /** Same as [definePrototypeMethod], but the engine can recognise the result by its tag. */
-    fun defineKnownBuiltInPrototypeMethod(
+    public fun defineKnownBuiltInPrototypeMethod(
         tag: Any,
         scope: Scriptable,
         name: String,
@@ -168,19 +168,19 @@ open class LambdaConstructor : LambdaFunction {
 
     // ---- Prototype properties -------------------------------------------------------------------
 
-    fun definePrototypeProperty(name: String, value: Any?, attributes: Int) {
+    public fun definePrototypeProperty(name: String, value: Any?, attributes: Int) {
         prototypeScriptable.defineProperty(name, value, attributes)
     }
 
-    fun definePrototypeProperty(key: Symbol, value: Any?, attributes: Int) {
+    public fun definePrototypeProperty(key: Symbol, value: Any?, attributes: Int) {
         prototypeScriptable.defineProperty(key, value, attributes)
     }
 
-    fun definePrototypeProperty(cx: Context, name: String, descriptor: ScriptableObject) {
+    public fun definePrototypeProperty(cx: Context, name: String, descriptor: ScriptableObject) {
         prototypeScriptable.defineOwnProperty(cx, name, descriptor)
     }
 
-    fun definePrototypeProperty(cx: Context, key: Symbol, descriptor: ScriptableObject) {
+    public fun definePrototypeProperty(cx: Context, key: Symbol, descriptor: ScriptableObject) {
         prototypeScriptable.defineOwnProperty(cx, key, descriptor)
     }
 
@@ -188,7 +188,7 @@ open class LambdaConstructor : LambdaFunction {
      * Defines a prototype property through a getter. The result looks exactly like a property
      * defined with `Object.defineProperty` and an accessor descriptor.
      */
-    fun definePrototypeProperty(
+    public fun definePrototypeProperty(
         cx: Context,
         name: String,
         getter: LambdaGetterFunction,
@@ -197,7 +197,7 @@ open class LambdaConstructor : LambdaFunction {
         prototypeScriptable.defineProperty(cx, name, getter, null, attributes)
     }
 
-    fun definePrototypeProperty(
+    public fun definePrototypeProperty(
         cx: Context,
         key: Symbol,
         getter: LambdaGetterFunction,
@@ -207,7 +207,7 @@ open class LambdaConstructor : LambdaFunction {
     }
 
     /** The getter and setter pair version of [definePrototypeProperty]. */
-    fun definePrototypeProperty(
+    public fun definePrototypeProperty(
         cx: Context,
         name: String,
         getter: LambdaGetterFunction?,
@@ -217,7 +217,7 @@ open class LambdaConstructor : LambdaFunction {
         prototypeScriptable.defineProperty(cx, name, getter, setter, attributes)
     }
 
-    fun definePrototypeProperty(
+    public fun definePrototypeProperty(
         cx: Context,
         key: Symbol,
         getter: LambdaGetterFunction?,
@@ -228,19 +228,19 @@ open class LambdaConstructor : LambdaFunction {
     }
 
     /** Gives [alias] the same value as the property already named [name]. */
-    fun definePrototypeAlias(name: String, alias: SymbolKey, attributes: Int) {
+    public fun definePrototypeAlias(name: String, alias: SymbolKey, attributes: Int) {
         val proto = prototypeScriptable
         proto.defineProperty(alias, proto.get(name, proto), attributes)
     }
 
-    fun definePrototypeAlias(name: String, alias: String, attributes: Int) {
+    public fun definePrototypeAlias(name: String, alias: String, attributes: Int) {
         val proto = prototypeScriptable
         proto.defineProperty(alias, proto.get(name, proto), attributes)
     }
 
     // ---- Methods on the constructor itself ------------------------------------------------------
 
-    fun defineConstructorMethod(
+    public fun defineConstructorMethod(
         scope: Scriptable,
         name: String,
         length: Int,
@@ -254,7 +254,7 @@ open class LambdaConstructor : LambdaFunction {
     }
 
     /** Upstream ignores [key] here and defines the method under [name], which this copies. */
-    fun defineConstructorMethod(
+    public fun defineConstructorMethod(
         scope: Scriptable,
         key: Symbol,
         name: String,
@@ -264,7 +264,7 @@ open class LambdaConstructor : LambdaFunction {
         defineConstructorMethod(scope, name, length, target)
     }
 
-    fun defineConstructorMethod(
+    public fun defineConstructorMethod(
         scope: Scriptable,
         name: String,
         length: Int,
@@ -282,7 +282,7 @@ open class LambdaConstructor : LambdaFunction {
      * Swaps the plain `Object` prototype for one of a particular kind. Only a few built-ins need
      * this, `Boolean` among them, because their prototype has to carry an internal slot.
      */
-    fun setPrototypeScriptable(proto: ScriptableObject) {
+    public fun setPrototypeScriptable(proto: ScriptableObject) {
         proto.parentScope = declarationScope
         setPrototypeProperty(proto)
         val objectProto = getObjectPrototype(this)
@@ -294,21 +294,21 @@ open class LambdaConstructor : LambdaFunction {
     private val prototypeScriptable: ScriptableObject get() = prototypeProperty as? ScriptableObject
             ?: throw ScriptRuntime.typeError("Not properly a lambda constructor")
 
-    companion object {
+    public companion object {
         /** The constructor may be called as an ordinary function. */
-        const val CONSTRUCTOR_FUNCTION = 1
+        public const val CONSTRUCTOR_FUNCTION: Int = 1
 
         /** The constructor may be called with `new`. */
-        const val CONSTRUCTOR_NEW = 1 shl 1
+        public const val CONSTRUCTOR_NEW: Int = 1 shl 1
 
         /** Both, which is the default. */
-        const val CONSTRUCTOR_DEFAULT = CONSTRUCTOR_FUNCTION or CONSTRUCTOR_NEW
+        public const val CONSTRUCTOR_DEFAULT: Int = CONSTRUCTOR_FUNCTION or CONSTRUCTOR_NEW
 
         /**
          * Casts `this` to [T], with a TypeError when it does not fit. Lambda implementations need
          * this because JavaScript's `this` is not guaranteed to be an instance of anything.
          */
-        inline fun <reified T : Any> convertThisObject(thisObj: Scriptable?): T =
+        public inline fun <reified T : Any> convertThisObject(thisObj: Scriptable?): T =
             thisObj as? T
                 ?: throw ScriptRuntime.typeErrorById("msg.this.not.instance", T::class.simpleName)
     }

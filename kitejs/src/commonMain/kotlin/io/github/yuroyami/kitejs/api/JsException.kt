@@ -12,29 +12,29 @@ import io.github.yuroyami.kitejs.ScriptRuntime
 import io.github.yuroyami.kitejs.ScriptableObject
 
 /** One frame of a script's own call stack. */
-data class JsStackFrame(val functionName: String?, val fileName: String?, val lineNumber: Int) {
+public data class JsStackFrame(val functionName: String?, val fileName: String?, val lineNumber: Int) {
     override fun toString(): String =
         "at ${functionName ?: "<anonymous>"} (${fileName ?: "<unknown>"}:$lineNumber)"
 }
 
 /** Anything the facade throws. Every case is one of the three below. */
-sealed class JsException(message: String, cause: Throwable?) : RuntimeException(message, cause)
+public sealed class JsException(message: String, cause: Throwable?) : RuntimeException(message, cause)
 
 /** A script threw. [value] is whatever it threw, which is usually an `Error` but need not be. */
-class JsError internal constructor(
-    val value: JsValue,
-    val name: String,
+public class JsError internal constructor(
+    public val value: JsValue,
+    public val name: String,
     message: String,
-    val scriptStack: List<JsStackFrame>,
+    public val scriptStack: List<JsStackFrame>,
     cause: Throwable?,
 ) : JsException(if (name.isEmpty()) message else "$name: $message", cause) {
 
     /** The message on its own, without the error's name in front. */
-    val errorMessage: String = message
+    public val errorMessage: String = message
 
-    companion object {
+    public companion object {
         /** Wraps a thrown or rejected value, reading `name` and `message` off it when it has them. */
-        fun from(value: JsValue): JsError {
+        public fun from(value: JsValue): JsError {
             val obj = value.asObjectOrNull()
             val name = obj?.get("name")?.takeIf { !it.isNullish }?.asString() ?: "Error"
             val message = obj?.get("message")?.takeIf { !it.isNullish }?.asString() ?: value.asString()
@@ -44,17 +44,17 @@ class JsError internal constructor(
 }
 
 /** The source did not parse. */
-class JsSyntaxError internal constructor(
+public class JsSyntaxError internal constructor(
     message: String,
-    val fileName: String?,
-    val lineNumber: Int,
-    val columnNumber: Int,
-    val lineSource: String?,
+    public val fileName: String?,
+    public val lineNumber: Int,
+    public val columnNumber: Int,
+    public val lineSource: String?,
     cause: Throwable?,
 ) : JsException(message, cause)
 
 /** The engine itself could not go on: it is closed, misused, or out of budget. */
-class JsEngineError internal constructor(message: String, cause: Throwable? = null) :
+public class JsEngineError internal constructor(message: String, cause: Throwable? = null) :
     JsException(message, cause)
 
 /** A shorthand for the facade's own type complaints, which reach the caller as a [JsError]. */

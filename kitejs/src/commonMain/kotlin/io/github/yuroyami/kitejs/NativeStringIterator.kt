@@ -5,7 +5,7 @@
 package io.github.yuroyami.kitejs
 
 /** The iterator behind `for (const ch of "text")`: one code point per step. */
-class NativeStringIterator : ES6Iterator {
+public class NativeStringIterator : ES6Iterator {
 
     private var string: String = ""
     private var index = 0
@@ -31,7 +31,7 @@ class NativeStringIterator : ES6Iterator {
 
     override val tag: String get() = ITERATOR_TAG
 
-    companion object {
+    public companion object {
         private const val ITERATOR_TAG = "StringIterator"
 
         internal fun init(scope: ScriptableObject, sealed: Boolean) {

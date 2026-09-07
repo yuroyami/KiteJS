@@ -7,11 +7,13 @@ package io.github.yuroyami.kitejs
 import io.github.yuroyami.kitejs.ScriptableObject.DescriptorInfo
 
 /** The spec's abstract operations on objects: integrity levels, species, grouping and the rest. */
-object AbstractEcmaObjectOperations {
+public object AbstractEcmaObjectOperations {
 
-    enum class INTEGRITY_LEVEL { FROZEN, SEALED }
+    /** How locked down an object is: `Object.freeze` or `Object.seal`. */
+    public enum class INTEGRITY_LEVEL { FROZEN, SEALED }
 
-    enum class KEY_COERCION { PROPERTY, COLLECTION }
+    /** Whether a key is coerced the way a property name is, or the way a Map key is. */
+    public enum class KEY_COERCION { PROPERTY, COLLECTION }
 
     internal fun hasOwnProperty(cx: Context, o: Any?, property: Any?): Boolean {
         val obj = ScriptableObject.ensureScriptable(o)
@@ -57,7 +59,7 @@ object AbstractEcmaObjectOperations {
     }
 
     /** SpeciesConstructor: the constructor to derive new objects from [s], or [defaultConstructor]. */
-    fun speciesConstructor(cx: Context, s: Scriptable, defaultConstructor: Constructable): Constructable {
+    public fun speciesConstructor(cx: Context, s: Scriptable, defaultConstructor: Constructable): Constructable {
         val constructor = ScriptableObject.getProperty(s, "constructor")
         if (constructor === Scriptable.NOT_FOUND || Undefined.isUndefined(constructor)) {
             return defaultConstructor
@@ -178,7 +180,7 @@ object AbstractEcmaObjectOperations {
         return list
     }
 
-    fun lengthOfArrayLike(cx: Context, o: Scriptable): Long {
+    public fun lengthOfArrayLike(cx: Context, o: Scriptable): Long {
         val value = ScriptableObject.getProperty(o, "length")
         return ScriptRuntime.toLength(arrayOf(value), 0)
     }
@@ -235,7 +237,7 @@ object AbstractEcmaObjectOperations {
     }
 
     /** IsConstructor: does [argument] have a [[Construct]] method. */
-    fun isConstructor(cx: Context, argument: Any?): Boolean {
+    public fun isConstructor(cx: Context, argument: Any?): Boolean {
         if (argument is LambdaConstructor) return true
         if (argument is LambdaFunction) return false
         if (argument is NativeProxy.NativeProxyFunction) {

@@ -5,7 +5,7 @@
 package io.github.yuroyami.kitejs
 
 /** The JavaScript `Error` object, and the prototype the other error kinds hang off. */
-class NativeError : IdScriptableObject() {
+internal class NativeError : IdScriptableObject() {
 
     private var stackProvider: RhinoException? = null
     private var stack: Any? = null
@@ -62,14 +62,14 @@ class NativeError : IdScriptableObject() {
         }
     }
 
-    fun setStackProvider(re: RhinoException) {
+    public fun setStackProvider(re: RhinoException) {
         if (stackProvider == null) {
             defineProperty(STACK_TAG, { getStackDelegated() }, { setStackDelegated(it) }, DONTENUM)
         }
         stackProvider = re
     }
 
-    fun getStackDelegated(): Any? {
+    public fun getStackDelegated(): Any? {
         if (stack != null) return stack
         val provider = stackProvider ?: return Scriptable.NOT_FOUND
         var limit = DEFAULT_STACK_LIMIT
@@ -91,7 +91,7 @@ class NativeError : IdScriptableObject() {
         return value
     }
 
-    fun setStackDelegated(value: Any?) {
+    public fun setStackDelegated(value: Any?) {
         stackProvider = null
         stack = value
     }
@@ -143,10 +143,10 @@ class NativeError : IdScriptableObject() {
         }
     }
 
-    companion object {
+    public companion object {
         private const val ERROR_TAG = "Error"
         private const val STACK_TAG = "stack"
-        const val DEFAULT_STACK_LIMIT = -1
+        public const val DEFAULT_STACK_LIMIT: Int = -1
         private const val STACK_HIDE_KEY = "_stackHide"
 
         internal fun init(scope: Scriptable, sealed: Boolean) {

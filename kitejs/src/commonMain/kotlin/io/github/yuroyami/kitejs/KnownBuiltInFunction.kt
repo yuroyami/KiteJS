@@ -8,9 +8,9 @@ package io.github.yuroyami.kitejs
  * A [LambdaFunction] the engine recognises by its [tag], so the interpreter and the runtime can
  * treat it specially. `Function.prototype.apply` and `call` are the two that matter most.
  */
-open class KnownBuiltInFunction(
+public open class KnownBuiltInFunction(
     /** What the engine identifies this function by. */
-    val tag: Any,
+    public val tag: Any,
     scope: Scriptable,
     name: String,
     length: Int,

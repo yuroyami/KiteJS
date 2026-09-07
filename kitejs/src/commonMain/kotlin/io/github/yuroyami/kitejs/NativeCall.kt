@@ -8,7 +8,7 @@ package io.github.yuroyami.kitejs
  * The activation record of one function call: its parameters, its variables and its `arguments`
  * object, kept as properties so closures and `eval` can reach them.
  */
-class NativeCall : IdScriptableObject {
+public class NativeCall : IdScriptableObject {
 
     internal val function: JSFunction?
     internal val originalArgs: Array<Any?>
@@ -97,9 +97,9 @@ class NativeCall : IdScriptableObject {
         throw IllegalArgumentException("$id")
     }
 
-    val homeObject: Scriptable? get() = function!!.homeObject
+    public val homeObject: Scriptable? get() = function!!.homeObject
 
-    companion object {
+    public companion object {
         private val CALL_TAG: Any = "Call"
         private const val Id_constructor = 1
         private const val MAX_PROTOTYPE_ID = 1

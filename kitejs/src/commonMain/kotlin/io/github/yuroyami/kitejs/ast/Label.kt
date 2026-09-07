@@ -13,27 +13,27 @@ import io.github.yuroyami.kitejs.Token
  * The constructors set position and length directly instead of delegating to [Jump], which is
  * how upstream does it too. Note the single-argument form leaves the length at -1.
  */
-class Label : Jump {
+public class Label : Jump {
 
     init {
         typeField = Token.LABEL
     }
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(pos: Int) : this(pos, -1)
+    public constructor(pos: Int) : this(pos, -1)
 
-    constructor(pos: Int, len: Int) : super() {
+    public constructor(pos: Int, len: Int) : super() {
         position = pos
         length = len
     }
 
-    constructor(pos: Int, len: Int, name: String?) : this(pos, len) {
+    public constructor(pos: Int, len: Int, name: String?) : this(pos, len) {
         this.name = name
     }
 
     /** The label name. Setting it trims the value and rejects a blank one. */
-    var name: String? = null
+    public var name: String? = null
         set(value) {
             val trimmed = value?.trim()
             if (trimmed.isNullOrEmpty()) {

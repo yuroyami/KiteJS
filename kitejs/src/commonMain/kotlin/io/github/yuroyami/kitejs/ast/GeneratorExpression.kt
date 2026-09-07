@@ -10,10 +10,10 @@ import io.github.yuroyami.kitejs.Token
  * A generator expression such as `(expr for (x in y) if (cond))`. Node type is
  * [Token.GENEXPR]. It introduces a scope, so it extends [Scope].
  */
-class GeneratorExpression(pos: Int = -1, len: Int = 1) : Scope(pos, len) {
+public class GeneratorExpression(pos: Int = -1, len: Int = 1) : Scope(pos, len) {
 
     /** The result expression. Setting it reparents the node. */
-    var result: AstNode? = null
+    public var result: AstNode? = null
         set(value) {
             val newResult = value!!
             field = newResult
@@ -23,36 +23,36 @@ class GeneratorExpression(pos: Int = -1, len: Int = 1) : Scope(pos, len) {
     private val loopList: MutableList<GeneratorExpressionLoop> = mutableListOf()
 
     /** The filter expression, or null when there is no `if` clause. */
-    var filter: AstNode? = null
+    public var filter: AstNode? = null
         set(value) {
             field = value
             value?.parent = this
         }
 
     /** Position of the `if` keyword, relative to this node. -1 if there is no filter. */
-    var ifPosition: Int = -1
+    public var ifPosition: Int = -1
 
     /** Position of the left paren of the filter condition. -1 if there is no filter. */
-    var filterLp: Int = -1
+    public var filterLp: Int = -1
 
     /** Position of the right paren of the filter condition. -1 if there is no filter. */
-    var filterRp: Int = -1
+    public var filterRp: Int = -1
 
     init {
         typeField = Token.GENEXPR
     }
 
-    val loops: List<GeneratorExpressionLoop>
+    public val loops: List<GeneratorExpressionLoop>
         get() = loopList
 
-    fun setLoops(loops: List<GeneratorExpressionLoop>) {
+    public fun setLoops(loops: List<GeneratorExpressionLoop>) {
         loopList.clear()
         for (acl in loops) {
             addLoop(acl)
         }
     }
 
-    fun addLoop(acl: GeneratorExpressionLoop) {
+    public fun addLoop(acl: GeneratorExpressionLoop) {
         loopList.add(acl)
         acl.parent = this
     }

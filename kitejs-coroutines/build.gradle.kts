@@ -17,6 +17,8 @@ plugins {
  * use coroutines pays nothing.
  */
 kotlin {
+    explicitApi()
+
     jvmToolchain(21)
 
     android {

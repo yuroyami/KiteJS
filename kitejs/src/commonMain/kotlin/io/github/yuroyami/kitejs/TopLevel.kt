@@ -14,10 +14,10 @@ package io.github.yuroyami.kitejs
  * `Context.initStandardObjects` fills this cache when the scope is a `TopLevel`. A scope that
  * inherits its globals from a prototype instead has to call [cacheBuiltins] itself.
  */
-open class TopLevel : ScriptableObject() {
+public open class TopLevel : ScriptableObject() {
 
     /** The built-in types worth caching. */
-    enum class Builtins {
+    public enum class Builtins {
         Object,
         Array,
         Function,
@@ -73,7 +73,7 @@ open class TopLevel : ScriptableObject() {
      * Takes a copy of the built-in constructors so a script cannot change what the engine itself
      * uses. `ScriptRuntime.initStandardObjects` calls this when the scope is a `TopLevel`.
      */
-    fun cacheBuiltins(scope: Scriptable, sealed: Boolean) {
+    public fun cacheBuiltins(scope: Scriptable, sealed: Boolean) {
         val c = mutableMapOf<Builtins, BaseFunction>()
         for (builtin in Builtins.entries) {
             val value = getProperty(this, builtin.name)
@@ -102,21 +102,21 @@ open class TopLevel : ScriptableObject() {
     }
 
     /** The cached constructor, or null when [cacheBuiltins] has not run. */
-    fun getBuiltinCtor(type: Builtins): BaseFunction? = ctors?.get(type)
+    public fun getBuiltinCtor(type: Builtins): BaseFunction? = ctors?.get(type)
 
     internal fun getNativeErrorCtor(type: NativeErrors): BaseFunction? = errors?.get(type)
 
     /** The cached prototype, or null when [cacheBuiltins] has not run. */
-    fun getBuiltinPrototype(type: Builtins): Scriptable? =
+    public fun getBuiltinPrototype(type: Builtins): Scriptable? =
         getBuiltinCtor(type)?.prototypeProperty as? Scriptable
 
-    companion object {
+    public companion object {
 
         /**
          * The built-in constructor for [type]. Falls back to an ordinary property lookup when the
          * scope has no cache.
          */
-        fun getBuiltinCtor(cx: Context, scope: Scriptable, type: Builtins): Function? {
+        public fun getBuiltinCtor(cx: Context, scope: Scriptable, type: Builtins): Function? {
             check(scope.parentScope == null) { "the scope has to be a top-level scope" }
             if (scope is TopLevel) scope.getBuiltinCtor(type)?.let { return it }
             // GeneratorFunction is not stored under its own name, so the fallback uses the hidden
@@ -141,7 +141,7 @@ open class TopLevel : ScriptableObject() {
          * The built-in prototype for [type]. Falls back to an ordinary property lookup when the
          * scope has no cache.
          */
-        fun getBuiltinPrototype(scope: Scriptable, type: Builtins): Scriptable? {
+        public fun getBuiltinPrototype(scope: Scriptable, type: Builtins): Scriptable? {
             check(scope.parentScope == null) { "the scope has to be a top-level scope" }
             if (scope is TopLevel) scope.getBuiltinPrototype(type)?.let { return it }
             val typeName =

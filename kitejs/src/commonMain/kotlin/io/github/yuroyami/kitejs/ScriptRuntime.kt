@@ -17,17 +17,17 @@ import io.github.yuroyami.kitejs.v8dtoa.DoubleConversion
  * terminator and whitespace classification, string-to-number parsing, and the error
  * message lookup. The rest of the file arrives with Phase 3.
  */
-object ScriptRuntime {
+public object ScriptRuntime {
 
-    val NaN: Double = Double.NaN
+    public val NaN: Double = Double.NaN
 
     // Preserve backward-compatibility with historical value of this.
-    val negativeZero: Double = -0.0
+    public val negativeZero: Double = -0.0
 
     // KMP: lives on NativeNumber upstream; moves there when Phase 3 ports it.
     internal const val MAX_SAFE_INTEGER: Double = 9007199254740991.0
 
-    fun isJSLineTerminator(c: Int): Boolean {
+    public fun isJSLineTerminator(c: Int): Boolean {
         // Optimization for faster check for eol character:
         // they do not have 0xDFD0 bits set
         if ((c and 0xDFD0) != 0) {
@@ -36,7 +36,7 @@ object ScriptRuntime {
         return c == '\n'.code || c == '\r'.code || c == 0x2028 || c == 0x2029
     }
 
-    fun isJSWhitespaceOrLineTerminator(c: Int): Boolean =
+    public fun isJSWhitespaceOrLineTerminator(c: Int): Boolean =
         isStrWhiteSpaceChar(c) || isJSLineTerminator(c)
 
     /**
@@ -210,26 +210,26 @@ object ScriptRuntime {
      * KMP: upstream looks these up reflectively by name and compares java.lang.Class objects. They
      * are only ever compared by identity, so KClass values map exactly (D-20).
      */
-    val BooleanClass: KClass<*> = Boolean::class
-    val StringClass: KClass<*> = String::class
-    val NumberClass: KClass<*> = Number::class
-    val FunctionClass: KClass<*> = Function::class
-    val ScriptableClass: KClass<*> = Scriptable::class
-    val ObjectClass: KClass<*> = Any::class
-    val BigIntegerClass: KClass<*> = KBigInt::class
+    public val BooleanClass: KClass<*> = Boolean::class
+    public val StringClass: KClass<*> = String::class
+    public val NumberClass: KClass<*> = Number::class
+    public val FunctionClass: KClass<*> = Function::class
+    public val ScriptableClass: KClass<*> = Scriptable::class
+    public val ObjectClass: KClass<*> = Any::class
+    public val BigIntegerClass: KClass<*> = KBigInt::class
 
-    val emptyArgs: Array<Any?> = arrayOf()
+    public val emptyArgs: Array<Any?> = arrayOf()
 
     private const val LIBRARY_SCOPE_KEY = "LIBRARY_SCOPE"
 
-    fun toInt32(d: Double): Int = DoubleConversion.doubleToInt32(d)
+    public fun toInt32(d: Double): Int = DoubleConversion.doubleToInt32(d)
 
-    fun toUint32(d: Double): Long = DoubleConversion.doubleToInt32(d).toLong() and 0xffffffffL
+    public fun toUint32(d: Double): Long = DoubleConversion.doubleToInt32(d).toLong() and 0xffffffffL
 
-    fun toUint32(value: Any?): Long = toUint32(toNumber(value))
+    public fun toUint32(value: Any?): Long = toUint32(toNumber(value))
 
     /** ECMAScript ToInteger: truncates toward zero, and maps NaN to positive zero. */
-    fun toInteger(d: Double): Double {
+    public fun toInteger(d: Double): Double {
         if (d.isNaN()) return +0.0
         if (d == 0.0 || d.isInfinite()) return d
         return if (d > 0.0) floor(d) else ceil(d)
@@ -243,7 +243,7 @@ object ScriptRuntime {
      * like `parseInt` does, a sign is allowed in front of one, and the binary and octal prefixes
      * are not recognised at all.
      */
-    fun toNumber(s: String): Double {
+    public fun toNumber(s: String): Double {
         val len = s.length
 
         // Skip the leading whitespace.
@@ -338,7 +338,7 @@ object ScriptRuntime {
      * If [str] is an array index, returns it as a value in 0..2^32-1. Otherwise returns -1.
      * Leading zeroes and "-0" are not indexes.
      */
-    fun indexFromString(str: String): Long {
+    public fun indexFromString(str: String): Long {
         // The length of the decimal form of Int.MAX_VALUE, 2147483647.
         val maxValueLength = 10
 
@@ -404,7 +404,7 @@ object ScriptRuntime {
     }
 
     /** Converts a number to its ECMAScript string form. */
-    fun numberToString(d: Double, base: Int): String {
+    public fun numberToString(d: Double, base: Int): String {
         if (base == 10) {
             // The common case. DoubleFormatter identifies the non-finite values efficiently, so
             // it runs before any other check.
@@ -421,14 +421,14 @@ object ScriptRuntime {
     }
 
     /** A bigint printed in [base], which is just what [KBigInt] already does. */
-    fun bigIntToString(n: KBigInt, base: Int): String {
+    public fun bigIntToString(n: KBigInt, base: Int): String {
         if (base < 2 || base > 36) throw rangeErrorById("msg.bad.radix", base.toString())
         return n.toString(base)
     }
 
-    fun toString(d: Double): String = numberToString(d, 10)
+    public fun toString(d: Double): String = numberToString(d, 10)
 
-    fun getMessageById(messageId: String, vararg args: Any?): String =
+    public fun getMessageById(messageId: String, vararg args: Any?): String =
         Messages.getMessageById(messageId, *args)
 
     /**
@@ -436,7 +436,7 @@ object ScriptRuntime {
      * the `escape` builtin: control characters become the short escapes where they exist and
      * hex escapes otherwise.
      */
-    fun escapeString(s: String, escapeQuote: Char = '"'): String {
+    public fun escapeString(s: String, escapeQuote: Char = '"'): String {
         if (!(escapeQuote == '"' || escapeQuote == '\'')) Kit.codeBug()
         var sb: StringBuilder? = null
 
@@ -509,7 +509,7 @@ object ScriptRuntime {
     }
 
     /** True for what the spec calls an Object: everything except the primitives. */
-    fun isObject(value: Any?): Boolean {
+    public fun isObject(value: Any?): Boolean {
         if (value == null) return false
         if (Undefined.isUndefined(value)) return false
         if (value is ScriptableObject) {
@@ -521,7 +521,7 @@ object ScriptRuntime {
     }
 
     /** The result of the `typeof` operator. */
-    fun typeOf(value: Any?): String {
+    public fun typeOf(value: Any?): String {
         if (value == null) return "object"
         if (value === Undefined.instance) return "undefined"
         if (value is ScriptableObject) return value.typeOf
@@ -542,7 +542,7 @@ object ScriptRuntime {
      *
      * [preferredType] is [StringClass], [NumberClass], or null for no preference.
      */
-    fun toPrimitive(input: Any?, preferredType: KClass<*>? = null): Any? {
+    public fun toPrimitive(input: Any?, preferredType: KClass<*>? = null): Any? {
         // Scriptables always go through getDefaultValue, even the ones isObject rejects.
         if (input !is Scriptable && !isObject(input)) return input
 
@@ -576,7 +576,7 @@ object ScriptRuntime {
     }
 
     /** ToString: what `String(value)` gives. */
-    fun toString(value: Any?): String {
+    public fun toString(value: Any?): String {
         var v = value
         while (true) {
             when {
@@ -598,13 +598,13 @@ object ScriptRuntime {
 
     // ---- Errors ------------------------------------------------------------------------------
 
-    fun constructError(error: String, message: String): EcmaError {
+    public fun constructError(error: String, message: String): EcmaError {
         val linep = IntArray(1)
         val filename = Context.getSourcePositionFromStack(linep)
         return constructError(error, message, filename, linep[0], null, 0)
     }
 
-    fun constructError(
+    public fun constructError(
         error: String,
         message: String,
         sourceName: String?,
@@ -613,27 +613,27 @@ object ScriptRuntime {
         columnNumber: Int,
     ): EcmaError = EcmaError(error, message, sourceName, lineNumber, lineSource, columnNumber)
 
-    fun typeError(message: String): EcmaError = constructError("TypeError", message)
+    public fun typeError(message: String): EcmaError = constructError("TypeError", message)
 
     /** Throws an error of a named constructor found in [scope], the way a builtin would build it. */
-    fun throwCustomError(cx: Context, scope: Scriptable, constructorName: String, message: String): JavaScriptException {
+    public fun throwCustomError(cx: Context, scope: Scriptable, constructorName: String, message: String): JavaScriptException {
         val linep = intArrayOf(0)
         val filename = Context.getSourcePositionFromStack(linep)
         val error = cx.newObject(scope, constructorName, arrayOf<Any?>(message, filename, linep[0]))
         return JavaScriptException(error, filename, linep[0])
     }
 
-    fun typeErrorById(messageId: String, vararg args: Any?): EcmaError =
+    public fun typeErrorById(messageId: String, vararg args: Any?): EcmaError =
         typeError(getMessageById(messageId, *args))
 
-    fun rangeError(message: String): EcmaError = constructError("RangeError", message)
+    public fun rangeError(message: String): EcmaError = constructError("RangeError", message)
 
-    fun rangeErrorById(messageId: String, vararg args: Any?): EcmaError =
+    public fun rangeErrorById(messageId: String, vararg args: Any?): EcmaError =
         rangeError(getMessageById(messageId, *args))
 
-    fun notFunctionError(value: Any?): RuntimeException = notFunctionError(value, value)
+    public fun notFunctionError(value: Any?): RuntimeException = notFunctionError(value, value)
 
-    fun notFunctionError(value: Any?, messageHelper: Any?): RuntimeException {
+    public fun notFunctionError(value: Any?, messageHelper: Any?): RuntimeException {
         val msg = JavaNumbers.toString(messageHelper)
         if (value === Scriptable.NOT_FOUND) return typeErrorById("msg.function.not.found", msg)
         return typeErrorById("msg.isnt.function", msg, typeOf(value))
@@ -650,7 +650,7 @@ object ScriptRuntime {
      * The `===` comparison. Numbers compare by value (so `NaN` is never equal to itself), strings
      * by their characters, and everything else by identity.
      */
-    fun shallowEq(x: Any?, y: Any?): Boolean {
+    public fun shallowEq(x: Any?, y: Any?): Boolean {
         if (x === y) {
             if (x !is Number) return true
             return !x.toDouble().isNaN()
@@ -675,23 +675,23 @@ object ScriptRuntime {
     // ---- Property keys ------------------------------------------------------------------------
 
     /** A property key resolved to either a string name or an array index, never both. */
-    class StringIdOrIndex {
-        val stringId: String?
-        val index: Int
+    public class StringIdOrIndex {
+        public val stringId: String?
+        public val index: Int
 
-        constructor(index: Int) {
+        public constructor(index: Int) {
             this.stringId = null
             this.index = index
         }
 
-        constructor(stringId: String) {
+        public constructor(stringId: String) {
             this.stringId = stringId
             this.index = -1
         }
     }
 
     /** Works out whether [id] names an array index or an ordinary property. */
-    fun toStringIdOrIndex(id: Any?): StringIdOrIndex {
+    public fun toStringIdOrIndex(id: Any?): StringIdOrIndex {
         if (id is Number) {
             val d = id.toDouble()
             if (d < 0.0) return StringIdOrIndex(toString(id))
@@ -705,7 +705,7 @@ object ScriptRuntime {
     }
 
     /** `obj[elem]`, giving `undefined` where the property is missing. */
-    fun getObjectElem(obj: Scriptable, elem: Any?, cx: Context): Any? {
+    public fun getObjectElem(obj: Scriptable, elem: Any?, cx: Context): Any? {
         val result = when {
             isSymbol(elem) -> ScriptableObject.getProperty(obj, elem as Symbol)
             else -> {
@@ -720,7 +720,7 @@ object ScriptRuntime {
     // ---- Truthiness and the prototype chain ---------------------------------------------------
 
     /** ToBoolean. */
-    fun toBoolean(value: Any?): Boolean {
+    public fun toBoolean(value: Any?): Boolean {
         var v = value
         while (true) {
             when {
@@ -747,7 +747,7 @@ object ScriptRuntime {
     }
 
     /** Whether [rhs] is somewhere in [lhs]'s prototype chain. */
-    fun jsDelegatesTo(lhs: Scriptable, rhs: Scriptable): Boolean {
+    public fun jsDelegatesTo(lhs: Scriptable, rhs: Scriptable): Boolean {
         var proto = lhs.prototype
         while (proto != null) {
             if (proto == rhs) return true
@@ -757,7 +757,7 @@ object ScriptRuntime {
     }
 
     /** The constructor named [constructorName] in [scope], or a failure explaining why not. */
-    fun getExistingCtor(cx: Context, scope: Scriptable, constructorName: String): Function {
+    public fun getExistingCtor(cx: Context, scope: Scriptable, constructorName: String): Function {
         val ctorVal = ScriptableObject.getProperty(scope, constructorName)
         if (ctorVal is Function) return ctorVal
         if (ctorVal === Scriptable.NOT_FOUND) {
@@ -767,7 +767,7 @@ object ScriptRuntime {
     }
 
     /** ToNumber. */
-    fun toNumber(value: Any?): Double {
+    public fun toNumber(value: Any?): Double {
         var v = value
         while (true) {
             when {
@@ -786,12 +786,12 @@ object ScriptRuntime {
         }
     }
 
-    fun toInt32(value: Any?): Int {
+    public fun toInt32(value: Any?): Int {
         if (isInt(value)) return value as Int
         return toInt32(toNumber(value))
     }
 
-    fun toInt32(args: Array<Any?>, index: Int): Int =
+    public fun toInt32(args: Array<Any?>, index: Int): Int =
         if (index < args.size) toInt32(args[index]) else 0
 
     /** What `Object.prototype.toString` gives for [obj]. */
@@ -806,7 +806,7 @@ object ScriptRuntime {
 
     // ---- Wiring a new object into its scope ----------------------------------------------------
 
-    fun setFunctionProtoAndParent(
+    public fun setFunctionProtoAndParent(
         fn: BaseFunction,
         cx: Context?,
         scope: Scriptable,
@@ -821,14 +821,14 @@ object ScriptRuntime {
         }
     }
 
-    fun setObjectProtoAndParent(obj: ScriptableObject, scope: Scriptable) {
+    public fun setObjectProtoAndParent(obj: ScriptableObject, scope: Scriptable) {
         // Unlike a function, an object always hangs off the top scope.
         val top = ScriptableObject.getTopLevelScope(scope)
         obj.parentScope = top
         obj.prototype = ScriptableObject.getClassPrototype(top, obj.className)
     }
 
-    fun setBuiltinProtoAndParent(
+    public fun setBuiltinProtoAndParent(
         obj: ScriptableObject,
         scope: Scriptable,
         type: TopLevel.Builtins,
@@ -856,7 +856,7 @@ object ScriptRuntime {
             throw typeErrorById("msg.op.not.allowed")
     }
 
-    fun typeErrorThrower(cx: Context): BaseFunction {
+    public fun typeErrorThrower(cx: Context): BaseFunction {
         var t = cx.typeErrorThrower
         if (t == null) {
             t = ThrowTypeError(cx.topCallScope!!)
@@ -865,9 +865,9 @@ object ScriptRuntime {
         return t
     }
 
-    fun hasTopCall(cx: Context): Boolean = cx.topCallScope != null
+    public fun hasTopCall(cx: Context): Boolean = cx.topCallScope != null
 
-    fun getTopCallScope(cx: Context): Scriptable = cx.topCallScope ?: throw IllegalStateException()
+    public fun getTopCallScope(cx: Context): Scriptable = cx.topCallScope ?: throw IllegalStateException()
 
     internal fun findFunctionActivation(cx: Context, f: Function): NativeCall? {
         var call = cx.currentActivationCall
@@ -878,14 +878,14 @@ object ScriptRuntime {
         return null
     }
 
-    fun doTopCall(callable: Callable, cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
+    public fun doTopCall(callable: Callable, cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
         doTopCall(callable, cx, scope, thisObj, args, cx.isTopLevelStrict)
 
-    fun doTopCall(script: Script, cx: Context, scope: Scriptable, thisObj: Scriptable): Any? =
+    public fun doTopCall(script: Script, cx: Context, scope: Scriptable, thisObj: Scriptable): Any? =
         doTopCall(script, cx, scope, thisObj, cx.isTopLevelStrict)
 
     /** Runs [callable] as the outermost call, setting up and tearing down the top scope around it. */
-    fun doTopCall(callable: Callable, cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>, isTopLevelStrict: Boolean): Any? {
+    public fun doTopCall(callable: Callable, cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>, isTopLevelStrict: Boolean): Any? {
         check(cx.topCallScope == null)
         cx.topCallScope = ScriptableObject.getTopLevelScope(scope)
         cx.useDynamicScope = cx.hasFeature(Context.FEATURE_DYNAMIC_SCOPE)
@@ -900,7 +900,7 @@ object ScriptRuntime {
         }
     }
 
-    fun doTopCall(script: Script, cx: Context, scope: Scriptable, thisObj: Scriptable, isTopLevelStrict: Boolean): Any? {
+    public fun doTopCall(script: Script, cx: Context, scope: Scriptable, thisObj: Scriptable, isTopLevelStrict: Boolean): Any? {
         check(cx.topCallScope == null)
         cx.topCallScope = ScriptableObject.getTopLevelScope(scope)
         cx.useDynamicScope = cx.hasFeature(Context.FEATURE_DYNAMIC_SCOPE)
@@ -918,7 +918,7 @@ object ScriptRuntime {
     // ---- apply and call ------------------------------------------------------------------------
 
     /** `Function.prototype.apply` and `call`, which differ only in how the arguments arrive. */
-    fun applyOrCall(isApply: Boolean, cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
+    public fun applyOrCall(isApply: Boolean, cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
         val l = args.size
         val function = getCallable(thisObj)
         val callThis = getApplyOrCallThis(cx, scope, if (l == 0) null else args[0], l, function)
@@ -939,7 +939,7 @@ object ScriptRuntime {
         return value
     }
 
-    fun getApplyOrCallThis(cx: Context, scope: Scriptable, arg0: Any?, l: Int, target: Callable): Scriptable? {
+    public fun getApplyOrCallThis(cx: Context, scope: Scriptable, arg0: Any?, l: Int, target: Callable): Scriptable? {
         var callThis: Scriptable?
         if (cx.hasFeature(Context.FEATURE_OLD_UNDEF_NULL_THIS)) {
             // The old rule: a missing or null this becomes the global object for everyone.
@@ -971,20 +971,20 @@ object ScriptRuntime {
         obj != null && (obj is NativeArray || obj is Arguments || ScriptableObject.hasProperty(obj, "length"))
 
     /** Calls [fun_] the way script would, with [thisArg] converted to an object. */
-    fun call(cx: Context, fun_: Any?, thisArg: Any?, args: Array<Any?>, scope: Scriptable): Any? {
+    public fun call(cx: Context, fun_: Any?, thisArg: Any?, args: Array<Any?>, scope: Scriptable): Any? {
         if (fun_ !is Function) throw notFunctionError(toString(fun_))
         val thisObj = toObjectOrNull(cx, thisArg, scope) ?: throw undefCallError(null, "function")
         return fun_.call(cx, scope, thisObj, args)
     }
 
-    fun undefCallError(obj: Any?, id: Any?): RuntimeException =
+    public fun undefCallError(obj: Any?, id: Any?): RuntimeException =
         typeErrorById("msg.undef.method.call", toString(obj), toString(id))
 
     /**
      * The next index to try after an empty match. In unicode mode a surrogate pair counts as one
      * step, so an empty match never lands between the two halves.
      */
-    fun advanceStringIndex(string: String, index: Long, unicode: Boolean): Long {
+    public fun advanceStringIndex(string: String, index: Long, unicode: Boolean): Long {
         if (index > NativeNumber.MAX_SAFE_INTEGER) Kit.codeBug()
         if (!unicode) return index + 1
         if (index + 1 > string.length) return index + 1
@@ -993,7 +993,7 @@ object ScriptRuntime {
     }
 
     /** Adds to the instruction budget and tells the context when the threshold is crossed. */
-    fun addInstructionCount(cx: Context, instructionsToAdd: Int) {
+    public fun addInstructionCount(cx: Context, instructionsToAdd: Int) {
         cx.instructionCount += instructionsToAdd
         if (cx.instructionCount > cx.instructionThreshold) {
             cx.observeInstructionCountInternal(cx.instructionCount)
@@ -1005,7 +1005,7 @@ object ScriptRuntime {
      * The number a property name stands for when it is a canonical numeric index, or null. A typed
      * array treats those names as element positions and everything else as ordinary properties.
      */
-    fun canonicalNumericIndexString(arg: String): Double? {
+    public fun canonicalNumericIndexString(arg: String): Double? {
         if ("-0" == arg) return Double.NEGATIVE_INFINITY
         val num = toNumber(arg)
         // "NaN" is deliberately not a number here.
@@ -1014,7 +1014,7 @@ object ScriptRuntime {
     }
 
     /** ToIndex: a non-negative integer that fits the safe range, or a RangeError. */
-    fun toIndex(value: Any?): Int {
+    public fun toIndex(value: Any?): Int {
         if (Undefined.isUndefined(value)) return 0
         val integerIndex = toInteger(value)
         if (integerIndex < 0) throw rangeErrorById("msg.out.of.range.index", integerIndex)
@@ -1023,23 +1023,23 @@ object ScriptRuntime {
         return index.toInt()
     }
 
-    fun isArrayObject(obj: Any?): Boolean = obj is NativeArray || obj is Arguments
+    public fun isArrayObject(obj: Any?): Boolean = obj is NativeArray || obj is Arguments
 
     /** True when an iterator result object says the iteration is over. */
-    fun isIteratorDone(cx: Context, result: Any?): Boolean {
+    public fun isIteratorDone(cx: Context, result: Any?): Boolean {
         if (result !is Scriptable) return false
         return toBoolean(getObjectProp(result, ES6Iterator.DONE_PROPERTY, cx))
     }
 
     // ---- ToObject ------------------------------------------------------------------------------
 
-    fun toObject(scope: Scriptable, value: Any?): Scriptable {
+    public fun toObject(scope: Scriptable, value: Any?): Scriptable {
         if (value is Scriptable) return value
         return toObject(Context.getContext(), scope, value)
     }
 
     /** ToObject: wraps a primitive in its object, and refuses null and undefined. */
-    fun toObject(cx: Context, scope: Scriptable, value: Any?): Scriptable {
+    public fun toObject(cx: Context, scope: Scriptable, value: Any?): Scriptable {
         if (value == null) throw typeErrorById("msg.null.to.object")
         if (Undefined.isUndefined(value)) throw typeErrorById("msg.undef.to.object")
         if (value is SymbolKey) {
@@ -1072,13 +1072,13 @@ object ScriptRuntime {
         throw errorWithClassName("msg.invalid.type", value)
     }
 
-    fun toObjectOrNull(cx: Context, obj: Any?): Scriptable? {
+    public fun toObjectOrNull(cx: Context, obj: Any?): Scriptable? {
         if (obj is Scriptable) return obj
         if (obj != null && !Undefined.isUndefined(obj)) return toObject(cx, getTopCallScope(cx), obj)
         return null
     }
 
-    fun toObjectOrNull(cx: Context, obj: Any?, scope: Scriptable): Scriptable? {
+    public fun toObjectOrNull(cx: Context, obj: Any?, scope: Scriptable): Scriptable? {
         if (obj is Scriptable) return obj
         if (obj != null && !Undefined.isUndefined(obj)) return toObject(cx, scope, obj)
         return null
@@ -1086,52 +1086,52 @@ object ScriptRuntime {
 
     // ---- Small helpers the natives share ---------------------------------------------------------
 
-    fun toNumber(args: Array<Any?>, index: Int): Double =
+    public fun toNumber(args: Array<Any?>, index: Int): Double =
         if (index < args.size) toNumber(args[index]) else Double.NaN
 
     /** ToUint16: the low 16 bits of ToInt32, as a char. */
-    fun toUint16(value: Any?): Char {
+    public fun toUint16(value: Any?): Char {
         val d = toNumber(value)
         return DoubleConversion.doubleToInt32(d).toChar()
     }
 
-    fun clamp(value: Int, min: Int, max: Int): Int = when {
+    public fun clamp(value: Int, min: Int, max: Int): Int = when {
         value < min -> min
         value > max -> max
         else -> value
     }
 
-    fun toString(args: Array<Any?>, index: Int): String =
+    public fun toString(args: Array<Any?>, index: Int): String =
         if (index < args.size) toString(args[index]) else "undefined"
 
-    fun toInteger(value: Any?): Double = toInteger(toNumber(value))
+    public fun toInteger(value: Any?): Double = toInteger(toNumber(value))
 
-    fun toInteger(args: Array<Any?>, index: Int): Double =
+    public fun toInteger(args: Array<Any?>, index: Int): Double =
         if (index < args.size) toInteger(args[index]) else +0.0
 
-    fun toLength(args: Array<Any?>, index: Int): Long {
+    public fun toLength(args: Array<Any?>, index: Int): Long {
         val len = toInteger(args, index)
         if (len <= 0.0) return 0
         return minOf(len, NativeNumber.MAX_SAFE_INTEGER).toLong()
     }
 
-    fun toLength(value: Any?): Long {
+    public fun toLength(value: Any?): Long {
         val len = toInteger(value)
         if (len <= 0.0) return 0
         return minOf(len, NativeNumber.MAX_SAFE_INTEGER).toLong()
     }
 
-    fun toIntegerOrInfinity(value: Any?): Double {
+    public fun toIntegerOrInfinity(value: Any?): Double {
         if (isInt(value)) return (value as Int).toDouble()
         return toIntegerOrInfinity(toNumber(value))
     }
 
-    fun toIntegerOrInfinity(d: Double): Double = DoubleConversion.truncate(d)
+    public fun toIntegerOrInfinity(d: Double): Double = DoubleConversion.truncate(d)
 
-    fun isNaN(n: Any?): Boolean = (n is Double && n.isNaN()) || (n is Float && n.isNaN())
+    public fun isNaN(n: Any?): Boolean = (n is Double && n.isNaN()) || (n is Float && n.isNaN())
 
     /** SameValue: `Object.is`. NaN equals NaN, and +0 and -0 differ. */
-    fun same(x: Any?, y: Any?): Boolean {
+    public fun same(x: Any?, y: Any?): Boolean {
         if (typeOf(x) != typeOf(y)) return false
         if (x is Number) {
             if (isNaN(x) && isNaN(y)) return true
@@ -1141,7 +1141,7 @@ object ScriptRuntime {
     }
 
     /** SameValueZero: like [same], but +0 and -0 are equal. */
-    fun sameZero(x: Any?, y: Any?): Boolean {
+    public fun sameZero(x: Any?, y: Any?): Boolean {
         if (typeOf(x) != typeOf(y)) return false
         if (x is KBigInt) return x == y
         if (x is Number) {
@@ -1156,7 +1156,7 @@ object ScriptRuntime {
         return eq(x, y)
     }
 
-    fun getTopLevelProp(scope: Scriptable, id: String): Any? {
+    public fun getTopLevelProp(scope: Scriptable, id: String): Any? {
         val top = ScriptableObject.getTopLevelScope(scope)
         return ScriptableObject.getProperty(top, id)
     }
@@ -1261,7 +1261,7 @@ object ScriptRuntime {
      * Walks the iterable [arg1] and hands each `[key, value]` pair to [setter]. Returns false when
      * there is nothing to walk.
      */
-    fun loadFromIterable(cx: Context, scope: Scriptable, arg1: Any?, setter: (Any?, Any?) -> Unit): Boolean {
+    public fun loadFromIterable(cx: Context, scope: Scriptable, arg1: Any?, setter: (Any?, Any?) -> Unit): Boolean {
         if (arg1 == null || Undefined.isUndefined(arg1)) return false
         // Call the "[Symbol.iterator]" property as a function.
         val ito = callIterator(arg1, cx, scope)
@@ -1288,19 +1288,19 @@ object ScriptRuntime {
 
     // ---- Making objects ------------------------------------------------------------------------
 
-    fun newObject(cx: Context, scope: Scriptable, constructorName: String, args: Array<Any?>?): Scriptable {
+    public fun newObject(cx: Context, scope: Scriptable, constructorName: String, args: Array<Any?>?): Scriptable {
         val top = ScriptableObject.getTopLevelScope(scope)
         val ctor = getExistingCtor(cx, top, constructorName)
         return ctor.construct(cx, top, args ?: emptyArgs)
     }
 
-    fun newObject(ctor: Any?, cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable {
+    public fun newObject(ctor: Any?, cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable {
         if (ctor !is Constructable) throw notFunctionError(ctor)
         return ctor.construct(cx, scope, args)
     }
 
     /** The elements of an array-like object, with holes read as `undefined`. */
-    fun getArrayElements(obj: Scriptable): Array<Any?> {
+    public fun getArrayElements(obj: Scriptable): Array<Any?> {
         val cx = Context.getContext()
         val longLen = NativeArray.getLengthProperty(cx, obj)
         require(longLen <= Int.MAX_VALUE)
@@ -1329,10 +1329,10 @@ object ScriptRuntime {
     }
 
     /** Builds the global scope. */
-    fun initStandardObjects(cx: Context, scope: ScriptableObject?, sealed: Boolean): ScriptableObject =
+    public fun initStandardObjects(cx: Context, scope: ScriptableObject?, sealed: Boolean): ScriptableObject =
         initSafeStandardObjects(cx, scope, sealed)
 
-    fun initSafeStandardObjects(cx: Context, scopeIn: ScriptableObject?, sealed: Boolean): ScriptableObject {
+    public fun initSafeStandardObjects(cx: Context, scopeIn: ScriptableObject?, sealed: Boolean): ScriptableObject {
         var scope = scopeIn
         if (scope == null) {
             scope = NativeObject()
@@ -1423,7 +1423,7 @@ object ScriptRuntime {
      * regexp package can be left out of a build; there is one implementation here and no service
      * loader in common Kotlin, so it is simply constructed (D-44).
      */
-    fun getRegExpProxy(cx: Context): RegExpProxy? {
+    public fun getRegExpProxy(cx: Context): RegExpProxy? {
         var proxy = cx.regExpProxy
         if (proxy == null) {
             proxy = io.github.yuroyami.kitejs.regexp.RegExpImpl()
@@ -1436,38 +1436,38 @@ object ScriptRuntime {
         getRegExpProxy(cx)?.register(scope, sealed)
     }
 
-    fun setRegExpProxy(cx: Context, proxy: RegExpProxy?) {
+    public fun setRegExpProxy(cx: Context, proxy: RegExpProxy?) {
         cx.regExpProxy = proxy
     }
 
-    fun checkRegExpProxy(cx: Context): RegExpProxy =
+    public fun checkRegExpProxy(cx: Context): RegExpProxy =
         getRegExpProxy(cx) ?: throw Context.reportRuntimeErrorById("msg.no.regexp")
 
     // ---- Numbers -------------------------------------------------------------------------------
 
-    val NaNobj: Double = Double.NaN
-    val negativeZeroObj: Double = -0.0
-    val zeroObj: Double = 0.0
+    public val NaNobj: Double = Double.NaN
+    public val negativeZeroObj: Double = -0.0
+    public val zeroObj: Double = 0.0
 
     /** The `+` operator applied to two values that both have to become strings. */
-    fun concat(lhs: Any?, rhs: Any?): Any {
+    public fun concat(lhs: Any?, rhs: Any?): Any {
         val rhsString = toString(rhs)
         val lhsString = toString(lhs)
         return ConsString(lhsString, rhsString)
     }
 
     /** Boxes a double, sharing one NaN. */
-    fun wrapNumber(x: Double): Number = if (x.isNaN()) NaNobj else x
+    public fun wrapNumber(x: Double): Number = if (x.isNaN()) NaNobj else x
 
-    fun wrapBoolean(b: Boolean): Boolean = b
+    public fun wrapBoolean(b: Boolean): Boolean = b
 
-    fun wrapInt(i: Int): Int = i
+    public fun wrapInt(i: Int): Int = i
 
     /**
      * `value is Int` that stays true to its name on Kotlin/JS (D-32), where every number passes the
      * `is Int` check. The extra test is free on the JVM, where an Int is always a whole number.
      */
-    fun isInt(value: Any?): Boolean {
+    public fun isInt(value: Any?): Boolean {
         if (value !is Int) return false
         val d = value.toDouble()
         return d.toInt().toDouble() == d && d.toRawBits() != NEGATIVE_ZERO_BITS
@@ -1479,7 +1479,7 @@ object ScriptRuntime {
      * A number or a bigint, read as a double. This is what upstream got for free from
      * `Number.doubleValue()` before bigints stopped being [Number] (D-54).
      */
-    fun numericToDouble(value: Any?): Double = when (value) {
+    public fun numericToDouble(value: Any?): Double = when (value) {
         is Double -> value
         is Int -> value.toDouble()
         is KBigInt -> value.toDouble()
@@ -1488,19 +1488,19 @@ object ScriptRuntime {
     }
 
     /** ToNumeric: a number or a bigint. Not `Number`, because a bigint is not one (D-54). */
-    fun toNumeric(value: Any?): Any {
+    public fun toNumeric(value: Any?): Any {
         val v = toPrimitive(value, NumberClass)
         if (v is Number || v is KBigInt) return v
         return toNumber(v)
     }
 
-    fun toCharSequence(value: Any?): CharSequence {
+    public fun toCharSequence(value: Any?): CharSequence {
         if (value is NativeString) return value.toCharSequence()
         return if (value is CharSequence) value else toString(value)
     }
 
     /** ToBigInt. Until phase 5 only a bigint value or a plain decimal string can be converted (D-5). */
-    fun toBigInt(value: Any?): KBigInt {
+    public fun toBigInt(value: Any?): KBigInt {
         val v = toPrimitive(value, NumberClass)
         if (v is KBigInt) return v
         if (v is Number) {
@@ -1517,7 +1517,7 @@ object ScriptRuntime {
         throw errorWithClassName("msg.primitive.expected", v)
     }
 
-    fun toBigInt(s: String): KBigInt {
+    public fun toBigInt(s: String): KBigInt {
         val len = s.length
         var start = 0
         var startChar: Char
@@ -1564,20 +1564,20 @@ object ScriptRuntime {
             throw syntaxErrorById("msg.bigint.bad.form")
         }
 
-    fun syntaxError(message: String): EcmaError = constructError("SyntaxError", message)
+    public fun syntaxError(message: String): EcmaError = constructError("SyntaxError", message)
 
-    fun syntaxErrorById(messageId: String, vararg args: Any?): EcmaError = syntaxError(getMessageById(messageId, *args))
+    public fun syntaxErrorById(messageId: String, vararg args: Any?): EcmaError = syntaxError(getMessageById(messageId, *args))
 
-    fun referenceError(message: String): EcmaError = constructError("ReferenceError", message)
+    public fun referenceError(message: String): EcmaError = constructError("ReferenceError", message)
 
-    fun referenceErrorById(messageId: String, vararg args: Any?): EcmaError = referenceError(getMessageById(messageId, *args))
+    public fun referenceErrorById(messageId: String, vararg args: Any?): EcmaError = referenceError(getMessageById(messageId, *args))
 
     private fun bigIntOperand(): RuntimeException = typeErrorById("msg.cant.convert.to.number", "BigInt")
 
     // ---- Arithmetic ----------------------------------------------------------------------------
 
     /** The `+` operator: string concatenation when either side is a string, addition otherwise. */
-    fun add(lval: Any?, rval: Any?, cx: Context): Any? {
+    public fun add(lval: Any?, rval: Any?, cx: Context): Any? {
         if (isInt(lval) && isInt(rval)) return add(lval as Int, rval as Int)
         if (lval is KBigInt && rval is KBigInt) return lval.add(rval)
         if (lval is Number && lval !is KBigInt && rval is Number && rval !is KBigInt) {
@@ -1597,41 +1597,41 @@ object ScriptRuntime {
         return numericToDouble(lnum) + numericToDouble(rnum)
     }
 
-    fun add(val1: CharSequence, val2: Any?): CharSequence = ConsString(val1, toCharSequence(val2))
+    public fun add(val1: CharSequence, val2: Any?): CharSequence = ConsString(val1, toCharSequence(val2))
 
-    fun add(val1: Any?, val2: CharSequence): CharSequence = ConsString(toCharSequence(val1), val2)
+    public fun add(val1: Any?, val2: CharSequence): CharSequence = ConsString(toCharSequence(val1), val2)
 
     /** Int plus Int, falling back to a double on overflow. */
-    fun add(i1: Int, i2: Int): Any {
+    public fun add(i1: Int, i2: Int): Any {
         val r = i1.toLong() + i2.toLong()
         return if (r >= Int.MIN_VALUE && r <= Int.MAX_VALUE) r.toInt() else r.toDouble()
     }
 
-    fun subtract(i1: Int, i2: Int): Number {
+    public fun subtract(i1: Int, i2: Int): Number {
         val r = i1.toLong() - i2.toLong()
         return if (r >= Int.MIN_VALUE && r <= Int.MAX_VALUE) r.toInt() else r.toDouble()
     }
 
-    fun multiply(i1: Int, i2: Int): Number {
+    public fun multiply(i1: Int, i2: Int): Number {
         val r = i1.toLong() * i2.toLong()
         return if (r >= Int.MIN_VALUE && r <= Int.MAX_VALUE) r.toInt() else r.toDouble()
     }
 
-    fun subtract(val1: Any?, val2: Any?): Any = when {
+    public fun subtract(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> val1.subtract(val2)
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
         isInt(val1) && isInt(val2) -> subtract(val1 as Int, val2 as Int)
         else -> numericToDouble(val1) - numericToDouble(val2)
     }
 
-    fun multiply(val1: Any?, val2: Any?): Any = when {
+    public fun multiply(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> val1.multiply(val2)
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
         isInt(val1) && isInt(val2) -> multiply(val1 as Int, val2 as Int)
         else -> numericToDouble(val1) * numericToDouble(val2)
     }
 
-    fun divide(val1: Any?, val2: Any?): Any = when {
+    public fun divide(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> {
             if (val2.isZero) throw rangeErrorById("msg.division.zero")
             val1.divide(val2)
@@ -1640,7 +1640,7 @@ object ScriptRuntime {
         else -> numericToDouble(val1) / numericToDouble(val2)
     }
 
-    fun remainder(val1: Any?, val2: Any?): Any = when {
+    public fun remainder(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> {
             if (val2.isZero) throw rangeErrorById("msg.division.zero")
             val1.remainder(val2)
@@ -1649,7 +1649,7 @@ object ScriptRuntime {
         else -> numericToDouble(val1).rem(numericToDouble(val2))
     }
 
-    fun exponentiate(val1: Any?, val2: Any?): Any = when {
+    public fun exponentiate(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> {
             if (val2.signum() == -1) throw rangeErrorById("msg.bigint.negative.exponent")
             val1.pow(val2.intValueExact())
@@ -1658,58 +1658,58 @@ object ScriptRuntime {
         else -> numericToDouble(val1).pow(numericToDouble(val2))
     }
 
-    fun bitwiseAND(val1: Double, val2: Double): Double = (toInt32(val1) and toInt32(val2)).toDouble()
+    public fun bitwiseAND(val1: Double, val2: Double): Double = (toInt32(val1) and toInt32(val2)).toDouble()
 
-    fun bitwiseAND(val1: Any?, val2: Any?): Any = when {
+    public fun bitwiseAND(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> val1.and(val2)
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
         isInt(val1) && isInt(val2) -> (val1 as Int) and (val2 as Int)
         else -> (toInt32(numericToDouble(val1)) and toInt32(numericToDouble(val2))).toDouble()
     }
 
-    fun bitwiseOR(val1: Double, val2: Double): Double = (toInt32(val1) or toInt32(val2)).toDouble()
+    public fun bitwiseOR(val1: Double, val2: Double): Double = (toInt32(val1) or toInt32(val2)).toDouble()
 
-    fun bitwiseOR(val1: Any?, val2: Any?): Any = when {
+    public fun bitwiseOR(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> val1.or(val2)
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
         isInt(val1) && isInt(val2) -> (val1 as Int) or (val2 as Int)
         else -> (toInt32(numericToDouble(val1)) or toInt32(numericToDouble(val2))).toDouble()
     }
 
-    fun bitwiseXOR(val1: Double, val2: Double): Double = (toInt32(val1) xor toInt32(val2)).toDouble()
+    public fun bitwiseXOR(val1: Double, val2: Double): Double = (toInt32(val1) xor toInt32(val2)).toDouble()
 
-    fun bitwiseXOR(val1: Any?, val2: Any?): Any = when {
+    public fun bitwiseXOR(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> val1.xor(val2)
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
         isInt(val1) && isInt(val2) -> (val1 as Int) xor (val2 as Int)
         else -> (toInt32(numericToDouble(val1)) xor toInt32(numericToDouble(val2))).toDouble()
     }
 
-    fun leftShift(val1: Double, val2: Double): Double = (toInt32(val1) shl toInt32(val2)).toDouble()
+    public fun leftShift(val1: Double, val2: Double): Double = (toInt32(val1) shl toInt32(val2)).toDouble()
 
-    fun leftShift(val1: Any?, val2: Any?): Any = when {
+    public fun leftShift(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> val1.shiftLeft(val2.intValueExact())
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
         isInt(val1) && isInt(val2) -> (val1 as Int) shl (val2 as Int)
         else -> (toInt32(numericToDouble(val1)) shl toInt32(numericToDouble(val2))).toDouble()
     }
 
-    fun signedRightShift(val1: Double, val2: Double): Double = (toInt32(val1) shr toInt32(val2)).toDouble()
+    public fun signedRightShift(val1: Double, val2: Double): Double = (toInt32(val1) shr toInt32(val2)).toDouble()
 
-    fun signedRightShift(val1: Any?, val2: Any?): Any = when {
+    public fun signedRightShift(val1: Any?, val2: Any?): Any = when {
         val1 is KBigInt && val2 is KBigInt -> val1.shiftRight(val2.intValueExact())
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
         isInt(val1) && isInt(val2) -> (val1 as Int) shr (val2 as Int)
         else -> (toInt32(numericToDouble(val1)) shr toInt32(numericToDouble(val2))).toDouble()
     }
 
-    fun bitwiseNOT(value: Any?): Any = when {
+    public fun bitwiseNOT(value: Any?): Any = when {
         value is KBigInt -> value.not()
         isInt(value) -> (value as Int).inv()
         else -> toInt32(numericToDouble(value)).inv().toDouble()
     }
 
-    fun negate(value: Any?): Any {
+    public fun negate(value: Any?): Any {
         if (value is KBigInt) return value.negate()
         if (isInt(value)) {
             val i = value as Int
@@ -1722,7 +1722,7 @@ object ScriptRuntime {
     // ---- Comparison ----------------------------------------------------------------------------
 
     /** The `==` operator. */
-    fun eq(x: Any?, y: Any?): Boolean {
+    public fun eq(x: Any?, y: Any?): Boolean {
         if (x == null || Undefined.isUndefined(x)) {
             if (y == null || Undefined.isUndefined(y)) return true
             if (y is ScriptableObject) {
@@ -1784,7 +1784,7 @@ object ScriptRuntime {
         return x === y
     }
 
-    fun isPrimitive(obj: Any?): Boolean =
+    public fun isPrimitive(obj: Any?): Boolean =
         obj == null || Undefined.isUndefined(obj) || obj is Number || obj is String || obj is Boolean
 
     internal fun eqNumber(x: Double, value: Any?): Boolean {
@@ -1865,19 +1865,19 @@ object ScriptRuntime {
         }
     }
 
-    fun instanceOf(a: Any?, b: Any?, cx: Context): Boolean {
+    public fun instanceOf(a: Any?, b: Any?, cx: Context): Boolean {
         if (b !is Scriptable) throw typeErrorById("msg.instanceof.not.object")
         if (a !is Scriptable) return false
         return b.hasInstance(a)
     }
 
-    fun `in`(a: Any?, b: Any?, cx: Context): Boolean {
+    public fun `in`(a: Any?, b: Any?, cx: Context): Boolean {
         if (b !is Scriptable) throw typeErrorById("msg.in.not.object")
         return hasObjectElem(b, a, cx)
     }
 
     /** The relational operators, [op] being one of GE, LE, GT and LT. */
-    fun compare(val1: Any?, val2: Any?, op: Int): Boolean {
+    public fun compare(val1: Any?, val2: Any?, op: Int): Boolean {
         if (val1 is Number && val2 is Number) return compareNumeric(val1, val2, op)
         if (isSymbol(val1) || isSymbol(val2)) throw typeErrorById("msg.compare.symbol")
         val v1 = toPrimitive(val1, NumberClass)
@@ -1895,7 +1895,7 @@ object ScriptRuntime {
     }
 
     /** The numeric half, where each side is already a number or a bigint. */
-    fun compareNumeric(val1: Any?, val2: Any?, op: Int): Boolean {
+    public fun compareNumeric(val1: Any?, val2: Any?, op: Int): Boolean {
         if (val1 is KBigInt && val2 is KBigInt) return compareTo(val1.compareTo(val2), op)
         if (val1 is KBigInt || val2 is KBigInt) {
             // A bigint against a double, with the infinities settled first.
@@ -1947,19 +1947,19 @@ object ScriptRuntime {
         }
     }
 
-    fun undefReadError(obj: Any?, id: Any?): RuntimeException =
+    public fun undefReadError(obj: Any?, id: Any?): RuntimeException =
         typeErrorById("msg.undef.prop.read", toString(obj), toString(id))
 
-    fun undefWriteError(obj: Any?, id: Any?, value: Any?): RuntimeException =
+    public fun undefWriteError(obj: Any?, id: Any?, value: Any?): RuntimeException =
         typeErrorById("msg.undef.prop.write", toString(obj), toString(id), toString(value))
 
     private fun undefDeleteError(obj: Any?, id: Any?): RuntimeException =
         typeErrorById("msg.undef.prop.delete", toString(obj), toString(id))
 
-    fun notFoundError(obj: Scriptable?, property: String): RuntimeException =
+    public fun notFoundError(obj: Scriptable?, property: String): RuntimeException =
         constructError("ReferenceError", getMessageById("msg.is.not.defined", property))
 
-    fun notFunctionError(obj: Any?, value: Any?, propertyName: String): RuntimeException {
+    public fun notFunctionError(obj: Any?, value: Any?, propertyName: String): RuntimeException {
         var objString = toString(obj)
         if (obj is JSFunction) {
             // Show the head of the function's source, not the whole body.
@@ -1971,18 +1971,18 @@ object ScriptRuntime {
         return typeErrorById("msg.isnt.function.in", propertyName, objString, typeOf(value))
     }
 
-    fun getObjectElem(obj: Any?, elem: Any?, cx: Context): Any? = getObjectElem(obj, elem, cx, getTopCallScope(cx))
+    public fun getObjectElem(obj: Any?, elem: Any?, cx: Context): Any? = getObjectElem(obj, elem, cx, getTopCallScope(cx))
 
-    fun getObjectElem(obj: Any?, elem: Any?, cx: Context, scope: Scriptable): Any? =
+    public fun getObjectElem(obj: Any?, elem: Any?, cx: Context, scope: Scriptable): Any? =
         getObjectElem(asScriptableOrThrowUndefReadError(cx, scope, obj, elem), elem, cx)
 
-    fun getSuperElem(superObject: Any?, elem: Any?, cx: Context, scope: Scriptable, thisObject: Any?): Any? {
+    public fun getSuperElem(superObject: Any?, elem: Any?, cx: Context, scope: Scriptable, thisObject: Any?): Any? {
         val superScriptable = asScriptableOrThrowUndefReadError(cx, scope, superObject, elem)
         val thisScriptable = asScriptableOrThrowUndefReadError(cx, scope, thisObject, elem)
         return getSuperElem(elem, superScriptable, thisScriptable)
     }
 
-    fun getSuperElem(elem: Any?, superScriptable: Scriptable, thisScriptable: Scriptable): Any? {
+    public fun getSuperElem(elem: Any?, superScriptable: Scriptable, thisScriptable: Scriptable): Any? {
         val result = if (isSymbol(elem)) {
             ScriptableObject.getSuperProperty(superScriptable, thisScriptable, elem as Symbol)
         } else {
@@ -1993,12 +1993,12 @@ object ScriptRuntime {
         return if (result === Scriptable.NOT_FOUND) Undefined.instance else result
     }
 
-    fun getObjectProp(obj: Any?, property: String, cx: Context): Any? = getObjectProp(obj, property, cx, getTopCallScope(cx))
+    public fun getObjectProp(obj: Any?, property: String, cx: Context): Any? = getObjectProp(obj, property, cx, getTopCallScope(cx))
 
-    fun getObjectProp(obj: Any?, property: String, cx: Context, scope: Scriptable): Any? =
+    public fun getObjectProp(obj: Any?, property: String, cx: Context, scope: Scriptable): Any? =
         getObjectProp(asScriptableOrThrowUndefReadError(cx, scope, obj, property), property, cx)
 
-    fun getObjectProp(obj: Scriptable, property: String, cx: Context): Any? {
+    public fun getObjectProp(obj: Scriptable, property: String, cx: Context): Any? {
         val result = ScriptableObject.getProperty(obj, property)
         if (result === Scriptable.NOT_FOUND) {
             if (cx.hasFeature(Context.FEATURE_STRICT_MODE)) {
@@ -2009,16 +2009,16 @@ object ScriptRuntime {
         return result
     }
 
-    fun getObjectPropNoWarn(obj: Any?, property: String, cx: Context): Any? =
+    public fun getObjectPropNoWarn(obj: Any?, property: String, cx: Context): Any? =
         getObjectPropNoWarn(obj, property, cx, getTopCallScope(cx))
 
-    fun getObjectPropNoWarn(obj: Any?, property: String, cx: Context, scope: Scriptable): Any? {
+    public fun getObjectPropNoWarn(obj: Any?, property: String, cx: Context, scope: Scriptable): Any? {
         val sobj = asScriptableOrThrowUndefReadError(cx, scope, obj, property)
         val result = ScriptableObject.getProperty(sobj, property)
         return if (result === Scriptable.NOT_FOUND) Undefined.instance else result
     }
 
-    fun getSuperProp(superObject: Any?, property: String, cx: Context, scope: Scriptable, thisObject: Any?, noWarn: Boolean): Any? {
+    public fun getSuperProp(superObject: Any?, property: String, cx: Context, scope: Scriptable, thisObject: Any?, noWarn: Boolean): Any? {
         val superScriptable = asScriptableOrThrowUndefReadError(cx, scope, superObject, property)
         val thisScriptable = asScriptableOrThrowUndefReadError(cx, scope, thisObject, property)
         return getSuperProp(superScriptable, thisScriptable, property, cx, noWarn)
@@ -2036,21 +2036,21 @@ object ScriptRuntime {
         return result
     }
 
-    fun getObjectIndex(obj: Any?, dblIndex: Double, cx: Context): Any? = getObjectIndex(obj, dblIndex, cx, getTopCallScope(cx))
+    public fun getObjectIndex(obj: Any?, dblIndex: Double, cx: Context): Any? = getObjectIndex(obj, dblIndex, cx, getTopCallScope(cx))
 
-    fun getObjectIndex(obj: Any?, dblIndex: Double, cx: Context, scope: Scriptable): Any? {
+    public fun getObjectIndex(obj: Any?, dblIndex: Double, cx: Context, scope: Scriptable): Any? {
         val sobj = asScriptableOrThrowUndefReadError(cx, scope, obj, dblIndex)
         val index = dblIndex.toInt()
         if (index.toDouble() == dblIndex && index >= 0) return getObjectIndex(sobj, index, cx)
         return getObjectProp(sobj, toString(dblIndex), cx)
     }
 
-    fun getObjectIndex(obj: Scriptable, index: Int, cx: Context): Any? {
+    public fun getObjectIndex(obj: Scriptable, index: Int, cx: Context): Any? {
         val result = ScriptableObject.getProperty(obj, index)
         return if (result === Scriptable.NOT_FOUND) Undefined.instance else result
     }
 
-    fun getSuperIndex(superObject: Any?, dblIndex: Double, cx: Context, scope: Scriptable, thisObject: Any?): Any? {
+    public fun getSuperIndex(superObject: Any?, dblIndex: Double, cx: Context, scope: Scriptable, thisObject: Any?): Any? {
         val superScriptable = asScriptableOrThrowUndefReadError(cx, scope, superObject, dblIndex)
         val thisScriptable = asScriptableOrThrowUndefReadError(cx, scope, thisObject, dblIndex)
         val index = dblIndex.toInt()
@@ -2061,14 +2061,14 @@ object ScriptRuntime {
         return getSuperProp(superScriptable, thisScriptable, toString(dblIndex), cx, false)
     }
 
-    fun setObjectElem(obj: Any?, elem: Any?, value: Any?, cx: Context): Any? = setObjectElem(obj, elem, value, cx, getTopCallScope(cx))
+    public fun setObjectElem(obj: Any?, elem: Any?, value: Any?, cx: Context): Any? = setObjectElem(obj, elem, value, cx, getTopCallScope(cx))
 
-    fun setObjectElem(obj: Any?, elem: Any?, value: Any?, cx: Context, scope: Scriptable): Any? {
+    public fun setObjectElem(obj: Any?, elem: Any?, value: Any?, cx: Context, scope: Scriptable): Any? {
         verifyIsScriptableOrComplainWriteErrorInEs5Strict(obj, elem, value, cx)
         return setObjectElem(asScriptableOrThrowUndefWriteError(cx, scope, obj, elem, value), elem, value, cx)
     }
 
-    fun setObjectElem(obj: Scriptable, elem: Any?, value: Any?, cx: Context): Any? {
+    public fun setObjectElem(obj: Scriptable, elem: Any?, value: Any?, cx: Context): Any? {
         if (isSymbol(elem)) {
             ScriptableObject.putProperty(obj, elem as Symbol, value)
         } else {
@@ -2079,13 +2079,13 @@ object ScriptRuntime {
         return value
     }
 
-    fun setSuperElem(superObject: Any?, elem: Any?, value: Any?, cx: Context, scope: Scriptable, thisObject: Any?): Any? {
+    public fun setSuperElem(superObject: Any?, elem: Any?, value: Any?, cx: Context, scope: Scriptable, thisObject: Any?): Any? {
         val superScriptable = asScriptableOrThrowUndefWriteError(cx, scope, superObject, elem, value)
         val thisScriptable = asScriptableOrThrowUndefWriteError(cx, scope, thisObject, elem, value)
         return setSuperElem(superScriptable, thisScriptable, elem, value, cx)
     }
 
-    fun setSuperElem(superScriptable: Scriptable, thisScriptable: Scriptable, elem: Any?, value: Any?, cx: Context): Any? {
+    public fun setSuperElem(superScriptable: Scriptable, thisScriptable: Scriptable, elem: Any?, value: Any?, cx: Context): Any? {
         if (isSymbol(elem)) {
             ScriptableObject.putSuperProperty(superScriptable, thisScriptable, elem as Symbol, value)
         } else {
@@ -2096,19 +2096,19 @@ object ScriptRuntime {
         return value
     }
 
-    fun setObjectProp(obj: Any?, property: String, value: Any?, cx: Context): Any? = setObjectProp(obj, property, value, cx, getTopCallScope(cx))
+    public fun setObjectProp(obj: Any?, property: String, value: Any?, cx: Context): Any? = setObjectProp(obj, property, value, cx, getTopCallScope(cx))
 
-    fun setObjectProp(obj: Any?, property: String, value: Any?, cx: Context, scope: Scriptable): Any? {
+    public fun setObjectProp(obj: Any?, property: String, value: Any?, cx: Context, scope: Scriptable): Any? {
         verifyIsScriptableOrComplainWriteErrorInEs5Strict(obj, property, value, cx)
         return setObjectProp(asScriptableOrThrowUndefWriteError(cx, scope, obj, property, value), property, value, cx)
     }
 
-    fun setObjectProp(obj: Scriptable, property: String, value: Any?, cx: Context): Any? {
+    public fun setObjectProp(obj: Scriptable, property: String, value: Any?, cx: Context): Any? {
         ScriptableObject.putProperty(obj, property, value)
         return value
     }
 
-    fun setSuperProp(superObject: Any?, property: String, value: Any?, cx: Context, scope: Scriptable, thisObject: Any?): Any? {
+    public fun setSuperProp(superObject: Any?, property: String, value: Any?, cx: Context, scope: Scriptable, thisObject: Any?): Any? {
         verifyIsScriptableOrComplainWriteErrorInEs5Strict(superObject, property, value, cx)
         verifyIsScriptableOrComplainWriteErrorInEs5Strict(thisObject, property, value, cx)
         val superScriptable = asScriptableOrThrowUndefWriteError(cx, scope, superObject, property, value)
@@ -2117,9 +2117,9 @@ object ScriptRuntime {
         return value
     }
 
-    fun setObjectIndex(obj: Any?, dblIndex: Double, value: Any?, cx: Context): Any? = setObjectIndex(obj, dblIndex, value, cx, getTopCallScope(cx))
+    public fun setObjectIndex(obj: Any?, dblIndex: Double, value: Any?, cx: Context): Any? = setObjectIndex(obj, dblIndex, value, cx, getTopCallScope(cx))
 
-    fun setObjectIndex(obj: Any?, dblIndex: Double, value: Any?, cx: Context, scope: Scriptable): Any? {
+    public fun setObjectIndex(obj: Any?, dblIndex: Double, value: Any?, cx: Context, scope: Scriptable): Any? {
         verifyIsScriptableOrComplainWriteErrorInEs5Strict(obj, dblIndex, value, cx)
         val sobj = asScriptableOrThrowUndefWriteError(cx, scope, obj, dblIndex, value)
         val index = dblIndex.toInt()
@@ -2127,12 +2127,12 @@ object ScriptRuntime {
         return setObjectProp(sobj, toString(dblIndex), value, cx)
     }
 
-    fun setObjectIndex(obj: Scriptable, index: Int, value: Any?, cx: Context): Any? {
+    public fun setObjectIndex(obj: Scriptable, index: Int, value: Any?, cx: Context): Any? {
         ScriptableObject.putProperty(obj, index, value)
         return value
     }
 
-    fun setSuperIndex(superObject: Any?, dblIndex: Double, value: Any?, cx: Context, scope: Scriptable, thisObject: Any?): Any? {
+    public fun setSuperIndex(superObject: Any?, dblIndex: Double, value: Any?, cx: Context, scope: Scriptable, thisObject: Any?): Any? {
         val superScriptable = asScriptableOrThrowUndefWriteError(cx, scope, superObject, dblIndex, value)
         val thisScriptable = asScriptableOrThrowUndefWriteError(cx, scope, thisObject, dblIndex, value)
         val index = dblIndex.toInt()
@@ -2144,7 +2144,7 @@ object ScriptRuntime {
         return value
     }
 
-    fun deleteObjectElem(target: Scriptable, elem: Any?, cx: Context): Boolean {
+    public fun deleteObjectElem(target: Scriptable, elem: Any?, cx: Context): Boolean {
         if (isSymbol(elem)) {
             val so = ScriptableObject.ensureSymbolScriptable(target)
             val sym = elem as Symbol
@@ -2160,31 +2160,31 @@ object ScriptRuntime {
         return !target.has(s.stringId, target)
     }
 
-    fun hasObjectElem(target: Scriptable, elem: Any?, cx: Context): Boolean {
+    public fun hasObjectElem(target: Scriptable, elem: Any?, cx: Context): Boolean {
         if (isSymbol(elem)) return ScriptableObject.hasProperty(target, elem as Symbol)
         val s = toStringIdOrIndex(elem)
         return if (s.stringId == null) ScriptableObject.hasProperty(target, s.index)
         else ScriptableObject.hasProperty(target, s.stringId)
     }
 
-    fun refGet(ref: Ref, cx: Context): Any? = ref.get(cx)
+    public fun refGet(ref: Ref, cx: Context): Any? = ref.get(cx)
 
-    fun refSet(ref: Ref, value: Any?, cx: Context): Any? = refSet(ref, value, cx, getTopCallScope(cx))
+    public fun refSet(ref: Ref, value: Any?, cx: Context): Any? = refSet(ref, value, cx, getTopCallScope(cx))
 
-    fun refSet(ref: Ref, value: Any?, cx: Context, scope: Scriptable): Any? = ref.set(cx, scope, value)
+    public fun refSet(ref: Ref, value: Any?, cx: Context, scope: Scriptable): Any? = ref.set(cx, scope, value)
 
-    fun refDel(ref: Ref, cx: Context): Any? = wrapBoolean(ref.delete(cx))
+    public fun refDel(ref: Ref, cx: Context): Any? = wrapBoolean(ref.delete(cx))
 
-    fun specialRef(obj: Any?, specialProperty: String, cx: Context): Ref = specialRef(obj, specialProperty, cx, getTopCallScope(cx))
+    public fun specialRef(obj: Any?, specialProperty: String, cx: Context): Ref = specialRef(obj, specialProperty, cx, getTopCallScope(cx))
 
-    fun specialRef(obj: Any?, specialProperty: String, cx: Context, scope: Scriptable): Ref =
+    public fun specialRef(obj: Any?, specialProperty: String, cx: Context, scope: Scriptable): Ref =
         SpecialRef.createSpecial(cx, scope, obj, specialProperty)
 
-    fun delete(obj: Any?, id: Any?, cx: Context): Any? = delete(obj, id, cx, false)
+    public fun delete(obj: Any?, id: Any?, cx: Context): Any? = delete(obj, id, cx, false)
 
-    fun delete(obj: Any?, id: Any?, cx: Context, isName: Boolean): Any? = delete(obj, id, cx, getTopCallScope(cx), isName)
+    public fun delete(obj: Any?, id: Any?, cx: Context, isName: Boolean): Any? = delete(obj, id, cx, getTopCallScope(cx), isName)
 
-    fun delete(obj: Any?, id: Any?, cx: Context, scope: Scriptable, isName: Boolean): Any? {
+    public fun delete(obj: Any?, id: Any?, cx: Context, scope: Scriptable, isName: Boolean): Any? {
         val sobj = toObjectOrNull(cx, obj, scope)
         if (sobj == null) {
             if (isName) return true
@@ -2196,7 +2196,7 @@ object ScriptRuntime {
     // ---- Names and scopes ----------------------------------------------------------------------
 
     /** Looks [name] up through the scope chain, the way a bare identifier does. */
-    fun name(cx: Context, scope: Scriptable, name: String): Any? {
+    public fun name(cx: Context, scope: Scriptable, name: String): Any? {
         val parent = scope.parentScope
         if (parent == null) {
             val result = topScopeName(cx, scope, name)
@@ -2207,7 +2207,7 @@ object ScriptRuntime {
     }
 
     /** Finds the object in the scope chain that holds [id], for an assignment. Null if none does. */
-    fun bind(cx: Context, scope: Scriptable, id: String): Scriptable? {
+    public fun bind(cx: Context, scope: Scriptable, id: String): Scriptable? {
         var s = scope
         var parent = s.parentScope
         if (parent != null) {
@@ -2234,7 +2234,7 @@ object ScriptRuntime {
         return if (ScriptableObject.hasProperty(s, id)) s else null
     }
 
-    fun setName(bound: Scriptable?, value: Any?, cx: Context, scope: Scriptable, id: String): Any? {
+    public fun setName(bound: Scriptable?, value: Any?, cx: Context, scope: Scriptable, id: String): Any? {
         if (bound != null) {
             ScriptableObject.putProperty(bound, id, value)
         } else {
@@ -2249,7 +2249,7 @@ object ScriptRuntime {
         return value
     }
 
-    fun strictSetName(bound: Scriptable?, value: Any?, cx: Context, scope: Scriptable, id: String): Any? {
+    public fun strictSetName(bound: Scriptable?, value: Any?, cx: Context, scope: Scriptable, id: String): Any? {
         if (bound != null) {
             ScriptableObject.putProperty(bound, id, value)
             return value
@@ -2257,7 +2257,7 @@ object ScriptRuntime {
         throw constructError("ReferenceError", "Assignment to undefined \"$id\" in strict mode")
     }
 
-    fun setConst(bound: Scriptable, value: Any?, cx: Context, id: String): Any? {
+    public fun setConst(bound: Scriptable, value: Any?, cx: Context, id: String): Any? {
         ScriptableObject.putConstProperty(bound, id, value)
         return value
     }
@@ -2374,13 +2374,13 @@ object ScriptRuntime {
         cx.scratchScriptable = value
     }
 
-    fun lastStoredScriptable(cx: Context): Scriptable? {
+    public fun lastStoredScriptable(cx: Context): Scriptable? {
         val result = cx.scratchScriptable
         cx.scratchScriptable = null
         return result
     }
 
-    fun typeofName(scope: Scriptable, id: String): String {
+    public fun typeofName(scope: Scriptable, id: String): String {
         val cx = Context.getContext()
         val v = bind(cx, scope, id) ?: return "undefined"
         return typeOf(getObjectProp(v, id, cx))
@@ -2389,15 +2389,15 @@ object ScriptRuntime {
     // ---- Function lookups for calls ------------------------------------------------------------
 
     /** What a call site needs: the callee and the `this` it goes with. */
-    class LookupResult internal constructor(
-        val result: Any?,
+    public class LookupResult internal constructor(
+        public val result: Any?,
         /** The `this` the callee is called with. */
-        val thisObj: Scriptable?,
+        public val thisObj: Scriptable?,
         private val nameOrIndex: Any?,
     ) {
-        val name: String get() = nameOrIndex?.toString() ?: "null"
-        val callable: Callable get() = result as? Callable ?: throw notFunctionError(result, name)
-        fun call(cx: Context, scope: Scriptable, args: Array<Any?>): Any? = callable.call(cx, scope, thisObj, args)
+        public val name: String get() = nameOrIndex?.toString() ?: "null"
+        public val callable: Callable get() = result as? Callable ?: throw notFunctionError(result, name)
+        public fun call(cx: Context, scope: Scriptable, args: Array<Any?>): Any? = callable.call(cx, scope, thisObj, args)
     }
 
     /** Stands in for a missing method when the object has a `__noSuchMethod__` hook. */
@@ -2406,9 +2406,9 @@ object ScriptRuntime {
             noSuchMethodMethod.call(cx, scope, thisObj, arrayOf(methodName, newArrayLiteral(args, null, cx, scope)))
     }
 
-    fun getNameAndThis(name: String, cx: Context, scope: Scriptable): LookupResult? = getNameAndThisInner(name, cx, scope, false)
+    public fun getNameAndThis(name: String, cx: Context, scope: Scriptable): LookupResult? = getNameAndThisInner(name, cx, scope, false)
 
-    fun getNameAndThisOptional(name: String, cx: Context, scope: Scriptable): LookupResult? = getNameAndThisInner(name, cx, scope, true)
+    public fun getNameAndThisOptional(name: String, cx: Context, scope: Scriptable): LookupResult? = getNameAndThisInner(name, cx, scope, true)
 
     private fun getNameAndThisInner(name: String, cx: Context, scope: Scriptable, isOptionalChainingCall: Boolean): LookupResult? {
         val parent = scope.parentScope
@@ -2423,9 +2423,9 @@ object ScriptRuntime {
         return nameOrFunction(cx, scope, parent, name, isOptionalChainingCall)
     }
 
-    fun getElemAndThis(obj: Any?, elem: Any?, cx: Context, scope: Scriptable): LookupResult? = getElemAndThisInner(obj, elem, cx, scope, false)
+    public fun getElemAndThis(obj: Any?, elem: Any?, cx: Context, scope: Scriptable): LookupResult? = getElemAndThisInner(obj, elem, cx, scope, false)
 
-    fun getElemAndThisOptional(obj: Any?, elem: Any?, cx: Context, scope: Scriptable): LookupResult? = getElemAndThisInner(obj, elem, cx, scope, true)
+    public fun getElemAndThisOptional(obj: Any?, elem: Any?, cx: Context, scope: Scriptable): LookupResult? = getElemAndThisInner(obj, elem, cx, scope, true)
 
     private fun getElemAndThisInner(obj: Any?, elem: Any?, cx: Context, scope: Scriptable, isOptionalChainingCall: Boolean): LookupResult? {
         val thisObj: Scriptable
@@ -2445,9 +2445,9 @@ object ScriptRuntime {
         return LookupResult(value, thisObj, elem.toString())
     }
 
-    fun getPropAndThis(obj: Any?, property: String, cx: Context, scope: Scriptable): LookupResult? = getPropAndThisInner(obj, property, cx, scope, false)
+    public fun getPropAndThis(obj: Any?, property: String, cx: Context, scope: Scriptable): LookupResult? = getPropAndThisInner(obj, property, cx, scope, false)
 
-    fun getPropAndThisOptional(obj: Any?, property: String, cx: Context, scope: Scriptable): LookupResult? = getPropAndThisInner(obj, property, cx, scope, true)
+    public fun getPropAndThisOptional(obj: Any?, property: String, cx: Context, scope: Scriptable): LookupResult? = getPropAndThisInner(obj, property, cx, scope, true)
 
     private fun getPropAndThisInner(obj: Any?, property: String, cx: Context, scope: Scriptable, isOptionalChainingCall: Boolean): LookupResult? =
         getPropAndThisHelper(obj, property, cx, toObjectOrNull(cx, obj, scope), isOptionalChainingCall)
@@ -2468,9 +2468,9 @@ object ScriptRuntime {
         return LookupResult(value, thisObj, property)
     }
 
-    fun getValueAndThis(value: Any?, cx: Context): LookupResult? = getValueAndThisInner(value, cx, false)
+    public fun getValueAndThis(value: Any?, cx: Context): LookupResult? = getValueAndThisInner(value, cx, false)
 
-    fun getValueAndThisOptional(value: Any?, cx: Context): LookupResult? = getValueAndThisInner(value, cx, true)
+    public fun getValueAndThisOptional(value: Any?, cx: Context): LookupResult? = getValueAndThisInner(value, cx, true)
 
     private fun getValueAndThisInner(value: Any?, cx: Context, isOptionalChainingCall: Boolean): LookupResult? {
         if (value !is Callable) {
@@ -2483,7 +2483,7 @@ object ScriptRuntime {
         return LookupResult(value, thisObj, value)
     }
 
-    fun getElemFunctionAndThis(obj: Any?, elem: Any?, cx: Context, scope: Scriptable): Callable? {
+    public fun getElemFunctionAndThis(obj: Any?, elem: Any?, cx: Context, scope: Scriptable): Callable? {
         val thisObj: Scriptable
         val value: Any?
         if (isSymbol(elem)) {
@@ -2507,13 +2507,13 @@ object ScriptRuntime {
     }
 
     /** Calls `obj[Symbol.iterator]()`. */
-    fun callIterator(obj: Any?, cx: Context, scope: Scriptable): Any? {
+    public fun callIterator(obj: Any?, cx: Context, scope: Scriptable): Any? {
         val getIterator = getElemFunctionAndThis(obj, SymbolKey.ITERATOR, cx, scope)!!
         val iterable = lastStoredScriptable(cx)
         return getIterator.call(cx, scope, iterable, emptyArgs)
     }
 
-    fun callRef(function: Callable, thisObj: Scriptable?, args: Array<Any?>, cx: Context): Ref {
+    public fun callRef(function: Callable, thisObj: Scriptable?, args: Array<Any?>, cx: Context): Ref {
         if (function is RefCallable) {
             return function.refCall(cx, thisObj, args)
         }
@@ -2521,7 +2521,7 @@ object ScriptRuntime {
     }
 
     /** A call to `eval` or `With`, which get special treatment when they are the real ones. */
-    fun callSpecial(cx: Context, fun_: Callable?, thisObj: Scriptable?, args: Array<Any?>, scope: Scriptable, callerThis: Scriptable?, callType: Int, filename: String?, lineNumber: Int, isOptionalChainingCall: Boolean): Any? {
+    public fun callSpecial(cx: Context, fun_: Callable?, thisObj: Scriptable?, args: Array<Any?>, scope: Scriptable, callerThis: Scriptable?, callType: Int, filename: String?, lineNumber: Int, isOptionalChainingCall: Boolean): Any? {
         if (fun_ == null && isOptionalChainingCall) return Undefined.instance
         when (callType) {
             Node.SPECIALCALL_EVAL -> {
@@ -2537,7 +2537,7 @@ object ScriptRuntime {
         return fun_!!.call(cx, scope, thisObj, args)
     }
 
-    fun newSpecial(cx: Context, fun_: Any?, args: Array<Any?>, scope: Scriptable, callType: Int): Any? {
+    public fun newSpecial(cx: Context, fun_: Any?, args: Array<Any?>, scope: Scriptable, callType: Int): Any? {
         when (callType) {
             Node.SPECIALCALL_EVAL -> if (NativeGlobal.isEvalFunction(fun_)) throw typeErrorById("msg.not.ctor", "eval")
             Node.SPECIALCALL_WITH -> if (NativeWith.isWithFunction(fun_)) return NativeWith.newWithSpecial(cx, scope, args)
@@ -2547,7 +2547,7 @@ object ScriptRuntime {
     }
 
     /** Direct `eval`: compiles the string in the caller's scope. */
-    fun evalSpecial(cx: Context, scope: Scriptable, thisArg: Any?, args: Array<Any?>, filenameIn: String?, lineNumberIn: Int): Any? {
+    public fun evalSpecial(cx: Context, scope: Scriptable, thisArg: Any?, args: Array<Any?>, filenameIn: String?, lineNumberIn: Int): Any? {
         if (args.isEmpty()) return Undefined.instance
         val x = args[0]
         if (x !is CharSequence) {
@@ -2581,9 +2581,9 @@ object ScriptRuntime {
 
     // ---- Increment and decrement -----------------------------------------------------------------
 
-    fun nameIncrDecr(scopeChain: Scriptable, id: String, incrDecrMask: Int): Any? = nameIncrDecr(scopeChain, id, Context.getContext(), incrDecrMask)
+    public fun nameIncrDecr(scopeChain: Scriptable, id: String, incrDecrMask: Int): Any? = nameIncrDecr(scopeChain, id, Context.getContext(), incrDecrMask)
 
-    fun nameIncrDecr(scopeChainIn: Scriptable, id: String, cx: Context, incrDecrMask: Int): Any? {
+    public fun nameIncrDecr(scopeChainIn: Scriptable, id: String, cx: Context, incrDecrMask: Int): Any? {
         var scopeChain: Scriptable? = scopeChainIn
         var target: Scriptable?
         var value: Any?
@@ -2595,14 +2595,14 @@ object ScriptRuntime {
                 if (value !== Scriptable.NOT_FOUND) return doScriptableIncrDecr(target, id, scopeChain, value, incrDecrMask)
                 target = target.prototype
             } while (target != null)
-            scopeChain = scopeChain!!.parentScope
+            scopeChain = scopeChain.parentScope
         } while (scopeChain != null)
         throw notFoundError(null, id)
     }
 
-    fun propIncrDecr(obj: Any?, id: String, cx: Context, incrDecrMask: Int): Any? = propIncrDecr(obj, id, cx, getTopCallScope(cx), incrDecrMask)
+    public fun propIncrDecr(obj: Any?, id: String, cx: Context, incrDecrMask: Int): Any? = propIncrDecr(obj, id, cx, getTopCallScope(cx), incrDecrMask)
 
-    fun propIncrDecr(obj: Any?, id: String, cx: Context, scope: Scriptable, incrDecrMask: Int): Any? {
+    public fun propIncrDecr(obj: Any?, id: String, cx: Context, scope: Scriptable, incrDecrMask: Int): Any? {
         val start = asScriptableOrThrowUndefReadError(cx, scope, obj, id)
         var target: Scriptable? = start
         do {
@@ -2628,9 +2628,9 @@ object ScriptRuntime {
         return if (post) number else result
     }
 
-    fun elemIncrDecr(obj: Any?, index: Any?, cx: Context, incrDecrMask: Int): Any? = elemIncrDecr(obj, index, cx, getTopCallScope(cx), incrDecrMask)
+    public fun elemIncrDecr(obj: Any?, index: Any?, cx: Context, incrDecrMask: Int): Any? = elemIncrDecr(obj, index, cx, getTopCallScope(cx), incrDecrMask)
 
-    fun elemIncrDecr(obj: Any?, index: Any?, cx: Context, scope: Scriptable, incrDecrMask: Int): Any? {
+    public fun elemIncrDecr(obj: Any?, index: Any?, cx: Context, scope: Scriptable, incrDecrMask: Int): Any? {
         val value = getObjectElem(obj, index, cx, scope)
         val post = (incrDecrMask and Node.POST_FLAG) != 0
         val number = if (value is Number || value is KBigInt) value else toNumeric(value)
@@ -2639,9 +2639,9 @@ object ScriptRuntime {
         return if (post) number else result
     }
 
-    fun refIncrDecr(ref: Ref, cx: Context, incrDecrMask: Int): Any? = refIncrDecr(ref, cx, getTopCallScope(cx), incrDecrMask)
+    public fun refIncrDecr(ref: Ref, cx: Context, incrDecrMask: Int): Any? = refIncrDecr(ref, cx, getTopCallScope(cx), incrDecrMask)
 
-    fun refIncrDecr(ref: Ref, cx: Context, scope: Scriptable, incrDecrMask: Int): Any? {
+    public fun refIncrDecr(ref: Ref, cx: Context, scope: Scriptable, incrDecrMask: Int): Any? {
         val value = ref.get(cx)
         val post = (incrDecrMask and Node.POST_FLAG) != 0
         val number = if (value is Number || value is KBigInt) value else toNumeric(value)
@@ -2652,13 +2652,13 @@ object ScriptRuntime {
 
     // ---- Enumeration (for..in, for..of) -------------------------------------------------------
 
-    const val ENUMERATE_KEYS = 0
-    const val ENUMERATE_VALUES = 1
-    const val ENUMERATE_ARRAY = 2
-    const val ENUMERATE_KEYS_NO_ITERATOR = 3
-    const val ENUMERATE_VALUES_NO_ITERATOR = 4
-    const val ENUMERATE_ARRAY_NO_ITERATOR = 5
-    const val ENUMERATE_VALUES_IN_ORDER = 6
+    public const val ENUMERATE_KEYS: Int = 0
+    public const val ENUMERATE_VALUES: Int = 1
+    public const val ENUMERATE_ARRAY: Int = 2
+    public const val ENUMERATE_KEYS_NO_ITERATOR: Int = 3
+    public const val ENUMERATE_VALUES_NO_ITERATOR: Int = 4
+    public const val ENUMERATE_ARRAY_NO_ITERATOR: Int = 5
+    public const val ENUMERATE_VALUES_IN_ORDER: Int = 6
 
     /** The state of one `for..in` or `for..of` loop. */
     private class IdEnumeration {
@@ -2673,16 +2673,16 @@ object ScriptRuntime {
     }
 
     /** Makes the enumeration hand back Int indices rather than their string form. */
-    fun setEnumNumbers(enumObj: Any?, enumNumbers: Boolean) {
+    public fun setEnumNumbers(enumObj: Any?, enumNumbers: Boolean) {
         (enumObj as IdEnumeration).enumNumbers = enumNumbers
     }
 
-    fun enumInit(value: Any?, cx: Context, enumValues: Boolean): Any =
+    public fun enumInit(value: Any?, cx: Context, enumValues: Boolean): Any =
         enumInit(value, cx, if (enumValues) ENUMERATE_VALUES else ENUMERATE_KEYS)
 
-    fun enumInit(value: Any?, cx: Context, enumType: Int): Any = enumInit(value, cx, getTopCallScope(cx), enumType)
+    public fun enumInit(value: Any?, cx: Context, enumType: Int): Any = enumInit(value, cx, getTopCallScope(cx), enumType)
 
-    fun enumInit(value: Any?, cx: Context, scope: Scriptable, enumType: Int): Any {
+    public fun enumInit(value: Any?, cx: Context, scope: Scriptable, enumType: Int): Any {
         val x = IdEnumeration()
         x.obj = toObjectOrNull(cx, value, scope)
         if (enumType == ENUMERATE_VALUES_IN_ORDER) {
@@ -2715,7 +2715,7 @@ object ScriptRuntime {
     }
 
     /** The legacy `__iterator__` protocol. Null when the object does not use it. */
-    fun toIterator(cx: Context, obj: Scriptable, keyOnly: Boolean): Scriptable? {
+    public fun toIterator(cx: Context, obj: Scriptable, keyOnly: Boolean): Scriptable? {
         if (ScriptableObject.hasProperty(obj, NativeIterator.ITERATOR_PROPERTY_NAME)) {
             val v = ScriptableObject.getProperty(obj, NativeIterator.ITERATOR_PROPERTY_NAME)
             if (v !is Function) throw typeErrorById("msg.invalid.iterator")
@@ -2726,9 +2726,9 @@ object ScriptRuntime {
         return null
     }
 
-    fun enumNext(enumObj: Any?): Boolean = enumNext(enumObj, Context.getContext())
+    public fun enumNext(enumObj: Any?): Boolean = enumNext(enumObj, Context.getContext())
 
-    fun enumNext(enumObj: Any?, cx: Context): Boolean {
+    public fun enumNext(enumObj: Any?, cx: Context): Boolean {
         val x = enumObj as IdEnumeration
         val iterator = x.iterator
         if (iterator != null) {
@@ -2781,7 +2781,7 @@ object ScriptRuntime {
         return true
     }
 
-    fun enumId(enumObj: Any?, cx: Context): Any? {
+    public fun enumId(enumObj: Any?, cx: Context): Any? {
         val x = enumObj as IdEnumeration
         if (x.iterator != null) return x.currentId
         return when (x.enumType) {
@@ -2793,7 +2793,7 @@ object ScriptRuntime {
         }
     }
 
-    fun enumValue(enumObj: Any?, cx: Context): Any? {
+    public fun enumValue(enumObj: Any?, cx: Context): Any? {
         val x = enumObj as IdEnumeration
         val obj = x.obj!!
         val id = x.currentId
@@ -2821,7 +2821,7 @@ object ScriptRuntime {
     // ---- Activations, scripts and scopes ------------------------------------------------------
 
     /** Puts a script's declared variables into [scope] before it runs. */
-    fun initScript(execObj: ScriptOrFn<*>, thisObj: Scriptable?, cx: Context, scope: Scriptable, evalScript: Boolean) {
+    public fun initScript(execObj: ScriptOrFn<*>, thisObj: Scriptable?, cx: Context, scope: Scriptable, evalScript: Boolean) {
         if (cx.topCallScope == null) throw IllegalStateException()
         val desc = execObj.descriptor!!
         val varCount = desc.paramAndVarCount
@@ -2848,27 +2848,27 @@ object ScriptRuntime {
         }
     }
 
-    fun createFunctionActivation(funObj: JSFunction, cx: Context, scope: Scriptable, args: Array<Any?>?, isStrict: Boolean, argsHasRest: Boolean, requiresArgumentObject: Boolean = true): Scriptable =
+    public fun createFunctionActivation(funObj: JSFunction, cx: Context, scope: Scriptable, args: Array<Any?>?, isStrict: Boolean, argsHasRest: Boolean, requiresArgumentObject: Boolean = true): Scriptable =
         NativeCall(funObj, cx, scope, args, false, isStrict, argsHasRest, requiresArgumentObject)
 
-    fun createArrowFunctionActivation(funObj: JSFunction, cx: Context, scope: Scriptable, args: Array<Any?>?, isStrict: Boolean, argsHasRest: Boolean, requiresArgumentObject: Boolean = true): Scriptable =
+    public fun createArrowFunctionActivation(funObj: JSFunction, cx: Context, scope: Scriptable, args: Array<Any?>?, isStrict: Boolean, argsHasRest: Boolean, requiresArgumentObject: Boolean = true): Scriptable =
         NativeCall(funObj, cx, scope, args, true, isStrict, argsHasRest, requiresArgumentObject)
 
-    fun enterActivationFunction(cx: Context, scope: Scriptable) {
+    public fun enterActivationFunction(cx: Context, scope: Scriptable) {
         if (cx.topCallScope == null) throw IllegalStateException()
         val call = scope as NativeCall
         call.parentActivationCall = cx.currentActivationCall
         cx.currentActivationCall = call
     }
 
-    fun exitActivationFunction(cx: Context) {
+    public fun exitActivationFunction(cx: Context) {
         val call = cx.currentActivationCall!!
         cx.currentActivationCall = call.parentActivationCall
         call.parentActivationCall = null
     }
 
     /** Puts a declared function into the scope it belongs to. */
-    fun initFunction(cx: Context, scope: Scriptable, function: JSFunction, type: Int, fromEvalCode: Boolean) {
+    public fun initFunction(cx: Context, scope: Scriptable, function: JSFunction, type: Int, fromEvalCode: Boolean) {
         if (type == FunctionNode.FUNCTION_STATEMENT) {
             val name = function.functionName
             if (name.isNotEmpty()) {
@@ -2892,7 +2892,7 @@ object ScriptRuntime {
      * Builds the script-visible error object for a Java-side exception. `javaException` and
      * `rhinoException` are LiveConnect properties and are not ported.
      */
-    fun wrapException(t: Throwable, scope: Scriptable, cx: Context): Scriptable {
+    public fun wrapException(t: Throwable, scope: Scriptable, cx: Context): Scriptable {
         val re: RhinoException
         val errorName: String
         val errorMsg: String?
@@ -2911,7 +2911,7 @@ object ScriptRuntime {
         return errorObject
     }
 
-    fun newCatchScope(t: Throwable, lastCatchScope: Scriptable?, exceptionName: String?, cx: Context, scope: Scriptable): Scriptable {
+    public fun newCatchScope(t: Throwable, lastCatchScope: Scriptable?, exceptionName: String?, cx: Context, scope: Scriptable): Scriptable {
         val obj: Any?
         val cacheObj: Boolean
         if (t is JavaScriptException) {
@@ -2959,14 +2959,14 @@ object ScriptRuntime {
         return catchScopeObject
     }
 
-    fun enterWith(obj: Any?, cx: Context, scope: Scriptable): Scriptable {
+    public fun enterWith(obj: Any?, cx: Context, scope: Scriptable): Scriptable {
         val sobj = toObjectOrNull(cx, obj, scope) ?: throw typeErrorById("msg.undef.with", toString(obj))
         return NativeWith.create(scope, sobj)
     }
 
-    fun leaveWith(scope: Scriptable): Scriptable = (scope as NativeWith).parentScope!!
+    public fun leaveWith(scope: Scriptable): Scriptable = (scope as NativeWith).parentScope!!
 
-    fun newBuiltinObject(cx: Context, scope: Scriptable, type: TopLevel.Builtins, args: Array<Any?>?): Scriptable {
+    public fun newBuiltinObject(cx: Context, scope: Scriptable, type: TopLevel.Builtins, args: Array<Any?>?): Scriptable {
         val top = ScriptableObject.getTopLevelScope(scope)
         val ctor = TopLevel.getBuiltinCtor(cx, top, type)!!
         return ctor.construct(cx, top, args ?: emptyArgs)
@@ -2981,7 +2981,7 @@ object ScriptRuntime {
     // ---- Literals ------------------------------------------------------------------------------
 
     /** Builds an array from a literal's values, with [skipIndices] naming the holes. */
-    fun newArrayLiteral(objects: Array<Any?>, skipIndices: IntArray?, cx: Context, scope: Scriptable): Scriptable {
+    public fun newArrayLiteral(objects: Array<Any?>, skipIndices: IntArray?, cx: Context, scope: Scriptable): Scriptable {
         val skipDensity = 2
         val count = objects.size
         val skipCount = skipIndices?.size ?: 0
@@ -3019,13 +3019,13 @@ object ScriptRuntime {
         return array
     }
 
-    fun newObjectLiteral(propertyIds: Array<Any?>?, propertyValues: Array<Any?>, getterSetters: IntArray?, cx: Context, scope: Scriptable): Scriptable {
+    public fun newObjectLiteral(propertyIds: Array<Any?>?, propertyValues: Array<Any?>, getterSetters: IntArray?, cx: Context, scope: Scriptable): Scriptable {
         val obj = cx.newObject(scope)
         fillObjectLiteral(obj, propertyIds, propertyValues, getterSetters, cx, scope)
         return obj
     }
 
-    fun fillObjectLiteral(obj: Scriptable, propertyIds: Array<Any?>?, propertyValues: Array<Any?>, getterSetters: IntArray?, cx: Context, scope: Scriptable) {
+    public fun fillObjectLiteral(obj: Scriptable, propertyIds: Array<Any?>?, propertyValues: Array<Any?>, getterSetters: IntArray?, cx: Context, scope: Scriptable) {
         val end = propertyIds?.size ?: 0
         for (i in 0 until end) {
             val id = propertyIds!![i]
@@ -3071,10 +3071,10 @@ object ScriptRuntime {
         }
     }
 
-    fun wrapRegExp(cx: Context, scope: Scriptable, compiled: Any): Scriptable = checkRegExpProxy(cx).wrapRegExp(cx, scope, compiled)
+    public fun wrapRegExp(cx: Context, scope: Scriptable, compiled: Any): Scriptable = checkRegExpProxy(cx).wrapRegExp(cx, scope, compiled)
 
     /** The frozen strings object a tagged template passes to its tag, built once per call site. */
-    fun getTemplateLiteralCallSite(cx: Context, scope: Scriptable, strings: Array<Any?>, index: Int): Scriptable {
+    public fun getTemplateLiteralCallSite(cx: Context, scope: Scriptable, strings: Array<Any?>, index: Int): Scriptable {
         val callsite = strings[index]
         if (callsite is Scriptable) return callsite
         @Suppress("UNCHECKED_CAST")
@@ -3098,5 +3098,5 @@ object ScriptRuntime {
     }
 
     // Upstream passes the key as the message text here, so the text is the key. Copied as written.
-    fun throwDeleteOnSuperPropertyNotAllowed(): Nothing = throw referenceError("msg.delete.super")
+    public fun throwDeleteOnSuperPropertyNotAllowed(): Nothing = throw referenceError("msg.delete.super")
 }

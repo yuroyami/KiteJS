@@ -10,7 +10,7 @@ package io.github.yuroyami.kitejs
  *
  * Upstream also wraps a `java.util.Iterator` here. That is LiveConnect and is not ported.
  */
-class NativeIterator private constructor(private val objectIterator: Any?) : ScriptableObject() {
+public class NativeIterator private constructor(private val objectIterator: Any?) : ScriptableObject() {
 
     /** Only for building the prototype object. */
     private constructor() : this(null)
@@ -27,19 +27,19 @@ class NativeIterator private constructor(private val objectIterator: Any?) : Scr
     }
 
     /** The value a legacy generator throws when it runs out. It has no constructor of its own. */
-    open class StopIteration(val value: Any? = Undefined.instance) : NativeObject() {
+    public open class StopIteration(public val value: Any? = Undefined.instance) : NativeObject() {
         override val className: String
             get() = STOP_ITERATION
 
         override fun hasInstance(instance: Scriptable): Boolean = instance is StopIteration
     }
 
-    companion object {
+    public companion object {
         private val ITERATOR_TAG: Any = "Iterator"
         private const val CLASS_NAME = "Iterator"
         private const val STOP_ITERATION = "StopIteration"
 
-        const val ITERATOR_PROPERTY_NAME: String = "__iterator__"
+        public const val ITERATOR_PROPERTY_NAME: String = "__iterator__"
 
         internal fun init(cx: Context, scope: ScriptableObject, sealed: Boolean) {
             val constructor = LambdaConstructor(
@@ -81,7 +81,7 @@ class NativeIterator private constructor(private val objectIterator: Any?) : Scr
          * The `StopIteration` value, read from the top scope's associated values so a script that
          * overwrote the global property cannot break the generators.
          */
-        fun getStopIterationObject(scope: Scriptable): Any? =
+        public fun getStopIterationObject(scope: Scriptable): Any? =
             getTopScopeValue(getTopLevelScope(scope), ITERATOR_TAG)
 
         private fun jsConstructorCall(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {

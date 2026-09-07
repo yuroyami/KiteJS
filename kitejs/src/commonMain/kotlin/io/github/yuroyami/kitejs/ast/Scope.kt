@@ -10,10 +10,10 @@ import io.github.yuroyami.kitejs.Token
 /**
  * A scope in the lexical scope chain. Base type for every [AstNode] that introduces a scope.
  */
-open class Scope(pos: Int = -1, len: Int = 1) : Jump() {
+public open class Scope(pos: Int = -1, len: Int = 1) : Jump() {
 
     /** Insertion-ordered so that iteration follows declaration order. */
-    var symbolTable: MutableMap<String, Symbol>? = null
+    public var symbolTable: MutableMap<String, Symbol>? = null
 
     /**
      * KMP: upstream's protected `parentScope` field. `clearParentScope` writes it without the
@@ -22,7 +22,7 @@ open class Scope(pos: Int = -1, len: Int = 1) : Jump() {
     internal var parentScopeField: Scope? = null
 
     /** The current script or function scope. */
-    var top: ScriptNode? = null
+    public var top: ScriptNode? = null
 
     private var childScopeList: MutableList<Scope>? = null
 
@@ -32,7 +32,7 @@ open class Scope(pos: Int = -1, len: Int = 1) : Jump() {
         this.length = len
     }
 
-    var parentScope: Scope?
+    public var parentScope: Scope?
         get() = parentScopeField
         set(value) {
             parentScopeField = value
@@ -40,16 +40,16 @@ open class Scope(pos: Int = -1, len: Int = 1) : Jump() {
         }
 
     /** Used only for code generation. */
-    fun clearParentScope() {
+    public fun clearParentScope() {
         parentScopeField = null
     }
 
     /** The scopes whose parent is this scope, or null if there are none. */
-    val childScopes: List<Scope>?
+    public val childScopes: List<Scope>?
         get() = childScopeList
 
     /** Adds a scope to the child list and sets the child's parent scope to this scope. */
-    fun addChildScope(child: Scope) {
+    public fun addChildScope(child: Scope) {
         if (childScopeList == null) {
             childScopeList = mutableListOf()
         }
@@ -61,7 +61,7 @@ open class Scope(pos: Int = -1, len: Int = 1) : Jump() {
      * Used by the parser. Repoints this scope's child scopes at [newScope] and copies this
      * scope's symbols into it.
      */
-    fun replaceWith(newScope: Scope) {
+    public fun replaceWith(newScope: Scope) {
         childScopeList?.let { kids ->
             for (kid in kids) {
                 newScope.addChildScope(kid) // sets kid's parent
@@ -79,7 +79,7 @@ open class Scope(pos: Int = -1, len: Int = 1) : Jump() {
      * The scope in which [name] is defined: this scope, one of its parents, or null when the
      * name is not defined anywhere in this scope chain.
      */
-    fun getDefiningScope(name: String): Scope? {
+    public fun getDefiningScope(name: String): Scope? {
         var s: Scope? = this
         while (s != null) {
             val table = s.symbolTable
@@ -92,10 +92,10 @@ open class Scope(pos: Int = -1, len: Int = 1) : Jump() {
     }
 
     /** Looks up a symbol in this scope, or null if it is not there. */
-    fun getSymbol(name: String): Symbol? = symbolTable?.get(name)
+    public fun getSymbol(name: String): Symbol? = symbolTable?.get(name)
 
     /** Enters a symbol into this scope. */
-    fun putSymbol(symbol: Symbol) {
+    public fun putSymbol(symbol: Symbol) {
         val name = symbol.name ?: throw IllegalArgumentException("null symbol name")
         ensureSymbolTable()
         symbolTable!![name] = symbol
@@ -114,7 +114,7 @@ open class Scope(pos: Int = -1, len: Int = 1) : Jump() {
      * A copy of the child list, with each child cast to an [AstNode]. Throws once the code
      * generator has begun the tree transformation and non-AstNode children appear.
      */
-    val statements: List<AstNode>
+    public val statements: List<AstNode>
         get() {
             val stmts = mutableListOf<AstNode>()
             var n = firstChild
@@ -149,13 +149,13 @@ open class Scope(pos: Int = -1, len: Int = 1) : Jump() {
         }
     }
 
-    companion object {
+    public companion object {
         /**
          * Creates a new scope node, moving the symbol table from [scope] into it and making
          * [scope] a nested scope contained by the new node. Useful for injecting a scope into
          * a scope chain.
          */
-        fun splitScope(scope: Scope): Scope {
+        public fun splitScope(scope: Scope): Scope {
             val result = Scope(scope.position, scope.length)
             result.symbolTable = scope.symbolTable
             scope.symbolTable = null
@@ -167,7 +167,7 @@ open class Scope(pos: Int = -1, len: Int = 1) : Jump() {
         }
 
         /** Copies all symbols from [source] to [dest]. */
-        fun joinScopes(source: Scope, dest: Scope) {
+        public fun joinScopes(source: Scope, dest: Scope) {
             val src = source.ensureSymbolTable()
             val dst = dest.ensureSymbolTable()
             if (src.keys.any { it in dst.keys }) {

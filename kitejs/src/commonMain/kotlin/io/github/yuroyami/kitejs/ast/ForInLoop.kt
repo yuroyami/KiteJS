@@ -10,10 +10,10 @@ import io.github.yuroyami.kitejs.Token
  * A `for..in` or `for..of` loop, and with [isForEach] the SpiderMonkey `for each..in` form.
  * Node type is [Token.FOR].
  */
-open class ForInLoop(pos: Int = -1, len: Int = 1) : Loop(pos, len) {
+public open class ForInLoop(pos: Int = -1, len: Int = 1) : Loop(pos, len) {
 
     /** The loop variable. Setting it reparents the node. */
-    var iterator: AstNode? = null
+    public var iterator: AstNode? = null
         set(value) {
             val newIterator = value!!
             field = newIterator
@@ -21,7 +21,7 @@ open class ForInLoop(pos: Int = -1, len: Int = 1) : Loop(pos, len) {
         }
 
     /** The object being iterated. Setting it reparents the node. */
-    var iteratedObject: AstNode? = null
+    public var iteratedObject: AstNode? = null
         set(value) {
             val newObject = value!!
             field = newObject
@@ -29,14 +29,14 @@ open class ForInLoop(pos: Int = -1, len: Int = 1) : Loop(pos, len) {
         }
 
     /** Position of the `in` or `of` keyword, relative to this node. */
-    var inPosition: Int = -1
+    public var inPosition: Int = -1
 
     /** Position of the `each` keyword in a `for each..in` loop, relative to this node. */
-    var eachPosition: Int = -1
+    public var eachPosition: Int = -1
 
-    open var isForEach: Boolean = false
+    public open var isForEach: Boolean = false
 
-    var isForOf: Boolean = false
+    public var isForOf: Boolean = false
 
     init {
         typeField = Token.FOR

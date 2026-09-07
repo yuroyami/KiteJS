@@ -8,15 +8,15 @@ import io.github.yuroyami.kitejs.dtoa.DecimalFormatter
 import kotlin.math.floor
 
 /** The JavaScript `Number` wrapper object. */
-class NativeNumber internal constructor(private val doubleValue: Double) : ScriptableObject() {
+internal class NativeNumber internal constructor(private val doubleValue: Double) : ScriptableObject() {
 
     override val className: String
         get() = CLASS_NAME
 
     override fun toString(): String = ScriptRuntime.numberToString(doubleValue, 10)
 
-    companion object {
-        const val MAX_SAFE_INTEGER = 9007199254740991.0
+    public companion object {
+        public const val MAX_SAFE_INTEGER: Double = 9007199254740991.0
         private const val CLASS_NAME = "Number"
         private const val MAX_PRECISION = 100
         private const val MIN_SAFE_INTEGER = -MAX_SAFE_INTEGER

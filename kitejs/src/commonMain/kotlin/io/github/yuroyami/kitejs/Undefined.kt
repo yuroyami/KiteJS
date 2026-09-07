@@ -11,20 +11,20 @@ import kotlin.reflect.KClass
  *
  * There are two representations of it, so a direct identity test is not enough. Use [isUndefined].
  */
-class Undefined private constructor() {
+public class Undefined private constructor() {
 
     override fun equals(other: Any?): Boolean = isUndefined(other) || other === this
 
     // Every instance of Undefined is equivalent.
     override fun hashCode(): Int = INSTANCE_HASH
 
-    companion object {
-        val instance: Any = Undefined()
+    public companion object {
+        public val instance: Any = Undefined()
 
         private val INSTANCE_HASH = 0x756E_6465 // "unde", a stable stand-in for an identity hash
 
         /** The Scriptable-shaped `undefined`, used where an object is required. */
-        val SCRIPTABLE_UNDEFINED: Scriptable = object : Scriptable {
+        public val SCRIPTABLE_UNDEFINED: Scriptable = object : Scriptable {
 
             override val className: String
                 get() = "undefined"
@@ -75,7 +75,7 @@ class Undefined private constructor() {
          * The safe way to test for undefined. A direct identity test is wrong, because the engine
          * has two representations of the value.
          */
-        fun isUndefined(obj: Any?): Boolean =
+        public fun isUndefined(obj: Any?): Boolean =
             instance === obj || SCRIPTABLE_UNDEFINED === obj
     }
 }

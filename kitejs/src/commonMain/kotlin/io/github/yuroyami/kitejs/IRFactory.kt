@@ -74,7 +74,7 @@ import io.github.yuroyami.kitejs.ast.Yield
  *
  * KMP: the E4X transforms are not ported, following D-16.
  */
-class IRFactory(
+public class IRFactory(
     env: CompilerEnvirons,
     sourceName: String?,
     sourceString: String,
@@ -85,7 +85,7 @@ class IRFactory(
     private val astNodePos = AstNodePosition(sourceString)
     private var outerScopeIsStrict = false
 
-    constructor(env: CompilerEnvirons, sourceString: String) :
+    public constructor(env: CompilerEnvirons, sourceString: String) :
         this(env, null, sourceString, env.errorReporter)
 
     init {
@@ -94,7 +94,7 @@ class IRFactory(
     }
 
     /** Transforms the tree into the lower-level IR the code generator uses. */
-    fun transformTree(root: AstRoot): ScriptNode? {
+    public fun transformTree(root: AstRoot): ScriptNode? {
         parser.currentScriptOrFn = root
         parser.inUseStrictDirective = root.isInStrictMode
 
@@ -1749,7 +1749,7 @@ class IRFactory(
     }
 
     /** Reports the source position of the AST node currently being transformed. */
-    class AstNodePosition(private val sourceString: String) : Parser.CurrentPositionReporter {
+    public class AstNodePosition(private val sourceString: String) : Parser.CurrentPositionReporter {
 
         private val stack = ArrayDeque<AstNode>()
 
@@ -1757,11 +1757,11 @@ class IRFactory(
         private var savedLine: String? = null
         private var savedLineOffset = 0
 
-        fun push(node: AstNode) {
+        public fun push(node: AstNode) {
             stack.addFirst(node)
         }
 
-        fun pop() {
+        public fun pop() {
             stack.removeFirst()
         }
 
@@ -1831,7 +1831,7 @@ class IRFactory(
             }
     }
 
-    companion object {
+    public companion object {
         private const val LOOP_DO_WHILE = 0
         private const val LOOP_WHILE = 1
         private const val LOOP_FOR = 2

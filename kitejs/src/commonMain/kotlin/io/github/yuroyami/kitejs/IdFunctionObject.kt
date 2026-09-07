@@ -5,16 +5,16 @@
 package io.github.yuroyami.kitejs
 
 /** A function identified by a number, which its [IdFunctionCall] master dispatches on. */
-open class IdFunctionObject : BaseFunction {
+public open class IdFunctionObject : BaseFunction {
 
     private val idcall: IdFunctionCall
-    val tag: Any?
+    public val tag: Any?
     private val methodIdField: Int
     private val declaredArity: Int
     private var useCallAsConstructor = false
     private var name: String? = null
 
-    constructor(idcall: IdFunctionCall, tag: Any?, id: Int, arity: Int) : super() {
+    public constructor(idcall: IdFunctionCall, tag: Any?, id: Int, arity: Int) : super() {
         require(arity >= 0)
         this.idcall = idcall
         this.tag = tag
@@ -22,7 +22,7 @@ open class IdFunctionObject : BaseFunction {
         this.declaredArity = arity
     }
 
-    constructor(idcall: IdFunctionCall, tag: Any?, id: Int, name: String, arity: Int, scope: Scriptable) :
+    public constructor(idcall: IdFunctionCall, tag: Any?, id: Int, name: String, arity: Int, scope: Scriptable) :
         super(scope, null) {
         require(arity >= 0)
         this.idcall = idcall
@@ -32,25 +32,25 @@ open class IdFunctionObject : BaseFunction {
         this.name = name
     }
 
-    fun initFunction(name: String, scope: Scriptable) {
+    public fun initFunction(name: String, scope: Scriptable) {
         this.name = name
         parentScope = scope
     }
 
-    fun hasTag(tag: Any?): Boolean = tag == this.tag
+    public fun hasTag(tag: Any?): Boolean = tag == this.tag
 
-    fun methodId(): Int = methodIdField
+    public fun methodId(): Int = methodIdField
 
-    fun markAsConstructor(prototypeProperty: Scriptable?) {
+    public fun markAsConstructor(prototypeProperty: Scriptable?) {
         useCallAsConstructor = true
         setImmunePrototypeProperty(prototypeProperty)
     }
 
-    fun addAsProperty(target: Scriptable) {
+    public fun addAsProperty(target: Scriptable) {
         defineProperty(target, name!!, this, DONTENUM)
     }
 
-    open fun exportAsScopeProperty() {
+    public open fun exportAsScopeProperty() {
         addAsProperty(declarationScope!!)
     }
 
@@ -81,6 +81,6 @@ open class IdFunctionObject : BaseFunction {
 
     override val functionName: String get() = name ?: ""
 
-    fun unknown(): RuntimeException =
+    public fun unknown(): RuntimeException =
         IllegalArgumentException("BAD FUNCTION ID=$methodIdField MASTER=$idcall")
 }

@@ -33,7 +33,8 @@ package io.github.yuroyami.kitejs.v8dtoa
 import kotlin.math.ceil
 import kotlin.math.floor
 
-object DoubleConversion {
+/** Bit-level helpers for reading a double apart, from V8's own conversion code. */
+public object DoubleConversion {
 
     // 0x8000000000000000, the sign bit. Kotlin cannot write that as a hex literal.
     private const val K_SIGN_MASK = Long.MIN_VALUE
@@ -64,7 +65,7 @@ object DoubleConversion {
 
     private fun sign(d64: Long): Int = if ((d64 and K_SIGN_MASK) == 0L) 1 else -1
 
-    fun doubleToInt32(x: Double): Int {
+    public fun doubleToInt32(x: Double): Int {
         val i = x.toInt()
         if (i.toDouble() == x) {
             return i
@@ -78,7 +79,7 @@ object DoubleConversion {
         return sign(d64) * (if (exponent < 0) s shr -exponent else s shl exponent).toInt()
     }
 
-    fun truncate(x: Double): Double {
+    public fun truncate(x: Double): Double {
         if (!x.isFinite()) {
             return x
         }

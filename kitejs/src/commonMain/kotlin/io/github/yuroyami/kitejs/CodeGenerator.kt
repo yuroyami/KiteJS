@@ -1286,7 +1286,7 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
             table = table.copyOf(index * 2)
             itsData.itsDoubleTable = table
         }
-        table!![index] = num
+        table[index] = num
         doubleTableTop = index + 1
         return index
     }

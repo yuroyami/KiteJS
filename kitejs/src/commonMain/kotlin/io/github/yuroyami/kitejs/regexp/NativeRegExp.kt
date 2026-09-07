@@ -26,7 +26,7 @@ import io.github.yuroyami.kitejs.Undefined
  * Nothing here calls a platform regex engine. The pattern is compiled to Rhino's own bytecode and
  * matched by [executeREBytecode], so JVM, JS, iOS and Wasm all answer the same thing.
  */
-open class NativeRegExp : IdScriptableObject {
+public open class NativeRegExp : IdScriptableObject {
 
     internal var re: RECompiled? = null
     internal var lastIndex: Any? = ScriptRuntime.zeroObj
@@ -509,7 +509,7 @@ open class NativeRegExp : IdScriptableObject {
             replaceFn = null
             replaceOps = io.github.yuroyami.kitejs.AbstractEcmaStringOperations.buildReplacementList(ScriptRuntime.toString(replaceValue))
         } else {
-            replaceFn = replaceValue as io.github.yuroyami.kitejs.Callable
+            replaceFn = replaceValue
             replaceOps = emptyList()
         }
         val flags = ScriptRuntime.toString(ScriptRuntime.getObjectProp(thisObj, "flags", cx))
@@ -593,7 +593,7 @@ open class NativeRegExp : IdScriptableObject {
             replaceFn = null
             replaceOps = io.github.yuroyami.kitejs.AbstractEcmaStringOperations.buildReplacementList(ScriptRuntime.toString(replaceValue))
         } else {
-            replaceFn = replaceValue as io.github.yuroyami.kitejs.Callable
+            replaceFn = replaceValue
             replaceOps = emptyList()
         }
         val flags = ScriptRuntime.toString(ScriptRuntime.getObjectProp(thisObj, "flags", cx))
@@ -839,20 +839,20 @@ open class NativeRegExp : IdScriptableObject {
         return a
     }
 
-    companion object {
+    public companion object {
         internal val REGEXP_TAG: Any = Any()
 
-        const val JSREG_GLOB: Int = 0x1 // 'g', global
-        const val JSREG_FOLD: Int = 0x2 // 'i', fold case
-        const val JSREG_MULTILINE: Int = 0x4 // 'm'
-        const val JSREG_DOTALL: Int = 0x8 // 's'
-        const val JSREG_STICKY: Int = 0x10 // 'y'
-        const val JSREG_UNICODE: Int = 0x20 // 'u'
+        public const val JSREG_GLOB: Int = 0x1 // 'g', global
+        public const val JSREG_FOLD: Int = 0x2 // 'i', fold case
+        public const val JSREG_MULTILINE: Int = 0x4 // 'm'
+        public const val JSREG_DOTALL: Int = 0x8 // 's'
+        public const val JSREG_STICKY: Int = 0x10 // 'y'
+        public const val JSREG_UNICODE: Int = 0x20 // 'u'
 
         // What kind of answer the caller wants.
-        const val TEST: Int = 0
-        const val MATCH: Int = 1
-        const val PREFIX: Int = 2
+        public const val TEST: Int = 0
+        public const val MATCH: Int = 1
+        public const val PREFIX: Int = 2
 
         // The bytecode. The "simple" opcodes are the ones simpleMatch can answer on its own.
         internal const val REOP_SIMPLE_START: Byte = 1
@@ -3166,7 +3166,7 @@ open class NativeRegExp : IdScriptableObject {
             ensureType<NativeRegExp>(thisObj, functionName)
 
         /** The spec's RegExpExec: call the object's own `exec` when it has one. */
-        fun regExpExec(regexp: Scriptable, string: String, cx: Context, scope: Scriptable): Any? {
+        public fun regExpExec(regexp: Scriptable, string: String, cx: Context, scope: Scriptable): Any? {
             val execMethod = ScriptRuntime.getObjectProp(regexp, "exec", cx, scope)
             if (execMethod is io.github.yuroyami.kitejs.Callable) {
                 return execMethod.call(cx, scope, regexp, arrayOf<Any?>(string))

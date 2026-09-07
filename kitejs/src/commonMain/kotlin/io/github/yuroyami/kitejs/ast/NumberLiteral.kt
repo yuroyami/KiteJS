@@ -7,40 +7,40 @@ package io.github.yuroyami.kitejs.ast
 import io.github.yuroyami.kitejs.Token
 
 /** A Number literal. Node type is [Token.NUMBER]. */
-class NumberLiteral : AstNode {
+public class NumberLiteral : AstNode {
 
     /** The node's string value: the original source token. */
-    var value: String? = null
+    public var value: String? = null
         set(value) {
             assertNotNull(value)
             field = value
         }
 
     /** The node's `double` value. */
-    var number: Double = 0.0
+    public var number: Double = 0.0
 
     init {
         typeField = Token.NUMBER
     }
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(pos: Int) : super(pos)
+    public constructor(pos: Int) : super(pos)
 
-    constructor(pos: Int, len: Int) : super(pos, len)
+    public constructor(pos: Int, len: Int) : super(pos, len)
 
     /** Sets the length to the length of the [value] string. */
-    constructor(pos: Int, value: String) : super(pos) {
+    public constructor(pos: Int, value: String) : super(pos) {
         this.value = value
         length = value.length
     }
 
     /** Sets the length to the length of the [value] string. */
-    constructor(pos: Int, value: String, number: Double) : this(pos, value) {
+    public constructor(pos: Int, value: String, number: Double) : this(pos, value) {
         this.number = number
     }
 
-    constructor(number: Double) : super() {
+    public constructor(number: Double) : super() {
         this.number = number
         this.value = number.toString()
     }

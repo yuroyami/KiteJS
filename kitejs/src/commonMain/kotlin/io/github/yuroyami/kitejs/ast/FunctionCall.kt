@@ -7,7 +7,7 @@ package io.github.yuroyami.kitejs.ast
 import io.github.yuroyami.kitejs.Token
 
 /** A function or method call. Node type is [Token.CALL]. */
-open class FunctionCall(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
+public open class FunctionCall(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     protected var argumentList: MutableList<AstNode>? = null
 
@@ -16,7 +16,7 @@ open class FunctionCall(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
     }
 
     /** The callee. Setting it reparents the node and copies its line and column. */
-    var target: AstNode? = null
+    public var target: AstNode? = null
         set(value) {
             val newTarget = value!!
             field = newTarget
@@ -25,20 +25,20 @@ open class FunctionCall(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         }
 
     /** Position of the left paren, relative to this node. */
-    var lp: Int = -1
+    public var lp: Int = -1
 
     /** Position of the right paren, relative to this node. */
-    var rp: Int = -1
+    public var rp: Int = -1
 
     /** True for an optional call `a?.()`. */
-    var isOptionalCall: Boolean = false
+    public var isOptionalCall: Boolean = false
         private set
 
     /** The call arguments, or an empty list if there are none. */
-    val arguments: List<AstNode> get() = argumentList ?: NO_ARGS
+    public val arguments: List<AstNode> get() = argumentList ?: NO_ARGS
 
     /** Replaces the argument list and reparents every element. Null means no arguments. */
-    fun setArguments(arguments: List<AstNode>?) {
+    public fun setArguments(arguments: List<AstNode>?) {
         if (arguments == null) {
             this.argumentList = null
         } else {
@@ -49,19 +49,19 @@ open class FunctionCall(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         }
     }
 
-    fun addArgument(arg: AstNode) {
+    public fun addArgument(arg: AstNode) {
         val list = argumentList ?: mutableListOf<AstNode>().also { argumentList = it }
         list.add(arg)
         arg.parent = this
     }
 
     /** Sets both paren positions. */
-    fun setParens(lp: Int, rp: Int) {
+    public fun setParens(lp: Int, rp: Int) {
         this.lp = lp
         this.rp = rp
     }
 
-    fun markIsOptionalCall() {
+    public fun markIsOptionalCall() {
         isOptionalCall = true
     }
 
@@ -88,7 +88,7 @@ open class FunctionCall(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         }
     }
 
-    companion object {
+    public companion object {
         internal val NO_ARGS: List<AstNode> = emptyList()
     }
 }

@@ -5,7 +5,7 @@
 package io.github.yuroyami.kitejs
 
 /** A host exception carried through script as a JavaScript error. */
-class WrappedException(val wrappedException: Throwable) :
+public class WrappedException(public val wrappedException: Throwable) :
     EvaluatorException("Wrapped $wrappedException") {
 
     init {

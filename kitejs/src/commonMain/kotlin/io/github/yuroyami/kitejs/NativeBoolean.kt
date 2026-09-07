@@ -7,7 +7,7 @@ package io.github.yuroyami.kitejs
 import kotlin.reflect.KClass
 
 /** The JavaScript `Boolean` wrapper object. */
-class NativeBoolean internal constructor(private val booleanValue: Boolean) : ScriptableObject() {
+internal class NativeBoolean internal constructor(private val booleanValue: Boolean) : ScriptableObject() {
 
     override val className: String
         get() = CLASS_NAME
@@ -17,7 +17,7 @@ class NativeBoolean internal constructor(private val booleanValue: Boolean) : Sc
         return super.getDefaultValue(hint)
     }
 
-    companion object {
+    public companion object {
         private const val CLASS_NAME = "Boolean"
 
         internal fun init(scope: Scriptable, sealed: Boolean) {

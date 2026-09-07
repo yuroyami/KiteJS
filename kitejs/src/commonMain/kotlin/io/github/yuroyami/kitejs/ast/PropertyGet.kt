@@ -10,30 +10,30 @@ import io.github.yuroyami.kitejs.Token
  * A dotted property access such as `a.b`. Node type is [Token.GETPROP]. The [target] is the
  * left side and the [property] is the [Name] on the right.
  */
-class PropertyGet : InfixExpression {
+public class PropertyGet : InfixExpression {
 
     init {
         typeField = Token.GETPROP
     }
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(pos: Int) : super(pos)
+    public constructor(pos: Int) : super(pos)
 
-    constructor(pos: Int, len: Int) : super(pos, len)
+    public constructor(pos: Int, len: Int) : super(pos, len)
 
-    constructor(pos: Int, len: Int, target: AstNode, property: Name) : super(
+    public constructor(pos: Int, len: Int, target: AstNode, property: Name) : super(
         pos,
         len,
         target,
         property,
     )
 
-    constructor(target: AstNode, property: Name) : super(target, property) {
+    public constructor(target: AstNode, property: Name) : super(target, property) {
         setLineColumnNumber(property.lineno, property.column)
     }
 
-    constructor(target: AstNode, property: Name, dotPosition: Int) : super(
+    public constructor(target: AstNode, property: Name, dotPosition: Int) : super(
         Token.GETPROP,
         target,
         property,
@@ -42,13 +42,13 @@ class PropertyGet : InfixExpression {
         setLineColumnNumber(property.lineno, property.column)
     }
 
-    var target: AstNode?
+    public var target: AstNode?
         get() = left
         set(value) {
             left = value
         }
 
-    var property: Name?
+    public var property: Name?
         get() = right as Name?
         set(value) {
             right = value

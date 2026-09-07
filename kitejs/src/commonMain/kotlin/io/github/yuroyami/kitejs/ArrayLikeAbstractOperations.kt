@@ -7,19 +7,22 @@ package io.github.yuroyami.kitejs
 import io.github.yuroyami.kitejs.ScriptableObject.DescriptorInfo
 
 /** The array methods that also work on typed arrays and other array-likes: iteration, reduce, sort. */
-object ArrayLikeAbstractOperations {
+public object ArrayLikeAbstractOperations {
 
-    enum class IterativeOperation {
+    /** Which of the array methods that walk every element is running. */
+    public enum class IterativeOperation {
         EVERY, FILTER, FOR_EACH, MAP, SOME, FIND, FIND_INDEX, FIND_LAST, FIND_LAST_INDEX,
     }
 
-    enum class ReduceOperation { REDUCE, REDUCE_RIGHT }
+    /** Which direction `reduce` walks in. */
+    public enum class ReduceOperation { REDUCE, REDUCE_RIGHT }
 
-    fun interface LengthAccessor {
-        fun getLength(cx: Context, o: Scriptable): Long
+    /** Reads the length of an array-like, which differs between arrays and typed arrays. */
+    public fun interface LengthAccessor {
+        public fun getLength(cx: Context, o: Scriptable): Long
     }
 
-    fun iterativeMethod(
+    public fun iterativeMethod(
         cx: Context,
         operation: IterativeOperation,
         scope: Scriptable,
@@ -28,7 +31,7 @@ object ArrayLikeAbstractOperations {
         lengthAccessor: LengthAccessor,
     ): Any? = iterativeMethod(cx, null, operation, scope, thisObj, args, lengthAccessor, true)
 
-    fun iterativeMethod(
+    public fun iterativeMethod(
         cx: Context,
         fn: IdFunctionObject?,
         operation: IterativeOperation,
@@ -56,7 +59,7 @@ object ArrayLikeAbstractOperations {
         return coercibleIterativeMethod(cx, operation, scope, o, args, length)
     }
 
-    fun iterativeMethod(
+    public fun iterativeMethod(
         cx: Context,
         tag: Any?,
         name: String,
@@ -92,7 +95,7 @@ object ArrayLikeAbstractOperations {
             operation == IterativeOperation.FIND_LAST ||
             operation == IterativeOperation.FIND_LAST_INDEX
 
-    fun coercibleIterativeMethod(
+    public fun coercibleIterativeMethod(
         cx: Context,
         operation: IterativeOperation,
         scope: Scriptable,
@@ -209,19 +212,19 @@ object ArrayLikeAbstractOperations {
         return ScriptableObject.getProperty(target, index.toInt())
     }
 
-    fun toSliceIndex(value: Double, length: Long): Long = when {
+    public fun toSliceIndex(value: Double, length: Long): Long = when {
         value < 0.0 -> if (value + length < 0.0) 0 else (value + length).toLong()
         value > length -> length
         else -> value.toLong()
     }
 
-    fun reduceMethod(cx: Context, operation: ReduceOperation, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
+    public fun reduceMethod(cx: Context, operation: ReduceOperation, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
         val o = ScriptRuntime.toObject(cx, scope, thisObj)
         val length = NativeArray.getLengthProperty(cx, o)
         return reduceMethodWithLength(cx, operation, scope, o, args, length)
     }
 
-    fun reduceMethodWithLength(
+    public fun reduceMethodWithLength(
         cx: Context,
         operation: ReduceOperation,
         scope: Scriptable,
@@ -253,14 +256,14 @@ object ArrayLikeAbstractOperations {
         return value
     }
 
-    fun getSortComparator(cx: Context, scope: Scriptable, args: Array<Any?>): Comparator<Any?> =
+    public fun getSortComparator(cx: Context, scope: Scriptable, args: Array<Any?>): Comparator<Any?> =
         if (args.isNotEmpty() && Undefined.instance !== args[0]) {
             getSortComparatorFromArguments(cx, scope, args)
         } else {
             DEFAULT_COMPARATOR
         }
 
-    fun getSortComparatorFromArguments(cx: Context, scope: Scriptable, args: Array<Any?>): ElementComparator {
+    public fun getSortComparatorFromArguments(cx: Context, scope: Scriptable, args: Array<Any?>): ElementComparator {
         val compareFunc = ScriptRuntime.getValueAndThis(args[0], cx)!!
         val compare = compareFunc.callable
         val compareThis = compareFunc.thisObj
@@ -280,7 +283,8 @@ object ArrayLikeAbstractOperations {
     private val STRING_COMPARATOR: Comparator<Any?> = StringLikeComparator()
     private val DEFAULT_COMPARATOR: Comparator<Any?> = ElementComparator()
 
-    class StringLikeComparator : Comparator<Any?> {
+    /** The default `sort` order: compare the elements as strings. */
+    public class StringLikeComparator : Comparator<Any?> {
         override fun compare(a: Any?, b: Any?): Int {
             val x = ScriptRuntime.toString(a)
             val y = ScriptRuntime.toString(b)
@@ -289,9 +293,9 @@ object ArrayLikeAbstractOperations {
     }
 
     /** Sorts holes last, `undefined` just before them, and everything else by [child]. */
-    class ElementComparator(private val child: Comparator<Any?>) : Comparator<Any?> {
+    public class ElementComparator(private val child: Comparator<Any?>) : Comparator<Any?> {
 
-        constructor() : this(STRING_COMPARATOR)
+        public constructor() : this(STRING_COMPARATOR)
 
         override fun compare(a: Any?, b: Any?): Int {
             if (a === Undefined.instance) {

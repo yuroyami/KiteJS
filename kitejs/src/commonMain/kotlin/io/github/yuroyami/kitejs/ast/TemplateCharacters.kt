@@ -10,13 +10,13 @@ import io.github.yuroyami.kitejs.Token
  * The literal text between substitutions in a template literal. Node type is
  * [Token.TEMPLATE_CHARS]. [value] is the cooked text and [rawValue] the source text.
  */
-class TemplateCharacters(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
+public class TemplateCharacters(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     /** The cooked value, with escapes resolved. Null when the escapes are invalid. */
-    var value: String? = null
+    public var value: String? = null
 
     /** The raw source text, escapes untouched. */
-    var rawValue: String? = null
+    public var rawValue: String? = null
         set(value) {
             assertNotNull(value)
             field = value

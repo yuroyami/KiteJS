@@ -32,7 +32,7 @@ import io.github.yuroyami.kitejs.Undefined
  * error, it simply reads as `undefined` and writes nowhere. That is why `get`, `put`, `has` and
  * `delete` are all overridden.
  */
-abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
+public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
 
     /** How many elements the view holds. */
     protected val length: Int
@@ -114,14 +114,14 @@ abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
     /** True when the index is not usable. */
     protected fun checkIndex(index: Int): Boolean = isTypedArrayOutOfBounds || index < 0 || index >= length
 
-    abstract val bytesPerElement: Int
+    public abstract val bytesPerElement: Int
     protected abstract fun js_get(index: Int): Any?
 
     protected abstract fun js_set(index: Int, c: Any?): Any?
 
     protected open fun toNumeric(num: Any?): Any? = ScriptRuntime.toNumber(num)
 
-    val isTypedArrayOutOfBounds: Boolean get() = arrayBuffer.isDetached || outOfRange
+    public val isTypedArrayOutOfBounds: Boolean get() = arrayBuffer.isDetached || outOfRange
 
     /** The spec's ValidateTypedArray, reduced to the length it hands back. */
     private fun validateAndGetLength(): Long {
@@ -234,12 +234,12 @@ abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
         arrayOf<Any?>(NativeArrayBuffer(length * bytesPerElement), 0, length, bytesPerElement),
     )
 
-    companion object {
+    public companion object {
         private val TYPED_ARRAY_TAG: Any = "%TypedArray.prototype%"
 
         /** How a concrete view builds itself, so the shared code can make one of any type. */
-        fun interface TypedArrayConstructable {
-            fun construct(ab: NativeArrayBuffer, off: Int, len: Int): NativeTypedArrayView
+        public fun interface TypedArrayConstructable {
+            public fun construct(ab: NativeArrayBuffer, off: Int, len: Int): NativeTypedArrayView
         }
 
         /**
@@ -818,7 +818,7 @@ abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
 
             val size: Int
             if (listFromIterator != null) {
-                size = listFromIterator!!.size
+                size = listFromIterator.size
             } else {
                 val sizeLong = AbstractEcmaObjectOperations.lengthOfArrayLike(cx, items)
                 if (sizeLong > Int.MAX_VALUE) throw ScriptRuntime.rangeErrorById("msg.arraylength.bad")
@@ -831,7 +831,7 @@ abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
 
             for (k in 0 until size) {
                 var temp: Any? = if (listFromIterator != null) {
-                    listFromIterator!![k]
+                    listFromIterator[k]
                 } else if (items is NativeTypedArrayView) {
                     items.js_get(k)
                 } else {

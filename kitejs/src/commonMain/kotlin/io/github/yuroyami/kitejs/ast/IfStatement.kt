@@ -7,14 +7,14 @@ package io.github.yuroyami.kitejs.ast
 import io.github.yuroyami.kitejs.Token
 
 /** An if statement with an optional else part. Node type is [Token.IF]. */
-class IfStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
+public class IfStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     init {
         typeField = Token.IF
     }
 
     /** The condition. Setting it reparents the expression. */
-    var condition: AstNode? = null
+    public var condition: AstNode? = null
         set(value) {
             val newCondition = value!!
             field = newCondition
@@ -22,7 +22,7 @@ class IfStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         }
 
     /** The then branch. Setting it reparents the statement. */
-    var thenPart: AstNode? = null
+    public var thenPart: AstNode? = null
         set(value) {
             val newThen = value!!
             field = newThen
@@ -30,26 +30,26 @@ class IfStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         }
 
     /** The else branch, or null. Setting it reparents the statement. */
-    var elsePart: AstNode? = null
+    public var elsePart: AstNode? = null
         set(value) {
             field = value
             value?.parent = this
         }
 
     /** Position of the `else` keyword, relative to this node. -1 if there is no else. */
-    var elsePosition: Int = -1
+    public var elsePosition: Int = -1
 
     /** A comment on the same line as the `else` keyword. */
-    var elseKeyWordInlineComment: AstNode? = null
+    public var elseKeyWordInlineComment: AstNode? = null
 
     /** Position of the left paren, relative to this node. */
-    var lp: Int = -1
+    public var lp: Int = -1
 
     /** Position of the right paren, relative to this node. */
-    var rp: Int = -1
+    public var rp: Int = -1
 
     /** Sets both paren positions. */
-    fun setParens(lp: Int, rp: Int) {
+    public fun setParens(lp: Int, rp: Int) {
         this.lp = lp
         this.rp = rp
     }

@@ -5,7 +5,7 @@
 package io.github.yuroyami.kitejs
 
 /** `WeakSet`: the same weak keys as [NativeWeakMap], with nothing stored against them. */
-class NativeWeakSet : ScriptableObject() {
+public class NativeWeakSet : ScriptableObject() {
 
     private var instanceOfWeakSet = false
 
@@ -32,7 +32,7 @@ class NativeWeakSet : ScriptableObject() {
         return entries.containsKey(key!!)
     }
 
-    companion object {
+    public companion object {
         private const val CLASS_NAME = "WeakSet"
 
         internal fun init(cx: Context, scope: Scriptable, sealed: Boolean): Any {

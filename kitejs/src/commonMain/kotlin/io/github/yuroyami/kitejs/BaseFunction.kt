@@ -10,7 +10,7 @@ package io.github.yuroyami.kitejs
  *
  * See ECMA 15.3.
  */
-open class BaseFunction : ScriptableObject, Function {
+public open class BaseFunction : ScriptableObject, Function {
 
     private var prototypePropertyValue: Any? = null
     private var argumentsObj: Any? = Scriptable.NOT_FOUND
@@ -23,16 +23,16 @@ open class BaseFunction : ScriptableObject, Function {
      */
     protected var prototypePropertyAttributesField: Int = PERMANENT or DONTENUM
 
-    constructor() {
+    public constructor() {
         createProperties()
     }
 
-    constructor(isGenerator: Boolean) {
+    public constructor(isGenerator: Boolean) {
         createProperties()
         this.isGeneratorFunctionField = isGenerator
     }
 
-    constructor(scope: Scriptable, prototype: Scriptable?) : super(scope, prototype) {
+    public constructor(scope: Scriptable, prototype: Scriptable?) : super(scope, prototype) {
         createProperties()
         ScriptRuntime.setBuiltinProtoAndParent(this, scope, TopLevel.Builtins.Function)
     }
@@ -115,7 +115,7 @@ open class BaseFunction : ScriptableObject, Function {
     }
 
     /** Makes [value] a non-enumerable, non-deletable, read-only `prototype` on this function. */
-    fun setImmunePrototypeProperty(value: Any?) {
+    public fun setImmunePrototypeProperty(value: Any?) {
         check((prototypePropertyAttributesField and READONLY) == 0)
         prototypePropertyValue = value ?: UniqueTag.NULL_VALUE
         createPrototypeProperty()
@@ -160,7 +160,7 @@ open class BaseFunction : ScriptableObject, Function {
      * Builds the object that [construct] passes to [call] as `this`. Returning null says that
      * [call] will make the object itself, and [construct] then fixes up its scope and prototype.
      */
-    open fun createObject(cx: Context, scope: Scriptable): Scriptable? {
+    public open fun createObject(cx: Context, scope: Scriptable): Scriptable? {
         val newInstance = NativeObject()
         newInstance.prototype = classPrototype
         newInstance.parentScope = parentScope
@@ -180,22 +180,22 @@ open class BaseFunction : ScriptableObject, Function {
     }
 
     /** What the `arity` property answers. */
-    open val arity: Int get() = 0
+    public open val arity: Int get() = 0
 
     /** What the `length` property answers: how many arguments the function declares. */
-    open val length: Int get() = 0
+    public open val length: Int get() = 0
 
     /** What the `name` property answers. Empty for an anonymous function. */
-    open val functionName: String get() = ""
+    public open val functionName: String get() = ""
 
     /** Sets the attributes of `name`, `length` and `arity`, which differ across the natives. */
-    fun setStandardPropertyAttributes(attributes: Int) {
+    public fun setStandardPropertyAttributes(attributes: Int) {
         setAttributes("name", attributes)
         setAttributes("length", attributes)
         setAttributes("arity", attributes)
     }
 
-    fun setPrototypePropertyAttributes(attributes: Int) {
+    public fun setPrototypePropertyAttributes(attributes: Int) {
         prototypePropertyAttributesField = attributes
         map.compute(this, PROTOTYPE_PROPERTY_NAME, 0) { _, _, s, _, _ ->
             s?.also { it.attributes = attributes }
@@ -206,7 +206,7 @@ open class BaseFunction : ScriptableObject, Function {
         prototypePropertyValue != null && prototypePropertyValue !== UniqueTag.NOT_FOUND
 
     /** The `prototype` property: `undefined` when unset, null when explicitly set to null. */
-    open val prototypeProperty: Any?
+    public open val prototypeProperty: Any?
         get() = when (val result = prototypePropertyValue) {
             null, UniqueTag.NOT_FOUND -> Undefined.instance
             UniqueTag.NULL_VALUE -> null
@@ -244,9 +244,9 @@ open class BaseFunction : ScriptableObject, Function {
     }
 
     /** The object a method was defined on, which `super` resolves against. Null for a plain function. */
-    open var homeObject: Scriptable? = null
+    public open var homeObject: Scriptable? = null
 
-    companion object {
+    public companion object {
         private const val FUNCTION_CLASS = "Function"
 
         internal const val GENERATOR_FUNCTION_CLASS = "__GeneratorFunction"

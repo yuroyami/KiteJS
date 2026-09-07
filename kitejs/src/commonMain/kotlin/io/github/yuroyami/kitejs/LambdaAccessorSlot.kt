@@ -9,7 +9,7 @@ package io.github.yuroyami.kitejs
  * the owner's own fields. That is what makes it usable for a native property that has to behave
  * like a normal JavaScript property without reflection.
  */
-class LambdaAccessorSlot : Slot {
+public class LambdaAccessorSlot : Slot {
 
     private var getter: ScriptableObject.LambdaGetterFunction? = null
     private var setter: ScriptableObject.LambdaSetterFunction? = null
@@ -50,7 +50,7 @@ class LambdaAccessorSlot : Slot {
      * Same as [getPropertyDescriptor] without the scope. The scope is genuinely unused here, and
      * saying so keeps callers from reaching for one they should not use.
      */
-    fun buildPropertyDescriptor(cx: Context): ScriptableObject.DescriptorInfo {
+    public fun buildPropertyDescriptor(cx: Context): ScriptableObject.DescriptorInfo {
         val attr = attributes
         val es6 = cx.languageVersion >= Context.VERSION_ES6
         val desc: ScriptableObject.DescriptorInfo
@@ -98,7 +98,7 @@ class LambdaAccessorSlot : Slot {
         return g.apply(start)
     }
 
-    fun setGetter(scope: Scriptable, getter: ScriptableObject.LambdaGetterFunction?) {
+    public fun setGetter(scope: Scriptable, getter: ScriptableObject.LambdaGetterFunction?) {
         this.getter = getter
         if (getter != null) {
             getterFunction = LambdaFunction(
@@ -110,7 +110,7 @@ class LambdaAccessorSlot : Slot {
         }
     }
 
-    fun setSetter(scope: Scriptable, setter: ScriptableObject.LambdaSetterFunction?) {
+    public fun setSetter(scope: Scriptable, setter: ScriptableObject.LambdaSetterFunction?) {
         this.setter = setter
         if (setter != null) {
             setterFunction = LambdaFunction(
@@ -125,7 +125,7 @@ class LambdaAccessorSlot : Slot {
         }
     }
 
-    fun replaceWith(slot: LambdaAccessorSlot) {
+    public fun replaceWith(slot: LambdaAccessorSlot) {
         getterFunction = slot.getterFunction
         getter = slot.getter
         setterFunction = slot.setterFunction

@@ -5,7 +5,7 @@
 package io.github.yuroyami.kitejs
 
 /** Anything that can be used with `new`. */
-interface Constructable {
+public interface Constructable {
 
-    fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable
+    public fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable
 }

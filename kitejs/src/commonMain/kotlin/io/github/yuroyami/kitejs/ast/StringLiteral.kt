@@ -8,31 +8,31 @@ import io.github.yuroyami.kitejs.ScriptRuntime
 import io.github.yuroyami.kitejs.Token
 
 /** A single- or double-quoted string literal. Node type is [Token.STRING]. */
-class StringLiteral : AstNode {
+public class StringLiteral : AstNode {
 
     /** The parsed string without the enclosing quotes. */
-    var value: String? = null
+    public var value: String? = null
         set(value) {
             assertNotNull(value)
             field = value
         }
 
     /** The character used as the delimiter for this string. */
-    var quoteCharacter: Char = ' '
+    public var quoteCharacter: Char = ' '
 
     init {
         typeField = Token.STRING
     }
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(pos: Int) : super(pos)
+    public constructor(pos: Int) : super(pos)
 
     /** @param len the length including the enclosing quotes */
-    constructor(pos: Int, len: Int) : super(pos, len)
+    public constructor(pos: Int, len: Int) : super(pos, len)
 
     /** The string value, optionally including the enclosing quotes. */
-    fun getValue(includeQuotes: Boolean): String? =
+    public fun getValue(includeQuotes: Boolean): String? =
         if (!includeQuotes) value else quoteCharacter + value!! + quoteCharacter
 
     override fun toSource(depth: Int): String =

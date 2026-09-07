@@ -12,7 +12,7 @@ import io.github.yuroyami.kitejs.json.JsonParser
  * Upstream also serialises wrapped Java maps, collections and arrays; that is LiveConnect and is
  * not ported.
  */
-class NativeJSON private constructor() : ScriptableObject() {
+public class NativeJSON private constructor() : ScriptableObject() {
 
     override val className: String
         get() = "JSON"
@@ -28,7 +28,7 @@ class NativeJSON private constructor() : ScriptableObject() {
         val stack = ArrayDeque<Any?>()
     }
 
-    companion object {
+    public companion object {
         private const val JSON_TAG = "JSON"
         private const val MAX_STRINGIFY_GAP_LENGTH = 10
 
@@ -78,7 +78,7 @@ class NativeJSON private constructor() : ScriptableObject() {
             }
         }
 
-        fun parse(cx: Context, scope: Scriptable, jtext: String, reviver: Callable): Any? {
+        public fun parse(cx: Context, scope: Scriptable, jtext: String, reviver: Callable): Any? {
             val unfiltered = parse(cx, scope, jtext)
             val root = cx.newObject(scope)
             root.put("", root, unfiltered)
@@ -131,7 +131,7 @@ class NativeJSON private constructor() : ScriptableObject() {
 
         private fun repeat(c: Char, count: Int): String = CharArray(count) { c }.concatToString()
 
-        fun stringify(cx: Context, scope: Scriptable, value: Any?, replacer: Any?, spaceIn: Any?): Any? {
+        public fun stringify(cx: Context, scope: Scriptable, value: Any?, replacer: Any?, spaceIn: Any?): Any? {
             var space = spaceIn
             val indent = ""
             var gap = ""

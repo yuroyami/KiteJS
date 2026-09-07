@@ -11,9 +11,10 @@ import io.github.yuroyami.kitejs.config.RhinoConfig
  *
  * It is based on the C source files jsscan.c and jsscan.h in the jsref package.
  */
-object Token {
+public object Token {
 
-    enum class CommentType {
+    /** Which kind of comment the lexer found. */
+    public enum class CommentType {
         LINE,
         BLOCK_COMMENT,
         JSDOC,
@@ -21,227 +22,227 @@ object Token {
     }
 
     // debug flags
-    val printTrees: Boolean = RhinoConfig.get("rhino.printTrees", false)
+    public val printTrees: Boolean = RhinoConfig.get("rhino.printTrees", false)
     internal val printICode: Boolean = RhinoConfig.get("rhino.printICode", false)
     internal val printNames: Boolean = printTrees || printICode
 
     /** Token types. These values correspond to JSTokenType values in jsscan.c. */
-    const val ERROR = -1 // well-known as the only code < EOF
-    const val FIRST_TOKEN = ERROR
-    const val EOF = ERROR + 1 // end of file token - (not EOF_CHAR)
-    const val EOL = EOF + 1 // end of line
+    public const val ERROR: Int = -1 // well-known as the only code < EOF
+    public const val FIRST_TOKEN: Int = ERROR
+    public const val EOF: Int = ERROR + 1 // end of file token - (not EOF_CHAR)
+    public const val EOL: Int = EOF + 1 // end of line
 
     // Interpreter reuses the following as bytecodes
-    const val FIRST_BYTECODE_TOKEN = EOL + 1
-    const val ENTERWITH = FIRST_BYTECODE_TOKEN
-    const val LEAVEWITH = ENTERWITH + 1
-    const val RETURN = LEAVEWITH + 1
-    const val GOTO = RETURN + 1
-    const val IFEQ = GOTO + 1
-    const val IFNE = IFEQ + 1
-    const val SETNAME = IFNE + 1
-    const val BITOR = SETNAME + 1
-    const val BITXOR = BITOR + 1
-    const val BITAND = BITXOR + 1
-    const val EQ = BITAND + 1
-    const val NE = EQ + 1
-    const val LT = NE + 1
-    const val LE = LT + 1
-    const val GT = LE + 1
-    const val GE = GT + 1
-    const val LSH = GE + 1
-    const val RSH = LSH + 1
-    const val URSH = RSH + 1
-    const val ADD = URSH + 1
-    const val SUB = ADD + 1
-    const val MUL = SUB + 1
-    const val DIV = MUL + 1
-    const val MOD = DIV + 1
-    const val NOT = MOD + 1
-    const val BITNOT = NOT + 1
-    const val POS = BITNOT + 1
-    const val NEG = POS + 1
-    const val NEW = NEG + 1
-    const val DELPROP = NEW + 1
-    const val TYPEOF = DELPROP + 1
-    const val GETPROP = TYPEOF + 1
-    const val GETPROPNOWARN = GETPROP + 1
-    const val GETPROP_SUPER = GETPROPNOWARN + 1
-    const val GETPROPNOWARN_SUPER = GETPROP_SUPER + 1
-    const val SETPROP = GETPROPNOWARN_SUPER + 1
-    const val SETPROP_SUPER = SETPROP + 1
-    const val GETELEM = SETPROP_SUPER + 1
-    const val GETELEM_SUPER = GETELEM + 1
-    const val SETELEM = GETELEM_SUPER + 1
-    const val SETELEM_SUPER = SETELEM + 1
-    const val CALL = SETELEM_SUPER + 1
-    const val NAME = CALL + 1
-    const val NUMBER = NAME + 1
-    const val STRING = NUMBER + 1
-    const val NULL = STRING + 1
-    const val UNDEFINED = NULL + 1
-    const val THIS = UNDEFINED + 1
-    const val FALSE = THIS + 1
-    const val TRUE = FALSE + 1
-    const val SHEQ = TRUE + 1 // shallow equality (===)
-    const val SHNE = SHEQ + 1 // shallow inequality (!==)
-    const val REGEXP = SHNE + 1
-    const val BINDNAME = REGEXP + 1
-    const val THROW = BINDNAME + 1
-    const val RETHROW = THROW + 1 // rethrow caught exception: catch (e if ) use it
-    const val IN = RETHROW + 1
-    const val INSTANCEOF = IN + 1
-    const val LOCAL_LOAD = INSTANCEOF + 1
-    const val GETVAR = LOCAL_LOAD + 1
-    const val SETVAR = GETVAR + 1
-    const val CATCH_SCOPE = SETVAR + 1
-    const val ENUM_INIT_KEYS = CATCH_SCOPE + 1
-    const val ENUM_INIT_VALUES = ENUM_INIT_KEYS + 1
-    const val ENUM_INIT_ARRAY = ENUM_INIT_VALUES + 1
-    const val ENUM_INIT_VALUES_IN_ORDER = ENUM_INIT_ARRAY + 1
-    const val ENUM_NEXT = ENUM_INIT_VALUES_IN_ORDER + 1
-    const val ENUM_ID = ENUM_NEXT + 1
-    const val THISFN = ENUM_ID + 1
-    const val RETURN_RESULT = THISFN + 1 // to return previously stored return result
-    const val ARRAYLIT = RETURN_RESULT + 1 // array literal
-    const val OBJECTLIT = ARRAYLIT + 1 // object literal
-    const val GET_REF = OBJECTLIT + 1 // *reference
-    const val SET_REF = GET_REF + 1 // *reference    = something
-    const val DEL_REF = SET_REF + 1 // delete reference
-    const val REF_CALL = DEL_REF + 1 // f(args)    = something or f(args)++
-    const val REF_SPECIAL = REF_CALL + 1 // reference for special properties like __proto
-    const val YIELD = REF_SPECIAL + 1 // JS 1.7 yield pseudo keyword
-    const val SUPER = YIELD + 1 // ES6 super keyword
-    const val STRICT_SETNAME = SUPER + 1
-    const val STRING_CONCAT = STRICT_SETNAME + 1 // string concatenation with toString first semantics
-    const val EXP = STRING_CONCAT + 1 // Exponentiation Operator
+    public const val FIRST_BYTECODE_TOKEN: Int = EOL + 1
+    public const val ENTERWITH: Int = FIRST_BYTECODE_TOKEN
+    public const val LEAVEWITH: Int = ENTERWITH + 1
+    public const val RETURN: Int = LEAVEWITH + 1
+    public const val GOTO: Int = RETURN + 1
+    public const val IFEQ: Int = GOTO + 1
+    public const val IFNE: Int = IFEQ + 1
+    public const val SETNAME: Int = IFNE + 1
+    public const val BITOR: Int = SETNAME + 1
+    public const val BITXOR: Int = BITOR + 1
+    public const val BITAND: Int = BITXOR + 1
+    public const val EQ: Int = BITAND + 1
+    public const val NE: Int = EQ + 1
+    public const val LT: Int = NE + 1
+    public const val LE: Int = LT + 1
+    public const val GT: Int = LE + 1
+    public const val GE: Int = GT + 1
+    public const val LSH: Int = GE + 1
+    public const val RSH: Int = LSH + 1
+    public const val URSH: Int = RSH + 1
+    public const val ADD: Int = URSH + 1
+    public const val SUB: Int = ADD + 1
+    public const val MUL: Int = SUB + 1
+    public const val DIV: Int = MUL + 1
+    public const val MOD: Int = DIV + 1
+    public const val NOT: Int = MOD + 1
+    public const val BITNOT: Int = NOT + 1
+    public const val POS: Int = BITNOT + 1
+    public const val NEG: Int = POS + 1
+    public const val NEW: Int = NEG + 1
+    public const val DELPROP: Int = NEW + 1
+    public const val TYPEOF: Int = DELPROP + 1
+    public const val GETPROP: Int = TYPEOF + 1
+    public const val GETPROPNOWARN: Int = GETPROP + 1
+    public const val GETPROP_SUPER: Int = GETPROPNOWARN + 1
+    public const val GETPROPNOWARN_SUPER: Int = GETPROP_SUPER + 1
+    public const val SETPROP: Int = GETPROPNOWARN_SUPER + 1
+    public const val SETPROP_SUPER: Int = SETPROP + 1
+    public const val GETELEM: Int = SETPROP_SUPER + 1
+    public const val GETELEM_SUPER: Int = GETELEM + 1
+    public const val SETELEM: Int = GETELEM_SUPER + 1
+    public const val SETELEM_SUPER: Int = SETELEM + 1
+    public const val CALL: Int = SETELEM_SUPER + 1
+    public const val NAME: Int = CALL + 1
+    public const val NUMBER: Int = NAME + 1
+    public const val STRING: Int = NUMBER + 1
+    public const val NULL: Int = STRING + 1
+    public const val UNDEFINED: Int = NULL + 1
+    public const val THIS: Int = UNDEFINED + 1
+    public const val FALSE: Int = THIS + 1
+    public const val TRUE: Int = FALSE + 1
+    public const val SHEQ: Int = TRUE + 1 // shallow equality (===)
+    public const val SHNE: Int = SHEQ + 1 // shallow inequality (!==)
+    public const val REGEXP: Int = SHNE + 1
+    public const val BINDNAME: Int = REGEXP + 1
+    public const val THROW: Int = BINDNAME + 1
+    public const val RETHROW: Int = THROW + 1 // rethrow caught exception: catch (e if ) use it
+    public const val IN: Int = RETHROW + 1
+    public const val INSTANCEOF: Int = IN + 1
+    public const val LOCAL_LOAD: Int = INSTANCEOF + 1
+    public const val GETVAR: Int = LOCAL_LOAD + 1
+    public const val SETVAR: Int = GETVAR + 1
+    public const val CATCH_SCOPE: Int = SETVAR + 1
+    public const val ENUM_INIT_KEYS: Int = CATCH_SCOPE + 1
+    public const val ENUM_INIT_VALUES: Int = ENUM_INIT_KEYS + 1
+    public const val ENUM_INIT_ARRAY: Int = ENUM_INIT_VALUES + 1
+    public const val ENUM_INIT_VALUES_IN_ORDER: Int = ENUM_INIT_ARRAY + 1
+    public const val ENUM_NEXT: Int = ENUM_INIT_VALUES_IN_ORDER + 1
+    public const val ENUM_ID: Int = ENUM_NEXT + 1
+    public const val THISFN: Int = ENUM_ID + 1
+    public const val RETURN_RESULT: Int = THISFN + 1 // to return previously stored return result
+    public const val ARRAYLIT: Int = RETURN_RESULT + 1 // array literal
+    public const val OBJECTLIT: Int = ARRAYLIT + 1 // object literal
+    public const val GET_REF: Int = OBJECTLIT + 1 // *reference
+    public const val SET_REF: Int = GET_REF + 1 // *reference    = something
+    public const val DEL_REF: Int = SET_REF + 1 // delete reference
+    public const val REF_CALL: Int = DEL_REF + 1 // f(args)    = something or f(args)++
+    public const val REF_SPECIAL: Int = REF_CALL + 1 // reference for special properties like __proto
+    public const val YIELD: Int = REF_SPECIAL + 1 // JS 1.7 yield pseudo keyword
+    public const val SUPER: Int = YIELD + 1 // ES6 super keyword
+    public const val STRICT_SETNAME: Int = SUPER + 1
+    public const val STRING_CONCAT: Int = STRICT_SETNAME + 1 // string concatenation with toString first semantics
+    public const val EXP: Int = STRING_CONCAT + 1 // Exponentiation Operator
 
     // For XML support:
-    const val DEFAULTNAMESPACE = EXP + 1 // default xml namespace =
-    const val ESCXMLATTR = DEFAULTNAMESPACE + 1
-    const val ESCXMLTEXT = ESCXMLATTR + 1
-    const val REF_MEMBER = ESCXMLTEXT + 1 // Reference for x.@y, x..y etc.
-    const val REF_NS_MEMBER = REF_MEMBER + 1 // Reference for x.ns::y, x..ns::y etc.
-    const val REF_NAME = REF_NS_MEMBER + 1 // Reference for @y, @[y] etc.
-    const val REF_NS_NAME = REF_NAME + 1 // Reference for ns::y, @ns::y@[y] etc.
-    const val BIGINT = REF_NS_NAME + 1 // ES2020 BigInt
+    public const val DEFAULTNAMESPACE: Int = EXP + 1 // default xml namespace =
+    public const val ESCXMLATTR: Int = DEFAULTNAMESPACE + 1
+    public const val ESCXMLTEXT: Int = ESCXMLATTR + 1
+    public const val REF_MEMBER: Int = ESCXMLTEXT + 1 // Reference for x.@y, x..y etc.
+    public const val REF_NS_MEMBER: Int = REF_MEMBER + 1 // Reference for x.ns::y, x..ns::y etc.
+    public const val REF_NAME: Int = REF_NS_MEMBER + 1 // Reference for @y, @[y] etc.
+    public const val REF_NS_NAME: Int = REF_NAME + 1 // Reference for ns::y, @ns::y@[y] etc.
+    public const val BIGINT: Int = REF_NS_NAME + 1 // ES2020 BigInt
 
     // End of interpreter bytecodes
-    const val LAST_BYTECODE_TOKEN = BIGINT
-    const val TRY = LAST_BYTECODE_TOKEN + 1
-    const val SEMI = TRY + 1 // semicolon
-    const val LB = SEMI + 1 // left and right brackets
-    const val RB = LB + 1
-    const val LC = RB + 1 // left and right curlies (braces)
-    const val RC = LC + 1
-    const val LP = RC + 1 // left and right parentheses
-    const val RP = LP + 1
-    const val COMMA = RP + 1 // comma operator
-    const val ASSIGN = COMMA + 1 // simple assignment  (=)
-    const val ASSIGN_BITOR = ASSIGN + 1 // |=
-    const val ASSIGN_LOGICAL_OR = ASSIGN_BITOR + 1 // ||=
-    const val ASSIGN_BITXOR = ASSIGN_LOGICAL_OR + 1 // ^=
-    const val ASSIGN_BITAND = ASSIGN_BITXOR + 1 // &=
-    const val ASSIGN_LOGICAL_AND = ASSIGN_BITAND + 1 // &&=
-    const val ASSIGN_LSH = ASSIGN_LOGICAL_AND + 1 // <<=
-    const val ASSIGN_RSH = ASSIGN_LSH + 1 // >>=
-    const val ASSIGN_URSH = ASSIGN_RSH + 1 // >>>=
-    const val ASSIGN_ADD = ASSIGN_URSH + 1 // +=
-    const val ASSIGN_SUB = ASSIGN_ADD + 1 // -=
-    const val ASSIGN_MUL = ASSIGN_SUB + 1 // *=
-    const val ASSIGN_DIV = ASSIGN_MUL + 1 // /=
-    const val ASSIGN_MOD = ASSIGN_DIV + 1 // %=
-    const val ASSIGN_EXP = ASSIGN_MOD + 1 // **=
-    const val ASSIGN_NULLISH = ASSIGN_EXP + 1 // ??=
+    public const val LAST_BYTECODE_TOKEN: Int = BIGINT
+    public const val TRY: Int = LAST_BYTECODE_TOKEN + 1
+    public const val SEMI: Int = TRY + 1 // semicolon
+    public const val LB: Int = SEMI + 1 // left and right brackets
+    public const val RB: Int = LB + 1
+    public const val LC: Int = RB + 1 // left and right curlies (braces)
+    public const val RC: Int = LC + 1
+    public const val LP: Int = RC + 1 // left and right parentheses
+    public const val RP: Int = LP + 1
+    public const val COMMA: Int = RP + 1 // comma operator
+    public const val ASSIGN: Int = COMMA + 1 // simple assignment  (=)
+    public const val ASSIGN_BITOR: Int = ASSIGN + 1 // |=
+    public const val ASSIGN_LOGICAL_OR: Int = ASSIGN_BITOR + 1 // ||=
+    public const val ASSIGN_BITXOR: Int = ASSIGN_LOGICAL_OR + 1 // ^=
+    public const val ASSIGN_BITAND: Int = ASSIGN_BITXOR + 1 // &=
+    public const val ASSIGN_LOGICAL_AND: Int = ASSIGN_BITAND + 1 // &&=
+    public const val ASSIGN_LSH: Int = ASSIGN_LOGICAL_AND + 1 // <<=
+    public const val ASSIGN_RSH: Int = ASSIGN_LSH + 1 // >>=
+    public const val ASSIGN_URSH: Int = ASSIGN_RSH + 1 // >>>=
+    public const val ASSIGN_ADD: Int = ASSIGN_URSH + 1 // +=
+    public const val ASSIGN_SUB: Int = ASSIGN_ADD + 1 // -=
+    public const val ASSIGN_MUL: Int = ASSIGN_SUB + 1 // *=
+    public const val ASSIGN_DIV: Int = ASSIGN_MUL + 1 // /=
+    public const val ASSIGN_MOD: Int = ASSIGN_DIV + 1 // %=
+    public const val ASSIGN_EXP: Int = ASSIGN_MOD + 1 // **=
+    public const val ASSIGN_NULLISH: Int = ASSIGN_EXP + 1 // ??=
 
-    const val FIRST_ASSIGN = ASSIGN
-    const val LAST_ASSIGN = ASSIGN_NULLISH
-    const val HOOK = LAST_ASSIGN + 1 // conditional (?:)
-    const val COLON = HOOK + 1
-    const val OR = COLON + 1 // logical or (||)
-    const val AND = OR + 1 // logical and (&&)
-    const val INC = AND + 1 // increment/decrement (++ --)
-    const val DEC = INC + 1
-    const val DOT = DEC + 1 // member operator (.)
-    const val FUNCTION = DOT + 1 // function keyword
-    const val EXPORT = FUNCTION + 1 // export keyword
-    const val IMPORT = EXPORT + 1 // import keyword
-    const val IF = IMPORT + 1 // if keyword
-    const val ELSE = IF + 1 // else keyword
-    const val SWITCH = ELSE + 1 // switch keyword
-    const val CASE = SWITCH + 1 // case keyword
-    const val DEFAULT = CASE + 1 // default keyword
-    const val WHILE = DEFAULT + 1 // while keyword
-    const val DO = WHILE + 1 // do keyword
-    const val FOR = DO + 1 // for keyword
-    const val BREAK = FOR + 1 // break keyword
-    const val CONTINUE = BREAK + 1 // continue keyword
-    const val VAR = CONTINUE + 1 // var keyword
-    const val WITH = VAR + 1 // with keyword
-    const val CATCH = WITH + 1 // catch keyword
-    const val FINALLY = CATCH + 1 // finally keyword
-    const val VOID = FINALLY + 1 // void keyword
-    const val RESERVED = VOID + 1 // reserved keywords
-    const val EMPTY = RESERVED + 1
-    const val COMPUTED_PROPERTY = EMPTY + 1 // computed property in object initializer [x]
+    public const val FIRST_ASSIGN: Int = ASSIGN
+    public const val LAST_ASSIGN: Int = ASSIGN_NULLISH
+    public const val HOOK: Int = LAST_ASSIGN + 1 // conditional (?:)
+    public const val COLON: Int = HOOK + 1
+    public const val OR: Int = COLON + 1 // logical or (||)
+    public const val AND: Int = OR + 1 // logical and (&&)
+    public const val INC: Int = AND + 1 // increment/decrement (++ --)
+    public const val DEC: Int = INC + 1
+    public const val DOT: Int = DEC + 1 // member operator (.)
+    public const val FUNCTION: Int = DOT + 1 // function keyword
+    public const val EXPORT: Int = FUNCTION + 1 // export keyword
+    public const val IMPORT: Int = EXPORT + 1 // import keyword
+    public const val IF: Int = IMPORT + 1 // if keyword
+    public const val ELSE: Int = IF + 1 // else keyword
+    public const val SWITCH: Int = ELSE + 1 // switch keyword
+    public const val CASE: Int = SWITCH + 1 // case keyword
+    public const val DEFAULT: Int = CASE + 1 // default keyword
+    public const val WHILE: Int = DEFAULT + 1 // while keyword
+    public const val DO: Int = WHILE + 1 // do keyword
+    public const val FOR: Int = DO + 1 // for keyword
+    public const val BREAK: Int = FOR + 1 // break keyword
+    public const val CONTINUE: Int = BREAK + 1 // continue keyword
+    public const val VAR: Int = CONTINUE + 1 // var keyword
+    public const val WITH: Int = VAR + 1 // with keyword
+    public const val CATCH: Int = WITH + 1 // catch keyword
+    public const val FINALLY: Int = CATCH + 1 // finally keyword
+    public const val VOID: Int = FINALLY + 1 // void keyword
+    public const val RESERVED: Int = VOID + 1 // reserved keywords
+    public const val EMPTY: Int = RESERVED + 1
+    public const val COMPUTED_PROPERTY: Int = EMPTY + 1 // computed property in object initializer [x]
 
     /* types used for the parse tree - these never get returned by the scanner. */
-    const val BLOCK = COMPUTED_PROPERTY + 1 // statement block
-    const val LABEL = BLOCK + 1 // label
-    const val TARGET = LABEL + 1
-    const val LOOP = TARGET + 1
-    const val EXPR_VOID = LOOP + 1 // expression statement in functions
-    const val EXPR_RESULT = EXPR_VOID + 1 // expression statement in scripts
-    const val JSR = EXPR_RESULT + 1
-    const val SCRIPT = JSR + 1 // top-level node for entire script
-    const val TYPEOFNAME = SCRIPT + 1 // for typeof(simple-name)
-    const val USE_STACK = TYPEOFNAME + 1
-    const val SETPROP_OP = USE_STACK + 1 // x.y op= something
-    const val SETELEM_OP = SETPROP_OP + 1 // x[y] op= something
-    const val LOCAL_BLOCK = SETELEM_OP + 1
-    const val SET_REF_OP = LOCAL_BLOCK + 1 // *reference op= something
+    public const val BLOCK: Int = COMPUTED_PROPERTY + 1 // statement block
+    public const val LABEL: Int = BLOCK + 1 // label
+    public const val TARGET: Int = LABEL + 1
+    public const val LOOP: Int = TARGET + 1
+    public const val EXPR_VOID: Int = LOOP + 1 // expression statement in functions
+    public const val EXPR_RESULT: Int = EXPR_VOID + 1 // expression statement in scripts
+    public const val JSR: Int = EXPR_RESULT + 1
+    public const val SCRIPT: Int = JSR + 1 // top-level node for entire script
+    public const val TYPEOFNAME: Int = SCRIPT + 1 // for typeof(simple-name)
+    public const val USE_STACK: Int = TYPEOFNAME + 1
+    public const val SETPROP_OP: Int = USE_STACK + 1 // x.y op= something
+    public const val SETELEM_OP: Int = SETPROP_OP + 1 // x[y] op= something
+    public const val LOCAL_BLOCK: Int = SETELEM_OP + 1
+    public const val SET_REF_OP: Int = LOCAL_BLOCK + 1 // *reference op= something
 
     // For XML support:
-    const val DOTDOT = SET_REF_OP + 1 // member operator (..)
-    const val COLONCOLON = DOTDOT + 1 // namespace::name
-    const val XML = COLONCOLON + 1 // XML type
-    const val DOTQUERY = XML + 1 // .() -- e.g., x.emps.emp.(name == "terry")
-    const val XMLATTR = DOTQUERY + 1 // @
-    const val XMLEND = XMLATTR + 1
+    public const val DOTDOT: Int = SET_REF_OP + 1 // member operator (..)
+    public const val COLONCOLON: Int = DOTDOT + 1 // namespace::name
+    public const val XML: Int = COLONCOLON + 1 // XML type
+    public const val DOTQUERY: Int = XML + 1 // .() -- e.g., x.emps.emp.(name == "terry")
+    public const val XMLATTR: Int = DOTQUERY + 1 // @
+    public const val XMLEND: Int = XMLATTR + 1
 
     // Optimizer-only-tokens
-    const val TO_OBJECT = XMLEND + 1
-    const val TO_DOUBLE = TO_OBJECT + 1
-    const val GET = TO_DOUBLE + 1 // JS 1.5 get pseudo keyword
-    const val SET = GET + 1 // JS 1.5 set pseudo keyword
-    const val LET = SET + 1 // JS 1.7 let pseudo keyword
-    const val CONST = LET + 1
-    const val SETCONST = CONST + 1
-    const val SETCONSTVAR = SETCONST + 1
-    const val ARRAYCOMP = SETCONSTVAR + 1 // array comprehension
-    const val LETEXPR = ARRAYCOMP + 1
-    const val WITHEXPR = LETEXPR + 1
-    const val DEBUGGER = WITHEXPR + 1
-    const val COMMENT = DEBUGGER + 1
-    const val GENEXPR = COMMENT + 1
-    const val METHOD = GENEXPR + 1 // ES6 MethodDefinition
-    const val ARROW = METHOD + 1 // ES6 ArrowFunction
-    const val YIELD_STAR = ARROW + 1 // ES6 "yield *", a specialization of yield
-    const val TEMPLATE_LITERAL = YIELD_STAR + 1 // template literal
-    const val TEMPLATE_CHARS = TEMPLATE_LITERAL + 1 // template literal - literal section
-    const val TEMPLATE_LITERAL_SUBST = TEMPLATE_CHARS + 1 // template literal - substitution
-    const val TAGGED_TEMPLATE_LITERAL = TEMPLATE_LITERAL_SUBST + 1 // template literal - tagged/handler
-    const val DOTDOTDOT = TAGGED_TEMPLATE_LITERAL + 1 // spread/rest ...
-    const val NULLISH_COALESCING = DOTDOTDOT + 1 // nullish coalescing (??)
-    const val QUESTION_DOT = NULLISH_COALESCING + 1 // optional chaining operator (?.)
-    const val LAST_TOKEN = QUESTION_DOT + 1
+    public const val TO_OBJECT: Int = XMLEND + 1
+    public const val TO_DOUBLE: Int = TO_OBJECT + 1
+    public const val GET: Int = TO_DOUBLE + 1 // JS 1.5 get pseudo keyword
+    public const val SET: Int = GET + 1 // JS 1.5 set pseudo keyword
+    public const val LET: Int = SET + 1 // JS 1.7 let pseudo keyword
+    public const val CONST: Int = LET + 1
+    public const val SETCONST: Int = CONST + 1
+    public const val SETCONSTVAR: Int = SETCONST + 1
+    public const val ARRAYCOMP: Int = SETCONSTVAR + 1 // array comprehension
+    public const val LETEXPR: Int = ARRAYCOMP + 1
+    public const val WITHEXPR: Int = LETEXPR + 1
+    public const val DEBUGGER: Int = WITHEXPR + 1
+    public const val COMMENT: Int = DEBUGGER + 1
+    public const val GENEXPR: Int = COMMENT + 1
+    public const val METHOD: Int = GENEXPR + 1 // ES6 MethodDefinition
+    public const val ARROW: Int = METHOD + 1 // ES6 ArrowFunction
+    public const val YIELD_STAR: Int = ARROW + 1 // ES6 "yield *", a specialization of yield
+    public const val TEMPLATE_LITERAL: Int = YIELD_STAR + 1 // template literal
+    public const val TEMPLATE_CHARS: Int = TEMPLATE_LITERAL + 1 // template literal - literal section
+    public const val TEMPLATE_LITERAL_SUBST: Int = TEMPLATE_CHARS + 1 // template literal - substitution
+    public const val TAGGED_TEMPLATE_LITERAL: Int = TEMPLATE_LITERAL_SUBST + 1 // template literal - tagged/handler
+    public const val DOTDOTDOT: Int = TAGGED_TEMPLATE_LITERAL + 1 // spread/rest ...
+    public const val NULLISH_COALESCING: Int = DOTDOTDOT + 1 // nullish coalescing (??)
+    public const val QUESTION_DOT: Int = NULLISH_COALESCING + 1 // optional chaining operator (?.)
+    public const val LAST_TOKEN: Int = QUESTION_DOT + 1
 
     /**
      * Returns a name for the token. If the engine is compiled with certain hardcoded
      * debugging flags in this file, it calls [typeToName]; otherwise it returns a string
      * whose value is the token number.
      */
-    fun name(token: Int): String {
+    public fun name(token: Int): String {
         if (!printNames) {
             return token.toString()
         }
@@ -252,7 +253,7 @@ object Token {
      * Always returns a human-readable string for the token name. For instance, [FINALLY]
      * has the name "FINALLY".
      */
-    fun typeToName(token: Int): String = when (token) {
+    public fun typeToName(token: Int): String = when (token) {
         ERROR -> "ERROR"
         EOF -> "EOF"
         EOL -> "EOL"
@@ -448,7 +449,7 @@ object Token {
     }
 
     /** Convert a keyword token to a name string. */
-    fun keywordToName(token: Int): String? = when (token) {
+    public fun keywordToName(token: Int): String? = when (token) {
         BREAK -> "break"
         CASE -> "case"
         CONTINUE -> "continue"
@@ -487,5 +488,5 @@ object Token {
     }
 
     /** Return true if the passed code is a valid Token constant. */
-    fun isValidToken(code: Int): Boolean = code in ERROR..LAST_TOKEN
+    public fun isValidToken(code: Int): Boolean = code in ERROR..LAST_TOKEN
 }

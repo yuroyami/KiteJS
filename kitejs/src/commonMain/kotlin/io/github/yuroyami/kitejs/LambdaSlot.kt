@@ -11,7 +11,7 @@ package io.github.yuroyami.kitejs
  *
  * This is how a native property gets implemented without reflection.
  */
-class LambdaSlot : Slot {
+public class LambdaSlot : Slot {
 
     internal constructor(name: Any?, index: Int) : super(name, index, 0)
 

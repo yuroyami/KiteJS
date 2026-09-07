@@ -10,7 +10,7 @@ package io.github.yuroyami.kitejs
  *
  * KMP: upstream synchronizes [flatten]. Dropped under the single-thread contract (D-3).
  */
-class ConsString(str1: CharSequence, str2: CharSequence) : CharSequence {
+public class ConsString(str1: CharSequence, str2: CharSequence) : CharSequence {
 
     private var left: CharSequence
     private var right: CharSequence

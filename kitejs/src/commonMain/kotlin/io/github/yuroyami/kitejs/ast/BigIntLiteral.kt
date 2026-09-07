@@ -13,10 +13,10 @@ import io.github.yuroyami.kitejs.Token
  * KMP: [bigInt] holds a [KBigInt], the digits-and-radix stand-in for BigInteger (D-5). Its
  * `toString` matches upstream only for decimal literals until Phase 5 lands real arithmetic.
  */
-class BigIntLiteral : AstNode {
+public class BigIntLiteral : AstNode {
 
     /** The node's string value: the original source token. */
-    var value: String? = null
+    public var value: String? = null
         set(value) {
             assertNotNull(value)
             field = value
@@ -28,18 +28,18 @@ class BigIntLiteral : AstNode {
         typeField = Token.BIGINT
     }
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(pos: Int) : super(pos)
+    public constructor(pos: Int) : super(pos)
 
-    constructor(pos: Int, len: Int) : super(pos, len)
+    public constructor(pos: Int, len: Int) : super(pos, len)
 
-    constructor(pos: Int, value: String) : super(pos) {
+    public constructor(pos: Int, value: String) : super(pos) {
         this.value = value
         length = value.length
     }
 
-    constructor(pos: Int, value: String, bigInt: KBigInt?) : this(pos, value) {
+    public constructor(pos: Int, value: String, bigInt: KBigInt?) : this(pos, value) {
         this.bigInt = bigInt
     }
 

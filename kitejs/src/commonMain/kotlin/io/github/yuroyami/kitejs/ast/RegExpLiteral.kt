@@ -10,17 +10,17 @@ import io.github.yuroyami.kitejs.Token
  * A regular expression literal. Node type is [Token.REGEXP]. The [value] is the pattern
  * without the delimiting slashes and [flags] are the trailing letters.
  */
-class RegExpLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
+public class RegExpLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     /** The regexp pattern, without the enclosing slashes. */
-    var value: String? = null
+    public var value: String? = null
         set(value) {
             assertNotNull(value)
             field = value
         }
 
     /** The regexp flags, or null if there are none. */
-    var flags: String? = null
+    public var flags: String? = null
 
     init {
         typeField = Token.REGEXP

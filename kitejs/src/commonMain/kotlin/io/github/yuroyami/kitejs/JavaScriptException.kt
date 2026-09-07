@@ -5,8 +5,8 @@
 package io.github.yuroyami.kitejs
 
 /** A JavaScript `throw` that reached Kotlin: [value] is whatever the script threw. */
-class JavaScriptException(
-    val value: Any?,
+public class JavaScriptException(
+    public val value: Any?,
     sourceName: String?,
     lineNumber: Int,
 ) : RhinoException() {

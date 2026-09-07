@@ -84,14 +84,14 @@ import io.github.yuroyami.kitejs.ast.Yield
  * `xmlInitializer`, `attributeAccess` and the XML branches of `propertyName` and `memberExprTail`
  * report "XML not available" instead of parsing E4X syntax.
  */
-class Parser(
+public class Parser(
     internal val compilerEnv: CompilerEnvirons = CompilerEnvirons(),
     private val errorReporter: ErrorReporter = compilerEnv.errorReporter,
 ) {
 
     private val errorCollector: IdeErrorReporter? = errorReporter as? IdeErrorReporter
 
-    var sourceURI: String? = null
+    public var sourceURI: String? = null
 
     private var sourceChars: CharArray? = null
 
@@ -142,7 +142,7 @@ class Parser(
     private var lastTokenColumn = -1
 
     /** Exception used to unwind out of a failed parse. */
-    class ParserException : RuntimeException()
+    public class ParserException : RuntimeException()
 
     /** Lowers an AST node to an IR node. Implemented by IRFactory. */
     internal fun interface Transformer {
@@ -435,7 +435,7 @@ class Parser(
         }
     }
 
-    fun eof(): Boolean = ts.eof
+    public fun eof(): Boolean = ts.eof
 
     internal fun insideFunctionBody(): Boolean = nestingOfFunction != 0
 
@@ -499,7 +499,7 @@ class Parser(
      * @return the parsed program. A failed parse reports through the [ErrorReporter] configured in
      *     [CompilerEnvirons].
      */
-    fun parse(sourceString: String, sourceURI: String?, lineno: Int): AstRoot {
+    public fun parse(sourceString: String, sourceURI: String?, lineno: Int): AstRoot {
         check(!parseFinished) { "parser reused" }
         this.sourceURI = sourceURI
         if (compilerEnv.ideMode) {
@@ -4929,9 +4929,9 @@ class Parser(
                 ", currentToken=" + currentToken,
         )
 
-    fun inUseStrictDirective(): Boolean = inUseStrictDirective
+    public fun inUseStrictDirective(): Boolean = inUseStrictDirective
 
-    fun reportErrorsIfExists(baseLineno: Int) {
+    public fun reportErrorsIfExists(baseLineno: Int) {
         if (this.syntaxErrorCount != 0) {
             val msg = lookupMessage("msg.got.syntax.errors", this.syntaxErrorCount.toString())
             if (!compilerEnv.ideMode) {
@@ -4940,17 +4940,18 @@ class Parser(
         }
     }
 
-    interface CurrentPositionReporter {
-        val position: Int
-        val length: Int
-        val lineno: Int
-        val line: String?
-        val offset: Int
+    /** Where the parser is right now, for an error message that wants to point at it. */
+    public interface CurrentPositionReporter {
+        public val position: Int
+        public val length: Int
+        public val lineno: Int
+        public val line: String?
+        public val offset: Int
     }
 
-    companion object {
+    public companion object {
         /** Maximum number of allowed function or constructor arguments, following SpiderMonkey. */
-        const val ARGC_LIMIT = 1 shl 16
+        public const val ARGC_LIMIT: Int = 1 shl 16
 
         // TokenInformation flags: currentFlaggedToken stores them together with the token type.
         internal const val CLEAR_TI_MASK = 0xFFFF // mask that clears the token information bits

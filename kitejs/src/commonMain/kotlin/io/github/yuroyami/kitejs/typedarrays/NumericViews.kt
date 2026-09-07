@@ -17,13 +17,13 @@ import io.github.yuroyami.kitejs.Undefined
 // written, so everything else lives in NativeTypedArrayView.
 
 /** The `Int8Array` view: 1 byte per element. */
-class NativeInt8Array : NativeTypedArrayView {
+public class NativeInt8Array : NativeTypedArrayView {
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * 1)
+    public constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * 1)
 
-    constructor(len: Int) : this(NativeArrayBuffer(len * 1), 0, len)
+    public constructor(len: Int) : this(NativeArrayBuffer(len * 1), 0, len)
 
     override val className: String
         get() = CLASS_NAME
@@ -44,7 +44,7 @@ class NativeInt8Array : NativeTypedArrayView {
         return null
     }
 
-    companion object {
+    public companion object {
         private const val CLASS_NAME = "Int8Array"
 
         internal fun init(cx: Context, scope: Scriptable, sealed: Boolean): Any {
@@ -73,13 +73,13 @@ class NativeInt8Array : NativeTypedArrayView {
 }
 
 /** The `Uint8Array` view: 1 byte per element. */
-class NativeUint8Array : NativeTypedArrayView {
+public class NativeUint8Array : NativeTypedArrayView {
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * 1)
+    public constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * 1)
 
-    constructor(len: Int) : this(NativeArrayBuffer(len * 1), 0, len)
+    public constructor(len: Int) : this(NativeArrayBuffer(len * 1), 0, len)
 
     override val className: String
         get() = CLASS_NAME
@@ -100,7 +100,7 @@ class NativeUint8Array : NativeTypedArrayView {
         return null
     }
 
-    companion object {
+    public companion object {
         private const val CLASS_NAME = "Uint8Array"
 
         internal fun init(cx: Context, scope: Scriptable, sealed: Boolean): Any {
@@ -129,13 +129,13 @@ class NativeUint8Array : NativeTypedArrayView {
 }
 
 /** The `Uint8ClampedArray` view: 1 byte per element. */
-class NativeUint8ClampedArray : NativeTypedArrayView {
+public class NativeUint8ClampedArray : NativeTypedArrayView {
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * 1)
+    public constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * 1)
 
-    constructor(len: Int) : this(NativeArrayBuffer(len * 1), 0, len)
+    public constructor(len: Int) : this(NativeArrayBuffer(len * 1), 0, len)
 
     override val className: String
         get() = CLASS_NAME
@@ -156,7 +156,7 @@ class NativeUint8ClampedArray : NativeTypedArrayView {
         return null
     }
 
-    companion object {
+    public companion object {
         private const val CLASS_NAME = "Uint8ClampedArray"
 
         internal fun init(cx: Context, scope: Scriptable, sealed: Boolean): Any {
@@ -185,13 +185,13 @@ class NativeUint8ClampedArray : NativeTypedArrayView {
 }
 
 /** The `Int16Array` view: 2 bytes per element. */
-class NativeInt16Array : NativeTypedArrayView {
+public class NativeInt16Array : NativeTypedArrayView {
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * 2)
+    public constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * 2)
 
-    constructor(len: Int) : this(NativeArrayBuffer(len * 2), 0, len)
+    public constructor(len: Int) : this(NativeArrayBuffer(len * 2), 0, len)
 
     override val className: String
         get() = CLASS_NAME
@@ -212,7 +212,7 @@ class NativeInt16Array : NativeTypedArrayView {
         return null
     }
 
-    companion object {
+    public companion object {
         private const val CLASS_NAME = "Int16Array"
 
         internal fun init(cx: Context, scope: Scriptable, sealed: Boolean): Any {
@@ -241,13 +241,13 @@ class NativeInt16Array : NativeTypedArrayView {
 }
 
 /** The `Uint16Array` view: 2 bytes per element. */
-class NativeUint16Array : NativeTypedArrayView {
+public class NativeUint16Array : NativeTypedArrayView {
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * 2)
+    public constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * 2)
 
-    constructor(len: Int) : this(NativeArrayBuffer(len * 2), 0, len)
+    public constructor(len: Int) : this(NativeArrayBuffer(len * 2), 0, len)
 
     override val className: String
         get() = CLASS_NAME
@@ -268,7 +268,7 @@ class NativeUint16Array : NativeTypedArrayView {
         return null
     }
 
-    companion object {
+    public companion object {
         private const val CLASS_NAME = "Uint16Array"
 
         internal fun init(cx: Context, scope: Scriptable, sealed: Boolean): Any {
@@ -297,13 +297,13 @@ class NativeUint16Array : NativeTypedArrayView {
 }
 
 /** The `Int32Array` view: 4 bytes per element. */
-class NativeInt32Array : NativeTypedArrayView {
+public class NativeInt32Array : NativeTypedArrayView {
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * 4)
+    public constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * 4)
 
-    constructor(len: Int) : this(NativeArrayBuffer(len * 4), 0, len)
+    public constructor(len: Int) : this(NativeArrayBuffer(len * 4), 0, len)
 
     override val className: String
         get() = CLASS_NAME
@@ -324,7 +324,7 @@ class NativeInt32Array : NativeTypedArrayView {
         return null
     }
 
-    companion object {
+    public companion object {
         private const val CLASS_NAME = "Int32Array"
 
         internal fun init(cx: Context, scope: Scriptable, sealed: Boolean): Any {
@@ -353,13 +353,13 @@ class NativeInt32Array : NativeTypedArrayView {
 }
 
 /** The `Uint32Array` view: 4 bytes per element. */
-class NativeUint32Array : NativeTypedArrayView {
+public class NativeUint32Array : NativeTypedArrayView {
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * 4)
+    public constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * 4)
 
-    constructor(len: Int) : this(NativeArrayBuffer(len * 4), 0, len)
+    public constructor(len: Int) : this(NativeArrayBuffer(len * 4), 0, len)
 
     override val className: String
         get() = CLASS_NAME
@@ -380,7 +380,7 @@ class NativeUint32Array : NativeTypedArrayView {
         return null
     }
 
-    companion object {
+    public companion object {
         private const val CLASS_NAME = "Uint32Array"
 
         internal fun init(cx: Context, scope: Scriptable, sealed: Boolean): Any {
@@ -409,13 +409,13 @@ class NativeUint32Array : NativeTypedArrayView {
 }
 
 /** The `Float32Array` view: 4 bytes per element. */
-class NativeFloat32Array : NativeTypedArrayView {
+public class NativeFloat32Array : NativeTypedArrayView {
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * 4)
+    public constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * 4)
 
-    constructor(len: Int) : this(NativeArrayBuffer(len * 4), 0, len)
+    public constructor(len: Int) : this(NativeArrayBuffer(len * 4), 0, len)
 
     override val className: String
         get() = CLASS_NAME
@@ -436,7 +436,7 @@ class NativeFloat32Array : NativeTypedArrayView {
         return null
     }
 
-    companion object {
+    public companion object {
         private const val CLASS_NAME = "Float32Array"
 
         internal fun init(cx: Context, scope: Scriptable, sealed: Boolean): Any {
@@ -465,13 +465,13 @@ class NativeFloat32Array : NativeTypedArrayView {
 }
 
 /** The `Float64Array` view: 8 bytes per element. */
-class NativeFloat64Array : NativeTypedArrayView {
+public class NativeFloat64Array : NativeTypedArrayView {
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * 8)
+    public constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * 8)
 
-    constructor(len: Int) : this(NativeArrayBuffer(len * 8), 0, len)
+    public constructor(len: Int) : this(NativeArrayBuffer(len * 8), 0, len)
 
     override val className: String
         get() = CLASS_NAME
@@ -492,7 +492,7 @@ class NativeFloat64Array : NativeTypedArrayView {
         return null
     }
 
-    companion object {
+    public companion object {
         private const val CLASS_NAME = "Float64Array"
 
         internal fun init(cx: Context, scope: Scriptable, sealed: Boolean): Any {

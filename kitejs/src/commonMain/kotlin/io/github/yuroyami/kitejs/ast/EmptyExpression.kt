@@ -10,7 +10,7 @@ import io.github.yuroyami.kitejs.Token
  * An empty expression. Node type is [Token.EMPTY]. Wrap it in an [ExpressionStatement] to
  * make an empty statement.
  */
-class EmptyExpression(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
+public class EmptyExpression(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     init {
         typeField = Token.EMPTY

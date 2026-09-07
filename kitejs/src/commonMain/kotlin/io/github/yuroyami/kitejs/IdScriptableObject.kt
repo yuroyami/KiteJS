@@ -13,7 +13,7 @@ package io.github.yuroyami.kitejs
  * `setInstanceIdValue`. To customise how the constructor and prototype are built it overrides
  * `fillConstructorProperties`.
  */
-abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
+public abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
 
     private var prototypeValues: PrototypeValues? = null
 
@@ -207,9 +207,9 @@ abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
         }
     }
 
-    constructor() : super()
+    public constructor() : super()
 
-    constructor(scope: Scriptable, prototype: Scriptable?) : super(scope, prototype)
+    public constructor(scope: Scriptable, prototype: Scriptable?) : super(scope, prototype)
 
     protected fun defaultHas(name: String): Boolean = super.has(name, this)
 
@@ -485,7 +485,7 @@ abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
     override fun execIdCall(f: IdFunctionObject, cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
         throw f.unknown()
 
-    fun exportAsJSClass(maxPrototypeId: Int, scope: Scriptable?, sealed: Boolean): IdFunctionObject {
+    public fun exportAsJSClass(maxPrototypeId: Int, scope: Scriptable?, sealed: Boolean): IdFunctionObject {
         if (scope !== this && scope != null) {
             parentScope = scope
             prototype = getObjectPrototype(scope)
@@ -499,38 +499,38 @@ abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
         return ctor
     }
 
-    fun hasPrototypeMap(): Boolean = prototypeValues != null
+    public fun hasPrototypeMap(): Boolean = prototypeValues != null
 
-    fun activatePrototypeMap(maxPrototypeId: Int) {
+    public fun activatePrototypeMap(maxPrototypeId: Int) {
         check(prototypeValues == null)
         prototypeValues = PrototypeValues(this, maxPrototypeId)
     }
 
-    fun initPrototypeMethod(tag: Any?, id: Int, name: String, arity: Int): IdFunctionObject =
+    public fun initPrototypeMethod(tag: Any?, id: Int, name: String, arity: Int): IdFunctionObject =
         initPrototypeMethod(tag, id, name, name, arity)
 
-    fun initPrototypeMethod(tag: Any?, id: Int, propertyName: String, functionName: String?, arity: Int): IdFunctionObject {
+    public fun initPrototypeMethod(tag: Any?, id: Int, propertyName: String, functionName: String?, arity: Int): IdFunctionObject {
         val scope = getTopLevelScope(this)
         val function = newIdFunction(tag, id, functionName ?: propertyName, arity, scope)
         prototypeValues!!.initValue(id, propertyName, function, DONTENUM)
         return function
     }
 
-    fun initPrototypeMethod(tag: Any?, id: Int, key: Symbol, functionName: String, arity: Int): IdFunctionObject {
+    public fun initPrototypeMethod(tag: Any?, id: Int, key: Symbol, functionName: String, arity: Int): IdFunctionObject {
         val scope = getTopLevelScope(this)
         val function = newIdFunction(tag, id, functionName, arity, scope)
         prototypeValues!!.initValue(id, key, function, DONTENUM)
         return function
     }
 
-    fun initPrototypeMethod(tag: Any?, id: Int, key: Symbol, functionName: String, arity: Int, attributes: Int): IdFunctionObject {
+    public fun initPrototypeMethod(tag: Any?, id: Int, key: Symbol, functionName: String, arity: Int, attributes: Int): IdFunctionObject {
         val scope = getTopLevelScope(this)
         val function = newIdFunction(tag, id, functionName, arity, scope)
         prototypeValues!!.initValue(id, key, function, attributes)
         return function
     }
 
-    fun initPrototypeConstructor(f: IdFunctionObject) {
+    public fun initPrototypeConstructor(f: IdFunctionObject) {
         val id = prototypeValues!!.constructorId
         check(id != 0)
         require(f.methodId() == id)
@@ -538,11 +538,11 @@ abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
         prototypeValues!!.initValue(id, "constructor", f, DONTENUM)
     }
 
-    fun initPrototypeValue(id: Int, name: String, value: Any?, attributes: Int) {
+    public fun initPrototypeValue(id: Int, name: String, value: Any?, attributes: Int) {
         prototypeValues!!.initValue(id, name, value, attributes)
     }
 
-    fun initPrototypeValue(id: Int, key: Symbol, value: Any?, attributes: Int) {
+    public fun initPrototypeValue(id: Int, key: Symbol, value: Any?, attributes: Int) {
         prototypeValues!!.initValue(id, key, value, attributes)
     }
 
@@ -683,12 +683,12 @@ abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
         return null
     }
 
-    companion object {
+    public companion object {
         /** Packs attributes and an id into the int [findInstanceIdInfo] returns. */
-        fun instanceIdInfo(attributes: Int, id: Int): Int = (attributes shl 16) or id
+        public fun instanceIdInfo(attributes: Int, id: Int): Int = (attributes shl 16) or id
 
         /** [ensureType] that names the function complaining. */
-        inline fun <reified T : Any> ensureType(obj: Any?, f: IdFunctionObject): T =
+        public inline fun <reified T : Any> ensureType(obj: Any?, f: IdFunctionObject): T =
             ensureType(obj, f.functionName)
     }
 }

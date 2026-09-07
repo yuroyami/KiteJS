@@ -4,7 +4,8 @@
 
 package io.github.yuroyami.kitejs
 
-enum class DecompilerFlag {
+/** How `decompile` should print a function. */
+public enum class DecompilerFlag {
     /** Omit the function header and the trailing brace. */
     ONLY_BODY,
 

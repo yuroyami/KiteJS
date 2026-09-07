@@ -7,14 +7,14 @@ package io.github.yuroyami.kitejs.ast
 import io.github.yuroyami.kitejs.Token
 
 /** A while loop. Node type is [Token.WHILE]. */
-class WhileLoop(pos: Int = -1, len: Int = 1) : Loop(pos, len) {
+public class WhileLoop(pos: Int = -1, len: Int = 1) : Loop(pos, len) {
 
     init {
         typeField = Token.WHILE
     }
 
     /** The loop condition. Setting it reparents the expression. */
-    var condition: AstNode? = null
+    public var condition: AstNode? = null
         set(value) {
             val newCondition = value!!
             field = newCondition

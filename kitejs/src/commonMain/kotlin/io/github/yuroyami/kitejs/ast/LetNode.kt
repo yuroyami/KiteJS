@@ -10,14 +10,14 @@ import io.github.yuroyami.kitejs.Token
  * A `let` expression or statement, as in `let (a = 1) expr`. Node type is [Token.LETEXPR]. It
  * introduces a scope.
  */
-class LetNode(pos: Int = -1, len: Int = 1) : Scope(pos, len) {
+public class LetNode(pos: Int = -1, len: Int = 1) : Scope(pos, len) {
 
     init {
         typeField = Token.LETEXPR
     }
 
     /** The bound variables. Setting it reparents the declaration. */
-    var variables: VariableDeclaration? = null
+    public var variables: VariableDeclaration? = null
         set(value) {
             val newVariables = value!!
             field = newVariables
@@ -25,20 +25,20 @@ class LetNode(pos: Int = -1, len: Int = 1) : Scope(pos, len) {
         }
 
     /** The body, or null for a bare let statement. Setting it reparents. */
-    var body: AstNode? = null
+    public var body: AstNode? = null
         set(value) {
             field = value
             value?.parent = this
         }
 
     /** Position of the left paren, relative to this node. */
-    var lp: Int = -1
+    public var lp: Int = -1
 
     /** Position of the right paren, relative to this node. */
-    var rp: Int = -1
+    public var rp: Int = -1
 
     /** Sets both paren positions. */
-    fun setParens(lp: Int, rp: Int) {
+    public fun setParens(lp: Int, rp: Int) {
         this.lp = lp
         this.rp = rp
     }

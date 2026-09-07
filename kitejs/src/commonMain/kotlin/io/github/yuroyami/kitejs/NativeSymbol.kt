@@ -8,7 +8,7 @@ package io.github.yuroyami.kitejs
  * The `Symbol` wrapper object. The primitive symbol value is a [SymbolKey]; this class is only what
  * `Object(sym)` produces, and it carries the key in an internal slot.
  */
-class NativeSymbol internal constructor(internal val key: SymbolKey) : ScriptableObject(), Symbol {
+public class NativeSymbol internal constructor(internal val key: SymbolKey) : ScriptableObject(), Symbol {
 
     override val kind: Symbol.Kind
         get() = key.kind
@@ -23,7 +23,7 @@ class NativeSymbol internal constructor(internal val key: SymbolKey) : Scriptabl
      * False for every instance in this version: a wrapper made from a symbol is an object, not a
      * symbol. Upstream keeps the hook because the checks below read better with it.
      */
-    val isSymbol: Boolean get() = false
+    public val isSymbol: Boolean get() = false
 
     override val typeOf: String
         get() = if (isSymbol) TYPE_NAME else super.typeOf
@@ -60,9 +60,9 @@ class NativeSymbol internal constructor(internal val key: SymbolKey) : Scriptabl
 
     override fun equals(other: Any?): Boolean = key == other
 
-    companion object {
-        const val CLASS_NAME: String = "Symbol"
-        const val TYPE_NAME: String = "symbol"
+    public companion object {
+        public const val CLASS_NAME: String = "Symbol"
+        public const val TYPE_NAME: String = "symbol"
 
         /**
          * The registry behind `Symbol.for`. Upstream uses a weak map keyed on the description, but

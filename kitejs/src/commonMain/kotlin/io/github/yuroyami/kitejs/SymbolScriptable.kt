@@ -5,13 +5,13 @@
 package io.github.yuroyami.kitejs
 
 /** The symbol-keyed half of the property protocol, implemented alongside [Scriptable]. */
-interface SymbolScriptable {
+public interface SymbolScriptable {
 
-    fun get(key: Symbol, start: Scriptable): Any?
+    public fun get(key: Symbol, start: Scriptable): Any?
 
-    fun has(key: Symbol, start: Scriptable): Boolean
+    public fun has(key: Symbol, start: Scriptable): Boolean
 
-    fun put(key: Symbol, start: Scriptable, value: Any?)
+    public fun put(key: Symbol, start: Scriptable, value: Any?)
 
-    fun delete(key: Symbol)
+    public fun delete(key: Symbol)
 }

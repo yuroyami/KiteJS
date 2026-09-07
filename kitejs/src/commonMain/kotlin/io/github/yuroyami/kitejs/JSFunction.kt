@@ -5,7 +5,7 @@
 package io.github.yuroyami.kitejs
 
 /** A function compiled from script source. Everything about it lives in its [descriptor]. */
-open class JSFunction(
+public open class JSFunction(
     cx: Context,
     scope: Scriptable,
     override val descriptor: JSDescriptor<JSFunction>,
@@ -27,10 +27,10 @@ open class JSFunction(
 
     override fun decompile(indent: Int, flags: Set<DecompilerFlag>): String = descriptor.rawSource
 
-    val isShorthand: Boolean
+    public val isShorthand: Boolean
         get() = descriptor.isShorthand
 
-    val isStrict: Boolean
+    public val isStrict: Boolean
         get() = descriptor.isStrict
 
     override val arity: Int get() = descriptor.arity
@@ -62,7 +62,7 @@ open class JSFunction(
 
     internal fun getParamOrVarName(index: Int): String = descriptor.getParamOrVarName(index)
 
-    val rawSource: String get() = descriptor.rawSource
+    public val rawSource: String get() = descriptor.rawSource
 
     override fun createPrototypeProperty() {
         if (descriptor.hasPrototype) super.createPrototypeProperty()
@@ -88,29 +88,29 @@ open class JSFunction(
         return thisObj!!
     }
 
-    val isScript: Boolean
+    public val isScript: Boolean
         get() = descriptor.isScript
 
     override fun hasDefaultParameters(): Boolean = descriptor.hasDefaultParameters
 
-    fun hasFunctionNamed(name: String): Boolean = descriptor.hasFunctionNamed(name)
+    public fun hasFunctionNamed(name: String): Boolean = descriptor.hasFunctionNamed(name)
 
     override val functionName: String get() = descriptor.name
 
-    fun resumeGenerator(cx: Context, scope: Scriptable, operation: Int, state: Any?, value: Any?): Any? =
+    public fun resumeGenerator(cx: Context, scope: Scriptable, operation: Int, state: Any?, value: Any?): Any? =
         descriptor.code!!.resume(cx, this, state, scope, operation, value)
 
     /** The `this` a call sees: the captured one for an arrow function, [functionThis] otherwise. */
-    fun getFunctionThis(functionThis: Scriptable?): Scriptable? =
+    public fun getFunctionThis(functionThis: Scriptable?): Scriptable? =
         if (descriptor.hasLexicalThis) lexicalThis else functionThis
 
-    companion object {
-        fun createScript(desc: JSDescriptor<JSScript>, homeObject: Scriptable?, staticSecurityDomain: Any?): JSScript {
+    public companion object {
+        public fun createScript(desc: JSDescriptor<JSScript>, homeObject: Scriptable?, staticSecurityDomain: Any?): JSScript {
             check(desc.isScript)
             return JSScript(desc, homeObject)
         }
 
-        fun createFunction(cx: Context, scope: Scriptable, desc: JSDescriptor<JSFunction>, homeObject: Scriptable?, staticSecurityDomain: Any?): JSFunction =
+        public fun createFunction(cx: Context, scope: Scriptable, desc: JSDescriptor<JSFunction>, homeObject: Scriptable?, staticSecurityDomain: Any?): JSFunction =
             JSFunction(cx, scope, desc, null, homeObject)
 
         internal fun createFunction(cx: Context, scope: Scriptable, parent: JSDescriptor<*>, index: Int, homeObject: Scriptable?): JSFunction =

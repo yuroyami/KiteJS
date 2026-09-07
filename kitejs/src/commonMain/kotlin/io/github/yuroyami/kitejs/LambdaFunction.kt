@@ -8,7 +8,7 @@ package io.github.yuroyami.kitejs
  * One JavaScript function, implemented by a single Kotlin lambda. It has the built-in `Function`
  * prototype and no parent scope; binding it into a scope is the caller's job.
  */
-open class LambdaFunction : BaseFunction {
+public open class LambdaFunction : BaseFunction {
 
     protected val target: SerializableCallable?
     final override val functionName: String
@@ -17,7 +17,7 @@ open class LambdaFunction : BaseFunction {
     override val arity: Int get() = length
 
     /** [defaultPrototype] gives the new function a `prototype` property of its own. */
-    constructor(
+    public constructor(
         scope: Scriptable,
         name: String,
         length: Int,
@@ -31,7 +31,7 @@ open class LambdaFunction : BaseFunction {
         if (defaultPrototype) setupDefaultPrototype(scope)
     }
 
-    constructor(
+    public constructor(
         scope: Scriptable,
         name: String,
         length: Int,
@@ -46,7 +46,7 @@ open class LambdaFunction : BaseFunction {
     }
 
     /** A built-in function: no name, no prototype of its own. */
-    constructor(scope: Scriptable, length: Int, target: SerializableCallable) {
+    public constructor(scope: Scriptable, length: Int, target: SerializableCallable) {
         this.target = target
         this.length = length
         this.functionName = ""

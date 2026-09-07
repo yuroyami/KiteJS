@@ -10,7 +10,7 @@ import io.github.yuroyami.kitejs.Token
  * A template literal. Node type is [Token.TEMPLATE_LITERAL]. Its elements alternate between
  * [TemplateCharacters] runs and substitution expressions.
  */
-class TemplateLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
+public class TemplateLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     private var elementList: MutableList<AstNode>? = null
 
@@ -19,20 +19,20 @@ class TemplateLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
     }
 
     /** The literal text runs, in source order. */
-    val templateStrings: List<TemplateCharacters>
+    public val templateStrings: List<TemplateCharacters>
         get() = elementList
             ?.filterIsInstance<TemplateCharacters>()
             ?: emptyList()
 
     /** The substitution expressions, in source order. */
-    val substitutions: List<AstNode>
+    public val substitutions: List<AstNode>
         get() = elementList?.filter { it.type != Token.TEMPLATE_CHARS } ?: emptyList()
 
     /** Every element, text runs and substitutions interleaved in source order. */
-    val elements: List<AstNode>
+    public val elements: List<AstNode>
         get() = elementList ?: emptyList()
 
-    fun setElements(elements: List<AstNode>?) {
+    public fun setElements(elements: List<AstNode>?) {
         if (elements == null) {
             this.elementList = null
         } else {
@@ -41,16 +41,16 @@ class TemplateLiteral(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         }
     }
 
-    fun addElement(element: AstNode) {
+    public fun addElement(element: AstNode) {
         val list = elementList ?: mutableListOf<AstNode>().also { elementList = it }
         list.add(element)
         element.parent = this
     }
 
-    val size: Int
+    public val size: Int
         get() = elementList?.size ?: 0
 
-    fun getElement(index: Int): AstNode {
+    public fun getElement(index: Int): AstNode {
         val list = elementList ?: throw IndexOutOfBoundsException("no elements")
         return list[index]
     }

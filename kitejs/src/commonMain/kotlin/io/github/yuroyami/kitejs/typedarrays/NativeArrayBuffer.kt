@@ -20,22 +20,22 @@ import io.github.yuroyami.kitejs.Undefined
  * The bytes a typed array sits on. Several views can share one buffer, and a write through any of
  * them is visible through all of them.
  */
-class NativeArrayBuffer : ScriptableObject {
+public class NativeArrayBuffer : ScriptableObject {
 
     /** The real bytes, not a copy: a write here shows up in every view. */
-    var buffer: ByteArray? = EMPTY_BUF
+    public var buffer: ByteArray? = EMPTY_BUF
         internal set
 
     override val className: String
         get() = CLASS_NAME
 
     /** An empty buffer. */
-    constructor() : super() {
+    public constructor() : super() {
         buffer = EMPTY_BUF
     }
 
     /** A zeroed buffer of [len] bytes. */
-    constructor(len: Double) : super() {
+    public constructor(len: Double) : super() {
         if (len >= Int.MAX_VALUE.toDouble()) {
             throw ScriptRuntime.rangeError("length parameter ($len) is too large ")
         }
@@ -48,21 +48,21 @@ class NativeArrayBuffer : ScriptableObject {
         buffer = if (intLen == 0) EMPTY_BUF else ByteArray(intLen)
     }
 
-    constructor(len: Int) : this(len.toDouble())
+    public constructor(len: Int) : this(len.toDouble())
 
-    val length: Int
+    public val length: Int
         get() = buffer?.size ?: 0
 
-    fun detach() {
+    public fun detach() {
         buffer = null
     }
 
-    val isDetached: Boolean get() = buffer == null
+    public val isDetached: Boolean get() = buffer == null
 
     /**
      * A copy of the bytes between [s] and [e], with both clamped into range the way the spec says.
      */
-    fun slice(s: Double, e: Double): NativeArrayBuffer {
+    public fun slice(s: Double, e: Double): NativeArrayBuffer {
         val len0 = length
         val end = ScriptRuntime.toInt32(maxOf(0.0, minOf(len0.toDouble(), if (e < 0) len0 + e else e)))
         val start = ScriptRuntime.toInt32(minOf(end.toDouble(), maxOf(0.0, if (s < 0) len0 + s else s)))
@@ -73,8 +73,8 @@ class NativeArrayBuffer : ScriptableObject {
         return newBuf
     }
 
-    companion object {
-        const val CLASS_NAME: String = "ArrayBuffer"
+    public companion object {
+        public const val CLASS_NAME: String = "ArrayBuffer"
         private val EMPTY_BUF = ByteArray(0)
 
         internal fun init(cx: Context, scope: Scriptable, sealed: Boolean): Any {
@@ -176,16 +176,16 @@ class NativeArrayBuffer : ScriptableObject {
  * The parent of every view onto a [NativeArrayBuffer]. Several views may share one buffer, and a
  * write through any of them is seen by all.
  */
-abstract class NativeArrayBufferView : ScriptableObject {
+public abstract class NativeArrayBufferView : ScriptableObject {
 
     /** The buffer this view reads and writes. */
     protected val arrayBuffer: NativeArrayBuffer
 
     /** Where in the buffer the view starts, in bytes. Upstream's getByteOffset (D-7). */
-    val offset: Int
+    public val offset: Int
 
     /** How much of the buffer the view covers, in bytes. Upstream's getByteLength (D-7). */
-    val byteLength: Int
+    public val byteLength: Int
 
     /** True when the view no longer fits inside its buffer. */
     protected val outOfRange: Boolean
@@ -207,9 +207,9 @@ abstract class NativeArrayBufferView : ScriptableObject {
         outOfRange = offset > bufferByteLength || byteOffsetEnd > bufferByteLength
     }
 
-    val buffer: NativeArrayBuffer get() = arrayBuffer
+    public val buffer: NativeArrayBuffer get() = arrayBuffer
 
-    companion object {
+    public companion object {
         private var useLittleEndianCache: Boolean? = null
 
         internal fun useLittleEndian(): Boolean {

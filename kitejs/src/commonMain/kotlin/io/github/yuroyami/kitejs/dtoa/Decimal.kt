@@ -28,7 +28,7 @@ package io.github.yuroyami.kitejs.dtoa
  *
  * Based on code by Giulietti.
  */
-class Decimal internal constructor(
+public class Decimal internal constructor(
     private val digits: Long,
     private val exponent: Int,
     private val negative: Boolean,
@@ -256,7 +256,7 @@ class Decimal internal constructor(
 
     private fun makeString(): String = buf.concatToString(0, length)
 
-    companion object {
+    public companion object {
         // Used for left-to-right digit extraction.
         private const val MASK_28 = (1 shl 28) - 1
 
@@ -268,6 +268,6 @@ class Decimal internal constructor(
          *     -ddddddddddddddddd0000       H + 5 characters (JS stays fixed up to exponent 21)
          * That is 26 characters at most; 32 is used because powers of two are convenient.
          */
-        const val MAX_CHARS = 32
+        public const val MAX_CHARS: Int = 32
     }
 }

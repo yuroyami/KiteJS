@@ -7,7 +7,7 @@ package io.github.yuroyami.kitejs
 import kotlin.reflect.KClass
 
 /** The scope a `with` statement pushes: every lookup goes to the object it wraps. */
-open class NativeWith : Scriptable, SymbolScriptable, IdFunctionCall {
+public open class NativeWith : Scriptable, SymbolScriptable, IdFunctionCall {
 
     protected var prototypeField: Scriptable? = null
     protected var parentField: Scriptable? = null
@@ -102,7 +102,7 @@ open class NativeWith : Scriptable, SymbolScriptable, IdFunctionCall {
         throw f.unknown()
     }
 
-    companion object {
+    public companion object {
         private val FTAG: Any = "With"
         private const val Id_constructor = 1
 

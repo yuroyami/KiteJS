@@ -7,14 +7,14 @@ package io.github.yuroyami.kitejs.ast
 import io.github.yuroyami.kitejs.Token
 
 /** A ternary expression `test ? then : else`. Node type is [Token.HOOK]. */
-class ConditionalExpression(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
+public class ConditionalExpression(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     init {
         typeField = Token.HOOK
     }
 
     /** The condition. Setting it reparents the expression. */
-    var testExpression: AstNode? = null
+    public var testExpression: AstNode? = null
         set(value) {
             val newTest = value!!
             field = newTest
@@ -22,7 +22,7 @@ class ConditionalExpression(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         }
 
     /** The value when the condition holds. Setting it reparents the expression. */
-    var trueExpression: AstNode? = null
+    public var trueExpression: AstNode? = null
         set(value) {
             val newTrue = value!!
             field = newTrue
@@ -30,7 +30,7 @@ class ConditionalExpression(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         }
 
     /** The value when the condition fails. Setting it reparents the expression. */
-    var falseExpression: AstNode? = null
+    public var falseExpression: AstNode? = null
         set(value) {
             val newFalse = value!!
             field = newFalse
@@ -38,10 +38,10 @@ class ConditionalExpression(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         }
 
     /** Position of the `?`, relative to this node. */
-    var questionMarkPosition: Int = -1
+    public var questionMarkPosition: Int = -1
 
     /** Position of the `:`, relative to this node. */
-    var colonPosition: Int = -1
+    public var colonPosition: Int = -1
 
     override fun hasSideEffects(): Boolean {
         if (testExpression == null || trueExpression == null || falseExpression == null) codeBug()

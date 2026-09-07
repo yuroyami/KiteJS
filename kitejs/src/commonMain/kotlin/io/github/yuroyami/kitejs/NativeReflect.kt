@@ -280,7 +280,7 @@ internal class NativeReflect private constructor() : ScriptableObject() {
                 if (s.stringId == null) {
                     receiver.put(s.index, receiver, args[2])
                 } else {
-                    receiver.put(s.stringId!!, receiver, args[2])
+                    receiver.put(s.stringId, receiver, args[2])
                 }
             }
 

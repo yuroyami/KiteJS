@@ -19,6 +19,8 @@ plugins {
  * never ships; it exists only on the JVM test classpath.
  */
 kotlin {
+    explicitApi()
+
     jvmToolchain(21)
 
     // WeakRef is an expect class, which the compiler still calls beta. It is the engine's only

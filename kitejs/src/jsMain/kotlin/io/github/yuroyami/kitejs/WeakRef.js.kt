@@ -31,13 +31,13 @@ private fun newWeakRefOrNull(o: Any): dynamic =
 private fun derefOrNull(r: dynamic): dynamic =
     js("(function(x){ var v = x.deref(); return v === undefined ? null : v; })(r)")
 
-actual class WeakRef<T : Any> actual constructor(referred: T) {
+public actual class WeakRef<T : Any> actual constructor(referred: T) {
 
     private var cleared = false
     private val ref: dynamic = if (hasWeakRef) newWeakRefOrNull(referred) else null
     private var strong: T? = if (ref == null) referred else null
 
-    actual fun get(): T? {
+    public actual fun get(): T? {
         if (cleared) return null
         strong?.let { return it }
         val v: Any? = derefOrNull(ref)
@@ -45,12 +45,12 @@ actual class WeakRef<T : Any> actual constructor(referred: T) {
         return v as T?
     }
 
-    actual fun clear() {
+    public actual fun clear() {
         cleared = true
         strong = null
     }
 
-    actual companion object {
-        actual val isWeakSupported: Boolean = hasWeakRef
+    public actual companion object {
+        public actual val isWeakSupported: Boolean = hasWeakRef
     }
 }

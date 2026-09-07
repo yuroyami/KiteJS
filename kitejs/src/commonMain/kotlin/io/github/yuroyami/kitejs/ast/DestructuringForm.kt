@@ -8,11 +8,11 @@ package io.github.yuroyami.kitejs.ast
  * Shared by [ArrayLiteral] and [ObjectLiteral], the two node types that can appear in a
  * destructuring position.
  */
-interface DestructuringForm {
+public interface DestructuringForm {
 
     /**
      * True when this node sits in a destructuring position: a function parameter, the target of
      * a variable initializer, the iterator of a for..in loop, and so on.
      */
-    var isDestructuring: Boolean
+    public var isDestructuring: Boolean
 }

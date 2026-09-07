@@ -13,7 +13,7 @@ import io.github.yuroyami.kitejs.ScriptableObject.DescriptorInfo
  * The regular-expression methods (`match`, `search`, `replace` with a pattern, `split` with a
  * pattern, `matchAll`) go through the [RegExpProxy], which the regexp engine installs.
  */
-class NativeString internal constructor(private val string: CharSequence) : ScriptableObject() {
+internal class NativeString internal constructor(private val string: CharSequence) : ScriptableObject() {
 
     init {
         defineProperty("length", { string.length }, null, DONTENUM or READONLY or PERMANENT)
@@ -22,7 +22,7 @@ class NativeString internal constructor(private val string: CharSequence) : Scri
     override val className: String
         get() = CLASS_NAME
 
-    fun toCharSequence(): CharSequence = string
+    public fun toCharSequence(): CharSequence = string
 
     override fun toString(): String = if (string is String) string else string.toString()
 
@@ -85,7 +85,7 @@ class NativeString internal constructor(private val string: CharSequence) : Scri
     private fun defaultIndexPropertyDescriptor(value: Any?): DescriptorInfo =
         DescriptorInfo(true, false, false, Scriptable.NOT_FOUND, Scriptable.NOT_FOUND, value)
 
-    companion object {
+    public companion object {
         private const val CLASS_NAME = "String"
 
         internal fun init(scope: Scriptable, sealed: Boolean) {
@@ -634,7 +634,7 @@ class NativeString internal constructor(private val string: CharSequence) : Scri
             val following = string.substring(position + searchLength)
             val replacement: String
             if (functionalReplace) {
-                val callThis = ScriptRuntime.getApplyOrCallThis(cx, scope, null, 0, replaceValue as Callable)
+                val callThis = ScriptRuntime.getApplyOrCallThis(cx, scope, null, 0, replaceValue)
                 val replacementObj = replaceValue.call(cx, scope, callThis, arrayOf(searchString, position, string))
                 replacement = ScriptRuntime.toString(replacementObj)
             } else {
@@ -692,7 +692,7 @@ class NativeString internal constructor(private val string: CharSequence) : Scri
                 val preserved = string.substring(endOfLastMatch, p)
                 val replacement: String
                 if (functionalReplace) {
-                    val callThis = ScriptRuntime.getApplyOrCallThis(cx, scope, null, 0, replaceValue as Callable)
+                    val callThis = ScriptRuntime.getApplyOrCallThis(cx, scope, null, 0, replaceValue)
                     val replacementObj = replaceValue.call(cx, scope, callThis, arrayOf(searchString, p, string))
                     replacement = ScriptRuntime.toString(replacementObj)
                 } else {

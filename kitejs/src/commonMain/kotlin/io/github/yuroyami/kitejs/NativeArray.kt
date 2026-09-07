@@ -18,9 +18,9 @@ import kotlin.reflect.KClass
  * slot map once something makes that impossible: a huge index, a getter, a non-array prototype.
  * Upstream also makes every array a `java.util.List`; that view is not ported.
  */
-class NativeArray : ScriptableObject {
+public class NativeArray : ScriptableObject {
 
-    var length: Long = 0
+    public var length: Long = 0
         private set
     private var lengthAttr = DONTENUM or PERMANENT
     private var modCount = 0
@@ -28,7 +28,7 @@ class NativeArray : ScriptableObject {
     internal var denseOnly = false
         private set
 
-    constructor(lengthArg: Long) : super() {
+    public constructor(lengthArg: Long) : super() {
         denseOnly = lengthArg <= maximumInitialCapacity
         if (denseOnly) {
             var intLength = lengthArg.toInt()
@@ -39,7 +39,7 @@ class NativeArray : ScriptableObject {
         createLengthProp()
     }
 
-    constructor(array: Array<Any?>) : super() {
+    public constructor(array: Array<Any?>) : super() {
         denseOnly = true
         dense = array
         length = array.size.toLong()
@@ -147,11 +147,11 @@ class NativeArray : ScriptableObject {
         }
     }
 
-    fun deleteInternal(compoundOp: CompoundOperationMap, id: String) {
+    public fun deleteInternal(compoundOp: CompoundOperationMap, id: String) {
         compoundOp.compute(this, id, 0, ::checkSlotRemoval)
     }
 
-    fun deleteInternal(compoundOp: CompoundOperationMap, index: Int) {
+    public fun deleteInternal(compoundOp: CompoundOperationMap, index: Int) {
         val slot = if (denseOnly) null else compoundOp.query(null, index)
         val d = dense
         if (d != null && index >= 0 && index < d.size && !isSealed && (denseOnly || (slot == null || !slot.isSetterSlot))) {
@@ -187,7 +187,7 @@ class NativeArray : ScriptableObject {
         return ids
     }
 
-    val indexIds: List<Int>
+    public val indexIds: List<Int>
 
         get() {
         val ids = getIds()
@@ -326,7 +326,7 @@ class NativeArray : ScriptableObject {
     }
 
     /** The elements as Kotlin sees them: holes and `undefined` become null. */
-    fun toArray(): Array<Any?> {
+    public fun toArray(): Array<Any?> {
         val len = size()
         return Array(len) { i -> get(i.toLong()) }
     }
@@ -341,7 +341,7 @@ class NativeArray : ScriptableObject {
 
     override fun isEmpty(): Boolean = length == 0L
 
-    fun get(index: Long): Any? {
+    public fun get(index: Long): Any? {
         if (index < 0 || index >= length) {
             throw IndexOutOfBoundsException("Index: $index, length: $length")
         }
@@ -353,7 +353,7 @@ class NativeArray : ScriptableObject {
         }
     }
 
-    companion object {
+    public companion object {
         internal const val MAX_ARRAY_INDEX = 0xfffffffeL
         private const val ARRAY_TAG = "Array"
         private const val CLASS_NAME = "Array"

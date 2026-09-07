@@ -10,20 +10,20 @@ package io.github.yuroyami.kitejs
  * Phase 0 shell: source-position plumbing and message composition only. Phase 3 ports
  * the full class (script stacks, interpreter integration).
  */
-abstract class RhinoException : RuntimeException {
+public abstract class RhinoException : RuntimeException {
 
     /** How a script stack trace is rendered. */
-    enum class StackStyle { RHINO, MOZILLA, MOZILLA_LF, V8 }
+    public enum class StackStyle { RHINO, MOZILLA, MOZILLA_LF, V8 }
 
-    companion object {
+    public companion object {
         /** How many frames a trace shows by default. */
         internal const val DEFAULT_STACK_LIMIT = 10
 
-        var stackStyle: StackStyle = StackStyle.RHINO
+        public var stackStyle: StackStyle = StackStyle.RHINO
 
-        fun usesMozillaStackStyle(): Boolean = stackStyle == StackStyle.MOZILLA
+        public fun usesMozillaStackStyle(): Boolean = stackStyle == StackStyle.MOZILLA
 
-        fun useMozillaStackStyle(flag: Boolean) {
+        public fun useMozillaStackStyle(flag: Boolean) {
             stackStyle = if (flag) StackStyle.MOZILLA else StackStyle.RHINO
         }
 
@@ -44,48 +44,48 @@ abstract class RhinoException : RuntimeException {
 
     private val detailsMessage: String?
 
-    constructor() : super() {
+    public constructor() : super() {
         detailsMessage = null
         Interpreter().captureStackInfo(this)
     }
 
-    constructor(details: String) : super() {
+    public constructor(details: String) : super() {
         detailsMessage = details
         Interpreter().captureStackInfo(this)
     }
 
-    var sourceName: String? = null
+    public var sourceName: String? = null
         private set
 
-    var lineNumber: Int = 0
+    public var lineNumber: Int = 0
         private set
 
-    var lineSource: String? = null
+    public var lineSource: String? = null
         private set
 
-    var columnNumber: Int = 0
+    public var columnNumber: Int = 0
         private set
 
-    open fun details(): String = detailsMessage ?: ""
+    public open fun details(): String = detailsMessage ?: ""
 
     /** Each of these may be set once, and only to a real value. */
-    fun initSourceName(sourceName: String) {
+    public fun initSourceName(sourceName: String) {
         check(this.sourceName == null) { "the source name is already set" }
         this.sourceName = sourceName
     }
 
-    fun initLineNumber(lineNumber: Int) {
+    public fun initLineNumber(lineNumber: Int) {
         require(lineNumber > 0) { "$lineNumber" }
         check(this.lineNumber <= 0) { "the line number is already set" }
         this.lineNumber = lineNumber
     }
 
-    fun initLineSource(lineSource: String) {
+    public fun initLineSource(lineSource: String) {
         check(this.lineSource == null) { "the line source is already set" }
         this.lineSource = lineSource
     }
 
-    fun initColumnNumber(columnNumber: Int) {
+    public fun initColumnNumber(columnNumber: Int) {
         require(columnNumber > 0) { "$columnNumber" }
         check(this.columnNumber <= 0) { "the column number is already set" }
         this.columnNumber = columnNumber
@@ -111,9 +111,9 @@ abstract class RhinoException : RuntimeException {
     internal var interpreterLineData: Int = 0
 
     /** The script frames at the time of the throw, innermost first. */
-    val scriptStack: Array<ScriptStackElement> get() = getScriptStack(-1, null)
+    public val scriptStack: Array<ScriptStackElement> get() = getScriptStack(-1, null)
 
-    fun getScriptStack(limit: Int, hideFunction: String?): Array<ScriptStackElement> {
+    public fun getScriptStack(limit: Int, hideFunction: String?): Array<ScriptStackElement> {
         if (interpreterStackInfo == null) return emptyArray()
         val list = ArrayList<ScriptStackElement>()
         var count = 0
@@ -131,9 +131,9 @@ abstract class RhinoException : RuntimeException {
         return list.toTypedArray()
     }
 
-    val scriptStackTrace: String get() = getScriptStackTrace(DEFAULT_STACK_LIMIT, null)
+    public val scriptStackTrace: String get() = getScriptStackTrace(DEFAULT_STACK_LIMIT, null)
 
-    fun getScriptStackTrace(limit: Int, functionName: String?): String =
+    public fun getScriptStackTrace(limit: Int, functionName: String?): String =
         formatStackTrace(getScriptStack(limit, functionName), details())
 
     final override val message: String

@@ -7,14 +7,14 @@ package io.github.yuroyami.kitejs.ast
 import io.github.yuroyami.kitejs.Token
 
 /** A with statement. Node type is [Token.WITH]. */
-class WithStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
+public class WithStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     init {
         typeField = Token.WITH
     }
 
     /** The object expression. Setting it reparents the expression. */
-    var expression: AstNode? = null
+    public var expression: AstNode? = null
         set(value) {
             val newExpression = value!!
             field = newExpression
@@ -22,7 +22,7 @@ class WithStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         }
 
     /** The body statement. Setting it reparents the statement. */
-    var statement: AstNode? = null
+    public var statement: AstNode? = null
         set(value) {
             val newStatement = value!!
             field = newStatement
@@ -30,13 +30,13 @@ class WithStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         }
 
     /** Position of the left paren, relative to this node. */
-    var lp: Int = -1
+    public var lp: Int = -1
 
     /** Position of the right paren, relative to this node. */
-    var rp: Int = -1
+    public var rp: Int = -1
 
     /** Sets both paren positions. */
-    fun setParens(lp: Int, rp: Int) {
+    public fun setParens(lp: Int, rp: Int) {
         this.lp = lp
         this.rp = rp
     }

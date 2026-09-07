@@ -10,7 +10,7 @@ import io.github.yuroyami.kitejs.Token
  * An expression statement. Node type is [Token.EXPR_VOID] when the value is discarded, and
  * [Token.EXPR_RESULT] when it becomes the script result.
  */
-class ExpressionStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
+public class ExpressionStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     private var expr: AstNode? = null
 
@@ -18,23 +18,23 @@ class ExpressionStatement(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
         typeField = Token.EXPR_VOID
     }
 
-    constructor(pos: Int, len: Int, expr: AstNode) : this(pos, len) {
+    public constructor(pos: Int, len: Int, expr: AstNode) : this(pos, len) {
         expression = expr
     }
 
-    constructor(expr: AstNode) : this(expr.position, expr.length, expr)
+    public constructor(expr: AstNode) : this(expr.position, expr.length, expr)
 
-    constructor(expr: AstNode, hasResult: Boolean) : this(expr) {
+    public constructor(expr: AstNode, hasResult: Boolean) : this(expr) {
         if (hasResult) setHasResult()
     }
 
     /** Marks this statement as producing the script result. */
-    fun setHasResult() {
+    public fun setHasResult() {
         typeField = Token.EXPR_RESULT
     }
 
     /** The wrapped expression. Setting it reparents the expression and copies its position. */
-    var expression: AstNode?
+    public var expression: AstNode?
         get() = expr
         set(value) {
             val newExpression = value!!

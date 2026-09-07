@@ -7,8 +7,8 @@ package io.github.yuroyami.kitejs.ast
 import io.github.yuroyami.kitejs.Token
 
 /** A `...expr` entry of an object literal. Node type is [Token.DOTDOTDOT]. */
-class SpreadObjectProperty(
-    val spreadNode: Spread,
+public class SpreadObjectProperty(
+    public val spreadNode: Spread,
 ) : AbstractObjectProperty(spreadNode.position, spreadNode.length) {
 
     init {

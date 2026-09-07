@@ -5,7 +5,7 @@
 package io.github.yuroyami.kitejs
 
 /** The non-standard `Script` object: a compiled script that can be run again with `exec`. */
-class NativeScript private constructor(private var script: Script?) : BaseFunction() {
+internal class NativeScript private constructor(private var script: Script?) : BaseFunction() {
 
     override val className: String
         get() = "Script"
@@ -29,7 +29,7 @@ class NativeScript private constructor(private var script: Script?) : BaseFuncti
         return super.decompile(indent, flags)
     }
 
-    companion object {
+    public companion object {
         private const val SCRIPT_TAG = "Script"
 
         internal fun init(cx: Context, scope: Scriptable, sealed: Boolean): LambdaConstructor {

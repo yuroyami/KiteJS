@@ -33,7 +33,7 @@ package io.github.yuroyami.kitejs.dtoa
  * Divisions are avoided throughout, which helps architectures where they are slow. Section 10 of
  * reference 1 covers that.
  */
-object DoubleFormatter {
+public object DoubleFormatter {
 
     /** The precision in bits. */
     internal const val P = 53
@@ -75,7 +75,7 @@ object DoubleFormatter {
      * Converts a double to a String the way ECMAScript's `Number::toString` defines it. Handles
      * every double, including the non-finite ones.
      */
-    fun toString(v: Double): String {
+    public fun toString(v: Double): String {
         val bits = v.toRawBits()
         val t = bits and T_MASK
         val bq = (bits ushr (P - 1)).toInt() and BQ_MASK
@@ -95,7 +95,7 @@ object DoubleFormatter {
      * Converts a double to a [Decimal] that can then be rendered in several ways. Unlike
      * [toString] this always returns a Decimal, so it is only defined for finite numbers.
      */
-    fun toDecimal(v: Double): Decimal {
+    public fun toDecimal(v: Double): Decimal {
         val bits = v.toRawBits()
         val t = bits and T_MASK
         val bq = (bits ushr (P - 1)).toInt() and BQ_MASK

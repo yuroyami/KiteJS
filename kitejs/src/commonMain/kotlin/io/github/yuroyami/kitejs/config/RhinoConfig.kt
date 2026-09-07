@@ -4,13 +4,15 @@
 
 package io.github.yuroyami.kitejs.config
 
-// KMP: upstream reads JVM system properties and env vars. Common Kotlin has neither,
-// so every flag resolves to its compile-time default (ledger D-6).
-object RhinoConfig {
+/**
+ * The engine's tuning flags. Upstream reads them from JVM system properties and environment
+ * variables; common Kotlin has neither, so every flag answers its compile-time default.
+ */
+public object RhinoConfig {
 
-    fun get(property: String, defaultValue: Boolean): Boolean = defaultValue
+    public fun get(property: String, defaultValue: Boolean): Boolean = defaultValue
 
-    fun get(property: String, defaultValue: Int): Int = defaultValue
+    public fun get(property: String, defaultValue: Int): Int = defaultValue
 
-    fun get(property: String): String? = null
+    public fun get(property: String): String? = null
 }

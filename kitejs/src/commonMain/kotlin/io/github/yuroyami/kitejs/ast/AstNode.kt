@@ -21,16 +21,16 @@ import io.github.yuroyami.kitejs.Token
  * are absolute; adding a node to its parent rewrites them to be relative, so by the time a
  * visitor sees the tree all offsets are relative.
  */
-abstract class AstNode(
+public abstract class AstNode(
     pos: Int = -1,
     len: Int = 1,
 ) : Node(Token.ERROR), Comparable<AstNode> {
 
     /** Relative position in the parent. */
-    var position: Int = pos
+    public var position: Int = pos
 
     /** Number of characters spanned by this node in the source text. */
-    var length: Int = len
+    public var length: Int = len
 
     /**
      * KMP: upstream's protected `parent` field. [Scope.splitScope] rewires parent links
@@ -42,10 +42,10 @@ abstract class AstNode(
      * Comments on the same line as the statement, for example the trailing comment in
      * `if (x == 2) // note`.
      */
-    var inlineComment: AstNode? = null
+    public var inlineComment: AstNode? = null
 
     /** Sorts nodes by relative start position, so it only compares siblings. */
-    class PositionComparator : Comparator<AstNode> {
+    public class PositionComparator : Comparator<AstNode> {
         override fun compare(a: AstNode, b: AstNode): Int = a.position - b.position
     }
 
@@ -53,7 +53,7 @@ abstract class AstNode(
      * The absolute document position, computed by adding this node's relative position to
      * the relative positions of all its parents.
      */
-    val absolutePosition: Int
+    public val absolutePosition: Int
         get() {
             var pos = position
             var p = parentField
@@ -65,7 +65,7 @@ abstract class AstNode(
         }
 
     /** Sets the start and end positions; the length becomes `end - position`. */
-    fun setBounds(position: Int, end: Int) {
+    public fun setBounds(position: Int, end: Int) {
         this.position = position
         this.length = end - position
     }
@@ -74,7 +74,7 @@ abstract class AstNode(
      * Makes this node's position relative to a parent. The current position is assumed to be
      * absolute and is decremented by [parentPosition].
      */
-    fun setRelative(parentPosition: Int) {
+    public fun setRelative(parentPosition: Int) {
         this.position -= parentPosition
     }
 
@@ -82,7 +82,7 @@ abstract class AstNode(
      * The node parent, or null. Setting it adjusts this node's start position to be relative
      * to the new parent.
      */
-    var parent: AstNode?
+    public var parent: AstNode?
         get() = parentField
         set(value) {
             if (value === parentField) return
@@ -98,7 +98,7 @@ abstract class AstNode(
      * Adds a child to the end of the block. Sets the child's parent to this node, rewrites
      * the child position to be relative, and grows this node to include the child.
      */
-    fun addChild(kid: AstNode) {
+    public fun addChild(kid: AstNode) {
         val end = kid.position + kid.length
         length = end - this.position
         addChildToBack(kid)
@@ -106,7 +106,7 @@ abstract class AstNode(
     }
 
     /** The [AstRoot] at the top of this node's parent chain, or null if there is none. */
-    val astRoot: AstRoot?
+    public val astRoot: AstRoot?
         get() {
             var p: AstNode? = this // this node could be the AstRoot
             while (p != null && p !is AstRoot) {
@@ -122,13 +122,13 @@ abstract class AstNode(
      * In error-recovery mode some nodes may have null children that are non-null in an
      * error-free tree; the behavior of toSource is undefined in that case.
      */
-    abstract fun toSource(depth: Int = 0): String
+    public abstract fun toSource(depth: Int = 0): String
 
     /** Constructs an indentation string of [indent] steps. */
-    fun makeIndent(indent: Int): String = INDENTATIONS[indent.coerceIn(0, MAX_INDENT)]
+    public fun makeIndent(indent: Int): String = INDENTATIONS[indent.coerceIn(0, MAX_INDENT)]
 
     /** A short, descriptive name for the node, such as "ArrayComprehension". */
-    fun shortName(): String = this::class.simpleName ?: ""
+    public fun shortName(): String = this::class.simpleName ?: ""
 
     /**
      * Visits this node and its children in an arbitrary order.
@@ -136,7 +136,7 @@ abstract class AstNode(
      * Each subclass decides the order for processing its children and which children are
      * passed to the visitor at all. Normally children are visited in lexical order.
      */
-    abstract fun visit(visitor: NodeVisitor)
+    public abstract fun visit(visitor: NodeVisitor)
 
     // Subclasses with potential side effects override this.
     override fun hasSideEffects(): Boolean = when (type) {
@@ -237,7 +237,7 @@ abstract class AstNode(
     }
 
     /** The innermost enclosing function, or null. The search begins with the parent. */
-    val enclosingFunction: FunctionNode?
+    public val enclosingFunction: FunctionNode?
         get() {
             var p = this.parent
             while (p != null && p !is FunctionNode) {
@@ -250,7 +250,7 @@ abstract class AstNode(
      * The innermost enclosing [Scope], or null. The search begins with the parent. This is
      * not the same as the defining scope for a [Name].
      */
-    val enclosingScope: Scope?
+    public val enclosingScope: Scope?
         get() {
             var p = this.parent
             while (p != null && p !is Scope) {
@@ -277,7 +277,7 @@ abstract class AstNode(
     }
 
     /** The depth of this node. The root is depth 0, its children depth 1, and so on. */
-    fun depth(): Int = if (parentField == null) 0 else 1 + parentField!!.depth()
+    public fun depth(): Int = if (parentField == null) 0 else 1 + parentField!!.depth()
 
     protected class DebugPrintVisitor(private val buffer: StringBuilder) : NodeVisitor {
 
@@ -301,7 +301,7 @@ abstract class AstNode(
             return true // process kids
         }
 
-        companion object {
+        public companion object {
             private const val DEBUG_INDENT = 2
 
             private fun makeIndent(depth: Int): String = " ".repeat(DEBUG_INDENT * depth)
@@ -322,13 +322,13 @@ abstract class AstNode(
      * A debugging representation of the parse tree starting at this node. Each line reads
      * `abs-pos name position length [identifier]`.
      */
-    open fun debugPrint(): String {
+    public open fun debugPrint(): String {
         val dpv = DebugPrintVisitor(StringBuilder(1000))
         visit(dpv)
         return dpv.toString()
     }
 
-    companion object {
+    public companion object {
         private const val MAX_INDENT = 42
 
         private val INDENTATIONS: Array<String> =
@@ -391,9 +391,9 @@ abstract class AstNode(
         )
 
         /** The source operator string for a token type, such as "+" or "typeof". */
-        fun operatorToString(op: Int): String =
+        public fun operatorToString(op: Int): String =
             operatorNames[op] ?: throw IllegalArgumentException("Invalid operator: $op")
 
-        fun codeBug(): RuntimeException = throw Kit.codeBug()
+        public fun codeBug(): RuntimeException = throw Kit.codeBug()
     }
 }
