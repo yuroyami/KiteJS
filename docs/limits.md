@@ -71,6 +71,19 @@ No script can tell the difference, because a `WeakMap` has no iteration and no s
 WebAssembly is memory, not behaviour. `WeakRef.isWeakSupported` answers false there if your host
 code needs to know.
 
+## Speed
+
+The engine interprets. It does not compile to bytecode or machine code, because iOS does not
+allow that and the port keeps one behaviour everywhere.
+
+Measured against Mozilla Rhino's own interpreter on the JVM, KiteJS runs the same scripts about
+1.0 to 2.0 times slower depending on the work: parsing is at parity, array and JSON methods are
+within 20 percent, and a tight arithmetic loop is about twice as slow.
+
+For scripting a document, evaluating a rule, or transforming data, that is not the part of your
+program you will be waiting on. For a numeric inner loop over millions of iterations, write it in
+Kotlin and bind it.
+
 ## One engine at a time
 
 An engine belongs to one thread. Opening a second while the first is open throws a

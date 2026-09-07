@@ -42,6 +42,10 @@ kotlin {
         namespace = "io.github.yuroyami.kitejs"
         compileSdk = 36
         minSdk = 21
+
+        // Without this the Android target compiles but never runs a test, so the whole
+        // common suite goes unchecked on the one target most likely to ship it.
+        withHostTestBuilder {}
     }
 
     listOf(

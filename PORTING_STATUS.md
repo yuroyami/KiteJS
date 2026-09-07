@@ -120,6 +120,31 @@ Adding WebAssembly is what proved that last one matters. Kotlin/Wasm's `String.t
 a neighbouring double for about one string in a hundred, so the engine reads decimals itself now
 rather than asking the platform.
 
+## Speed
+
+Measured on the JVM against upstream Rhino in interpreted mode, which is the thing this port
+mirrors. Both engines warmed first, same scripts, same machine. Numbers are the ratio, so lower
+is better and 1.00 would be parity.
+
+| Workload | Ratio |
+|---|---|
+| Parsing a 300 function source | 1.04 |
+| Array methods (`push`, `map`, `filter`) | 1.12 |
+| JSON parse and stringify | 1.17 |
+| Regular expression `exec` in a loop | 1.23 |
+| Object property writes | 1.28 |
+| Closure creation and calls | 1.49 |
+| Function calls | 1.57 |
+| String concatenation | 1.91 |
+| Number to string | 1.91 |
+| Loop arithmetic | 1.97 |
+
+So: the parser is at parity, the library methods are close, and the interpreter's inner loop is
+about twice as slow. That is the cost of the port, and it has not been optimised. The obvious
+places to look first are the arithmetic opcodes and the number printer.
+
+There is no benchmark in the test suite. These numbers came from a one-off run and will drift.
+
 ## Language level
 
 Upstream Rhino 1.9.1 implements complete ES5.1 plus a large part of ES2015+
