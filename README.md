@@ -4,9 +4,11 @@ A JavaScript engine for Kotlin Multiplatform, built on the interpreter from
 [Mozilla Rhino](https://github.com/mozilla/rhino). It runs the same script the same way on every
 target.
 
-**[Documentation](docs/)** · [Getting started](docs/getting-started.md) ·
-[Binding host objects](docs/host-objects.md) ·
-[Differences from a browser](docs/differences.md)
+**[Documentation](https://yuroyami.github.io/KiteJS/)** ·
+[Getting started](https://yuroyami.github.io/KiteJS/getting-started/) ·
+[Binding host objects](https://yuroyami.github.io/KiteJS/host-objects/) ·
+[Differences from a browser](https://yuroyami.github.io/KiteJS/differences/) ·
+[API reference](https://yuroyami.github.io/KiteJS/api/)
 
 ```kotlin
 KiteJs { instructionBudget = 5_000_000 }.use { js ->
