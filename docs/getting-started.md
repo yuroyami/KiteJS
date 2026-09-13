@@ -2,35 +2,26 @@
 
 ## Add the dependency
 
-KiteJS is not on Maven Central yet. Until it is, build it from source and include it locally:
-
-```bash
-git clone https://github.com/yuroyami/KiteJS.git
-cd KiteJS
-./gradlew :kitejs:assemble
-```
-
-Then add it to your build with an `includeBuild` in `settings.gradle.kts`:
-
-```kotlin
-includeBuild("../KiteJS")
-```
+KiteJS is on Maven Central:
 
 ```kotlin
 // build.gradle.kts
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            implementation("io.github.yuroyami:kitejs:0.0.1")
+            implementation("io.github.yuroyami:kitejs:0.1.0")
         }
     }
 }
 ```
 
+To build from source instead, clone the repository and add `includeBuild("../KiteJS")` to
+`settings.gradle.kts`.
+
 If you also want the suspending API, add the second artifact:
 
 ```kotlin
-implementation("io.github.yuroyami:kitejs-coroutines:0.0.1")
+implementation("io.github.yuroyami:kitejs-coroutines:0.1.0")
 ```
 
 ## Run a script

@@ -11,8 +11,9 @@ plugins {
 }
 
 allprojects {
+    // The version lives in gradle.properties only.
     group = "io.github.yuroyami"
-    version = "0.0.1"
+    version = providers.gradleProperty("version").get()
 }
 
 dependencies {

@@ -42,26 +42,15 @@ it behaves identically on every target too.
 JVM (bytecode 11), Android, iOS, macOS, JavaScript, WebAssembly, Linux (x64 and arm64) and
 Windows.
 
-## Building it
+## Installing it
 
-KiteJS is not published yet. Build it and include it locally:
-
-```bash
-git clone https://github.com/yuroyami/KiteJS.git
-cd KiteJS
-./gradlew :kitejs:assemble
-```
-
-```kotlin
-// settings.gradle.kts
-includeBuild("../KiteJS")
-```
+KiteJS is on Maven Central:
 
 ```kotlin
 // build.gradle.kts
 commonMain.dependencies {
-    implementation("io.github.yuroyami:kitejs:0.0.1")
-    implementation("io.github.yuroyami:kitejs-coroutines:0.0.1")  // optional
+    implementation("io.github.yuroyami:kitejs:0.1.0")
+    implementation("io.github.yuroyami:kitejs-coroutines:0.1.0")  // optional
 }
 ```
 
