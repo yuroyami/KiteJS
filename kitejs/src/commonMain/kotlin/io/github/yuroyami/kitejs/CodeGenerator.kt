@@ -67,6 +67,8 @@ import io.github.yuroyami.kitejs.Icode.Companion.Icode_SETCONSTVAR1
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_SETVAR1
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_SHORTNUMBER
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_SPARE_ARRAYLIT
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_CALL_SPREAD
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_NEW_SPREAD
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_SPREAD
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_STARTSUB
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_SWAP
@@ -462,6 +464,10 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
             Token.USE_STACK -> stackChange(1)
             Token.REF_CALL, Token.CALL, Token.NEW -> {
                 val isOptionalChainingCall = node.getIntProp(Node.OPTIONAL_CHAINING, 0) == 1
+                if (type != Token.REF_CALL && node.getIntProp(Node.NUMBER_OF_SPREAD, 0) > 0) {
+                    visitCallWithSpread(node, child!!, type, isOptionalChainingCall)
+                    return
+                }
                 var completeOptionalCallJump: CompleteOptionalCallJump? = null
                 if (type == Token.NEW) {
                     visitExpression(child!!, 0)
@@ -1112,6 +1118,58 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
             childIdx++
         }
         if (skipIndexes == null) addToken(Token.ARRAYLIT) else addIndexOp(Icode_SPARE_ARRAYLIT, skipIndexesId)
+    }
+
+    /**
+     * A call or a `new` with a spread argument, for example `f(a, ...rest)`. The number of
+     * arguments is only known while the script runs, so the arguments are built into an array
+     * first, with the same operations an array literal uses, and one operation makes the call
+     * with that array (ECMAScript 2015, 12.3.6 Argument Lists).
+     */
+    private fun visitCallWithSpread(node: Node, target: Node, type: Int, isOptionalChainingCall: Boolean) {
+        val savedStackDepth = stackDepth
+        var completeOptionalCallJump: CompleteOptionalCallJump? = null
+        if (type == Token.NEW) {
+            visitExpression(target, 0)
+        } else {
+            completeOptionalCallJump = generateCallFunAndThis(target, isOptionalChainingCall)
+            if (completeOptionalCallJump != null) resolveForwardGoto(completeOptionalCallJump.putArgsAndDoCallLabel)
+        }
+        visitArgumentArray(target.next)
+        if (type == Token.NEW) {
+            addIcode(Icode_NEW_SPREAD)
+            stackChange(-1)
+        } else {
+            addIcode(Icode_CALL_SPREAD)
+            stackChange(-2)
+        }
+        if (completeOptionalCallJump != null) resolveForwardGoto(completeOptionalCallJump.afterLabel)
+        if (savedStackDepth + 1 != stackDepth) throw Kit.codeBug()
+    }
+
+    /** Builds an argument list that holds a spread into one array on the stack. */
+    private fun visitArgumentArray(first: Node?) {
+        var fixed = 0
+        var child = first
+        while (child != null) {
+            if (child.type != Token.DOTDOTDOT) fixed++
+            child = child.next
+        }
+        addIndexOp(Icode_LITERAL_NEW_ARRAY, fixed)
+        addUint8(0) // An argument list has no holes, so there are no skipped indexes.
+        stackChange(1)
+        child = first
+        while (child != null) {
+            if (child.type == Token.DOTDOTDOT) {
+                visitExpression(child.firstChild!!, 0)
+                addIcode(Icode_SPREAD)
+                stackChange(-1)
+            } else {
+                visitLiteralValue(child)
+            }
+            child = child.next
+        }
+        addToken(Token.ARRAYLIT)
     }
 
     private fun visitLiteralValue(child: Node) {

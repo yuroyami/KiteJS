@@ -135,8 +135,12 @@ internal abstract class Icode {
         const val Icode_DELPROP_SUPER = Icode_CALL_ON_SUPER - 1
         // spread
         const val Icode_SPREAD = Icode_DELPROP_SUPER - 1
+        // Call whose arguments were built into an array, because a spread argument made the
+        // count a runtime matter: f(a, ...b)
+        const val Icode_CALL_SPREAD = Icode_SPREAD - 1
+        const val Icode_NEW_SPREAD = Icode_CALL_SPREAD - 1
         // Last icode
-        const val MIN_ICODE = Icode_SPREAD
+        const val MIN_ICODE = Icode_NEW_SPREAD
 
         fun bytecodeName(bytecode: Int): String {
             if (!validBytecode(bytecode)) {
@@ -240,6 +244,8 @@ internal abstract class Icode {
             Icode_CALL_ON_SUPER -> "CALL_ON_SUPER"
             Icode_DELPROP_SUPER -> "DELPROP_SUPER"
             Icode_SPREAD -> "SPREAD"
+            Icode_CALL_SPREAD -> "CALL_SPREAD"
+            Icode_NEW_SPREAD -> "NEW_SPREAD"
                 // An icode with no name.
                 else -> throw IllegalStateException(bytecode.toString())
             }

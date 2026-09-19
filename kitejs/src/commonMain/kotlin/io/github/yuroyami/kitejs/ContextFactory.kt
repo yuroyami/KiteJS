@@ -55,7 +55,9 @@ public open class ContextFactory {
         Context.FEATURE_ENUMERATE_IDS_FIRST -> cx.languageVersion >= Context.VERSION_ES6
         Context.FEATURE_THREAD_SAFE_OBJECTS -> false
         Context.FEATURE_INTEGER_WITHOUT_DECIMAL_PLACE -> false
-        Context.FEATURE_LITTLE_ENDIAN -> false
+        // Every engine a script is written for is little-endian, and the asm.js memory model
+        // assumes it. Upstream answers false here, which scrambles Emscripten output.
+        Context.FEATURE_LITTLE_ENDIAN -> true
         Context.FEATURE_ENABLE_XML_SECURE_PARSING -> true
         Context.FEATURE_ENABLE_JAVA_MAP_ACCESS -> false
         Context.FEATURE_INTL_402 -> false

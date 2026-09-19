@@ -625,6 +625,11 @@ public class IRFactory(
             call.setLineColumnNumber(node.lineno, node.column)
             for (arg in node.arguments) {
                 call.addChildToBack(transform(arg))
+                // A spread argument makes the count a runtime matter, so the call builds its
+                // arguments as an array first (ECMAScript 2015, 12.3.6).
+                if (arg.type == Token.DOTDOTDOT) {
+                    call.putIntProp(Node.NUMBER_OF_SPREAD, call.getIntProp(Node.NUMBER_OF_SPREAD, 0) + 1)
+                }
             }
             if (node.isOptionalCall) {
                 call.putIntProp(Node.OPTIONAL_CHAINING, 1)
@@ -831,6 +836,9 @@ public class IRFactory(
         nx.setLineColumnNumber(node.lineno, node.column)
         for (arg in node.arguments) {
             nx.addChildToBack(transform(arg))
+            if (arg.type == Token.DOTDOTDOT) {
+                nx.putIntProp(Node.NUMBER_OF_SPREAD, nx.getIntProp(Node.NUMBER_OF_SPREAD, 0) + 1)
+            }
         }
         node.initializer?.let { nx.addChildToBack(transformObjectLiteral(it)) }
         return nx

@@ -80,6 +80,8 @@ import io.github.yuroyami.kitejs.Icode.Companion.Icode_SETCONSTVAR1
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_SETVAR1
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_SHORTNUMBER
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_SPARE_ARRAYLIT
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_CALL_SPREAD
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_NEW_SPREAD
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_SPREAD
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_STARTSUB
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_SWAP
@@ -1403,8 +1405,33 @@ public class Interpreter : Evaluator {
                     stack[state.indexReg] = frame.scope
                     return null
                 }
+                Icode_CALL_SPREAD -> {
+                    // The arguments were built into an array, because a spread made their number
+                    // a runtime matter. The stack holds the callee and its `this` under it.
+                    if (state.instructionCounting) cx.instructionCount += INVOCATION_COST
+                    var args = stack[state.stackTop]
+                    if (args === DBL_MRK) args = ScriptRuntime.wrapNumber(sDbl[state.stackTop])
+                    --state.stackTop
+                    val lookup = stack[state.stackTop] as ScriptRuntime.LookupResult
+                    stack[state.stackTop] = lookup.call(cx, frame.scope!!, ScriptRuntime.getApplyArguments(cx, args))
+                    return null
+                }
+                Icode_NEW_SPREAD -> {
+                    if (state.instructionCounting) cx.instructionCount += INVOCATION_COST
+                    var args = stack[state.stackTop]
+                    if (args === DBL_MRK) args = ScriptRuntime.wrapNumber(sDbl[state.stackTop])
+                    --state.stackTop
+                    var ctor = stack[state.stackTop]
+                    if (ctor === DBL_MRK) ctor = ScriptRuntime.wrapNumber(sDbl[state.stackTop])
+                    stack[state.stackTop] =
+                        ScriptRuntime.newObject(ctor, cx, frame.scope!!, ScriptRuntime.getApplyArguments(cx, args))
+                    return null
+                }
                 Icode_SPREAD -> {
-                    val source = stack[state.stackTop]
+                    var source = stack[state.stackTop]
+                    // A number lives in the parallel double stack, so it needs unwrapping before
+                    // anything reads it as a value.
+                    if (source === DBL_MRK) source = ScriptRuntime.wrapNumber(sDbl[state.stackTop])
                     --state.stackTop
                     val store = stack[state.stackTop] as NewLiteralStorage
                     if (store.hasSkipIndexes()) {

@@ -57,6 +57,14 @@ public class KiteJsConfig internal constructor() {
 
     /** Makes the built-ins read-only, so a script cannot redefine `Array.prototype.push`. */
     public var sealBuiltins: Boolean = false
+
+    /**
+     * The byte order a typed array view uses, for example `Int32Array` over an `ArrayBuffer`.
+     * Little-endian is what every browser and Node answer, and what Emscripten output needs.
+     * Set it to false only for a script written against Rhino's old order. `DataView` is
+     * unaffected: it takes the order on every call.
+     */
+    public var littleEndian: Boolean = true
 }
 
 /** A parsed script, ready to run more than once. */
@@ -154,7 +162,8 @@ public class KiteJs internal constructor(
         internal fun build(config: KiteJsConfig): KiteJs {
             if (Context.getCurrentContext() != null) {
                 throw JsEngineError(
-                    "another engine is already open on this thread; close it first, or use `use { }`",
+                    "this thread already has an open engine; close it first, use `use { }`, " +
+                        "or open the second engine on its own thread",
                 )
             }
             val factory = EngineFactory(config)
@@ -189,6 +198,9 @@ public class KiteJs internal constructor(
 internal class EngineFactory(private val config: KiteJsConfig) : ContextFactory() {
 
     var instructionsUsed: Int = 0
+
+    override fun hasFeature(cx: Context, featureIndex: Int): Boolean =
+        if (featureIndex == Context.FEATURE_LITTLE_ENDIAN) config.littleEndian else super.hasFeature(cx, featureIndex)
 
     override fun observeInstructionCount(cx: Context, instructionCount: Int) {
         instructionsUsed += instructionCount

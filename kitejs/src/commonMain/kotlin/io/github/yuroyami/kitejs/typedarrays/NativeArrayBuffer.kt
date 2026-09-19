@@ -209,17 +209,16 @@ public abstract class NativeArrayBufferView : ScriptableObject {
 
     public val buffer: NativeArrayBuffer get() = arrayBuffer
 
-    public companion object {
-        private var useLittleEndianCache: Boolean? = null
+    /**
+     * The byte order this view reads and writes with, taken from the engine that created it
+     * (ECMAScript 2015, 24.1.1.5 GetValueFromBuffer, which leaves the order to the
+     * implementation). It is read once here, so two engines may answer differently and a view
+     * keeps the answer of the one that made it.
+     */
+    internal val littleEndian: Boolean =
+        Context.getCurrentContext()?.hasFeature(Context.FEATURE_LITTLE_ENDIAN) ?: true
 
-        internal fun useLittleEndian(): Boolean {
-            val cached = useLittleEndianCache
-            if (cached != null) return cached
-            val cx = Context.getCurrentContext() ?: return false
-            val value = cx.hasFeature(Context.FEATURE_LITTLE_ENDIAN)
-            useLittleEndianCache = value
-            return value
-        }
+    public companion object {
 
         internal fun isArg(args: Array<Any?>, i: Int): Boolean = args.size > i && Undefined.instance != args[i]
     }

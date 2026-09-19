@@ -201,14 +201,14 @@ public class NativeInt16Array : NativeTypedArrayView {
     override fun js_get(index: Int): Any? {
         if (checkIndex(index)) return Undefined.instance
         val buf = arrayBuffer.buffer!!
-        return ByteIo.readInt16(buf, (index * 2) + offset, NativeArrayBufferView.useLittleEndian())
+        return ByteIo.readInt16(buf, (index * 2) + offset, littleEndian)
     }
 
     override fun js_set(index: Int, c: Any?): Any? {
         val v = Conversions.toInt16(c)
         if (checkIndex(index)) return Undefined.instance
         val buf = arrayBuffer.buffer!!
-        ByteIo.writeInt16(buf, (index * 2) + offset, v, NativeArrayBufferView.useLittleEndian())
+        ByteIo.writeInt16(buf, (index * 2) + offset, v, littleEndian)
         return null
     }
 
@@ -257,14 +257,14 @@ public class NativeUint16Array : NativeTypedArrayView {
     override fun js_get(index: Int): Any? {
         if (checkIndex(index)) return Undefined.instance
         val buf = arrayBuffer.buffer!!
-        return ByteIo.readUint16(buf, (index * 2) + offset, NativeArrayBufferView.useLittleEndian())
+        return ByteIo.readUint16(buf, (index * 2) + offset, littleEndian)
     }
 
     override fun js_set(index: Int, c: Any?): Any? {
         val v = Conversions.toUint16(c)
         if (checkIndex(index)) return Undefined.instance
         val buf = arrayBuffer.buffer!!
-        ByteIo.writeUint16(buf, (index * 2) + offset, v, NativeArrayBufferView.useLittleEndian())
+        ByteIo.writeUint16(buf, (index * 2) + offset, v, littleEndian)
         return null
     }
 
@@ -313,14 +313,14 @@ public class NativeInt32Array : NativeTypedArrayView {
     override fun js_get(index: Int): Any? {
         if (checkIndex(index)) return Undefined.instance
         val buf = arrayBuffer.buffer!!
-        return ByteIo.readInt32(buf, (index * 4) + offset, NativeArrayBufferView.useLittleEndian())
+        return ByteIo.readInt32(buf, (index * 4) + offset, littleEndian)
     }
 
     override fun js_set(index: Int, c: Any?): Any? {
         val v = Conversions.toInt32(c)
         if (checkIndex(index)) return Undefined.instance
         val buf = arrayBuffer.buffer!!
-        ByteIo.writeInt32(buf, (index * 4) + offset, v, NativeArrayBufferView.useLittleEndian())
+        ByteIo.writeInt32(buf, (index * 4) + offset, v, littleEndian)
         return null
     }
 
@@ -369,14 +369,14 @@ public class NativeUint32Array : NativeTypedArrayView {
     override fun js_get(index: Int): Any? {
         if (checkIndex(index)) return Undefined.instance
         val buf = arrayBuffer.buffer!!
-        return ByteIo.readUint32(buf, (index * 4) + offset, NativeArrayBufferView.useLittleEndian())
+        return ByteIo.readUint32(buf, (index * 4) + offset, littleEndian)
     }
 
     override fun js_set(index: Int, c: Any?): Any? {
         val v = Conversions.toUint32(c)
         if (checkIndex(index)) return Undefined.instance
         val buf = arrayBuffer.buffer!!
-        ByteIo.writeUint32(buf, (index * 4) + offset, v, NativeArrayBufferView.useLittleEndian())
+        ByteIo.writeUint32(buf, (index * 4) + offset, v, littleEndian)
         return null
     }
 
@@ -425,14 +425,14 @@ public class NativeFloat32Array : NativeTypedArrayView {
     override fun js_get(index: Int): Any? {
         if (checkIndex(index)) return Undefined.instance
         val buf = arrayBuffer.buffer!!
-        return ByteIo.readFloat32(buf, (index * 4) + offset, NativeArrayBufferView.useLittleEndian())
+        return ByteIo.readFloat32(buf, (index * 4) + offset, littleEndian)
     }
 
     override fun js_set(index: Int, c: Any?): Any? {
         val v = ScriptRuntime.toNumber(c)
         if (checkIndex(index)) return Undefined.instance
         val buf = arrayBuffer.buffer!!
-        ByteIo.writeFloat32(buf, (index * 4) + offset, v, NativeArrayBufferView.useLittleEndian())
+        ByteIo.writeFloat32(buf, (index * 4) + offset, v, littleEndian)
         return null
     }
 
@@ -481,14 +481,14 @@ public class NativeFloat64Array : NativeTypedArrayView {
     override fun js_get(index: Int): Any? {
         if (checkIndex(index)) return Undefined.instance
         val buf = arrayBuffer.buffer!!
-        return ByteIo.readFloat64(buf, (index * 8) + offset, NativeArrayBufferView.useLittleEndian())
+        return ByteIo.readFloat64(buf, (index * 8) + offset, littleEndian)
     }
 
     override fun js_set(index: Int, c: Any?): Any? {
         val v = ScriptRuntime.toNumber(c)
         if (checkIndex(index)) return Undefined.instance
         val buf = arrayBuffer.buffer!!
-        ByteIo.writeFloat64(buf, (index * 8) + offset, v, NativeArrayBufferView.useLittleEndian())
+        ByteIo.writeFloat64(buf, (index * 8) + offset, v, littleEndian)
         return null
     }
 

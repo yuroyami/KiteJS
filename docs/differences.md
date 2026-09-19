@@ -14,19 +14,22 @@ These are syntax errors. A script using any of them will not even parse.
 | `import` and `export` | Nothing. Concatenate the sources, or bind a loader function yourself |
 | `async function`, `await` | `Promise` with `.then`, or a host function that suspends |
 | `for await (... of ...)` | Iterate the promises and await each one |
-| `f(...args)`, `new C(...args)` | `f.apply(null, args)`, or build the call yourself |
 | `var [a, ...rest] = list` | `var a = list[0], rest = list.slice(1)` |
 | `return` outside a function | Wrap the script in a function and call it |
 | The regular expression flags `d` and `v` | Read `exec` results for positions; use `u` for Unicode |
 
-Spread works in an array literal and in an object literal. It is a call argument list, and
-destructuring with a rest element, that the parser does not take.
+Spread works in an array literal, an object literal and an argument list. It is destructuring
+with a rest element that the parser does not take.
 
 ```js
 [...set]              // fine
 ({ ...defaults })     // fine
-Math.max(...numbers)  // syntax error, use Math.max.apply(null, numbers)
+Math.max(...numbers)  // fine
+new Date(...parts)    // fine
+var [a, ...rest] = xs // syntax error, use xs[0] and xs.slice(1)
 ```
+
+A value with no iterator spreads to nothing here, where a browser throws a `TypeError`.
 
 ## Globals that are not there
 

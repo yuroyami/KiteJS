@@ -64,6 +64,9 @@ class Test262ParityTest {
             "built-ins/TypedArrayConstructors/internals/Set/BigInt/bigint-tobiguint64.js",
             "built-ins/Proxy/construct/arguments-realm.js",
             "language/destructuring/binding/keyed-destructuring-property-reference-target-evaluation-order-with-bindings.js",
+            // Typed array views read and write little-endian here and big-endian upstream, so a
+            // test that copies between two views over one buffer only passes here.
+            "built-ins/TypedArray/prototype/set/typedarray-arg-set-values-same-buffer-other-type.js",
         )) {
             put(path, "D-58: upstream fails this and the port passes it")
         }
@@ -99,6 +102,14 @@ class Test262ParityTest {
         )
     }
 
+    /**
+     * Whether upstream failed before it could run the file. Upstream's parser rejects syntax this
+     * engine takes, such as spread in an argument list, and a rejected harness file fails every
+     * test that includes it, so those runs carry no verdict to compare with.
+     */
+    private fun upstreamFailedToParse(outcome: String): Boolean =
+        outcome.startsWith("threw SyntaxError") || outcome.startsWith("crashed with EvaluatorException")
+
     private val upstreamHarness = HashMap<String, UScript>()
     private val portedHarness = HashMap<String, Script>()
 
@@ -114,6 +125,9 @@ class Test262ParityTest {
 
         val expectations = StringBuilder()
         val differences = mutableListOf<String>()
+        // Files upstream cannot parse. The port takes syntax upstream rejects, so there is
+        // nothing to compare on these: they are counted and listed, not treated as a difference.
+        val upstreamCannotParse = mutableListOf<String>()
         val staleExpectations = mutableListOf<String>()
         val agreedButExpectedToDiffer = mutableListOf<String>()
         var ran = 0
@@ -152,8 +166,12 @@ class Test262ParityTest {
                     .append(ported).append('\n')
                 val known = relative in knownDifferences
                 if (upstream != ported) {
-                    if (!known) {
-                        val mode = if (strict) "strict" else "non-strict"
+                    val mode = if (strict) "strict" else "non-strict"
+                    if (known) {
+                        // Pinned on purpose; the stale check below watches it.
+                    } else if (upstreamFailedToParse(upstream)) {
+                        upstreamCannotParse.add("$relative [$mode]\n  upstream: $upstream\n  ported:   $ported")
+                    } else {
                         differences.add("$relative [$mode]\n  upstream: $upstream\n  ported:   $ported")
                     }
                 } else if (known) {
@@ -177,6 +195,17 @@ class Test262ParityTest {
             "test262 parity: ran $ran cases, skipped $skipped files. " +
                 "$passed agree passing, $failedBoth agree failing, ${differences.size} differ.",
         )
+        if (upstreamCannotParse.isNotEmpty()) {
+            val ranHere = upstreamCannotParse.count { it.endsWith("ported:   $PASS") }
+            println(
+                "${upstreamCannotParse.size} cases upstream cannot parse, so nothing to compare: " +
+                    "the port ran them and $ranHere passed.",
+            )
+            val report = File("build/test262/upstream-cannot-parse.txt")
+            report.parentFile.mkdirs()
+            report.writeText(upstreamCannotParse.joinToString("\n\n"))
+            println("that list: ${report.absolutePath}")
+        }
 
         // The whole list goes to a file: a long run is expensive, so nothing it learned is thrown
         // away just because the assertion message has to stay readable.

@@ -2794,6 +2794,19 @@ public class Parser(
                 if (peekToken() == Token.YIELD) {
                     reportError("msg.yield.parenthesized")
                 }
+                // ECMAScript 2015, 12.3.6 Argument Lists: an argument may be `...expression`, in
+                // any position and any number, and its value is spread through its iterator.
+                if (peekToken() == Token.DOTDOTDOT && compilerEnv.languageVersion >= Context.VERSION_ES6) {
+                    consumeToken()
+                    val spreadPos = ts.tokenBeg
+                    val spreadLineno = lineNumber()
+                    val spreadColumn = columnNumber()
+                    val spread = Spread(spreadPos, ts.tokenEnd - spreadPos)
+                    spread.setLineColumnNumber(spreadLineno, spreadColumn)
+                    spread.expression = assignExpr()
+                    result.add(spread)
+                    continue
+                }
                 val en = assignExpr()
                 if (peekToken() == Token.FOR) {
                     result.add(generatorExpression(en, 0, true))

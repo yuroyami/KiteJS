@@ -43,7 +43,10 @@ class IcodeParityTest {
         assertTrue(expected.size >= 89, "expected the upstream icode table, got ${expected.size}")
 
         val failures = mutableListOf<String>()
-        for ((name, value) in expected) {
+        // MIN_ICODE marks where the range ends rather than naming an operation, and the port's
+        // range reaches further down for the icodes it adds. theIcodeRangeIsWhereUpstreamPutsIt
+        // and theOnlyExtraIcodesAreThePortsOwn check that part.
+        for ((name, value) in expected.filterKeys { it != "MIN_ICODE" }) {
             val ported = actual[name]
             if (ported == null) {
                 failures.add("$name is missing from the port")
@@ -57,11 +60,34 @@ class IcodeParityTest {
     @Test
     fun theIcodeRangeIsWhereUpstreamPutsIt() {
         val expected = upstreamIcodeConstants()
-        assertEquals(expected["MIN_ICODE"], Icode.MIN_ICODE)
         assertEquals(0, Icode.Icode_DELNAME)
+        // The port adds icodes of its own for syntax upstream does not compile, so its range
+        // reaches further down. Each one sits below every upstream code, so no upstream value
+        // moves (the previous test pins that).
+        assertTrue(
+            Icode.MIN_ICODE <= expected["MIN_ICODE"]!!,
+            "the port's range must cover upstream's: ${Icode.MIN_ICODE} against ${expected["MIN_ICODE"]}",
+        )
         // The icodes must stay clear of the bytecode tokens, which run upward from FIRST_BYTECODE.
         assertTrue(Icode.MIN_ICODE < 0)
         assertTrue(Token.FIRST_BYTECODE_TOKEN > 0)
+    }
+
+    /** What the port adds below upstream's range, and why each one is there. */
+    @Test
+    fun theOnlyExtraIcodesAreThePortsOwn() {
+        val upstream = upstreamIcodeConstants()
+        val extras = portedIcodeConstants()
+            .filterKeys { it.startsWith("Icode_") && it !in upstream }
+            .toSortedMap()
+        assertEquals(
+            // Spread in an argument list: the number of arguments is a runtime matter, so the
+            // call takes them as one array. Upstream's parser rejects that syntax.
+            listOf("Icode_CALL_SPREAD", "Icode_NEW_SPREAD"),
+            extras.keys.toList(),
+        )
+        val lowestUpstream = upstream.values.min()
+        assertTrue(extras.values.all { it < lowestUpstream }, "an added icode must sit below upstream's range")
     }
 
     @Test

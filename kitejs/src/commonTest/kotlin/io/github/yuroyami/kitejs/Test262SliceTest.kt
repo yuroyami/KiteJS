@@ -36,6 +36,13 @@ class Test262SliceTest {
     private val knownPlatformDifferences = setOf(
         "built-ins/String/prototype/toLowerCase/special_casing_conditional.js",
         "built-ins/String/prototype/toLocaleLowerCase/special_casing_conditional.js",
+        // Two files whose outcome is not a property of the engine.
+        // The first builds a BigInt of a size that fits the parity run's larger heap and not this
+        // one's, so it passes there and runs out of memory here.
+        "staging/sm/BigInt/large-bit-length.js",
+        // The second throws an error whose message is a function's own source, and a function
+        // prints its body differently once it is a built-in.
+        "staging/sm/generators/delegating-yield-11.js",
     )
 
     private fun read(path: String): String = fs.source(Path(path)).buffered().use { it.readString() }

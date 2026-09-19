@@ -64,12 +64,6 @@ public class NativeSymbol internal constructor(internal val key: SymbolKey) : Sc
         public const val CLASS_NAME: String = "Symbol"
         public const val TYPE_NAME: String = "symbol"
 
-        /**
-         * The registry behind `Symbol.for`. Upstream uses a weak map keyed on the description, but
-         * the keys are strings the map itself holds, so nothing was ever collected (D-40).
-         */
-        private val globalMap = HashMap<String, SymbolKey>()
-
         internal fun init(cx: Context, scope: Scriptable, sealed: Boolean) {
             val ctor = LambdaConstructor(
                 scope,
@@ -143,7 +137,7 @@ public class NativeSymbol internal constructor(internal val key: SymbolKey) : Sc
 
         private fun js_for(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val name = ScriptRuntime.toString(if (args.isNotEmpty()) args[0] else Undefined.instance)
-            return globalMap.getOrPut(name) { SymbolKey(name, Symbol.Kind.REGISTERED) }
+            return cx.symbolRegistry.getOrPut(name) { SymbolKey(name, Symbol.Kind.REGISTERED) }
         }
 
         private fun js_keyFor(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
@@ -153,7 +147,7 @@ public class NativeSymbol internal constructor(internal val key: SymbolKey) : Sc
                 is SymbolKey -> s
                 else -> throw ScriptRuntime.throwCustomError(cx, scope, "TypeError", "Not a Symbol")
             }
-            if (globalMap[sym.name] === sym) return sym.name
+            if (cx.symbolRegistry[sym.name] === sym) return sym.name
             return Undefined.instance
         }
     }

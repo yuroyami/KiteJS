@@ -47,7 +47,7 @@ public class NativeBigInt64Array : NativeBigIntArrayView {
         val base = ByteIo.readUint64Primitive(
             arrayBuffer.buffer!!,
             (index * BYTES_PER_ELEMENT) + offset,
-            NativeArrayBufferView.useLittleEndian(),
+            littleEndian,
         )
         // A Long is already the signed 64-bit reading, so nothing to correct.
         return KBigInt.fromLong(base)
@@ -60,7 +60,7 @@ public class NativeBigInt64Array : NativeBigIntArrayView {
             arrayBuffer.buffer!!,
             (index * BYTES_PER_ELEMENT) + offset,
             value.toLong(),
-            NativeArrayBufferView.useLittleEndian(),
+            littleEndian,
         )
         return null
     }
@@ -119,7 +119,7 @@ public class NativeBigUint64Array : NativeBigIntArrayView {
         val base = ByteIo.readUint64Primitive(
             arrayBuffer.buffer!!,
             (index * BYTES_PER_ELEMENT) + offset,
-            NativeArrayBufferView.useLittleEndian(),
+            littleEndian,
         )
         if ((base and Long.MIN_VALUE) == 0L) return KBigInt.fromLong(base)
         // The top bit is set, so the Long reads as negative. Rebuild it from two halves instead.
@@ -135,7 +135,7 @@ public class NativeBigUint64Array : NativeBigIntArrayView {
             arrayBuffer.buffer!!,
             (index * BYTES_PER_ELEMENT) + offset,
             value.toLong(),
-            NativeArrayBufferView.useLittleEndian(),
+            littleEndian,
         )
         return null
     }

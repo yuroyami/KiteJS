@@ -287,7 +287,7 @@ class FacadeTest {
     @Test
     fun twoEnginesAtOnceIsRefusedClearly() = engine { _ ->
         val e = assertFailsWith<JsEngineError> { KiteJs() }
-        assertContains(e.message ?: "", "already open")
+        assertContains(e.message ?: "", "this thread already has an open engine")
     }
 
     // ---- The budget ---------------------------------------------------------------------------

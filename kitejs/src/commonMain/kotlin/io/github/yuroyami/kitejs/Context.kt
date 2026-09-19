@@ -33,6 +33,13 @@ public open class Context internal constructor(public val factory: ContextFactor
     internal var iterating: MutableSet<Scriptable>? = null
     internal var interpreterSecurityDomain: Any? = null
 
+    /**
+     * The registry behind `Symbol.for`, one per context. ECMAScript 2024, 20.4.2.2 shares it
+     * across the realms of one agent, and a thread is one agent here, so two engines never write
+     * the same map (D-40).
+     */
+    internal val symbolRegistry: MutableMap<String, SymbolKey> = HashMap()
+
     private var version: Int = VERSION_ES6
 
     private var errorReporterField: ErrorReporter? = null
@@ -487,10 +494,14 @@ public open class Context internal constructor(public val factory: ContextFactor
         public const val errorReporterProperty: String = "error reporter"
 
         /**
-         * The entered context, if any. Upstream keeps one per thread; this port is single-thread
-         * confined (D-3), so this is a plain slot.
+         * The entered context of the calling thread, if any. An engine belongs to one thread, and
+         * each thread has its own slot, as upstream does. See [CurrentContextSlot].
          */
-        internal var currentContext: Context? = null
+        internal var currentContext: Context?
+            get() = CurrentContextSlot.value
+            set(value) {
+                CurrentContextSlot.value = value
+            }
 
         public fun getCurrentContext(): Context? = currentContext
 

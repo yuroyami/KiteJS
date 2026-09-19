@@ -1148,7 +1148,9 @@ class EvalOracleTest {
 
         // Shared storage.
         "var b = new ArrayBuffer(4); var a = new Uint8Array(b); var c = new Uint8Array(b); a[0] = 9; c[0]",
-        "var b = new ArrayBuffer(4); var a = new Uint8Array(b); var c = new Uint32Array(b); a[0] = 1; a[1] = 0; a[2] = 0; a[3] = 0; c[0]",
+        // Two views over one buffer disagree with upstream on purpose: this engine reads and
+        // writes little-endian, as browsers do, and upstream reads big-endian. ByteOrderTest
+        // holds the expected values.
         "var a = new Int8Array(4); a.buffer.byteLength", "var a = new Int8Array(4); a.byteLength",
         "var a = new Int8Array(4); a.byteOffset", "var b = new ArrayBuffer(8); new Int16Array(b, 4).byteOffset",
         "var a = new Int16Array(4); a.byteLength",
@@ -1566,7 +1568,8 @@ class EvalOracleTest {
         "var r = ''; for (var x of [1, 2, 3]) r += x; r", "var r = ''; for (var [k, v] of [[1, 'a'], [2, 'b']]) r += k + v; r",
         "var [a, b] = [1, 2]; a + b", "var [a, , c] = [1, 2, 3]; c", "var [a = 5] = []; a", "var [a, ...rest] = [1, 2, 3]; rest.join()",
         "var { x, y } = { x: 1, y: 2 }; x + y", "[...[1, 2], ...[3]].join()", "function f(...a) { return a.length } f(1, 2, 3)",
-        "function f(a, b) { return a + b } f(...[1, 2])", "Math.max(...[1, 5, 3])",
+        // Spread in an argument list runs here and is a syntax error upstream, so it cannot be
+        // compared. SpreadArgumentsTest holds what it does.
         "[3, 1, 2].toSorted().join()", "var a = [3, 1, 2]; a.toSorted(); a.join()", "[1, 2, 3].toReversed().join()",
         "[1, 2, 3].toSpliced(1, 1).join()", "[1, 2, 3].toSpliced(1, 1, 'x', 'y').join()", "[1, 2, 3].toSpliced().join()",
         "[1, 2, 3].with(1, 'x').join()", "[1, 2, 3].with(-1, 'x').join()",

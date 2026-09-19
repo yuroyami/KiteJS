@@ -73,3 +73,4 @@ KiteJs {
 | `interruptWhen` | Asked now and then while a script runs. Answer `true` to stop it |
 | `safeBuiltins` | Leaves out the built-ins a sandbox does not want |
 | `sealBuiltins` | Makes the built-ins read only, so a script cannot replace `Array.prototype.push` |
+| `littleEndian` | The byte order of typed array views. True by default, as in every browser |

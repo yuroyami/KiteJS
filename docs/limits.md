@@ -84,13 +84,21 @@ For scripting a document, evaluating a rule, or transforming data, that is not t
 program you will be waiting on. For a numeric inner loop over millions of iterations, write it in
 Kotlin and bind it.
 
-## One engine at a time
+## One engine per thread
 
-An engine belongs to one thread. Opening a second while the first is open throws a
-`JsEngineError` that says so, rather than quietly sharing the first one's state.
+An engine belongs to the thread that opened it. Opening a second engine on that same thread
+throws a `JsEngineError` that says so, rather than quietly sharing the first one's state.
 
-If you need concurrency, either run the engines in separate processes, or use `asyncKiteJs` and
-let it serialise the calls for you.
+Each thread has its own slot, so two threads can hold two engines at once, and neither sees the
+other's global scope. A program that runs several documents gives each document a thread.
+
+```kotlin
+val worker = thread { KiteJs().use { js -> js.evaluate(script) } }
+```
+
+JavaScript and WebAssembly run one thread, so there one engine is open at a time.
+
+Use `asyncKiteJs` when you want the calls serialised for you on a dispatcher of its own.
 
 ## Errors from a script cannot break the engine
 
