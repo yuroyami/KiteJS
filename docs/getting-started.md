@@ -9,7 +9,7 @@ KiteJS is on Maven Central:
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            implementation("io.github.yuroyami:kitejs:0.1.0")
+            implementation("io.github.yuroyami:kitejs:0.2.0")
         }
     }
 }
@@ -21,7 +21,7 @@ To build from source instead, clone the repository and add `includeBuild("../Kit
 If you also want the suspending API, add the second artifact:
 
 ```kotlin
-implementation("io.github.yuroyami:kitejs-coroutines:0.1.0")
+implementation("io.github.yuroyami:kitejs-coroutines:0.2.0")
 ```
 
 ## Run a script

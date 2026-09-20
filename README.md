@@ -49,8 +49,8 @@ KiteJS is on Maven Central:
 ```kotlin
 // build.gradle.kts
 commonMain.dependencies {
-    implementation("io.github.yuroyami:kitejs:0.1.0")
-    implementation("io.github.yuroyami:kitejs-coroutines:0.1.0")  // optional
+    implementation("io.github.yuroyami:kitejs:0.2.0")
+    implementation("io.github.yuroyami:kitejs-coroutines:0.2.0")  // optional
 }
 ```
 
