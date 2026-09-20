@@ -375,9 +375,11 @@ public class Interpreter : Evaluator {
 
     /** What one instruction tells the loop to do next. Null from the dispatch means "carry on". */
     private sealed class NewState {
-        data object BreakLoop : NewState()
-        data object BreakJumplessRun : NewState()
-        data object BreakWithoutExtension : NewState()
+        // Plain objects, not data objects: the loop compares them by identity, and a data object
+        // would add an `equals` that a `when` on the value calls instead.
+        object BreakLoop : NewState()
+        object BreakJumplessRun : NewState()
+        object BreakWithoutExtension : NewState()
         class YieldResult(val yielding: Any?) : NewState()
         class StateBreakResult(val frame: CallFrame) : NewState()
         class StateContinueResult(val frame: CallFrame, val indexReg: Int) : NewState()
@@ -669,15 +671,18 @@ public class Interpreter : Evaluator {
                         val op = iCode[frame.pc++].toInt()
                         nextState = execute(cx, frame, state, op)
                     } while (nextState == null)
-                    when (nextState) {
-                        NewState.BreakLoop -> break@loop
-                        NewState.BreakJumplessRun -> {
+                    // These three are single instances, so they are compared by identity. Writing
+                    // `when (nextState) { NewState.BreakLoop -> ... }` instead would call
+                    // `equals` on every branch instruction the engine runs.
+                    when {
+                        nextState === NewState.BreakJumplessRun -> {
                             if (instructionCounting) addInstructionCount(cx, frame, 2)
                             val offset = getShort(iCode, frame.pc)
                             if (offset != 0) frame.pc += offset - 1 else frame.pc = frame.idata.longJumps!![frame.pc]!!
                             if (instructionCounting) frame.pcPrevBranch = frame.pc
                         }
-                        NewState.BreakWithoutExtension -> return NewState.ThrowableResult(frame, state.throwable)
+                        nextState === NewState.BreakLoop -> break@loop
+                        nextState === NewState.BreakWithoutExtension -> return NewState.ThrowableResult(frame, state.throwable)
                         else -> return nextState
                     }
                 }
@@ -1844,6 +1849,20 @@ public class Interpreter : Evaluator {
                 val ifun = fun_
                 @Suppress("UNCHECKED_CAST")
                 val idata = ifun.descriptor.code as InterpreterData<JSFunction>
+                // An asm.js module is linked here rather than run, and a call that cannot supply
+                // what the module needs falls through to the icode below, which is the same
+                // JavaScript.
+                val asm = idata.asmModule
+                if (asm != null) {
+                    val moduleArgs = getArgsArray(stack, sDbl, boundArgs, blen, state.stackTop + 1, state.indexReg)
+                    val exports = io.github.yuroyami.kitejs.asm.AsmLink.link(cx, calleeScope, asm, moduleArgs)
+                    if (exports != null) {
+                        frame.savedCallOp = op
+                        frame.savedStackTop = state.stackTop
+                        stack[state.stackTop] = exports
+                        return null
+                    }
+                }
                 var callParentFrame: CallFrame? = frame
                 if (op == Icode_TAIL_CALL) {
                     callParentFrame = frame.parentFrame

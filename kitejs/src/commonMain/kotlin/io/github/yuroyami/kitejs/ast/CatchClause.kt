@@ -72,7 +72,8 @@ public class CatchClause(pos: Int = -1, len: Int = 1) : AstNode(pos, len) {
 
     override fun visit(visitor: NodeVisitor) {
         if (visitor.visit(this)) {
-            varName!!.visit(visitor)
+            // `catch { }` with no binding is valid, so there may be no name to visit.
+            varName?.visit(visitor)
             catchCondition?.visit(visitor)
             body!!.visit(visitor)
         }

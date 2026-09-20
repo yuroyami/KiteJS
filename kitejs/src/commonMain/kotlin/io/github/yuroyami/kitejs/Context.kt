@@ -100,6 +100,9 @@ public open class Context internal constructor(public val factory: ContextFactor
     internal var instructionCount: Int = 0
     internal var instructionThreshold: Int = 0
 
+    /** One entry per `"use asm"` function this context has parsed, compiled or not. */
+    internal val asmDiagnostics: MutableList<io.github.yuroyami.kitejs.asm.AsmDiagnostic> = ArrayList()
+
     /** Scratch space the interpreter reuses rather than allocating. */
     internal var scratchUint32: Long = 0
     internal var scratchScriptable: Scriptable? = null
@@ -412,6 +415,14 @@ public open class Context internal constructor(public val factory: ContextFactor
                 "compileFunction only accepts source with single JS function: $sourceString"
             }
         }
+        // Before the tree is lowered, because lowering reads the source tree apart: an asm.js
+        // module needs to know whether a number was written 0 or 0.0, and the lowered form
+        // keeps only the value.
+        // Looking for the directive in the text first: a script without it has no module, and
+        // walking its whole tree to find that out would cost every script something.
+        if (hasFeature(FEATURE_ASM_JS) && sourceString.contains(io.github.yuroyami.kitejs.asm.AsmCompiler.DIRECTIVE)) {
+            io.github.yuroyami.kitejs.asm.AsmCompiler.compileAll(ast, asmDiagnostics)
+        }
         val irf = IRFactory(compilerEnv, sourceName, sourceString, compilationErrorReporter)
         val tree = irf.transformTree(ast)!!
         if (compilerEnv.generatingSource) {
@@ -489,6 +500,12 @@ public open class Context internal constructor(public val factory: ContextFactor
         public const val FEATURE_ENABLE_XML_SECURE_PARSING: Int = 20
         public const val FEATURE_ENABLE_JAVA_MAP_ACCESS: Int = 21
         public const val FEATURE_INTL_402: Int = 22
+
+        /**
+         * Whether a function marked `"use asm"` is compiled to typed code. On by default. Turning
+         * it off makes such a function run like any other, which is the same answer, only slower.
+         */
+        public const val FEATURE_ASM_JS: Int = 23
 
         public const val languageVersionProperty: String = "language version"
         public const val errorReporterProperty: String = "error reporter"

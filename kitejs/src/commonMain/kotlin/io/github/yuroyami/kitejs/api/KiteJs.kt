@@ -65,6 +65,42 @@ public class KiteJsConfig internal constructor() {
      * unaffected: it takes the order on every call.
      */
     public var littleEndian: Boolean = true
+
+    /**
+     * Whether a function whose body starts with `"use asm"` is compiled ahead of time to typed
+     * code. On by default.
+     *
+     * asm.js is the subset of JavaScript that Emscripten writes, and its types are all known
+     * before it runs, so the engine can hold an integer as an integer instead of as an object.
+     * A module the engine cannot validate runs as ordinary JavaScript either way, so this only
+     * changes speed, never answers. Turn it off to compare the two.
+     */
+    public var asmJs: Boolean = true
+}
+
+/**
+ * What the engine did with one function whose body starts with `"use asm"`.
+ *
+ * Such a function is compiled ahead of time to typed code, which is much faster than running it
+ * as ordinary JavaScript. Compiling can decline, and so can the linking that happens when the
+ * module is called. Either way the module still runs and still gives the same answers, so this is
+ * only for finding out why one is slower than expected.
+ */
+public class AsmReport internal constructor(
+    /** The module function's name, or an empty string when it has none. */
+    public val name: String,
+    /** True when the module compiled to typed code. */
+    public val compiled: Boolean,
+    /** True when the last call to the module could use that code. */
+    public val linked: Boolean,
+    /** Why it did not, in one sentence. Empty when everything worked. */
+    public val reason: String,
+) {
+    override fun toString(): String = when {
+        compiled && linked -> "$name: compiled"
+        compiled -> "$name: compiled, not linked ($reason)"
+        else -> "$name: not compiled ($reason)"
+    }
 }
 
 /** A parsed script, ready to run more than once. */
@@ -97,6 +133,22 @@ public class KiteJs internal constructor(
 
     /** The engine's version string. */
     public val version: String get() = cx.implementationVersion
+
+    /**
+     * One entry per `"use asm"` function the engine has parsed, in the order it met them.
+     *
+     * Use it to find out why an Emscripten module is running slowly: the reason names the first
+     * thing in it that asm.js does not allow.
+     */
+    public val asmReports: List<AsmReport>
+        get() = cx.asmDiagnostics.map {
+            AsmReport(
+                it.name,
+                it.compiled,
+                it.linked,
+                if (!it.compiled) it.compileReason else it.linkReason,
+            )
+        }
 
     /** Parses and runs [source]. The answer is the last expression's value. */
     public fun evaluate(source: String, fileName: String = "<eval>"): JsValue = guarded {
@@ -199,8 +251,11 @@ internal class EngineFactory(private val config: KiteJsConfig) : ContextFactory(
 
     var instructionsUsed: Int = 0
 
-    override fun hasFeature(cx: Context, featureIndex: Int): Boolean =
-        if (featureIndex == Context.FEATURE_LITTLE_ENDIAN) config.littleEndian else super.hasFeature(cx, featureIndex)
+    override fun hasFeature(cx: Context, featureIndex: Int): Boolean = when (featureIndex) {
+        Context.FEATURE_LITTLE_ENDIAN -> config.littleEndian
+        Context.FEATURE_ASM_JS -> config.asmJs
+        else -> super.hasFeature(cx, featureIndex)
+    }
 
     override fun observeInstructionCount(cx: Context, instructionCount: Int) {
         instructionsUsed += instructionCount

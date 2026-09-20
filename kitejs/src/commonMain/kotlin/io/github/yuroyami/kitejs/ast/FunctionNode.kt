@@ -29,6 +29,16 @@ public open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(p
             value?.parent = this
         }
 
+    /**
+     * The typed code an asm.js module compiled to, filled in after parsing and before the tree is
+     * lowered, because lowering throws away what the compiler reads. Null for every other
+     * function, and for a module the compiler turned down.
+     */
+    internal var asmModule: io.github.yuroyami.kitejs.asm.AsmModule? = null
+
+    /** Why a `"use asm"` function was turned down, for anyone asking why it is slow. */
+    internal var asmRejection: String? = null
+
     private var paramList: MutableList<AstNode>? = null
 
     private var bodyNode: AstNode? = null

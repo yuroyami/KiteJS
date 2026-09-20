@@ -61,6 +61,7 @@ public open class ContextFactory {
         Context.FEATURE_ENABLE_XML_SECURE_PARSING -> true
         Context.FEATURE_ENABLE_JAVA_MAP_ACCESS -> false
         Context.FEATURE_INTL_402 -> false
+        Context.FEATURE_ASM_JS -> true
         else -> throw IllegalArgumentException("$featureIndex")
     }
 

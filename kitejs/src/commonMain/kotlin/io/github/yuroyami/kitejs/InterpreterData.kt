@@ -22,6 +22,8 @@ internal class InterpreterData<T : ScriptOrFn<T>>(
     val literalIds: Array<Any?>?,
     val longJumps: Map<Int, Int>?,
     val firstLinePC: Int,
+    /** The typed code this function compiled to, when it is an asm.js module. Null otherwise. */
+    val asmModule: io.github.yuroyami.kitejs.asm.AsmModule?,
 ) : JSCode<T>() {
 
     private var icodeHashCode = 0
@@ -37,8 +39,15 @@ internal class InterpreterData<T : ScriptOrFn<T>>(
 
     override fun toString(): String = "An idata thing."
 
-    override fun execute(cx: Context, executableObject: T, newTarget: Any?, scope: Scriptable, thisObj: Any?, args: Array<Any?>): Any? =
-        Interpreter.interpret(executableObject, this, cx, scope, thisObj as Scriptable?, args)
+    override fun execute(cx: Context, executableObject: T, newTarget: Any?, scope: Scriptable, thisObj: Any?, args: Array<Any?>): Any? {
+        // An asm.js module is linked when it is called, and a call that cannot supply what the
+        // module needs falls through to the icode below, which is the same JavaScript.
+        val asm = asmModule
+        if (asm != null && newTarget == null) {
+            io.github.yuroyami.kitejs.asm.AsmLink.link(cx, scope, asm, args)?.let { return it }
+        }
+        return Interpreter.interpret(executableObject, this, cx, scope, thisObj as Scriptable?, args)
+    }
 
     override fun resume(cx: Context, executableObject: T, state: Any?, scope: Scriptable, operation: Int, value: Any?): Any? =
         Interpreter.resumeGenerator(cx, scope, operation, state, value)
@@ -61,6 +70,7 @@ internal class InterpreterData<T : ScriptOrFn<T>>(
         var longJumps: MutableMap<Int, Int>? = null
         var built: InterpreterData<T>? = null
         var firstLinePC = -1
+        var asmModule: io.github.yuroyami.kitejs.asm.AsmModule? = null
 
         override fun build(): JSCode<T> {
             var b = built
@@ -69,6 +79,7 @@ internal class InterpreterData<T : ScriptOrFn<T>>(
                     itsStringTable, itsDoubleTable, itsBigIntTable, itsNestedFunctions, itsRegExpLiterals,
                     itsTemplateLiterals, itsICode, itsExceptionTable, itsMaxVars, itsMaxLocals, itsMaxStack,
                     itsMaxFrameArray, itsMaxCalleeArgs, literalIds, longJumps?.toMap(), firstLinePC,
+                    asmModule,
                 )
                 built = b
             }

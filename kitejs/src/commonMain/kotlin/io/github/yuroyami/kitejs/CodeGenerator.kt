@@ -132,6 +132,9 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
     private fun generateFunctionICode() {
         itsInFunctionFlag = true
         val theFunction = scriptOrFn as FunctionNode
+        // A validated asm.js module still gets icode, because the call that links it can fail and
+        // then the module has to run as ordinary JavaScript.
+        itsData.asmModule = theFunction.asmModule
         CodeGenUtils.setConstructor(builder, theFunction)
         if (theFunction.isGenerator) {
             val paramInitBlock = theFunction.generatorParamInitBlock
