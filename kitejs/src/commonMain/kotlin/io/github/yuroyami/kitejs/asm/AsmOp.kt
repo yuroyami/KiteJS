@@ -138,6 +138,66 @@ internal object AsmOp {
     const val I_DROP = 99
     const val D_DROP = 100
 
+    // Fused forms. The compiler emits the plain instructions and a pass over the finished code
+    // folds the common pairs into these, which is where most of the speed of a small instruction
+    // set comes back. Each one takes the constant that the `I_CONST` before it would have pushed.
+    const val I_ADDC = 101
+    const val I_SUBC = 102
+    const val I_MULC = 103
+    const val I_ANDC = 104
+    const val I_ORC = 105
+    const val I_XORC = 106
+    const val I_SHLC = 107
+    const val I_SHRC = 108
+    const val I_USHRC = 109
+    const val I_EQC = 110
+    const val I_NEC = 111
+    const val I_LT_SC = 112
+    const val I_LE_SC = 113
+    const val I_GT_SC = 114
+    const val I_GE_SC = 115
+    const val I_LT_UC = 116
+    const val I_LE_UC = 117
+    const val I_GT_UC = 118
+    const val I_GE_UC = 119
+
+    /** The fused form of [op] with a constant on its right, or -1 when there is none. */
+    fun withConstant(op: Int): Int = when (op) {
+        I_ADD -> I_ADDC
+        I_SUB -> I_SUBC
+        I_MUL, M_IMUL -> I_MULC
+        I_AND -> I_ANDC
+        I_OR -> I_ORC
+        I_XOR -> I_XORC
+        I_SHL -> I_SHLC
+        I_SHR -> I_SHRC
+        I_USHR -> I_USHRC
+        I_EQ -> I_EQC
+        I_NE -> I_NEC
+        I_LT_S -> I_LT_SC
+        I_LE_S -> I_LE_SC
+        I_GT_S -> I_GT_SC
+        I_GE_S -> I_GE_SC
+        I_LT_U -> I_LT_UC
+        I_LE_U -> I_LE_UC
+        I_GT_U -> I_GT_UC
+        I_GE_U -> I_GE_UC
+        else -> -1
+    }
+
+    /** How many operands follow [op] in the code, so a walk lands on the next instruction. */
+    fun operandCount(op: Int, code: IntArray, at: Int): Int = when (op) {
+        CALL_FFI -> 2
+        SWITCH -> 2 + code[at + 2] * 2
+        I_CONST, D_CONST, I_LOAD, I_STORE, I_STORE_KEEP, D_LOAD, D_STORE, D_STORE_KEEP,
+        GI_LOAD, GI_STORE, GI_STORE_KEEP, GD_LOAD, GD_STORE, GD_STORE_KEEP,
+        JMP, JZ, JNZ, CALL_DIRECT, CALL_INDIRECT,
+        I_ADDC, I_SUBC, I_MULC, I_ANDC, I_ORC, I_XORC, I_SHLC, I_SHRC, I_USHRC,
+        I_EQC, I_NEC, I_LT_SC, I_LE_SC, I_GT_SC, I_GE_SC, I_LT_UC, I_LE_UC, I_GT_UC, I_GE_UC,
+        -> 1
+        else -> 0
+    }
+
     /** The name to print when dumping code. */
     fun name(op: Int): String = NAMES.getOrElse(op) { "op$op" }
 
@@ -154,6 +214,8 @@ internal object AsmOp {
         "M_CLZ32", "M_ABS_D", "M_FLOOR", "M_CEIL", "M_SQRT", "M_SIN", "M_COS", "M_TAN", "M_ASIN",
         "M_ACOS", "M_ATAN", "M_ATAN2", "M_POW", "M_EXP", "M_LOG", "M_MIN_D", "M_MAX_D", "M_MIN_I",
         "M_MAX_I", "JMP", "JZ", "JNZ", "SWITCH", "RET_I", "RET_D", "RET_V", "CALL_DIRECT",
-        "CALL_INDIRECT", "CALL_FFI", "I_DROP", "D_DROP",
+        "CALL_INDIRECT", "CALL_FFI", "I_DROP", "D_DROP", "I_ADDC", "I_SUBC", "I_MULC", "I_ANDC",
+        "I_ORC", "I_XORC", "I_SHLC", "I_SHRC", "I_USHRC", "I_EQC", "I_NEC", "I_LT_SC", "I_LE_SC",
+        "I_GT_SC", "I_GE_SC", "I_LT_UC", "I_LE_UC", "I_GT_UC", "I_GE_UC",
     )
 }

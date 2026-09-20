@@ -45,12 +45,15 @@ class AsmProfileProbe {
         // through loads both sides rather than only the second.
         val plain = ArrayList<Long>()
         val typed = ArrayList<Long>()
-        repeat(4) {
+        repeat(6) {
             plain.add(timeOnePass(asm = false))
             typed.add(timeOnePass(asm = true))
         }
-        println("plain (ms): $plain  median ${plain.sorted()[plain.size / 2]}")
-        println("typed (ms): $typed  median ${typed.sorted()[typed.size / 2]}")
+        // The smallest of several passes, because another program on the machine can only ever
+        // make a pass slower. A median moves when half the passes are contaminated; the smallest
+        // one does not.
+        println("plain (ms): $plain  smallest ${plain.min()}")
+        println("typed (ms): $typed  smallest ${typed.min()}")
     }
 
     private fun timeOnePass(asm: Boolean): Long = KiteJs {

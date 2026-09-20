@@ -63,9 +63,161 @@ internal class AsmRunner(private val instance: AsmInstance) {
     /** Counted on backward jumps, which is where a module that never returns has to be caught. */
     private var backJumps = 0
 
+    // Where the hot loop and the cold one hand their registers to each other. Fields rather than
+    // arguments, because only the rare instructions pay for them.
+    private var coldIp = 0
+    private var coldDp = 0
+    private var coldPc = 0
+
     /** Re-reads the heap. Called whenever the module is entered from outside. */
     fun enter() {
         heap = instance.buffer.buffer ?: throw ScriptRuntime.typeError("the module's heap was detached")
+    }
+
+    /** The instructions [execute] leaves out, so that the loop it runs stays small. */
+    @Suppress("CyclomaticComplexMethod", "LongMethod")
+    private fun executeCold(cx: Context, fn: AsmFunction, op: Int, dbase: Int) {
+        val code = fn.code
+        val pool = fn.doubles
+        val globalDbls = instance.globalDbls
+        var bytes = heap
+        var iv = ints
+        var dv = dbls
+        var ip = coldIp
+        var dp = coldDp
+        var pc = coldPc
+        when (op) {
+            AsmOp.D_CONST -> dv[dp++] = pool[code[pc++]]
+            AsmOp.D_LOAD -> dv[dp++] = dv[dbase + code[pc++]]
+            AsmOp.D_STORE -> dv[dbase + code[pc++]] = dv[--dp]
+            AsmOp.D_STORE_KEEP -> dv[dbase + code[pc++]] = dv[dp - 1]
+
+            AsmOp.GD_LOAD -> dv[dp++] = globalDbls[code[pc++]]
+            AsmOp.GD_STORE -> globalDbls[code[pc++]] = dv[--dp]
+            AsmOp.GD_STORE_KEEP -> globalDbls[code[pc++]] = dv[dp - 1]
+
+            AsmOp.I_DIV_S -> { ip--; iv[ip - 1] = divS(iv[ip - 1], iv[ip]) }
+            AsmOp.I_DIV_U -> { ip--; iv[ip - 1] = divU(iv[ip - 1], iv[ip]) }
+            AsmOp.I_REM_S -> { ip--; iv[ip - 1] = remS(iv[ip - 1], iv[ip]) }
+            AsmOp.I_REM_U -> { ip--; iv[ip - 1] = remU(iv[ip - 1], iv[ip]) }
+            AsmOp.I_LT_U -> { ip--; iv[ip - 1] = if (ltU(iv[ip - 1], iv[ip])) 1 else 0 }
+            AsmOp.I_LE_U -> { ip--; iv[ip - 1] = if (!ltU(iv[ip], iv[ip - 1])) 1 else 0 }
+            AsmOp.I_GT_U -> { ip--; iv[ip - 1] = if (ltU(iv[ip], iv[ip - 1])) 1 else 0 }
+            AsmOp.I_GE_U -> { ip--; iv[ip - 1] = if (!ltU(iv[ip - 1], iv[ip])) 1 else 0 }
+
+            AsmOp.D_ADD -> { dp--; dv[dp - 1] = dv[dp - 1] + dv[dp] }
+            AsmOp.D_SUB -> { dp--; dv[dp - 1] = dv[dp - 1] - dv[dp] }
+            AsmOp.D_MUL -> { dp--; dv[dp - 1] = dv[dp - 1] * dv[dp] }
+            AsmOp.D_DIV -> { dp--; dv[dp - 1] = dv[dp - 1] / dv[dp] }
+            AsmOp.D_REM -> { dp--; dv[dp - 1] = dv[dp - 1] % dv[dp] }
+            AsmOp.D_NEG -> dv[dp - 1] = -dv[dp - 1]
+            AsmOp.D_EQ -> { dp -= 2; iv[ip++] = if (dv[dp] == dv[dp + 1]) 1 else 0 }
+            AsmOp.D_NE -> { dp -= 2; iv[ip++] = if (dv[dp] != dv[dp + 1]) 1 else 0 }
+            AsmOp.D_LT -> { dp -= 2; iv[ip++] = if (dv[dp] < dv[dp + 1]) 1 else 0 }
+            AsmOp.D_LE -> { dp -= 2; iv[ip++] = if (dv[dp] <= dv[dp + 1]) 1 else 0 }
+            AsmOp.D_GT -> { dp -= 2; iv[ip++] = if (dv[dp] > dv[dp + 1]) 1 else 0 }
+            AsmOp.D_GE -> { dp -= 2; iv[ip++] = if (dv[dp] >= dv[dp + 1]) 1 else 0 }
+
+            AsmOp.I2D_S -> dv[dp++] = iv[--ip].toDouble()
+            AsmOp.I2D_U -> dv[dp++] = (iv[--ip].toLong() and 0xFFFFFFFFL).toDouble()
+            AsmOp.D2I -> iv[ip++] = ScriptRuntime.toInt32(dv[--dp])
+            AsmOp.D_FROUND -> dv[dp - 1] = dv[dp - 1].toFloat().toDouble()
+
+            AsmOp.H_LOAD_I16 -> iv[ip - 1] = loadI16(bytes, iv[ip - 1])
+            AsmOp.H_LOAD_U16 -> iv[ip - 1] = loadI16(bytes, iv[ip - 1]) and 0xFFFF
+            AsmOp.H_LOAD_F32 -> dv[dp++] = Float.fromBits(loadI32(bytes, iv[--ip])).toDouble()
+            AsmOp.H_LOAD_F64 -> dv[dp++] = loadF64(bytes, iv[--ip])
+            AsmOp.H_STORE_I16 -> { ip -= 2; storeI16(bytes, iv[ip], iv[ip + 1]) }
+            AsmOp.H_STORE_F32 -> { ip--; dp--; storeI32(bytes, iv[ip], dv[dp].toFloat().toRawBits()) }
+            AsmOp.H_STORE_F64 -> { ip--; dp--; storeF64(bytes, iv[ip], dv[dp]) }
+
+            AsmOp.M_CLZ32 -> iv[ip - 1] = clz32(iv[ip - 1])
+            AsmOp.M_ABS_D -> dv[dp - 1] = abs(dv[dp - 1])
+            AsmOp.M_FLOOR -> dv[dp - 1] = floor(dv[dp - 1])
+            AsmOp.M_CEIL -> dv[dp - 1] = ceil(dv[dp - 1])
+            AsmOp.M_SQRT -> dv[dp - 1] = sqrt(dv[dp - 1])
+            AsmOp.M_SIN -> dv[dp - 1] = sin(dv[dp - 1])
+            AsmOp.M_COS -> dv[dp - 1] = cos(dv[dp - 1])
+            AsmOp.M_TAN -> dv[dp - 1] = tan(dv[dp - 1])
+            AsmOp.M_ASIN -> dv[dp - 1] = asin(dv[dp - 1])
+            AsmOp.M_ACOS -> dv[dp - 1] = acos(dv[dp - 1])
+            AsmOp.M_ATAN -> dv[dp - 1] = atan(dv[dp - 1])
+            AsmOp.M_ATAN2 -> { dp--; dv[dp - 1] = atan2(dv[dp - 1], dv[dp]) }
+            AsmOp.M_POW -> { dp--; dv[dp - 1] = jsPow(dv[dp - 1], dv[dp]) }
+            AsmOp.M_EXP -> dv[dp - 1] = exp(dv[dp - 1])
+            AsmOp.M_LOG -> dv[dp - 1] = ln(dv[dp - 1])
+            AsmOp.M_MIN_D -> { dp--; dv[dp - 1] = jsMin(dv[dp - 1], dv[dp]) }
+            AsmOp.M_MAX_D -> { dp--; dv[dp - 1] = jsMax(dv[dp - 1], dv[dp]) }
+            AsmOp.M_MIN_I -> { ip--; if (iv[ip] < iv[ip - 1]) iv[ip - 1] = iv[ip] }
+            AsmOp.M_MAX_I -> { ip--; if (iv[ip] > iv[ip - 1]) iv[ip - 1] = iv[ip] }
+
+            AsmOp.SWITCH -> {
+                val defaultTarget = code[pc++]
+                val count = code[pc++]
+                val value = iv[--ip]
+                var next = defaultTarget
+                var i = 0
+                while (i < count) {
+                    if (code[pc + i * 2] == value) {
+                        next = code[pc + i * 2 + 1]
+                        break
+                    }
+                    i++
+                }
+                pc = next
+            }
+
+            AsmOp.CALL_INDIRECT -> {
+                val table = instance.module.tables[code[pc++]]
+                // Every function in one table takes the same arguments, so the first one
+                // says how many slots they fill. The table offset was pushed before them
+                // and so sits just below.
+                val callee = instance.module.functions[table.entries[0]]
+                ip -= callee.intParams
+                dp -= callee.dblParams
+                val entry = table.entries[iv[ip - 1]]
+                run(cx, entry, ip, dp)
+                ip--
+                iv = ints
+                dv = dbls
+                bytes = heap
+                when {
+                    callee.returnType == AsmType.VOID -> Unit
+                    AsmType.isDbl(callee.returnType) -> dv[dp++] = retDbl
+                    else -> iv[ip++] = retInt
+                }
+            }
+            AsmOp.CALL_FFI -> {
+                val index = code[pc++]
+                val packed = code[pc++]
+                val count = packed and 0xFF
+                val args = arrayOfNulls<Any?>(count)
+                // The arguments were pushed in order onto whichever stack their type uses,
+                // so they come off in reverse.
+                for (i in count - 1 downTo 0) {
+                    args[i] = if ((packed and (1 shl (8 + i))) != 0) dv[--dp] else iv[--ip].toDouble()
+                }
+                val answer = callForeign(cx, index, args)
+                room(ip, dp + 1)
+                iv = ints
+                dv = dbls
+                bytes = heap
+                dv[dp++] = answer
+            }
+
+            AsmOp.D_DROP -> dp--
+
+            // The fused forms. Each one is the instruction before it and the constant that
+            // instruction would have pushed, done as one step.
+            AsmOp.I_LT_UC -> iv[ip - 1] = if (ltU(iv[ip - 1], code[pc++])) 1 else 0
+            AsmOp.I_LE_UC -> iv[ip - 1] = if (!ltU(code[pc++], iv[ip - 1])) 1 else 0
+            AsmOp.I_GT_UC -> iv[ip - 1] = if (ltU(code[pc++], iv[ip - 1])) 1 else 0
+            AsmOp.I_GE_UC -> iv[ip - 1] = if (!ltU(iv[ip - 1], code[pc++])) 1 else 0
+            else -> throw IllegalStateException("unknown asm instruction $op")
+        }
+        coldIp = ip
+        coldDp = dp
+        coldPc = pc
     }
 
     private fun room(intsNeeded: Int, dblsNeeded: Int) {
@@ -110,7 +262,11 @@ internal class AsmRunner(private val instance: AsmInstance) {
     private fun execute(cx: Context, fn: AsmFunction, ibase: Int, dbase: Int) {
         room(ibase + fn.intFrame, dbase + fn.dblFrame)
         val code = fn.code
-        val pool = fn.doubles
+        // Held in locals for the length of the call. An array's identity never changes while a
+        // module runs, so reading the field once instead of on every instruction costs nothing
+        // and saves a load each time.
+        val globalInts = instance.globalInts
+        var bytes = heap
         var iv = ints
         var dv = dbls
         var ip = ibase + fn.intLocals
@@ -120,28 +276,15 @@ internal class AsmRunner(private val instance: AsmInstance) {
         while (true) {
             when (code[pc++]) {
                 AsmOp.I_CONST -> iv[ip++] = code[pc++]
-                AsmOp.D_CONST -> dv[dp++] = pool[code[pc++]]
                 AsmOp.I_LOAD -> iv[ip++] = iv[ibase + code[pc++]]
                 AsmOp.I_STORE -> iv[ibase + code[pc++]] = iv[--ip]
                 AsmOp.I_STORE_KEEP -> iv[ibase + code[pc++]] = iv[ip - 1]
-                AsmOp.D_LOAD -> dv[dp++] = dv[dbase + code[pc++]]
-                AsmOp.D_STORE -> dv[dbase + code[pc++]] = dv[--dp]
-                AsmOp.D_STORE_KEEP -> dv[dbase + code[pc++]] = dv[dp - 1]
-
-                AsmOp.GI_LOAD -> iv[ip++] = instance.globalInts[code[pc++]]
-                AsmOp.GI_STORE -> instance.globalInts[code[pc++]] = iv[--ip]
-                AsmOp.GI_STORE_KEEP -> instance.globalInts[code[pc++]] = iv[ip - 1]
-                AsmOp.GD_LOAD -> dv[dp++] = instance.globalDbls[code[pc++]]
-                AsmOp.GD_STORE -> instance.globalDbls[code[pc++]] = dv[--dp]
-                AsmOp.GD_STORE_KEEP -> instance.globalDbls[code[pc++]] = dv[dp - 1]
-
+                AsmOp.GI_LOAD -> iv[ip++] = globalInts[code[pc++]]
+                AsmOp.GI_STORE -> globalInts[code[pc++]] = iv[--ip]
+                AsmOp.GI_STORE_KEEP -> globalInts[code[pc++]] = iv[ip - 1]
                 AsmOp.I_ADD -> { ip--; iv[ip - 1] = iv[ip - 1] + iv[ip] }
                 AsmOp.I_SUB -> { ip--; iv[ip - 1] = iv[ip - 1] - iv[ip] }
                 AsmOp.I_MUL -> { ip--; iv[ip - 1] = iv[ip - 1] * iv[ip] }
-                AsmOp.I_DIV_S -> { ip--; iv[ip - 1] = divS(iv[ip - 1], iv[ip]) }
-                AsmOp.I_DIV_U -> { ip--; iv[ip - 1] = divU(iv[ip - 1], iv[ip]) }
-                AsmOp.I_REM_S -> { ip--; iv[ip - 1] = remS(iv[ip - 1], iv[ip]) }
-                AsmOp.I_REM_U -> { ip--; iv[ip - 1] = remU(iv[ip - 1], iv[ip]) }
                 AsmOp.I_AND -> { ip--; iv[ip - 1] = iv[ip - 1] and iv[ip] }
                 AsmOp.I_OR -> { ip--; iv[ip - 1] = iv[ip - 1] or iv[ip] }
                 AsmOp.I_XOR -> { ip--; iv[ip - 1] = iv[ip - 1] xor iv[ip] }
@@ -158,64 +301,13 @@ internal class AsmRunner(private val instance: AsmInstance) {
                 AsmOp.I_LE_S -> { ip--; iv[ip - 1] = if (iv[ip - 1] <= iv[ip]) 1 else 0 }
                 AsmOp.I_GT_S -> { ip--; iv[ip - 1] = if (iv[ip - 1] > iv[ip]) 1 else 0 }
                 AsmOp.I_GE_S -> { ip--; iv[ip - 1] = if (iv[ip - 1] >= iv[ip]) 1 else 0 }
-                AsmOp.I_LT_U -> { ip--; iv[ip - 1] = if (ltU(iv[ip - 1], iv[ip])) 1 else 0 }
-                AsmOp.I_LE_U -> { ip--; iv[ip - 1] = if (!ltU(iv[ip], iv[ip - 1])) 1 else 0 }
-                AsmOp.I_GT_U -> { ip--; iv[ip - 1] = if (ltU(iv[ip], iv[ip - 1])) 1 else 0 }
-                AsmOp.I_GE_U -> { ip--; iv[ip - 1] = if (!ltU(iv[ip - 1], iv[ip])) 1 else 0 }
-
-                AsmOp.D_ADD -> { dp--; dv[dp - 1] = dv[dp - 1] + dv[dp] }
-                AsmOp.D_SUB -> { dp--; dv[dp - 1] = dv[dp - 1] - dv[dp] }
-                AsmOp.D_MUL -> { dp--; dv[dp - 1] = dv[dp - 1] * dv[dp] }
-                AsmOp.D_DIV -> { dp--; dv[dp - 1] = dv[dp - 1] / dv[dp] }
-                AsmOp.D_REM -> { dp--; dv[dp - 1] = dv[dp - 1] % dv[dp] }
-                AsmOp.D_NEG -> dv[dp - 1] = -dv[dp - 1]
-                AsmOp.D_EQ -> { dp -= 2; iv[ip++] = if (dv[dp] == dv[dp + 1]) 1 else 0 }
-                AsmOp.D_NE -> { dp -= 2; iv[ip++] = if (dv[dp] != dv[dp + 1]) 1 else 0 }
-                AsmOp.D_LT -> { dp -= 2; iv[ip++] = if (dv[dp] < dv[dp + 1]) 1 else 0 }
-                AsmOp.D_LE -> { dp -= 2; iv[ip++] = if (dv[dp] <= dv[dp + 1]) 1 else 0 }
-                AsmOp.D_GT -> { dp -= 2; iv[ip++] = if (dv[dp] > dv[dp + 1]) 1 else 0 }
-                AsmOp.D_GE -> { dp -= 2; iv[ip++] = if (dv[dp] >= dv[dp + 1]) 1 else 0 }
-
-                AsmOp.I2D_S -> dv[dp++] = iv[--ip].toDouble()
-                AsmOp.I2D_U -> dv[dp++] = (iv[--ip].toLong() and 0xFFFFFFFFL).toDouble()
-                AsmOp.D2I -> iv[ip++] = ScriptRuntime.toInt32(dv[--dp])
-                AsmOp.D_FROUND -> dv[dp - 1] = dv[dp - 1].toFloat().toDouble()
-
-                AsmOp.H_LOAD_I8 -> iv[ip - 1] = loadI8(iv[ip - 1])
-                AsmOp.H_LOAD_U8 -> iv[ip - 1] = loadI8(iv[ip - 1]) and 0xFF
-                AsmOp.H_LOAD_I16 -> iv[ip - 1] = loadI16(iv[ip - 1])
-                AsmOp.H_LOAD_U16 -> iv[ip - 1] = loadI16(iv[ip - 1]) and 0xFFFF
-                AsmOp.H_LOAD_I32 -> iv[ip - 1] = loadI32(iv[ip - 1])
-                AsmOp.H_LOAD_F32 -> dv[dp++] = Float.fromBits(loadI32(iv[--ip])).toDouble()
-                AsmOp.H_LOAD_F64 -> dv[dp++] = loadF64(iv[--ip])
-                AsmOp.H_STORE_I8 -> { ip -= 2; storeI8(iv[ip], iv[ip + 1]) }
-                AsmOp.H_STORE_I16 -> { ip -= 2; storeI16(iv[ip], iv[ip + 1]) }
-                AsmOp.H_STORE_I32 -> { ip -= 2; storeI32(iv[ip], iv[ip + 1]) }
-                AsmOp.H_STORE_F32 -> { ip--; dp--; storeI32(iv[ip], dv[dp].toFloat().toRawBits()) }
-                AsmOp.H_STORE_F64 -> { ip--; dp--; storeF64(iv[ip], dv[dp]) }
-
+                AsmOp.H_LOAD_I8 -> iv[ip - 1] = loadI8(bytes, iv[ip - 1])
+                AsmOp.H_LOAD_U8 -> iv[ip - 1] = loadI8(bytes, iv[ip - 1]) and 0xFF
+                AsmOp.H_LOAD_I32 -> iv[ip - 1] = loadI32(bytes, iv[ip - 1])
+                AsmOp.H_STORE_I8 -> { ip -= 2; storeI8(bytes, iv[ip], iv[ip + 1]) }
+                AsmOp.H_STORE_I32 -> { ip -= 2; storeI32(bytes, iv[ip], iv[ip + 1]) }
                 AsmOp.M_IMUL -> { ip--; iv[ip - 1] = iv[ip - 1] * iv[ip] }
                 AsmOp.M_ABS_I -> iv[ip - 1] = if (iv[ip - 1] < 0) -iv[ip - 1] else iv[ip - 1]
-                AsmOp.M_CLZ32 -> iv[ip - 1] = clz32(iv[ip - 1])
-                AsmOp.M_ABS_D -> dv[dp - 1] = abs(dv[dp - 1])
-                AsmOp.M_FLOOR -> dv[dp - 1] = floor(dv[dp - 1])
-                AsmOp.M_CEIL -> dv[dp - 1] = ceil(dv[dp - 1])
-                AsmOp.M_SQRT -> dv[dp - 1] = sqrt(dv[dp - 1])
-                AsmOp.M_SIN -> dv[dp - 1] = sin(dv[dp - 1])
-                AsmOp.M_COS -> dv[dp - 1] = cos(dv[dp - 1])
-                AsmOp.M_TAN -> dv[dp - 1] = tan(dv[dp - 1])
-                AsmOp.M_ASIN -> dv[dp - 1] = asin(dv[dp - 1])
-                AsmOp.M_ACOS -> dv[dp - 1] = acos(dv[dp - 1])
-                AsmOp.M_ATAN -> dv[dp - 1] = atan(dv[dp - 1])
-                AsmOp.M_ATAN2 -> { dp--; dv[dp - 1] = atan2(dv[dp - 1], dv[dp]) }
-                AsmOp.M_POW -> { dp--; dv[dp - 1] = jsPow(dv[dp - 1], dv[dp]) }
-                AsmOp.M_EXP -> dv[dp - 1] = exp(dv[dp - 1])
-                AsmOp.M_LOG -> dv[dp - 1] = ln(dv[dp - 1])
-                AsmOp.M_MIN_D -> { dp--; dv[dp - 1] = jsMin(dv[dp - 1], dv[dp]) }
-                AsmOp.M_MAX_D -> { dp--; dv[dp - 1] = jsMax(dv[dp - 1], dv[dp]) }
-                AsmOp.M_MIN_I -> { ip--; if (iv[ip] < iv[ip - 1]) iv[ip - 1] = iv[ip] }
-                AsmOp.M_MAX_I -> { ip--; if (iv[ip] > iv[ip - 1]) iv[ip - 1] = iv[ip] }
-
                 AsmOp.JMP -> {
                     val target = code[pc]
                     if (target <= pc) poll(cx)
@@ -235,22 +327,6 @@ internal class AsmRunner(private val instance: AsmInstance) {
                         pc = target
                     }
                 }
-                AsmOp.SWITCH -> {
-                    val defaultTarget = code[pc++]
-                    val count = code[pc++]
-                    val value = iv[--ip]
-                    var next = defaultTarget
-                    var i = 0
-                    while (i < count) {
-                        if (code[pc + i * 2] == value) {
-                            next = code[pc + i * 2 + 1]
-                            break
-                        }
-                        i++
-                    }
-                    pc = next
-                }
-
                 AsmOp.RET_I -> { retInt = iv[ip - 1]; return }
                 AsmOp.RET_D -> { retDbl = dv[dp - 1]; return }
                 AsmOp.RET_V -> return
@@ -263,51 +339,46 @@ internal class AsmRunner(private val instance: AsmInstance) {
                     run(cx, index, ip, dp)
                     iv = ints
                     dv = dbls
+                    bytes = heap
                     when {
                         callee.returnType == AsmType.VOID -> Unit
                         AsmType.isDbl(callee.returnType) -> dv[dp++] = retDbl
                         else -> iv[ip++] = retInt
                     }
                 }
-                AsmOp.CALL_INDIRECT -> {
-                    val table = instance.module.tables[code[pc++]]
-                    // Every function in one table takes the same arguments, so the first one
-                    // says how many slots they fill. The table offset was pushed before them
-                    // and so sits just below.
-                    val callee = instance.module.functions[table.entries[0]]
-                    ip -= callee.intParams
-                    dp -= callee.dblParams
-                    val entry = table.entries[iv[ip - 1]]
-                    run(cx, entry, ip, dp)
-                    ip--
-                    iv = ints
-                    dv = dbls
-                    when {
-                        callee.returnType == AsmType.VOID -> Unit
-                        AsmType.isDbl(callee.returnType) -> dv[dp++] = retDbl
-                        else -> iv[ip++] = retInt
-                    }
-                }
-                AsmOp.CALL_FFI -> {
-                    val index = code[pc++]
-                    val packed = code[pc++]
-                    val count = packed and 0xFF
-                    val args = arrayOfNulls<Any?>(count)
-                    // The arguments were pushed in order onto whichever stack their type uses,
-                    // so they come off in reverse.
-                    for (i in count - 1 downTo 0) {
-                        args[i] = if ((packed and (1 shl (8 + i))) != 0) dv[--dp] else iv[--ip].toDouble()
-                    }
-                    val answer = callForeign(cx, index, args)
-                    room(ip, dp + 1)
-                    iv = ints
-                    dv = dbls
-                    dv[dp++] = answer
-                }
-
                 AsmOp.I_DROP -> ip--
-                AsmOp.D_DROP -> dp--
-                else -> throw IllegalStateException("unknown asm instruction ${code[pc - 1]}")
+                AsmOp.I_ADDC -> iv[ip - 1] = iv[ip - 1] + code[pc++]
+                AsmOp.I_SUBC -> iv[ip - 1] = iv[ip - 1] - code[pc++]
+                AsmOp.I_MULC -> iv[ip - 1] = iv[ip - 1] * code[pc++]
+                AsmOp.I_ANDC -> iv[ip - 1] = iv[ip - 1] and code[pc++]
+                AsmOp.I_ORC -> iv[ip - 1] = iv[ip - 1] or code[pc++]
+                AsmOp.I_XORC -> iv[ip - 1] = iv[ip - 1] xor code[pc++]
+                AsmOp.I_SHLC -> iv[ip - 1] = iv[ip - 1] shl (code[pc++] and 31)
+                AsmOp.I_SHRC -> iv[ip - 1] = iv[ip - 1] shr (code[pc++] and 31)
+                AsmOp.I_USHRC -> iv[ip - 1] = iv[ip - 1] ushr (code[pc++] and 31)
+                AsmOp.I_EQC -> iv[ip - 1] = if (iv[ip - 1] == code[pc++]) 1 else 0
+                AsmOp.I_NEC -> iv[ip - 1] = if (iv[ip - 1] != code[pc++]) 1 else 0
+                AsmOp.I_LT_SC -> iv[ip - 1] = if (iv[ip - 1] < code[pc++]) 1 else 0
+                AsmOp.I_LE_SC -> iv[ip - 1] = if (iv[ip - 1] <= code[pc++]) 1 else 0
+                AsmOp.I_GT_SC -> iv[ip - 1] = if (iv[ip - 1] > code[pc++]) 1 else 0
+                AsmOp.I_GE_SC -> iv[ip - 1] = if (iv[ip - 1] >= code[pc++]) 1 else 0
+                else -> {
+                    // Everything a module built from C rarely reaches: doubles, the maths
+                    // library, indirect and foreign calls. Keeping them out of this method makes
+                    // it small enough for the JVM to compile the hot loop well, which is worth
+                    // more than the call they now cost. Measured: adding five instructions that
+                    // nothing executed still made the loop ten per cent slower.
+                    coldIp = ip
+                    coldDp = dp
+                    coldPc = pc
+                    executeCold(cx, fn, code[pc - 1], dbase)
+                    ip = coldIp
+                    dp = coldDp
+                    pc = coldPc
+                    iv = ints
+                    dv = dbls
+                    bytes = heap
+                }
             }
         }
     }
@@ -340,20 +411,17 @@ internal class AsmRunner(private val instance: AsmInstance) {
     // Reading past the end answers zero and writing past it does nothing, which is what a typed
     // array view does and so what the module would have seen through one.
 
-    private fun loadI8(at: Int): Int {
-        val h = heap
+    private fun loadI8(h: ByteArray, at: Int): Int {
         if (at < 0 || at >= h.size) return 0
         return h[at].toInt()
     }
 
-    private fun loadI16(at: Int): Int {
-        val h = heap
+    private fun loadI16(h: ByteArray, at: Int): Int {
         if (at < 0 || at + 2 > h.size) return 0
         return (h[at].toInt() and 0xFF) or (h[at + 1].toInt() shl 8)
     }
 
-    private fun loadI32(at: Int): Int {
-        val h = heap
+    private fun loadI32(h: ByteArray, at: Int): Int {
         if (at < 0 || at + 4 > h.size) return 0
         return (h[at].toInt() and 0xFF) or
             ((h[at + 1].toInt() and 0xFF) shl 8) or
@@ -361,29 +429,25 @@ internal class AsmRunner(private val instance: AsmInstance) {
             (h[at + 3].toInt() shl 24)
     }
 
-    private fun loadF64(at: Int): Double {
-        val h = heap
+    private fun loadF64(h: ByteArray, at: Int): Double {
         if (at < 0 || at + 8 > h.size) return Double.NaN
         var bits = 0L
         for (i in 7 downTo 0) bits = (bits shl 8) or (h[at + i].toLong() and 0xFF)
         return Double.fromBits(bits)
     }
 
-    private fun storeI8(at: Int, value: Int) {
-        val h = heap
+    private fun storeI8(h: ByteArray, at: Int, value: Int) {
         if (at < 0 || at >= h.size) return
         h[at] = value.toByte()
     }
 
-    private fun storeI16(at: Int, value: Int) {
-        val h = heap
+    private fun storeI16(h: ByteArray, at: Int, value: Int) {
         if (at < 0 || at + 2 > h.size) return
         h[at] = value.toByte()
         h[at + 1] = (value shr 8).toByte()
     }
 
-    private fun storeI32(at: Int, value: Int) {
-        val h = heap
+    private fun storeI32(h: ByteArray, at: Int, value: Int) {
         if (at < 0 || at + 4 > h.size) return
         h[at] = value.toByte()
         h[at + 1] = (value shr 8).toByte()
@@ -391,8 +455,7 @@ internal class AsmRunner(private val instance: AsmInstance) {
         h[at + 3] = (value shr 24).toByte()
     }
 
-    private fun storeF64(at: Int, value: Double) {
-        val h = heap
+    private fun storeF64(h: ByteArray, at: Int, value: Double) {
         if (at < 0 || at + 8 > h.size) return
         var bits = value.toRawBits()
         for (i in 0 until 8) {

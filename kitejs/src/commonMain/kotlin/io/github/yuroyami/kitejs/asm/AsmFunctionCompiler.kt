@@ -180,7 +180,7 @@ internal class AsmFunctionCompiler(private val owner: AsmCompiler, private val f
 
         return AsmFunction(
             name = fn.name,
-            code = code.copyOf(top),
+            code = AsmFuse.fuse(code.copyOf(top)),
             doubles = doubles.toDoubleArray(),
             paramTypes = paramTypes,
             returnType = returnType,
