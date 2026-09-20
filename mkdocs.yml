@@ -76,6 +76,7 @@ nav:
       - Binding host objects: host-objects.md
       - Promises and coroutines: promises-and-coroutines.md
       - Dates and time zones: dates-and-time-zones.md
+      - Programs compiled to JavaScript: asm-js.md
   - Knowing the edges:
       - Limits and safety: limits.md
       - Differences from a browser: differences.md

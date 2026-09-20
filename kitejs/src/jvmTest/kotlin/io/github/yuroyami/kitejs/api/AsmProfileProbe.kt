@@ -37,6 +37,32 @@ class AsmProfileProbe {
         mod.fill(3000000);
     """.trimIndent()
 
+    /** The same kernel with the typed path off and on, back to back on one machine. */
+    @Test
+    fun the_typed_path_against_the_general_interpreter() {
+        assumeTrue("Run with KITEJS_PROFILE=true.", System.getenv("KITEJS_PROFILE") == "true")
+        // Interleaved rather than one after the other, so a machine that gets busier partway
+        // through loads both sides rather than only the second.
+        val plain = ArrayList<Long>()
+        val typed = ArrayList<Long>()
+        repeat(4) {
+            plain.add(timeOnePass(asm = false))
+            typed.add(timeOnePass(asm = true))
+        }
+        println("plain (ms): $plain  median ${plain.sorted()[plain.size / 2]}")
+        println("typed (ms): $typed  median ${typed.sorted()[typed.size / 2]}")
+    }
+
+    private fun timeOnePass(asm: Boolean): Long = KiteJs {
+        instructionBudget = 0
+        asmJs = asm
+    }.use { js ->
+        js.evaluate(kernel, "warm")
+        val started = System.nanoTime()
+        js.evaluate(kernel, "asm")
+        (System.nanoTime() - started) / 1_000_000
+    }
+
     @Test
     fun where_the_asm_kernel_spends_its_time() {
         assumeTrue("Run with KITEJS_PROFILE=true.", System.getenv("KITEJS_PROFILE") == "true")
