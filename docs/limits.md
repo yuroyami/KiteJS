@@ -98,7 +98,7 @@ val worker = thread { KiteJs().use { js -> js.evaluate(script) } }
 
 JavaScript and WebAssembly run one thread, so there one engine is open at a time.
 
-Use `asyncKiteJs` when you want the calls serialised for you on a dispatcher of its own.
+Use `asyncKiteJs` when you want the calls serialised for you on a thread of its own.
 
 ## Errors from a script cannot break the engine
 

@@ -20,18 +20,18 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.coroutineContext
 
 /**
- * An engine that lives on one dispatcher, so suspending code can use it from anywhere.
+ * An engine that lives on one thread, so suspending code can use it from anywhere.
  *
- * The engine underneath is single-threaded, as JavaScript is. Every call here hops onto the
- * engine's own dispatcher, which runs one thing at a time, so two callers never overlap.
+ * The engine underneath is single-threaded, as JavaScript is, and the thread that opened it holds
+ * it. Every call here hops onto that thread, one at a time, so two callers never overlap.
  *
  * ```
  * val js = asyncKiteJs()
@@ -136,11 +136,17 @@ public class AsyncKiteJs internal constructor(
         }
     }
 
-    /** Releases the engine. */
+    /**
+     * Releases the engine. The release runs on the engine's thread, after any call still running
+     * there, so it can happen after this returns. A thread made for the engine then ends.
+     */
     override fun close() {
         if (closed) return
         closed = true
-        engine.close()
+        // Only the thread that opened the engine can release it.
+        val release = { engine.close() }
+        if (dispatcher is EngineThread) dispatcher.finish(release)
+        else dispatcher.dispatch(EmptyCoroutineContext, Runnable(release))
     }
 
 }
@@ -151,29 +157,40 @@ internal class EngineState {
 }
 
 /**
- * Builds an engine on its own dispatcher.
+ * Builds an engine on a thread of its own.
+ *
+ * The thread that opens an engine holds it, so every call to the engine has to run on that
+ * thread. By default the engine gets a new thread, which [AsyncKiteJs.close] ends. A [dispatcher]
+ * you pass instead must run everything on one thread, such as one from `newSingleThreadContext`,
+ * and you close it yourself. A pool view such as `Dispatchers.Default.limitedParallelism(1)` does
+ * not work, because it moves calls between the threads of the pool.
  *
  * Cancelling the coroutine that called into the engine stops the running script: the engine asks
  * the hook between instructions, and a cancelled job answers "stop". That needs an instruction
  * budget to be set, so one is set for you when you do not name one.
  */
-@OptIn(ExperimentalCoroutinesApi::class)
 public suspend fun asyncKiteJs(
-    dispatcher: CoroutineDispatcher = Dispatchers.Default.limitedParallelism(1),
+    dispatcher: CoroutineDispatcher = EngineThread(),
     configure: KiteJsConfig.() -> Unit = {},
 ): AsyncKiteJs {
     val state = EngineState()
-    val engine = withContext(dispatcher) {
-        KiteJs {
-            configure()
-            // Whatever the caller asked for still gets asked; the job check is added to it.
-            val theirs = interruptWhen
-            val caller = state
-            interruptWhen = {
-                val job = caller.runningJob
-                (job != null && !job.isActive) || theirs?.invoke() == true
+    val engine = try {
+        withContext(dispatcher) {
+            KiteJs {
+                configure()
+                // Whatever the caller asked for still gets asked; the job check is added to it.
+                val theirs = interruptWhen
+                val caller = state
+                interruptWhen = {
+                    val job = caller.runningJob
+                    (job != null && !job.isActive) || theirs?.invoke() == true
+                }
             }
         }
+    } catch (e: Throwable) {
+        // No engine came back to close, so a thread made for one would never end.
+        (dispatcher as? EngineThread)?.finish {}
+        throw e
     }
     return AsyncKiteJs(dispatcher, engine, state)
 }

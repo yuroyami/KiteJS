@@ -40,8 +40,13 @@ try {
 }
 ```
 
-The engine is single threaded, as JavaScript is. `asyncKiteJs` owns a dispatcher that runs one
-thing at a time and moves every call onto it, so two callers never overlap.
+The engine is single threaded, as JavaScript is, and the thread that opens it holds it.
+`asyncKiteJs` gives the engine a thread of its own and moves every call onto that thread, so two
+callers never overlap. `close()` releases the engine on that thread, and the thread then ends.
+
+To run the engine on a dispatcher of your own, pass one that runs everything on one thread, such
+as one from `newSingleThreadContext`. You close that dispatcher yourself. A pool view such as
+`Dispatchers.Default.limitedParallelism(1)` does not work, because it moves calls between threads.
 
 Reach the engine directly with `onEngine`:
 

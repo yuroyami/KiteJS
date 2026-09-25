@@ -12,8 +12,8 @@ plugins {
 
 /*
  * :kitejs-coroutines puts the engine behind suspending functions. The engine itself is
- * single-threaded, as JavaScript is, so this module owns a dispatcher that runs one thing at a
- * time and hops every call onto it. Nothing here changes what the engine does; it only decides
+ * single-threaded, as JavaScript is, so this module gives each engine a thread of its own and
+ * hops every call onto it. Nothing here changes what the engine does; it only decides
  * when and where the engine runs.
  *
  * It is a separate artifact so :kitejs keeps its one runtime dependency. An embedder that does not
@@ -23,6 +23,12 @@ kotlin {
     explicitApi()
 
     jvmToolchain(21)
+
+    // EngineThread is an expect class, which the compiler still calls beta. Each platform makes
+    // the engine's thread in its own way.
+    compilerOptions {
+        freeCompilerArgs.add("-Xexpect-actual-classes")
+    }
 
     @OptIn(ExperimentalAbiValidation::class)
     abiValidation {

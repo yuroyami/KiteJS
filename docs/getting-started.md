@@ -44,8 +44,8 @@ An engine belongs to one thread, the same way JavaScript itself is single thread
 second engine while the first is still open throws a `JsEngineError` that says so. Close the first
 one, or keep both inside their own `use { }` blocks that do not overlap.
 
-If you need the engine from suspending code, use `kitejs-coroutines`. It owns a dispatcher that
-runs one thing at a time and moves every call onto it, so callers never overlap. See
+If you need the engine from suspending code, use `kitejs-coroutines`. It gives each engine a
+thread of its own and moves every call onto that thread, so callers never overlap. See
 [Promises and coroutines](promises-and-coroutines.md).
 
 ## Configure it
