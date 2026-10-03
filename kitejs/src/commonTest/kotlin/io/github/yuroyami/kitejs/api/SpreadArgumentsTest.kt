@@ -57,13 +57,37 @@ class SpreadArgumentsTest {
     }
 
     /**
-     * A value with no iterator adds no arguments, the same as it adds no elements to an array
-     * literal. A browser throws a TypeError here; issue 9 holds that difference. What this test
-     * pins is that a call and an array literal answer alike, and that neither fails internally.
+     * A value with no iterator is a TypeError, in a call and in an array literal alike: each
+     * spread asks GetIterator for its value (ECMAScript 2015, 12.3.6.1 and 12.2.5.2).
      */
     @Test
-    fun spreading_something_that_is_not_iterable_adds_nothing() {
-        assertEquals("0", eval("function f() { return arguments.length } f(...5) + ''"))
-        assertEquals("0", eval("[...5].length + ''"))
+    fun spreading_something_that_is_not_iterable_throws_a_type_error() {
+        val f = "function f() { return arguments.length } "
+        for (value in listOf("5", "true", "null", "undefined", "{ a: 1 }", "Symbol()")) {
+            assertEquals("TypeError", eval("${f}try { f(...$value); 'none' } catch (e) { e.name }"), "f(...$value)")
+            assertEquals("TypeError", eval("try { [...$value]; 'none' } catch (e) { e.name }"), "[...$value]")
+            assertEquals("TypeError", eval("try { Math.max(...$value); 'none' } catch (e) { e.name }"), "Math.max(...$value)")
+        }
+        assertEquals("TypeError: 5 is not iterable", eval("try { [...5] } catch (e) { String(e) }"))
+        assertEquals("TypeError: null is not iterable", eval("${f}try { f(...null) } catch (e) { String(e) }"))
+    }
+
+    /** An array whose iterator was taken away still spreads, by its length. */
+    @Test
+    fun an_array_spreads_by_its_length_when_its_iterator_is_gone() {
+        assertEquals(
+            "1,,3|3",
+            eval(
+                "var saved = Array.prototype[Symbol.iterator]; delete Array.prototype[Symbol.iterator];" +
+                    " var a; try { a = [...[1, , 3]] } finally { Array.prototype[Symbol.iterator] = saved }" +
+                    " String(a) + '|' + a.length",
+            ),
+        )
+    }
+
+    /** An object spread in an object literal copies own properties, so null and a number are fine. */
+    @Test
+    fun object_spread_still_takes_anything() {
+        assertEquals("0", eval("Object.keys({ ...null, ...undefined, ...5 }).length + ''"))
     }
 }

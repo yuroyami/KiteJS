@@ -348,6 +348,12 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   spec asks for and the port was leaving to the platform. The JVM clamps inside `indexOf` and
   the other targets do not, so `"abc".includes("", 100)` was true on the JVM and false on Wasm.
   The test262 cross-target slice is what caught it.
+- D-70: spreading a value with no `Symbol.iterator` into an array literal or an argument list
+  throws a TypeError, as ECMAScript 2015, 12.2.5.2 and 12.3.6.1 ask through GetIterator and as
+  every browser does. Upstream spreads a primitive or a plain object by its own ids, so `[...5]`
+  has nine elements and `[...{ a: 1 }]` has one, and it spreads null and undefined as nothing.
+  A real array whose iterator was deleted still spreads by its length, which is the one lenient
+  path upstream's fallback was there for. `EvalOracleTest` pins both halves.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

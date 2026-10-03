@@ -2109,9 +2109,43 @@ class EvalOracleTest {
     ))
 
     /**
+     * Spreading a value with no `Symbol.iterator` throws a TypeError here, which is what ECMAScript
+     * 2015, 12.2.5.2 asks and what every browser does. Upstream spreads a primitive or a plain
+     * object by its own ids and spreads null and undefined as nothing (D-70). Both halves are
+     * pinned so a change on either side shows.
+     */
+    @Test
+    fun spreadingSomethingThatIsNotIterableThrows() {
+        val withoutArrayIterator = { body: String ->
+            "(function () { var saved = Array.prototype[Symbol.iterator];" +
+                " delete Array.prototype[Symbol.iterator];" +
+                " try { $body } finally { Array.prototype[Symbol.iterator] = saved } })()"
+        }
+        val upstreamAnswers = linkedMapOf(
+            "try { [...5].length } catch (e) { e.name }" to "9",
+            "try { [...true].length } catch (e) { e.name }" to "0",
+            "try { [...{ a: 1 }].length } catch (e) { e.name }" to "1",
+            "try { [...null].length } catch (e) { e.name }" to "0",
+            "try { [...undefined].length } catch (e) { e.name }" to "0",
+            "try { [0, ...{ a: 1, b: 2 }, 3].join() } catch (e) { e.name }" to "\"0,1,2,3\"",
+            withoutArrayIterator("var o = { a: 1, b: 2 }; try { return String([...o]) } catch (e) { return e.name }") to "\"1,2\"",
+            withoutArrayIterator("var o = { 0: 'x', length: 1 }; try { return String([...o]) } catch (e) { return e.name }") to "\"x,1\"",
+            withoutArrayIterator("try { return String([...Object.create([4, 5])]) } catch (e) { return e.name }") to "\"\"",
+            withoutArrayIterator("try { return String([...null]) } catch (e) { return e.name }") to "\"\"",
+            withoutArrayIterator("try { return String([...undefined]) } catch (e) { return e.name }") to "\"\"",
+        )
+        for ((script, upstreamAnswer) in upstreamAnswers) {
+            assertEquals(upstreamAnswer, upstream(script), "upstream: $script")
+            assertEquals("\"TypeError\"", ported(script), "ported: $script")
+        }
+        assertEquals("\"TypeError: 5 is not iterable\"", ported("try { [...5] } catch (e) { String(e) }"))
+        assertEquals("\"TypeError: object is not iterable\"", ported("try { [...{}] } catch (e) { String(e) }"))
+    }
+
+    /**
      * Array spread when no `Symbol.iterator` is in reach. A real array is still walked by its
-     * length, so a hole arrives as undefined and a non-index own property is left out; anything
-     * else spreads by its own ids. Each script puts the iterator back so the next one starts clean.
+     * length, so a hole arrives as undefined and a non-index own property is left out. Each
+     * script puts the iterator back so the next one starts clean.
      */
     @Test
     fun arraySpreadWithoutTheIteratorProtocol() = check(listOf(
@@ -2124,14 +2158,9 @@ class EvalOracleTest {
         "var a = [1, 2]; a[5] = 6; return String([...a]) + '|' + [...a].length",
         "return String([0, ...[1, 2], 3])", "return String([...[1, 2], ...[3, 4]])",
         "return String([...[[1, 2], [3]]])", "return [...[[1, 2], [3]]].length",
-        "var o = { a: 1, b: 2 }; return String([...o]) + '|' + [...o].length",
-        "var o = { 0: 'x', length: 1 }; return String([...o]) + '|' + [...o].length",
         "return String([...'abc'])",
         "return (function () { return String([...arguments]) })(1, 2, 3)",
         "var a = [1, 2]; a[Symbol.iterator] = function () { var n = 0; return { next: function () { return n < 2 ? { value: 'own' + n++, done: false } : { done: true } } } }; return String([...a])",
-        "return String([...Object.create([4, 5])])",
-        "try { return String([...null]) } catch (e) { return e.name }",
-        "try { return String([...undefined]) } catch (e) { return e.name }",
     ).map {
         "(function () { var saved = Array.prototype[Symbol.iterator];" +
             " delete Array.prototype[Symbol.iterator];" +

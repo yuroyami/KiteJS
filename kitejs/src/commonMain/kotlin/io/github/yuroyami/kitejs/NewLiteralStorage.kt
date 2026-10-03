@@ -60,7 +60,9 @@ public abstract class NewLiteralStorage protected constructor(ids: Array<Any?>?,
     }
 
     private fun spreadArray(cx: Context, scope: Scriptable, source: Any?) {
-        if (source == null || Undefined.isUndefined(source)) return
+        // ES2015 12.2.5.2 and 12.3.6.1: a spread asks GetIterator for the value, which throws a
+        // TypeError when there is no Symbol.iterator to call (D-70).
+        if (source == null || Undefined.isUndefined(source)) throw notIterable(source)
         val src = ScriptRuntime.toObject(cx, scope, source)
         val iteratorProp = ScriptableObject.getProperty(src, SymbolKey.ITERATOR)
         if (iteratorProp !== Scriptable.NOT_FOUND && !Undefined.isUndefined(iteratorProp)) {
@@ -75,17 +77,20 @@ public abstract class NewLiteralStorage protected constructor(ids: Array<Any?>?,
                 return
             }
         }
-        // No Symbol.iterator. An array still spreads by its length, so holes come through as
-        // undefined and a non-index own property is left out; anything else spreads by its own ids.
-        val spreadSize = if (src is NativeArray) src.length.toInt() else src.getIds().size
-        val newLen = valuesField.size + spreadSize
+        // No Symbol.iterator. An array whose iterator was taken away still spreads by its length,
+        // so holes come through as undefined and a non-index own property is left out. Anything
+        // else is not iterable, whatever own properties it has (D-70).
+        if (src !is NativeArray) throw notIterable(source)
+        val newLen = valuesField.size + src.length.toInt()
         getterSettersField = getterSettersField.copyOf(newLen)
         valuesField = valuesField.copyOf(newLen)
-        if (src is NativeArray) {
-            for (i in 0 until src.length) pushValue(NativeArray.getElem(cx, src, i))
-        } else {
-            for (id in src.getIds()) pushValue(getPropertyById(src, id))
-        }
+        for (i in 0 until src.length) pushValue(NativeArray.getElem(cx, src, i))
+    }
+
+    /** Names an object by its type, so building the message never calls back into script. */
+    private fun notIterable(source: Any?): EcmaError {
+        val name = if (source is Scriptable || ScriptRuntime.isSymbol(source)) ScriptRuntime.typeOf(source) else ScriptRuntime.toString(source)
+        return ScriptRuntime.typeErrorById("msg.not.iterable", name)
     }
 
     private fun spreadObject(cx: Context, scope: Scriptable, source: Any?) {

@@ -29,7 +29,8 @@ new Date(...parts)    // fine
 var [a, ...rest] = xs // syntax error, use xs[0] and xs.slice(1)
 ```
 
-A value with no iterator spreads to nothing here, where a browser throws a `TypeError`.
+Spreading a value with no iterator, such as `[...5]` or `f(...null)`, throws a `TypeError`, as it
+does in a browser.
 
 ## Globals that are not there
 
