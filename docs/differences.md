@@ -81,6 +81,17 @@ Case conversion is the one operation still borrowed from the platform, and the p
 about the Greek final sigma. On the JVM, `'ΑΣ'.toLowerCase()` gives `'ας'`. On JavaScript,
 WebAssembly and the native targets it gives `'ασ'`. Every other character agrees.
 
+### `Math.pow` can differ from Chrome in the last digit
+
+`Math` gives the same digits on every target, and they are the digits V8 gives, with one
+exception: `Math.pow`, and the `**` operator, follow fdlibm, as Java's `StrictMath.pow` does. V8
+computes powers its own way, and the two disagree in the last digit for about one argument in a
+hundred. Where that argument is an integer power, the answer here is the correctly rounded one.
+
+```js
+121.60979304462671 ** 21   // 6.086106353125176e43 here, 6.086106353125175e43 in Chrome
+```
+
 ### Dates format for en-US only
 
 `toLocaleString`, `toLocaleDateString` and `toLocaleTimeString` use fixed en-US patterns and

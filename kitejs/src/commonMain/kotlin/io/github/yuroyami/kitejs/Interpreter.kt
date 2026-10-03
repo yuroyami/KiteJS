@@ -99,7 +99,6 @@ import io.github.yuroyami.kitejs.Icode.Companion.Icode_ZERO
 import io.github.yuroyami.kitejs.Icode.Companion.MIN_ICODE
 import io.github.yuroyami.kitejs.ast.FunctionNode
 import io.github.yuroyami.kitejs.ast.ScriptNode
-import kotlin.math.pow
 
 /**
  * The interpreter: the one [Evaluator] this engine has. It runs the icode `CodeGenerator` emits,
@@ -984,7 +983,7 @@ public class Interpreter : Evaluator {
                             Token.MUL -> lNum * rNum
                             Token.DIV -> lNum / rNum
                             Token.MOD -> lNum.rem(rNum)
-                            else -> lNum.pow(rNum)
+                            else -> FdLibm.pow(lNum, rNum)
                         }
                         stack[state.stackTop] = DBL_MRK
                         sDbl[state.stackTop] = result

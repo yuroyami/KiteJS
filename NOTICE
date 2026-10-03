@@ -22,8 +22,14 @@ it and which keeps its own license:
   Copyright 2011 the V8 project authors, three-clause BSD license. The file
   carries the full text in its header.
 
-KiteJS also carries one small piece of code that did not come from Rhino, and
-which keeps its own license:
+KiteJS also carries code that did not come from Rhino, and which keeps its own
+license:
+
+  io/github/yuroyami/kitejs/FdLibm.kt
+  A port of fdlibm 5.3, Copyright (C) 1993 and 2004 by Sun Microsystems, Inc.,
+  with the fixes FreeBSD's msun library and V8's ieee754.cc made to it. Its
+  license grants permission to use, copy, modify and distribute the software
+  provided the notice is preserved; the file carries it in its header.
 
   io/github/yuroyami/kitejs/WeakRef.kt and its four platform actuals
   (jvmMain, androidMain, nativeMain, jsMain), plus WeakRefTest

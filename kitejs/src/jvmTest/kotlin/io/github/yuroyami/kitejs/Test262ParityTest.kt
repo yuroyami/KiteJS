@@ -104,6 +104,10 @@ class Test262ParityTest {
             put(path, "D-72: upstream rejects the const head, the port parses it and accepts the body")
         }
 
+        // Math is fdlibm here, as V8 has it. Upstream computes log2 as log(x) * LOG2E, which is a
+        // unit off for powers of two: Math.log2(8) is 2.9999999999999996 (D-73).
+        put("built-ins/Math/log2/log2-basicTests.js", "D-73: log2 is fdlibm's here and exact for powers of two")
+
         // Date.prototype[Symbol.toPrimitive] is non-writable here and writable upstream (D-56).
         put(
             "built-ins/Date/prototype/Symbol.toPrimitive/prop-desc.js",

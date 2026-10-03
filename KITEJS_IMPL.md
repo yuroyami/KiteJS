@@ -380,6 +380,24 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   const in a for-in or for-of head with an initializer is a SyntaxError. `Test262ParityTest`
   lists the five files that pass only here, and the three `labelled-fn-stmt-const.js` files
   upstream passes only because it rejects the head before it reaches the body.
+- D-73: `Math`'s transcendental functions, the `**` operator and asm.js's maths library are
+  `FdLibm`, a port of Sun's fdlibm 5.3 to common Kotlin, rather than `kotlin.math`, which hands
+  them to the platform: the JVM's `Math` (intrinsics that may be a unit off in the last place),
+  JavaScript's own, or the native libm. The same argument gave different digits on different
+  targets, and `Math.exp(1)` was `2.7182818284590455` on the JVM on Apple silicon. The port follows
+  V8's `ieee754.cc` where V8 left fdlibm 5.3: `exp(1)` is `Math.E`, `tanh` returns a tiny
+  argument unchanged, `atan2` answers +-pi/2 whenever `|y/x|` exceeds 2^60, `cbrt` is FreeBSD's
+  newer algorithm, and `acosh`, `asinh`, `atanh` and `log2` are FreeBSD's routines rather than
+  upstream's formulas on top of `log`, which overflowed for `acosh(1e300)` and gave
+  `Math.log2(8)` as `2.9999999999999996`. Against Node 22, 200,000 arguments for each function
+  give the same bits. `pow` is the exception: it stays fdlibm's, which is what `StrictMath.pow`
+  gives. V8 computes powers its own way and disagrees in the last bit for about one argument in
+  a hundred, half of them integer powers, and on the integer powers checked exactly fdlibm's
+  answer is the correctly rounded one and V8's is not.
+  `FdLibmOracleTest` checks every routine against `StrictMath` over hundreds of thousands of
+  arguments, `MathDigitsTest` checks V8's digits on every target, and `EvalOracleTest` and
+  `Test262ParityTest` pin the four arguments and one file where upstream's answer was the
+  wrong one.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

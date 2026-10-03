@@ -9,7 +9,6 @@ import io.github.yuroyami.kitejs.dtoa.DoubleFormatter
 import kotlin.math.ceil
 import kotlin.math.floor
 import io.github.yuroyami.kitejs.ast.FunctionNode
-import kotlin.math.pow
 import kotlin.reflect.KClass
 import io.github.yuroyami.kitejs.v8dtoa.DoubleConversion
 
@@ -1652,7 +1651,7 @@ public object ScriptRuntime {
             val1.pow(val2.intValueExact())
         }
         val1 is KBigInt || val2 is KBigInt -> throw bigIntOperand()
-        else -> numericToDouble(val1).pow(numericToDouble(val2))
+        else -> FdLibm.pow(numericToDouble(val1), numericToDouble(val2))
     }
 
     public fun bitwiseAND(val1: Double, val2: Double): Double = (toInt32(val1) and toInt32(val2)).toDouble()

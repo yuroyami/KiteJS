@@ -6,30 +6,17 @@ package io.github.yuroyami.kitejs
 
 import kotlin.math.E
 import kotlin.math.PI
-import kotlin.math.acos
-import kotlin.math.asin
-import kotlin.math.atan
-import kotlin.math.atan2
-import kotlin.math.cbrt
 import kotlin.math.ceil
-import kotlin.math.cos
-import kotlin.math.cosh
-import kotlin.math.exp
-import kotlin.math.expm1
 import kotlin.math.floor
-import kotlin.math.ln
-import kotlin.math.ln1p
-import kotlin.math.log10
 import kotlin.math.pow
 import kotlin.math.sign
-import kotlin.math.sin
-import kotlin.math.sinh
 import kotlin.math.sqrt
-import kotlin.math.tan
-import kotlin.math.tanh
 import kotlin.random.Random
 
-/** The JavaScript `Math` object. */
+/**
+ * The JavaScript `Math` object. The transcendental functions come from [FdLibm] rather than
+ * `kotlin.math`, so they give the same digits on every target (D-73).
+ */
 internal class NativeMath private constructor() : ScriptableObject() {
 
     override val className: String
@@ -102,55 +89,35 @@ internal class NativeMath private constructor() : ScriptableObject() {
 
         private fun acos(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             var x = ScriptRuntime.toNumber(args, 0)
-            x = if (!x.isNaN() && -1.0 <= x && x <= 1.0) acos(x) else Double.NaN
+            x = if (!x.isNaN() && -1.0 <= x && x <= 1.0) FdLibm.acos(x) else Double.NaN
             return ScriptRuntime.wrapNumber(x)
         }
 
-        private fun acosh(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val x = ScriptRuntime.toNumber(args, 0)
-            if (!x.isNaN()) return ln(x + sqrt(x * x - 1.0))
-            return ScriptRuntime.NaNobj
-        }
+        private fun acosh(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
+            ScriptRuntime.wrapNumber(FdLibm.acosh(ScriptRuntime.toNumber(args, 0)))
 
         private fun asin(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             var x = ScriptRuntime.toNumber(args, 0)
-            x = if (!x.isNaN() && -1.0 <= x && x <= 1.0) asin(x) else Double.NaN
+            x = if (!x.isNaN() && -1.0 <= x && x <= 1.0) FdLibm.asin(x) else Double.NaN
             return ScriptRuntime.wrapNumber(x)
         }
 
-        private fun asinh(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val x = ScriptRuntime.toNumber(args, 0)
-            if (x.isInfinite()) return x
-            if (!x.isNaN()) {
-                if (x == 0.0) {
-                    return if (1 / x > 0) ScriptRuntime.zeroObj else ScriptRuntime.negativeZeroObj
-                }
-                return ln(x + sqrt(x * x + 1.0))
-            }
-            return ScriptRuntime.NaNobj
-        }
+        private fun asinh(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
+            ScriptRuntime.wrapNumber(FdLibm.asinh(ScriptRuntime.toNumber(args, 0)))
 
         private fun atan(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
-            ScriptRuntime.wrapNumber(atan(ScriptRuntime.toNumber(args, 0)))
+            ScriptRuntime.wrapNumber(FdLibm.atan(ScriptRuntime.toNumber(args, 0)))
 
-        private fun atanh(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val x = ScriptRuntime.toNumber(args, 0)
-            if (!x.isNaN() && -1.0 <= x && x <= 1.0) {
-                if (x == 0.0) {
-                    return if (1 / x > 0) ScriptRuntime.zeroObj else ScriptRuntime.negativeZeroObj
-                }
-                return 0.5 * ln((1.0 + x) / (1.0 - x))
-            }
-            return ScriptRuntime.NaNobj
-        }
+        private fun atanh(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
+            ScriptRuntime.wrapNumber(FdLibm.atanh(ScriptRuntime.toNumber(args, 0)))
 
         private fun atan2(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val x = ScriptRuntime.toNumber(args, 0)
-            return ScriptRuntime.wrapNumber(atan2(x, ScriptRuntime.toNumber(args, 1)))
+            return ScriptRuntime.wrapNumber(FdLibm.atan2(x, ScriptRuntime.toNumber(args, 1)))
         }
 
         private fun cbrt(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
-            ScriptRuntime.wrapNumber(cbrt(ScriptRuntime.toNumber(args, 0)))
+            ScriptRuntime.wrapNumber(FdLibm.cbrt(ScriptRuntime.toNumber(args, 0)))
 
         private fun ceil(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
             ScriptRuntime.wrapNumber(ceil(ScriptRuntime.toNumber(args, 0)))
@@ -187,20 +154,20 @@ internal class NativeMath private constructor() : ScriptableObject() {
 
         private fun cos(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val x = ScriptRuntime.toNumber(args, 0)
-            return ScriptRuntime.wrapNumber(if (x.isInfinite()) Double.NaN else cos(x))
+            return ScriptRuntime.wrapNumber(if (x.isInfinite()) Double.NaN else FdLibm.cos(x))
         }
 
         private fun cosh(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
-            ScriptRuntime.wrapNumber(cosh(ScriptRuntime.toNumber(args, 0)))
+            ScriptRuntime.wrapNumber(FdLibm.cosh(ScriptRuntime.toNumber(args, 0)))
 
         private fun exp(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             var x = ScriptRuntime.toNumber(args, 0)
-            x = if (x == Double.POSITIVE_INFINITY) x else if (x == Double.NEGATIVE_INFINITY) 0.0 else exp(x)
+            x = if (x == Double.POSITIVE_INFINITY) x else if (x == Double.NEGATIVE_INFINITY) 0.0 else FdLibm.exp(x)
             return ScriptRuntime.wrapNumber(x)
         }
 
         private fun expm1(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
-            ScriptRuntime.wrapNumber(expm1(ScriptRuntime.toNumber(args, 0)))
+            ScriptRuntime.wrapNumber(FdLibm.expm1(ScriptRuntime.toNumber(args, 0)))
 
         private fun floor(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
             ScriptRuntime.wrapNumber(floor(ScriptRuntime.toNumber(args, 0)))
@@ -359,19 +326,17 @@ internal class NativeMath private constructor() : ScriptableObject() {
 
         private fun log(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val x = ScriptRuntime.toNumber(args, 0)
-            return ScriptRuntime.wrapNumber(if (x < 0) Double.NaN else ln(x))
+            return ScriptRuntime.wrapNumber(if (x < 0) Double.NaN else FdLibm.log(x))
         }
 
         private fun log1p(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
-            ScriptRuntime.wrapNumber(ln1p(ScriptRuntime.toNumber(args, 0)))
+            ScriptRuntime.wrapNumber(FdLibm.log1p(ScriptRuntime.toNumber(args, 0)))
 
         private fun log10(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
-            ScriptRuntime.wrapNumber(log10(ScriptRuntime.toNumber(args, 0)))
+            ScriptRuntime.wrapNumber(FdLibm.log10(ScriptRuntime.toNumber(args, 0)))
 
-        private fun log2(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val x = ScriptRuntime.toNumber(args, 0)
-            return ScriptRuntime.wrapNumber(if (x < 0) Double.NaN else ln(x) * LOG2E)
-        }
+        private fun log2(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
+            ScriptRuntime.wrapNumber(FdLibm.log2(ScriptRuntime.toNumber(args, 0)))
 
         private fun max(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             var x = Double.NEGATIVE_INFINITY
@@ -426,7 +391,7 @@ internal class NativeMath private constructor() : ScriptableObject() {
                     }
                 }
             } else {
-                result = x.pow(y)
+                result = FdLibm.pow(x, y)
                 if (result.isNaN()) {
                     if (y == Double.POSITIVE_INFINITY) {
                         if (x < -1.0 || 1.0 < x) {
@@ -501,20 +466,20 @@ internal class NativeMath private constructor() : ScriptableObject() {
 
         private fun sin(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val x = ScriptRuntime.toNumber(args, 0)
-            return ScriptRuntime.wrapNumber(if (x.isInfinite()) Double.NaN else sin(x))
+            return ScriptRuntime.wrapNumber(if (x.isInfinite()) Double.NaN else FdLibm.sin(x))
         }
 
         private fun sinh(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
-            ScriptRuntime.wrapNumber(sinh(ScriptRuntime.toNumber(args, 0)))
+            ScriptRuntime.wrapNumber(FdLibm.sinh(ScriptRuntime.toNumber(args, 0)))
 
         private fun sqrt(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
             ScriptRuntime.wrapNumber(sqrt(ScriptRuntime.toNumber(args, 0)))
 
         private fun tan(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
-            ScriptRuntime.wrapNumber(tan(ScriptRuntime.toNumber(args, 0)))
+            ScriptRuntime.wrapNumber(FdLibm.tan(ScriptRuntime.toNumber(args, 0)))
 
         private fun tanh(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
-            ScriptRuntime.wrapNumber(tanh(ScriptRuntime.toNumber(args, 0)))
+            ScriptRuntime.wrapNumber(FdLibm.tanh(ScriptRuntime.toNumber(args, 0)))
 
         private fun trunc(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val x = ScriptRuntime.toNumber(args, 0)

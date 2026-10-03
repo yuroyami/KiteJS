@@ -6,23 +6,15 @@ package io.github.yuroyami.kitejs.asm
 
 import io.github.yuroyami.kitejs.Callable
 import io.github.yuroyami.kitejs.Context
+import io.github.yuroyami.kitejs.FdLibm
 import io.github.yuroyami.kitejs.ScriptRuntime
 import io.github.yuroyami.kitejs.Scriptable
 import io.github.yuroyami.kitejs.typedarrays.NativeArrayBuffer
 import kotlin.math.abs
-import kotlin.math.acos
-import kotlin.math.asin
-import kotlin.math.atan
-import kotlin.math.atan2
 import kotlin.math.ceil
-import kotlin.math.cos
-import kotlin.math.exp
 import kotlin.math.floor
-import kotlin.math.ln
 import kotlin.math.pow
-import kotlin.math.sin
 import kotlin.math.sqrt
-import kotlin.math.tan
 
 /** A linked module: the compiled code, the heap it was given and the imports it resolved to. */
 internal class AsmInstance(
@@ -136,16 +128,16 @@ internal class AsmRunner(private val instance: AsmInstance) {
             AsmOp.M_FLOOR -> dv[dp - 1] = floor(dv[dp - 1])
             AsmOp.M_CEIL -> dv[dp - 1] = ceil(dv[dp - 1])
             AsmOp.M_SQRT -> dv[dp - 1] = sqrt(dv[dp - 1])
-            AsmOp.M_SIN -> dv[dp - 1] = sin(dv[dp - 1])
-            AsmOp.M_COS -> dv[dp - 1] = cos(dv[dp - 1])
-            AsmOp.M_TAN -> dv[dp - 1] = tan(dv[dp - 1])
-            AsmOp.M_ASIN -> dv[dp - 1] = asin(dv[dp - 1])
-            AsmOp.M_ACOS -> dv[dp - 1] = acos(dv[dp - 1])
-            AsmOp.M_ATAN -> dv[dp - 1] = atan(dv[dp - 1])
-            AsmOp.M_ATAN2 -> { dp--; dv[dp - 1] = atan2(dv[dp - 1], dv[dp]) }
+            AsmOp.M_SIN -> dv[dp - 1] = FdLibm.sin(dv[dp - 1])
+            AsmOp.M_COS -> dv[dp - 1] = FdLibm.cos(dv[dp - 1])
+            AsmOp.M_TAN -> dv[dp - 1] = FdLibm.tan(dv[dp - 1])
+            AsmOp.M_ASIN -> dv[dp - 1] = FdLibm.asin(dv[dp - 1])
+            AsmOp.M_ACOS -> dv[dp - 1] = FdLibm.acos(dv[dp - 1])
+            AsmOp.M_ATAN -> dv[dp - 1] = FdLibm.atan(dv[dp - 1])
+            AsmOp.M_ATAN2 -> { dp--; dv[dp - 1] = FdLibm.atan2(dv[dp - 1], dv[dp]) }
             AsmOp.M_POW -> { dp--; dv[dp - 1] = jsPow(dv[dp - 1], dv[dp]) }
-            AsmOp.M_EXP -> dv[dp - 1] = exp(dv[dp - 1])
-            AsmOp.M_LOG -> dv[dp - 1] = ln(dv[dp - 1])
+            AsmOp.M_EXP -> dv[dp - 1] = FdLibm.exp(dv[dp - 1])
+            AsmOp.M_LOG -> dv[dp - 1] = FdLibm.log(dv[dp - 1])
             AsmOp.M_MIN_D -> { dp--; dv[dp - 1] = jsMin(dv[dp - 1], dv[dp]) }
             AsmOp.M_MAX_D -> { dp--; dv[dp - 1] = jsMax(dv[dp - 1], dv[dp]) }
             AsmOp.M_MIN_I -> { ip--; if (iv[ip] < iv[ip - 1]) iv[ip - 1] = iv[ip] }
@@ -512,15 +504,8 @@ internal fun clz32(value: Int): Int {
     return n
 }
 
-/** `Math.pow`, whose answer for a few arguments is not the one Kotlin gives. */
-internal fun jsPow(base: Double, exponent: Double): Double {
-    if (exponent.isNaN()) return Double.NaN
-    // Kotlin answers 1.0 for pow(NaN, 0.0) and for pow(1.0, Infinity); JavaScript answers NaN
-    // for the second.
-    if (exponent == 0.0) return 1.0
-    if ((base == 1.0 || base == -1.0) && exponent.isInfinite()) return Double.NaN
-    return base.pow(exponent)
-}
+/** `Math.pow`, the same fdlibm routine the interpreted `Math.pow` uses (D-73). */
+internal fun jsPow(base: Double, exponent: Double): Double = FdLibm.pow(base, exponent)
 
 /** `Math.min`, which answers NaN when either side is NaN and tells -0 from 0. */
 internal fun jsMin(a: Double, b: Double): Double {

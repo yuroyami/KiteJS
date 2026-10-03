@@ -414,16 +414,36 @@ class EvalOracleTest {
         "Math.pow(0, -1)", "1 / Math.pow(-0, 3)", "Math.pow(-0, -3)", "Math.pow(-Infinity, 3)", "Math.pow(2, -1074)",
         "Math.sqrt(16)", "Math.sqrt(-1)", "Math.cbrt(27)", "Math.cbrt(-8)", "Math.hypot(3, 4)", "Math.hypot()",
         "Math.hypot(NaN, Infinity)", "Math.sign(-5)", "1 / Math.sign(-0)", "Math.sign('x')", "Math.trunc(-4.7)",
-        "Math.log(Math.E)", "Math.log(-1)", "Math.log2(8)", "Math.log10(1000)", "Math.log1p(0)", "Math.expm1(0)",
+        "Math.log(Math.E)", "Math.log(-1)", "Math.log10(1000)", "Math.log1p(0)", "Math.expm1(0)",
         "Math.exp(1) === Math.E", "Math.exp(-Infinity)", "Math.sin(0)", "Math.sin(Infinity)", "Math.cos(0)", "Math.tan(0)",
         "Math.atan2(1, 1)", "Math.atan(1)", "Math.asin(2)", "Math.asin(1)", "Math.acos(1)", "Math.sinh(0)", "Math.cosh(0)",
-        "Math.tanh(Infinity)", "1 / Math.asinh(-0)", "Math.asinh(1)", "Math.acosh(1)", "Math.acosh(0)", "Math.atanh(0)",
-        "Math.atanh(0.5)", "Math.clz32(1)", "Math.clz32(0)", "Math.clz32(-1)", "Math.clz32(0x10000)",
+        "Math.tanh(Infinity)", "1 / Math.asinh(-0)", "Math.acosh(1)", "Math.acosh(0)", "Math.atanh(0)",
+        "Math.clz32(1)", "Math.clz32(0)", "Math.clz32(-1)", "Math.clz32(0x10000)",
         "Math.imul(0xffffffff, 5)", "Math.imul(2, 4)", "Math.imul(0x7fffffff, 2)", "Math.fround(5.5)", "Math.fround(5.05)",
         "Math.f16round(1.337)", "Math.f16round(65520)", "Math.f16round(5.960464477539063e-8)", "Math.f16round(0.1)",
         "Math.f16round()", "Math.f16round(-1e-9)", "typeof Math.random()", "Math.random() < 1", "Math.toSource",
         "'' + Math", "Object.prototype.toString.call(Math)", "typeof Math", "Math.abs()", "Math.max('1', '2')",
     ))
+
+    /**
+     * The transcendental functions are fdlibm here, as V8 has them, on every target. Upstream
+     * hands `log`, `log2`, `asinh` and `atanh` to the JVM's `Math`, or to formulas on top of it,
+     * which is a unit off in the last place for these arguments (D-73). Both halves are pinned so
+     * a change on either side shows. Each ported answer is the one Node 22 gives.
+     */
+    @Test
+    fun mathIsFdlibmAsV8HasIt() {
+        val answers = linkedMapOf(
+            "Math.log2(8)" to ("2.9999999999999996" to "3"),
+            "Math.asinh(1)" to ("0.8813735870195429" to "0.881373587019543"),
+            "Math.atanh(0.5)" to ("0.5493061443340549" to "0.5493061443340548"),
+            "Math.acosh(1e300)" to ("Infinity" to "691.4686750787736"),
+        )
+        for ((script, pair) in answers) {
+            assertEquals(pair.first, upstream(script), "upstream: $script")
+            assertEquals(pair.second, ported(script), "ported: $script")
+        }
+    }
 
     // Number.prototype.toString with a radix other than 10 waits for the phase 5 BigInt. match,
     // search, matchAll and the regexp forms of split and replace wait for the phase 4 regexp
