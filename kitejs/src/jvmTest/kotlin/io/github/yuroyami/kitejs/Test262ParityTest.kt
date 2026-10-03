@@ -81,6 +81,29 @@ class Test262ParityTest {
             put(path, "D-50: upstream crashes where the port answers undefined")
         }
 
+        // A let or const loop head gives each iteration a binding of its own here. Upstream shares
+        // one binding across the loop, so a closure made in the body sees the last value (D-72).
+        for (path in listOf(
+            "language/block-scope/syntax/for-in/mixed-values-in-iteration.js",
+            "language/statements/for-in/head-let-fresh-binding-per-iteration.js",
+            "language/statements/for-in/scope-body-lex-boundary.js",
+            "language/statements/for-of/head-let-fresh-binding-per-iteration.js",
+            "language/statements/for-of/scope-body-lex-boundary.js",
+        )) {
+            put(path, "D-72: each iteration of a let or const loop head binds afresh here")
+        }
+
+        // A labelled function as the body of a loop is an early error, which neither engine
+        // reports for a var or let head. Upstream passes these only because it rejects a const
+        // head outright, before it reaches the body; the port takes the head (D-72).
+        for (path in listOf(
+            "language/statements/for/labelled-fn-stmt-const.js",
+            "language/statements/for-in/labelled-fn-stmt-const.js",
+            "language/statements/for-of/labelled-fn-stmt-const.js",
+        )) {
+            put(path, "D-72: upstream rejects the const head, the port parses it and accepts the body")
+        }
+
         // Date.prototype[Symbol.toPrimitive] is non-writable here and writable upstream (D-56).
         put(
             "built-ins/Date/prototype/Symbol.toPrimitive/prop-desc.js",

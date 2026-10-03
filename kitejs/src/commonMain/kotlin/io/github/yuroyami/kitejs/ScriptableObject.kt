@@ -178,6 +178,13 @@ public abstract class ScriptableObject :
 
     public open fun getAttributes(sym: Symbol): Int = getAttributeSlot(sym).attributes and CONST_BINDING.inv()
 
+    /** Makes [name] an initialized const binding holding [value], whatever it held before (D-72). */
+    internal fun initConstBinding(name: String, value: Any?) {
+        val slot = map.modify(this, name, 0, CONST)
+        slot.value = value
+        slot.attributes = CONST and UNINITIALIZED_CONST.inv()
+    }
+
     /** Whether [name] is an own `const` binding here, which no assignment may change (D-71). */
     internal fun isConstBinding(name: String): Boolean {
         val slot = map.query(name, 0) ?: return false

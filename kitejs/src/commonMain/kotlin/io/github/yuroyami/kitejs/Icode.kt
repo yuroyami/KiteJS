@@ -139,8 +139,12 @@ internal abstract class Icode {
         // count a runtime matter: f(a, ...b)
         const val Icode_CALL_SPREAD = Icode_SPREAD - 1
         const val Icode_NEW_SPREAD = Icode_CALL_SPREAD - 1
+        // Bind a const a loop declares afresh on each pass, by name and by frame slot:
+        // for (const x of xs)
+        const val Icode_INITCONST = Icode_NEW_SPREAD - 1
+        const val Icode_INITCONSTVAR = Icode_INITCONST - 1
         // Last icode
-        const val MIN_ICODE = Icode_NEW_SPREAD
+        const val MIN_ICODE = Icode_INITCONSTVAR
 
         fun bytecodeName(bytecode: Int): String {
             if (!validBytecode(bytecode)) {
@@ -246,6 +250,8 @@ internal abstract class Icode {
             Icode_SPREAD -> "SPREAD"
             Icode_CALL_SPREAD -> "CALL_SPREAD"
             Icode_NEW_SPREAD -> "NEW_SPREAD"
+            Icode_INITCONST -> "INITCONST"
+            Icode_INITCONSTVAR -> "INITCONSTVAR"
                 // An icode with no name.
                 else -> throw IllegalStateException(bytecode.toString())
             }

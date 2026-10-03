@@ -512,7 +512,14 @@ public class IRFactory(
         val savedScope = parser.currentScope
         parser.currentScope = loop
         try {
-            val init = transform(loop.initializer!!)
+            // The names a const head destructures belong to the loop as well (D-72).
+            val savedBlockScopedConst = parser.blockScopedConst
+            parser.blockScopedConst = loop.initializer!!.type == Token.CONST
+            val init = try {
+                transform(loop.initializer!!)
+            } finally {
+                parser.blockScopedConst = savedBlockScopedConst
+            }
             val test = transform(loop.condition!!)
             val incr = transform(loop.increment!!)
             val body = transform(loop.body!!)
@@ -1315,11 +1322,19 @@ public class IRFactory(
     ): Node {
         astNodePos.push(ast)
         try {
+            // A let or const the head declares gets a binding of its own on every pass, so a
+            // closure made in the body keeps the value of its own iteration (ECMAScript 2015,
+            // 13.7.5.13). The names move from the loop into a block around the body, which
+            // becomes a fresh scope each time the body is entered (D-72).
+            // A comprehension passes LET with a plain name, which this leaves as it was.
+            val declares = lhs.type == Token.LET || lhs.type == Token.CONST
+            val iterationScope =
+                if (declares && (declType == Token.LET || declType == Token.CONST)) newIterationScope(loop as Scope) else null
             var destructuring = -1
             var destructuringLen = 0
             val lvalue: Node
             var type = lhs.type
-            if (type == Token.VAR || type == Token.LET) {
+            if (type == Token.VAR || type == Token.LET || type == Token.CONST) {
                 val kid = lhs.lastChild!!
                 val kidType = kid.type
                 if (kidType == Token.ARRAYLIT || kidType == Token.OBJECTLIT) {
@@ -1360,15 +1375,25 @@ public class IRFactory(
             val id = Node(Token.ENUM_ID)
             id.putProp(Node.LOCAL_BLOCK_PROP, localBlock)
 
-            val newBody = Node(Token.BLOCK)
+            val newBody = iterationScope ?: Node(Token.BLOCK)
             val assign: Node
             if (destructuring != -1) {
-                assign = parser.createDestructuringAssignment(
-                    declType,
-                    lvalue,
-                    id,
-                    Parser.Transformer { transform(it) },
-                )
+                // The names the pattern declares belong to the iteration's own scope too.
+                val savedScope = parser.currentScope
+                val savedBlockScopedConst = parser.blockScopedConst
+                if (iterationScope != null) parser.currentScope = iterationScope
+                parser.blockScopedConst = declType == Token.CONST
+                try {
+                    assign = parser.createDestructuringAssignment(
+                        declType,
+                        lvalue,
+                        id,
+                        Parser.Transformer { transform(it) },
+                    )
+                } finally {
+                    parser.currentScope = savedScope
+                    parser.blockScopedConst = savedBlockScopedConst
+                }
                 if (!isForEach &&
                     !isForOf &&
                     (destructuring == Token.OBJECTLIT || destructuringLen != 2)
@@ -1377,9 +1402,12 @@ public class IRFactory(
                     // it can hold the key and the value.
                     parser.reportError("msg.bad.for.in.destruct")
                 }
+            } else if (declType == Token.CONST) {
+                assign = Node(Token.SETCONST, Node.newString(Token.BINDNAME, lvalue.string!!), id)
             } else {
                 assign = parser.simpleAssignment(lvalue, id)
             }
+            if (declType == Token.CONST) markFreshConsts(assign)
             newBody.addChildToBack(Node(Token.EXPR_VOID, assign))
             newBody.addChildToBack(body)
 
@@ -1392,6 +1420,21 @@ public class IRFactory(
         } finally {
             astNodePos.pop()
         }
+    }
+
+    /**
+     * A block for the body of a loop whose head declares a let or const. It takes over the
+     * loop's names, and the scopes inside the loop now hang off it, so the names resolve to it.
+     */
+    private fun newIterationScope(loop: Scope): Scope {
+        val scope = parser.createScopeNode(Token.BLOCK, loop.lineno, loop.column)
+        loop.childScopes?.toList()?.forEach { scope.addChildScope(it) }
+        loop.addChildScope(scope)
+        if (loop.symbolTable != null) {
+            Scope.joinScopes(loop, scope)
+            loop.symbolTable = null
+        }
+        return scope
     }
 
     /**
@@ -1913,7 +1956,28 @@ public class IRFactory(
             }
         }
 
+        /** Marks every const store under [node] as one that binds afresh on each pass (D-72). */
+        private fun markFreshConsts(node: Node) {
+            if (node.type == Token.SETCONST) node.putIntProp(Node.FRESH_CONST_PROP, 1)
+            var child = node.firstChild
+            while (child != null) {
+                markFreshConsts(child)
+                child = child.next
+            }
+        }
+
         private fun createFor(loop: Scope, init: Node, test: Node, incr: Node, body: Node): Node {
+            if (init.type == Token.CONST) {
+                // for (const i = s; ...): the const belongs to a block around the loop, and is
+                // bound afresh each time the loop starts (D-72).
+                val block = Scope.splitScope(loop)
+                loop.parentScope = block
+                init.putIntProp(Node.FRESH_CONST_PROP, 1)
+                markFreshConsts(init)
+                block.addChildToBack(init)
+                block.addChildToBack(createLoop(loop, LOOP_FOR, body, test, Node(Token.EMPTY), incr))
+                return block
+            }
             if (init.type == Token.LET) {
                 // Rewrite "for (let i=s; i < N; i++)..." as "let (i=s) { for (; i < N; i++)..."
                 // so that "s" is evaluated outside the scope of the for.

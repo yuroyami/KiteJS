@@ -261,6 +261,10 @@ public open class NodeTransformer {
                                     v,
                                     init,
                                 )
+                                // A const a for head declares is bound afresh each time (D-72).
+                                if (type == Token.CONST && n.getIntProp(Node.FRESH_CONST_PROP, 0) == 1) {
+                                    v.putIntProp(Node.FRESH_CONST_PROP, 1)
+                                }
                             } else {
                                 // May be a destructuring assignment already turned into a LETEXPR.
                                 if (v.type != Token.LETEXPR) throw Kit.codeBug()

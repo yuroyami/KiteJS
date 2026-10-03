@@ -99,7 +99,8 @@ that:
 
 ## Everything else
 
-The rest of ES5.1 and most of ES2015 and later is there and tested: `let`, `const`, arrow
+The rest of ES5.1 and most of ES2015 and later is there and tested: `let`, `const` (also in a
+`for` head, as in `for (const x of xs)`, with a fresh binding on every pass), arrow
 functions, template literals and tagged templates, destructuring in declarations and parameters,
 default and rest parameters, computed keys, getters and setters in object literals, generators
 and `yield*`, `Symbol` and every well-known symbol, `Map`, `Set`, `WeakMap`, `WeakSet`,

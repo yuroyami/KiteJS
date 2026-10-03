@@ -69,6 +69,8 @@ import io.github.yuroyami.kitejs.Icode.Companion.Icode_SHORTNUMBER
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_SPARE_ARRAYLIT
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_CALL_SPREAD
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_NEW_SPREAD
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_INITCONST
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_INITCONSTVAR
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_SPREAD
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_STARTSUB
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_SWAP
@@ -680,7 +682,7 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
                 visitExpression(child, 0)
                 child = child.next!!
                 visitExpression(child, 0)
-                addStringOp(Icode_SETCONST, name)
+                addStringOp(if (node.getIntProp(Node.FRESH_CONST_PROP, 0) == 1) Icode_INITCONST else Icode_SETCONST, name)
                 stackChange(-1)
             }
             Token.TYPEOFNAME -> {
@@ -718,7 +720,11 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
                 val index = scriptOrFn.getIndexForNameNode(child!!)
                 child = child.next!!
                 visitExpression(child, 0)
-                addVarOp(Token.SETCONSTVAR, index)
+                if (node.getIntProp(Node.FRESH_CONST_PROP, 0) == 1) {
+                    addIndexOp(Icode_INITCONSTVAR, index)
+                } else {
+                    addVarOp(Token.SETCONSTVAR, index)
+                }
             }
             Token.NULL, Token.THIS, Token.SUPER, Token.THISFN, Token.FALSE, Token.TRUE -> {
                 addToken(type)

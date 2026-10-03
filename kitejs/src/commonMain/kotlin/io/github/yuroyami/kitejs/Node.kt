@@ -821,7 +821,9 @@ public open class Node : Iterable<Node> {
         public const val OPTIONAL_CHAINING: Int = 30
         public const val SUPER_PROPERTY_ACCESS: Int = 31
         public const val NUMBER_OF_SPREAD: Int = 32
-        public const val LAST_PROP: Int = NUMBER_OF_SPREAD
+        // The port's own: a const a loop declares, given its value afresh on every pass (D-72).
+        internal const val FRESH_CONST_PROP: Int = 33
+        public const val LAST_PROP: Int = FRESH_CONST_PROP
         public const val FIRST_PROP: Int = FUNCTION_PROP
 
         // Values of ISNUMBER_PROP: which of the children are Number types.
@@ -911,6 +913,7 @@ public open class Node : Iterable<Node> {
             OPTIONAL_CHAINING -> "optional_chaining"
             SUPER_PROPERTY_ACCESS -> "super_property_access"
             NUMBER_OF_SPREAD -> "number_of_spread"
+            FRESH_CONST_PROP -> "fresh_const"
             else -> throw Kit.codeBug()
         }
 

@@ -367,6 +367,19 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   happens. The corpus keeps its logical assignments on properties, which lower as upstream does.
   `EvalOracleTest` pins both halves, and `Test262ParityTest` lists the six destructuring files
   that now pass only here, outside strict mode.
+- D-72: a `for` head may declare its variable with `const`, as in `for (const x of xs)`,
+  `for (const k in o)`, a destructuring head and `for (const i = s; ...)`. Upstream's parser
+  rejects all of these. A let or const head now gives each iteration a binding of its own
+  (ECMAScript 2015, 13.7.5.13), where upstream shares one binding across the loop, so a closure
+  made in the body keeps the value of its own pass. The names move from the loop into a block
+  around the body, which becomes a fresh scope object each time it is entered when the function
+  keeps scope objects, and frame slots when it does not. Such a const is scoped to the loop, so
+  it may shadow an outer name the way a let does, and it is bound afresh on every pass by two
+  icodes of the port's own, `INITCONST` by name and `INITCONSTVAR` by frame slot, since
+  `SETCONST` only ever binds a const once. A write to it in the body is a TypeError (D-71). A
+  const in a for-in or for-of head with an initializer is a SyntaxError. `Test262ParityTest`
+  lists the five files that pass only here, and the three `labelled-fn-stmt-const.js` files
+  upstream passes only because it rejects the head before it reaches the body.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

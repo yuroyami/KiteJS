@@ -82,6 +82,8 @@ import io.github.yuroyami.kitejs.Icode.Companion.Icode_SHORTNUMBER
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_SPARE_ARRAYLIT
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_CALL_SPREAD
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_NEW_SPREAD
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_INITCONST
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_INITCONSTVAR
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_SPREAD
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_STARTSUB
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_SWAP
@@ -1421,6 +1423,24 @@ public class Interpreter : Evaluator {
                     --state.stackTop
                     val lookup = stack[state.stackTop] as ScriptRuntime.LookupResult
                     stack[state.stackTop] = lookup.call(cx, frame.scope!!, ScriptRuntime.getApplyArguments(cx, args))
+                    return null
+                }
+                Icode_INITCONST -> {
+                    // A const a loop declares takes the value of this pass, even if an earlier
+                    // pass already bound it (D-72).
+                    var rhs = stack[state.stackTop]
+                    if (rhs === DBL_MRK) rhs = ScriptRuntime.wrapNumber(sDbl[state.stackTop])
+                    val lhs = stack[state.stackTop - 1] as Scriptable
+                    stack[state.stackTop - 1] = ScriptRuntime.initConst(lhs, rhs, state.stringReg!!)
+                    --state.stackTop
+                    return null
+                }
+                Icode_INITCONSTVAR -> {
+                    val source = frame.varSource
+                    source.stack[state.indexReg] = stack[state.stackTop]
+                    source.sDbl[state.indexReg] = sDbl[state.stackTop]
+                    source.stackAttributes[state.indexReg] =
+                        (ScriptableObject.CONST and ScriptableObject.UNINITIALIZED_CONST.inv()).toByte()
                     return null
                 }
                 Icode_NEW_SPREAD -> {

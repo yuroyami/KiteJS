@@ -126,6 +126,12 @@ public class Parser(
     internal var currentScope: Scope? = null
     private var endFlags = 0
     private var inForInit = false // bound temporarily during forStatement()
+
+    /**
+     * Set while the names a `for` head declares with `const` are defined. Such a const belongs to
+     * the loop, as a `let` there does, rather than to the whole function (D-72).
+     */
+    internal var blockScopedConst = false
     private var labelSet: MutableMap<String, LabeledStatement>? = null
     private var loopSet: MutableList<Loop>? = null
     private var loopAndSwitchSet: MutableList<Jump>? = null
@@ -1609,6 +1615,10 @@ public class Parser(
                     if (init.variables.size > 1) {
                         reportError("msg.mult.index")
                     }
+                    // A const head takes each value as it comes, so it has no initializer.
+                    if (init.type == Token.CONST && init.variables.any { it.initializer != null }) {
+                        reportError("msg.bad.for.in.lhs")
+                    }
                 }
                 if (isForOf && isForEach) {
                     reportError("msg.invalid.for.each")
@@ -1664,6 +1674,15 @@ public class Parser(
             } else if (tt == Token.VAR || tt == Token.LET) {
                 consumeToken()
                 init = variables(tt, ts.tokenBeg, false)
+            } else if (tt == Token.CONST && compilerEnv.languageVersion >= Context.VERSION_ES6) {
+                consumeToken()
+                val saved = blockScopedConst
+                blockScopedConst = true
+                try {
+                    init = variables(tt, ts.tokenBeg, false)
+                } finally {
+                    blockScopedConst = saved
+                }
             } else {
                 init = expr(false)
             }
@@ -2348,11 +2367,17 @@ public class Parser(
         val definingScope = scope.getDefiningScope(name!!)
         val symbol = definingScope?.getSymbol(name)
         val symDeclType = symbol?.declType ?: -1
-        if (symbol != null &&
-            (symDeclType == Token.CONST ||
-                declType == Token.CONST ||
-                (definingScope === scope && symDeclType == Token.LET))
-        ) {
+        // A const a for head declares shadows an outer name the way a let does.
+        val loopConst = declType == Token.CONST && blockScopedConst
+        val conflicts =
+            if (loopConst) {
+                definingScope === scope
+            } else {
+                symDeclType == Token.CONST ||
+                    declType == Token.CONST ||
+                    (definingScope === scope && symDeclType == Token.LET)
+            }
+        if (symbol != null && conflicts) {
             addError(
                 when (symDeclType) {
                     Token.CONST -> "msg.const.redecl"
@@ -2363,6 +2388,10 @@ public class Parser(
                 },
                 name,
             )
+            return
+        }
+        if (loopConst) {
+            scope.putSymbol(Symbol(declType, name))
             return
         }
         when (declType) {

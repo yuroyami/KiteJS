@@ -2262,10 +2262,28 @@ public object ScriptRuntime {
      * (D-71). The message is the one upstream's strict mode gives for the same write.
      */
     private fun checkNotConstBinding(bound: Scriptable, id: String) {
-        if (bound is ScriptableObject && bound.isConstBinding(id)) throw constAssignError(id)
+        if (isConstBinding(bound, id)) throw constAssignError(id)
+    }
+
+    /**
+     * Whether [id] is a const binding held by [holder]. A block's scope object, such as the one a
+     * loop gives each pass, sits behind a NativeWith on the scope chain, so that is looked through.
+     */
+    private fun isConstBinding(holder: Scriptable, id: String): Boolean {
+        val target = if (holder is NativeWith) holder.prototype else holder
+        return target is ScriptableObject && target.isConstBinding(id)
     }
 
     internal fun constAssignError(id: String): EcmaError = typeErrorById("msg.modify.readonly", id)
+
+    /**
+     * Binds a const that a loop declares, on each pass: ECMAScript 2015, 13.7.5.13 gives every
+     * iteration a binding of its own, so the value from an earlier pass must not stand (D-72).
+     */
+    internal fun initConst(bound: Scriptable, value: Any?, id: String): Any? {
+        if (bound is ScriptableObject) bound.initConstBinding(id, value) else bound.put(id, bound, value)
+        return value
+    }
 
     public fun setConst(bound: Scriptable, value: Any?, cx: Context, id: String): Any? {
         ScriptableObject.putConstProperty(bound, id, value)
@@ -2603,7 +2621,7 @@ public object ScriptRuntime {
             do {
                 value = target!!.get(id, scopeChain!!)
                 if (value !== Scriptable.NOT_FOUND) {
-                    if (target is ScriptableObject && target.isConstBinding(id)) {
+                    if (isConstBinding(target, id)) {
                         // The operand is still converted first, as the spec's order asks.
                         if (value !is Number && value !is KBigInt) toNumeric(value)
                         throw constAssignError(id)

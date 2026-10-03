@@ -83,7 +83,9 @@ class IcodeParityTest {
         assertEquals(
             // Spread in an argument list: the number of arguments is a runtime matter, so the
             // call takes them as one array. Upstream's parser rejects that syntax.
-            listOf("Icode_CALL_SPREAD", "Icode_NEW_SPREAD"),
+            // A const a for head declares, bound afresh on every pass, by name and by frame slot
+            // (D-72). Upstream's parser rejects that syntax too.
+            listOf("Icode_CALL_SPREAD", "Icode_INITCONST", "Icode_INITCONSTVAR", "Icode_NEW_SPREAD"),
             extras.keys.toList(),
         )
         val lowestUpstream = upstream.values.min()
