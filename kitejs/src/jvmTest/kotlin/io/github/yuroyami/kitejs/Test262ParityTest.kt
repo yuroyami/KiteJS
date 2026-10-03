@@ -103,6 +103,25 @@ class Test262ParityTest {
     }
 
     /**
+     * Like [knownDifferences], for files whose two engines disagree only outside strict mode. In
+     * strict mode they agree, so a file-wide entry would read as stale there.
+     */
+    private val knownSloppyDifferences = buildMap {
+        // Assigning to a const throws a TypeError here in any mode. Upstream ignores the write
+        // outside strict mode, so these destructuring assignments pass only here (D-71).
+        for (path in listOf(
+            "language/expressions/assignment/dstr/array-elem-put-const.js",
+            "language/expressions/assignment/dstr/obj-id-put-const.js",
+            "language/expressions/assignment/dstr/obj-prop-put-const.js",
+            "language/statements/for-of/dstr/array-elem-put-const.js",
+            "language/statements/for-of/dstr/obj-id-put-const.js",
+            "language/statements/for-of/dstr/obj-prop-put-const.js",
+        )) {
+            put(path, "D-71: a write to a const throws here and is ignored upstream")
+        }
+    }
+
+    /**
      * Whether upstream failed before it could run the file. Upstream's parser rejects syntax this
      * engine takes, such as spread in an argument list, and a rejected harness file fails every
      * test that includes it, so those runs carry no verdict to compare with.
@@ -164,7 +183,7 @@ class Test262ParityTest {
                 // What the port did here, for the other targets to match (Test262SliceTest).
                 expectations.append(relative).append(if (strict) "\tstrict\t" else "\tsloppy\t")
                     .append(ported).append('\n')
-                val known = relative in knownDifferences
+                val known = relative in knownDifferences || (!strict && relative in knownSloppyDifferences)
                 if (upstream != ported) {
                     val mode = if (strict) "strict" else "non-strict"
                     if (known) {

@@ -1286,6 +1286,8 @@ public class Interpreter : Evaluator {
                     if ((varAttributes[state.indexReg].toInt() and ScriptableObject.READONLY) == 0) {
                         frame.varSource.stack[state.indexReg] = stack[state.stackTop]
                         frame.varSource.sDbl[state.indexReg] = sDbl[state.stackTop]
+                    } else {
+                        throw constVarAssignError(frame, state.indexReg)
                     }
                     return null
                 }
@@ -1714,33 +1716,31 @@ public class Interpreter : Evaluator {
                 if (num is KBigInt) bi = num else d = ScriptRuntime.numericToDouble(num)
             }
             val post = (incrDecrMask and Node.POST_FLAG) != 0
-            val readonly = (varAttributes[state.indexReg].toInt() and ScriptableObject.READONLY) != 0
+            // Only a const is read-only in a frame, and ++ or -- on one is a TypeError once its
+            // operand has been converted (D-71).
+            if ((varAttributes[state.indexReg].toInt() and ScriptableObject.READONLY) != 0) {
+                throw constVarAssignError(frame, state.indexReg)
+            }
             if (bi == null) {
                 val d2 = if ((incrDecrMask and Node.DECR_FLAG) == 0) d + 1.0 else d - 1.0
-                if (!readonly) {
-                    if (varValue !== DBL_MRK) vars[state.indexReg] = DBL_MRK
-                    varDbls[state.indexReg] = d2
-                    frame.stack[state.stackTop] = DBL_MRK
-                    frame.sDbl[state.stackTop] = if (post) d else d2
-                } else if (post && varValue !== DBL_MRK) {
-                    frame.stack[state.stackTop] = varValue
-                } else {
-                    frame.stack[state.stackTop] = DBL_MRK
-                    frame.sDbl[state.stackTop] = if (post) d else d2
-                }
+                if (varValue !== DBL_MRK) vars[state.indexReg] = DBL_MRK
+                varDbls[state.indexReg] = d2
+                frame.stack[state.stackTop] = DBL_MRK
+                frame.sDbl[state.stackTop] = if (post) d else d2
             } else {
                 val result = if ((incrDecrMask and Node.DECR_FLAG) == 0) bi.add(KBigInt.ONE) else bi.subtract(KBigInt.ONE)
-                if (!readonly) {
-                    vars[state.indexReg] = result
-                    frame.stack[state.stackTop] = if (post) bi else result
-                } else if (post && varValue !== DBL_MRK) {
-                    frame.stack[state.stackTop] = varValue
-                } else {
-                    frame.stack[state.stackTop] = if (post) bi else result
-                }
+                vars[state.indexReg] = result
+                frame.stack[state.stackTop] = if (post) bi else result
             }
             ++frame.pc
         }
+
+        /**
+         * A frame marks only its consts read-only, so a write that meets one is an assignment to
+         * a const, which ECMAScript 2015, 8.1.1.1.5 makes a TypeError in any mode (D-71).
+         */
+        private fun constVarAssignError(frame: CallFrame, index: Int): EcmaError =
+            ScriptRuntime.constAssignError(frame.fnOrScript.descriptor!!.getParamOrVarName(index))
 
         private fun doCallSpecial(cx: Context, frame: CallFrame, state: InterpreterState, op: Int) {
             val stack = frame.stack

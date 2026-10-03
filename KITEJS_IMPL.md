@@ -354,6 +354,19 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   has nine elements and `[...{ a: 1 }]` has one, and it spreads null and undefined as nothing.
   A real array whose iterator was deleted still spreads by its length, which is the one lenient
   path upstream's fallback was there for. `EvalOracleTest` pins both halves.
+- D-71: assigning to a `const` throws a TypeError in any mode, as ECMAScript 2015, 8.1.1.1.5
+  (SetMutableBinding) asks and every browser does. Upstream keeps the older Rhino `const`, which
+  ignores the write outside strict mode and in strict code run by `eval`. A const in a frame is
+  the only read-only variable there, so `SETVAR` and `++`/`--` throw when they meet one. A const
+  held by a scope object carries a `CONST_BINDING` attribute bit, which is what tells it apart
+  from a merely read-only property such as `NaN`, where a sloppy-mode write must still fail
+  silently. `getAttributes` never reports the bit, so a host sees upstream's attributes. The
+  message is the one upstream's strict mode already gives for the same write. A logical
+  assignment to a name, `a ||= b`, now lowers to `a || (a = b)` as ES2021, 13.15.2 asks, where
+  upstream writes either way; without that, a truthy const would throw on a write that never
+  happens. The corpus keeps its logical assignments on properties, which lower as upstream does.
+  `EvalOracleTest` pins both halves, and `Test262ParityTest` lists the six destructuring files
+  that now pass only here, outside strict mode.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

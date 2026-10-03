@@ -1682,7 +1682,7 @@ class EvalOracleTest {
         "'use strict'; undeclaredAssign = 1",
         "1 in 2",
         "1 instanceof 2",
-        "const c = 1; c = 2",
+        "'use strict'; const c = 1; c = 2",
         "throw 'plain'",
         "throw 1",
         "Object.defineProperty(1, 'x', {})", "Object.create(1)", "Object.setPrototypeOf({})",
@@ -2140,6 +2140,51 @@ class EvalOracleTest {
         }
         assertEquals("\"TypeError: 5 is not iterable\"", ported("try { [...5] } catch (e) { String(e) }"))
         assertEquals("\"TypeError: object is not iterable\"", ported("try { [...{}] } catch (e) { String(e) }"))
+    }
+
+    /**
+     * Assigning to a const is a TypeError here in any mode, which is what ECMAScript 2015,
+     * 8.1.1.1.5 asks and what every browser does. Upstream lets the write pass silently outside
+     * strict mode, and in strict code run by `eval` (D-71). Both halves are pinned so a change on
+     * either side shows.
+     */
+    @Test
+    fun assigningToAConstThrows() {
+        val upstreamAnswers = linkedMapOf(
+            "(function () { const c = 1; try { c = 2 } catch (e) { return e.name } return 'assigned' })()" to "\"assigned\"",
+            "const c1 = 1; var r = 'assigned'; try { c1 = 2 } catch (e) { r = e.name } r" to "\"assigned\"",
+            "(function () { const c = 1; try { c++ } catch (e) { return e.name } return 'assigned' })()" to "\"assigned\"",
+            "const c2 = 1; var r = 'assigned'; try { c2 += 1 } catch (e) { r = e.name } r" to "\"assigned\"",
+            "(function () { const c = 1; return (function () { try { c = 5 } catch (e) { return e.name } return 'assigned' })() })()" to "\"assigned\"",
+            "(function () { const c = 1; try { eval('c = 3') } catch (e) { return e.name } return 'assigned' })()" to "\"assigned\"",
+            "var r = 'assigned'; try { eval(\"'use strict'; const c3 = 1; c3 = 2\") } catch (e) { r = e.name } r" to "\"assigned\"",
+        )
+        for ((script, upstreamAnswer) in upstreamAnswers) {
+            assertEquals(upstreamAnswer, upstream(script), "upstream: $script")
+            assertEquals("\"TypeError\"", ported(script), "ported: $script")
+        }
+        // Where upstream already throws, in strict mode, the two agree on the error and its text.
+        val strict = "(function () { 'use strict'; const c = 1; try { c = 2 } catch (e) { return String(e) } })()"
+        assertEquals(upstream(strict), ported(strict))
+        assertEquals("\"TypeError: Cannot modify readonly property: c.\"", ported(strict))
+    }
+
+    /**
+     * `a ||= b` on a name writes only when it does not short circuit, as ES2021, 13.15.2 asks.
+     * Upstream lowers it to `a = a || b` and writes either way, which a setter on the global
+     * notices, and which a truthy const would turn into a TypeError now that writing one throws
+     * (D-71). Both halves are pinned so a change on either side shows.
+     */
+    @Test
+    fun logicalAssignmentToANameWritesOnlyWhenItMust() {
+        val script = "(function () { var n = 0, g = (function () { return this })();" +
+            " Object.defineProperty(g, 'lgcl', { get: function () { return 1 }, set: function (v) { n++ }, configurable: true });" +
+            " lgcl ||= 2; lgcl &&= 0; lgcl ??= 3; delete g.lgcl; return n })()"
+        assertEquals("3", upstream(script))
+        assertEquals("1", ported(script))
+        val onAConst = "(function () { const c = 1; c ||= 2; c ??= 3; return c })()"
+        assertEquals("1", upstream(onAConst))
+        assertEquals("1", ported(onAConst))
     }
 
     /**

@@ -1688,6 +1688,15 @@ public class IRFactory(
 
         when (lhs.type) {
             Token.NAME -> {
+                if (assignType == Token.ASSIGN_LOGICAL_OR || assignType == Token.ASSIGN_LOGICAL_AND ||
+                    assignType == Token.ASSIGN_NULLISH
+                ) {
+                    // ES2021, 13.15.2: a logical assignment writes only when it does not short
+                    // circuit, so `a ||= b` is `a || (a = b)`. Upstream writes either way, which
+                    // a const notices once a write to it throws (D-71).
+                    val write = Node(Token.SETNAME, Node.newString(Token.BINDNAME, lhs.string!!), right)
+                    return propagateSuperFromLhs(Node(assignOp, lhs, write), lhs)
+                }
                 val op = Node(assignOp, lhs, right)
                 val lvalueLeft = Node.newString(Token.BINDNAME, lhs.string!!)
                 return propagateSuperFromLhs(Node(Token.SETNAME, lvalueLeft, op), lhs)

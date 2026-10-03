@@ -2233,6 +2233,7 @@ public object ScriptRuntime {
 
     public fun setName(bound: Scriptable?, value: Any?, cx: Context, scope: Scriptable, id: String): Any? {
         if (bound != null) {
+            checkNotConstBinding(bound, id)
             ScriptableObject.putProperty(bound, id, value)
         } else {
             // Assigning to a name nothing declares creates a global.
@@ -2248,11 +2249,23 @@ public object ScriptRuntime {
 
     public fun strictSetName(bound: Scriptable?, value: Any?, cx: Context, scope: Scriptable, id: String): Any? {
         if (bound != null) {
+            checkNotConstBinding(bound, id)
             ScriptableObject.putProperty(bound, id, value)
             return value
         }
         throw constructError("ReferenceError", "Assignment to undefined \"$id\" in strict mode")
     }
+
+    /**
+     * ECMAScript 2015, 8.1.1.1.5: assigning to an immutable binding is a TypeError whatever the
+     * mode. Upstream lets it pass silently outside strict mode, and in strict code run by `eval`
+     * (D-71). The message is the one upstream's strict mode gives for the same write.
+     */
+    private fun checkNotConstBinding(bound: Scriptable, id: String) {
+        if (bound is ScriptableObject && bound.isConstBinding(id)) throw constAssignError(id)
+    }
+
+    internal fun constAssignError(id: String): EcmaError = typeErrorById("msg.modify.readonly", id)
 
     public fun setConst(bound: Scriptable, value: Any?, cx: Context, id: String): Any? {
         ScriptableObject.putConstProperty(bound, id, value)
@@ -2589,7 +2602,14 @@ public object ScriptRuntime {
             target = scopeChain
             do {
                 value = target!!.get(id, scopeChain!!)
-                if (value !== Scriptable.NOT_FOUND) return doScriptableIncrDecr(target, id, scopeChain, value, incrDecrMask)
+                if (value !== Scriptable.NOT_FOUND) {
+                    if (target is ScriptableObject && target.isConstBinding(id)) {
+                        // The operand is still converted first, as the spec's order asks.
+                        if (value !is Number && value !is KBigInt) toNumeric(value)
+                        throw constAssignError(id)
+                    }
+                    return doScriptableIncrDecr(target, id, scopeChain, value, incrDecrMask)
+                }
                 target = target.prototype
             } while (target != null)
             scopeChain = scopeChain.parentScope

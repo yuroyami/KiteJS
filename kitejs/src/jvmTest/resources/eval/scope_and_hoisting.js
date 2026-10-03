@@ -5,7 +5,6 @@ function hoistedFn() { return 'fn'; }
 out.push(hoistedVar, hoistedFn());
 try { tdz; } catch (e) { out.push(e.name); }
 let tdz = 1;
-try { eval('const c = 1; c = 2;'); } catch (e) { out.push(e.name); }
 var shadow = 'outer';
 function f() { var shadow = 'inner'; return shadow; }
 out.push(f(), shadow);

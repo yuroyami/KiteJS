@@ -172,11 +172,17 @@ public abstract class ScriptableObject :
 
     // ---- Attributes ---------------------------------------------------------------------------
 
-    public open fun getAttributes(name: String): Int = getAttributeSlot(name, 0).attributes
+    public open fun getAttributes(name: String): Int = getAttributeSlot(name, 0).attributes and CONST_BINDING.inv()
 
-    public open fun getAttributes(index: Int): Int = getAttributeSlot(null, index).attributes
+    public open fun getAttributes(index: Int): Int = getAttributeSlot(null, index).attributes and CONST_BINDING.inv()
 
-    public open fun getAttributes(sym: Symbol): Int = getAttributeSlot(sym).attributes
+    public open fun getAttributes(sym: Symbol): Int = getAttributeSlot(sym).attributes and CONST_BINDING.inv()
+
+    /** Whether [name] is an own `const` binding here, which no assignment may change (D-71). */
+    internal fun isConstBinding(name: String): Boolean {
+        val slot = map.query(name, 0) ?: return false
+        return (slot.attributes and CONST_BINDING) != 0
+    }
 
     public open fun setAttributes(name: String, attributes: Int) {
         checkNotSealed(name, 0)
@@ -904,13 +910,20 @@ public abstract class ScriptableObject :
         /** The const was declared but not yet given a value. */
         public const val UNINITIALIZED_CONST: Int = 0x08
 
-        public const val CONST: Int = PERMANENT or READONLY or UNINITIALIZED_CONST
+        /**
+         * The property is a `const` binding, so assigning to it is a TypeError in any mode. It
+         * tells a const apart from a property that is only read-only, such as `NaN`, where a
+         * sloppy-mode assignment fails silently. Never reported by [getAttributes] (D-71).
+         */
+        internal const val CONST_BINDING: Int = 0x10
+
+        public const val CONST: Int = PERMANENT or READONLY or UNINITIALIZED_CONST or CONST_BINDING
 
         internal fun buildDataDescriptor(value: Any?, attributes: Int): DescriptorInfo =
             DescriptorInfo(value, attributes, true)
 
         internal fun checkValidAttributes(attributes: Int) {
-            val mask = READONLY or DONTENUM or PERMANENT or UNINITIALIZED_CONST
+            val mask = READONLY or DONTENUM or PERMANENT or UNINITIALIZED_CONST or CONST_BINDING
             require((attributes and mask.inv()) == 0) { "$attributes" }
         }
 

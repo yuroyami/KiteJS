@@ -12,7 +12,7 @@ var attempts = [
   function () { return 'abc'.repeat(-1); },
   function () { return new (function () {})().x.y; },
   function () { return JSON.parse('{bad'); },
-  function () { const c = 1; c = 2; },
+  function () { 'use strict'; const c = 1; c = 2; },
   function () { return Object.defineProperty(1, 'x', {}); },
   function () { var o = Object.freeze({}); 'use strict'; o.x = 1; return o.x; },
   function () { 'use strict'; var o = Object.freeze({}); o.x = 1; },
