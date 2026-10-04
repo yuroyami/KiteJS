@@ -7,8 +7,10 @@ package io.github.yuroyami.kitejs.api
 import io.github.yuroyami.kitejs.EcmaError
 import io.github.yuroyami.kitejs.EvaluatorException
 import io.github.yuroyami.kitejs.JavaScriptException
+import io.github.yuroyami.kitejs.Symbol
 import io.github.yuroyami.kitejs.RhinoException
 import io.github.yuroyami.kitejs.ScriptRuntime
+import io.github.yuroyami.kitejs.Scriptable
 import io.github.yuroyami.kitejs.ScriptableObject
 
 /** One frame of a script's own call stack. */
@@ -33,12 +35,33 @@ public class JsError internal constructor(
     public val errorMessage: String = message
 
     public companion object {
-        /** Wraps a thrown or rejected value, reading `name` and `message` off it when it has them. */
+        /**
+         * Wraps a thrown or rejected value, reading `name` and `message` off it when it has them.
+         * Any value can be thrown, so reading them can fail, from a getter that throws or a
+         * revoked proxy; then the name is `Error` and the message is what the value is, without
+         * running more script. [value] is kept as it was either way.
+         */
         public fun from(value: JsValue): JsError {
             val obj = value.asObjectOrNull()
-            val name = obj?.get("name")?.takeIf { !it.isNullish }?.asString() ?: "Error"
-            val message = obj?.get("message")?.takeIf { !it.isNullish }?.asString() ?: value.asString()
+            val name = readOrNull { obj?.get("name")?.takeIf { !it.isNullish }?.asString() } ?: "Error"
+            val message = readOrNull { obj?.get("message")?.takeIf { !it.isNullish }?.asString() ?: value.asString() }
+                ?: inertDescription(value.raw)
             return JsError(value, name, message, emptyList(), null)
+        }
+
+        /** What a script failure while reading turns into: nothing, so the caller falls back. */
+        private inline fun readOrNull(read: () -> String?): String? = try {
+            read()
+        } catch (e: RhinoException) {
+            null
+        } catch (e: JsError) {
+            null
+        }
+
+        private fun inertDescription(raw: Any?): String = when (raw) {
+            is Symbol -> raw.toString()
+            is Scriptable -> inertText(raw)
+            else -> ScriptRuntime.typeOf(raw)
         }
     }
 }

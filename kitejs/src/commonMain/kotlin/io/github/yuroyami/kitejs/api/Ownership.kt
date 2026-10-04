@@ -5,6 +5,7 @@
 package io.github.yuroyami.kitejs.api
 
 import io.github.yuroyami.kitejs.Context
+import io.github.yuroyami.kitejs.RhinoException
 import io.github.yuroyami.kitejs.Scriptable
 import io.github.yuroyami.kitejs.ScriptableObject
 
@@ -32,8 +33,18 @@ internal fun contextFor(obj: Scriptable): Context = ownerOf(obj)?.usableContext(
 internal fun usableHere(obj: Scriptable): Boolean =
     ownerOf(obj)?.isUsableHere ?: (Context.getCurrentContext() != null)
 
-/** What a handle prints as where it cannot be touched: its class, without running any script. */
-internal fun inertText(obj: Scriptable): String = "[object ${obj.className}]"
+/**
+ * What a handle prints as where it cannot be touched: its class, without running any script. A
+ * revoked proxy has no class to give, and prints as a plain object.
+ */
+internal fun inertText(obj: Scriptable): String {
+    val className = try {
+        obj.className
+    } catch (e: RhinoException) {
+        "Object"
+    }
+    return "[object $className]"
+}
 
 /**
  * Refuses to hand [value] to the engine [scope] belongs to when another engine made it. A value

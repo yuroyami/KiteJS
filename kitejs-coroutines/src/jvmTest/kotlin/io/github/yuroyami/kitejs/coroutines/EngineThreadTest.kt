@@ -4,17 +4,24 @@
 
 package io.github.yuroyami.kitejs.coroutines
 
+import io.github.yuroyami.kitejs.api.KiteJs
 import java.util.concurrent.Executors
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 
 /**
  * An engine is held by the thread that opened it, so everything it does has to happen on that one
@@ -96,5 +103,65 @@ class EngineThreadTest {
         val thread = assertNotNull(home, "configure never ran")
         thread.join(10_000)
         assertFalse(thread.isAlive, "the thread of an engine that never opened was left running")
+    }
+
+    /**
+     * A cancellation that lands after the engine was built, as withContext hands it back, used to
+     * lose the engine with its context still entered on the thread, so a dispatcher of the
+     * caller's own could never open another (issue 20). Cancelling from inside `configure` puts the
+     * cancellation exactly there.
+     */
+    @Test
+    fun aCreationCancelledAfterTheEngineWasBuiltReleasesIt() = runBlocking {
+        val thread = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+        try {
+            lateinit var creation: Deferred<AsyncKiteJs>
+            creation = CoroutineScope(Dispatchers.Default).async(start = CoroutineStart.LAZY) {
+                asyncKiteJs(thread) { creation.cancel() }
+            }
+            creation.start()
+            assertFailsWith<CancellationException> { creation.await() }
+            // The thread holds one engine at a time, so this opens only if the first was released.
+            assertEquals(2.0, withContext(thread) { KiteJs().use { it.evaluate("1 + 1").asDouble() } })
+        } finally {
+            thread.close()
+        }
+    }
+
+    @Test
+    fun aCreationCancelledBeforeItRanLeavesTheDispatcherFree() = runBlocking {
+        val thread = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
+        try {
+            val creation = CoroutineScope(Dispatchers.Default).async {
+                coroutineContext.cancel()
+                asyncKiteJs(thread)
+            }
+            assertFailsWith<CancellationException> { creation.await() }
+            val js = asyncKiteJs(thread)
+            try {
+                assertEquals(2.0, js.evaluate("1 + 1").asDouble())
+            } finally {
+                js.close()
+            }
+        } finally {
+            thread.close()
+        }
+    }
+
+    @Test
+    fun aCreationCancelledAfterTheEngineWasBuiltEndsTheThreadItWasGiven() = runBlocking {
+        var home: Thread? = null
+        lateinit var creation: Deferred<AsyncKiteJs>
+        creation = CoroutineScope(Dispatchers.Default).async(start = CoroutineStart.LAZY) {
+            asyncKiteJs {
+                home = Thread.currentThread()
+                creation.cancel()
+            }
+        }
+        creation.start()
+        assertFailsWith<CancellationException> { creation.await() }
+        val thread = assertNotNull(home, "configure never ran")
+        thread.join(10_000)
+        assertFalse(thread.isAlive, "the thread of an engine nobody received was left running")
     }
 }

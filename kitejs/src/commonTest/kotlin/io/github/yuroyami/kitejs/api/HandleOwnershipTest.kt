@@ -55,6 +55,14 @@ class HandleOwnershipTest {
     }
 
     @Test
+    fun a_revoked_proxy_still_prints_where_its_engine_is_gone() {
+        val first = KiteJs()
+        val revoked = first.evaluate("var r = Proxy.revocable({}, {}); r.revoke(); r.proxy")
+        first.close()
+        assertEquals("[object Object]", revoked.toString())
+    }
+
+    @Test
     fun scalars_outlive_their_engine() {
         val first = KiteJs()
         val n = first.evaluate("6 * 7")

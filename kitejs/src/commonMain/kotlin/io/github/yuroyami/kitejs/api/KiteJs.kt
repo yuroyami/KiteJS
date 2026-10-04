@@ -178,6 +178,19 @@ public class KiteJs internal constructor(
         guarded { cx.processMicrotasks() }
     }
 
+    /**
+     * Runs [body] as a call from the host that is not a script: on this engine's thread, as one
+     * call to the budget when nothing else is running, with what it throws in the facade's shape.
+     */
+    internal fun <T> hostCall(body: (Context, Scriptable) -> T): T {
+        val cx = usableContext()
+        try {
+            return topCall(cx, scopeObject) { body(cx, scopeObject) }
+        } catch (e: Throwable) {
+            throw translate(e)
+        }
+    }
+
     /** A Kotlin value as the engine sees it, collections and all. */
     public fun valueOf(value: Any?): JsValue = JsValue(Converters.toEngine(value, usableContext(), scopeObject))
 

@@ -471,6 +471,15 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   is sloppy, whoever reads it, and an indirect `eval` compiles its code sloppy unless the code
   says otherwise, where upstream made it strict whenever its caller was. `StrictModeFollowsTheCodeTest`
   runs each failed write in both directions, and `EvalOracleTest` pins the difference (#69).
+- D-81: a Promise resolve function whose resolution has a `then` getter that throws rejects
+  the promise with what was thrown, as ECMAScript 2015, 25.4.1.3.2 steps 8 and 9 ask and V8
+  does. Upstream reads `then` outside any catch after setting `alreadyResolved`, so the error
+  escapes the resolve function (into the executor, or into the reaction that returned the
+  thenable) and the promise is never settled. `NativePromise.awaitValue` is the spec's Await
+  for the host: a native promise is observed through `PerformPromiseThen` with no derived
+  promise and without calling its `then`, and any other thenable has `then` read once and called
+  from a microtask with fresh resolving functions, so nested promises and thenables are adopted
+  and only one settlement counts. `onSettled` and the coroutine `await` sit on it.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

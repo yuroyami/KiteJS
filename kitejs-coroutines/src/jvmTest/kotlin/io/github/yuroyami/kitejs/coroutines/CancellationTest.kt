@@ -7,7 +7,9 @@ package io.github.yuroyami.kitejs.coroutines
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import io.github.yuroyami.kitejs.api.function
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -100,6 +102,33 @@ class CancellationTest {
             assertEquals(3.0, js.evaluate("1 + 2").asDouble())
         } finally {
             js.close()
+        }
+    }
+
+    /**
+     * The wait used to outlive the engine: nothing settles the promise once the engine is gone,
+     * and nothing ended the wait either (issue 18). Here the engine is on its own thread, which
+     * close ends, and the waiter is on another.
+     */
+    @Test
+    fun closingTheEngineEndsAWaitOnAnotherThread() = runBlocking {
+        val js = asyncKiteJs()
+        val never = js.evaluate("new Promise(function () {})")
+        val registered = CompletableDeferred<Unit>()
+        // Reading `then` happens as the wait is registered, so this says when it is.
+        val thenable = js.onEngine { engine ->
+            engine.global.function("registered") { registered.complete(Unit) }
+            engine.evaluate("({ get then() { registered(); return function () {} } })")
+        }
+        val onPromise = async(Dispatchers.Default) { runCatching { js.await(never) } }
+        val onThenable = async(Dispatchers.Default) { runCatching { js.await(thenable) } }
+        registered.await()
+        // The promise's wait registers on the same thread; one more call queued behind it ensures it has.
+        js.evaluate("0")
+        js.close()
+        for (waiter in listOf(onPromise, onThenable)) {
+            val outcome = withTimeout(10_000) { waiter.await() }
+            assertTrue(outcome.exceptionOrNull() is IllegalStateException, "expected the closed engine, got $outcome")
         }
     }
 

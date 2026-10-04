@@ -21,6 +21,16 @@ js.evaluate("resolveIt('done')")
 js.runMicrotasks()
 ```
 
+To hear from a promise in Kotlin, `onSettled` attaches to it the way `await` does in a script,
+and `isThenable` says whether a value is one `await` would wait for:
+
+```kotlin
+val promise = js.evaluate("fetchUser(7)")
+if (promise.isThenable) {
+    js.onSettled(promise) { value, error -> if (error == null) show(value) else report(error) }
+}
+```
+
 There is no `async`/`await`. See [Differences from a browser](differences.md).
 
 ## The suspending API
@@ -69,8 +79,9 @@ println(js.onEngine { user.asObject()["name"].asString() })
 ```
 
 `evaluateAwaiting` runs the script and, if the answer is a promise, waits for it to settle.
-`await` does the same for a value you already have. A value that is not a promise comes straight
-back.
+`await` does the same for a value you already have, the way `await` does in a script: any object
+with a callable `then` is waited for, a thenable that answers with another promise or thenable is
+followed to the value at the end, and a value that is not thenable comes straight back.
 
 A rejection arrives as the `JsError` it carried:
 
@@ -82,6 +93,12 @@ try {
     println(e.errorMessage)  // nope
 }
 ```
+
+Any value can be a rejection reason. When reading its `name` or `message` fails, the error is
+still raised, named `Error`, with the original value in `JsError.value`.
+
+Closing the engine ends every `await` still waiting with `IllegalStateException`, because nothing
+can settle the promise any more. A waiting coroutine that is cancelled simply stops waiting.
 
 ## Giving a script a promise
 
@@ -108,6 +125,19 @@ val length = js.evaluateAwaiting("fetch('/a').then(function (body) { return body
 If the body throws, the promise rejects with that message. The body runs on `scope`, off the
 engine's thread, so read an object or a function argument inside `onEngine`; scalars can be read
 as they are.
+
+Every promise these hand out settles once, whatever happens to the work behind it:
+
+| What happens | The script sees |
+|---|---|
+| The body returns, or the `Deferred` completes | The promise fulfils with the value |
+| The body throws, or the `Deferred` fails | It rejects with the failure's message |
+| `scope` is cancelled, before the work starts or while it runs, or the `Deferred` is cancelled | It rejects with the cancellation's message |
+| The engine is closed first | Nothing: the engine is gone, and the work carries on in its scope |
+
+Settling a promise runs the script's reactions to it. If one of them fails in a way the script
+cannot catch, such as running out of its instruction budget, the failure goes to the
+`CoroutineExceptionHandler` in `scope`, or to the platform's handler if there is none.
 
 ## Cancellation
 

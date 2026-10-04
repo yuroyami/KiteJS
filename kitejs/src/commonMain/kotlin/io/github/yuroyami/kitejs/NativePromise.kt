@@ -70,9 +70,17 @@ public class NativePromise : ScriptableObject() {
         val onFulfilled = if (args.isNotEmpty() && args[0] is Callable) args[0] as Callable else null
         val onRejected = if (args.size >= 2 && args[1] is Callable) args[1] as Callable else null
 
-        val fulfillReaction = Reaction(capability, ReactionType.FULFILL, onFulfilled)
-        val rejectReaction = Reaction(capability, ReactionType.REJECT, onRejected)
+        addReactions(
+            cx,
+            scope,
+            Reaction(capability, ReactionType.FULFILL, onFulfilled),
+            Reaction(capability, ReactionType.REJECT, onRejected),
+        )
+        return capability.promise
+    }
 
+    /** The rest of PerformPromiseThen: park both reactions, or queue the one that applies now. */
+    private fun addReactions(cx: Context, scope: Scriptable, fulfillReaction: Reaction, rejectReaction: Reaction) {
         when (state) {
             State.PENDING -> {
                 fulfillReactions.add(fulfillReaction)
@@ -88,7 +96,6 @@ public class NativePromise : ScriptableObject() {
                 cx.enqueueMicrotask(Context.Runnable { rejectReaction.invoke(cx, scope, value) })
             }
         }
-        return capability.promise
     }
 
     /** The Promise Resolve Thenable Job: hand our own resolvers to someone else's `then`. */
@@ -136,7 +143,13 @@ public class NativePromise : ScriptableObject() {
 
             if (!ScriptRuntime.isObject(resolution)) return promise.fulfillPromise(cx, scope, resolution)
 
-            val thenObj = getProperty(ensureScriptable(resolution), "then")
+            // A `then` getter that throws rejects the promise. Upstream lets the error escape the
+            // resolve function with the promise already marked resolved, so it stays pending (D-81).
+            val thenObj = try {
+                getProperty(ensureScriptable(resolution), "then")
+            } catch (re: RhinoException) {
+                return promise.rejectPromise(cx, scope, getErrorObject(cx, scope, re))
+            }
             if (thenObj !is Callable) return promise.fulfillPromise(cx, scope, resolution)
 
             // A thenable is adopted through a microtask, never synchronously.
@@ -145,14 +158,21 @@ public class NativePromise : ScriptableObject() {
         }
     }
 
-    /** One waiting handler plus the promise its answer settles. */
+    /**
+     * One waiting handler plus the promise its answer settles. A reaction with no [capability] is
+     * the host's own, attached the way `await` attaches, and has nothing to settle afterwards.
+     */
     private class Reaction(
-        val capability: Capability,
+        val capability: Capability?,
         val reaction: ReactionType,
         val handler: Callable?,
     ) {
         /** NewPromiseReactionJob: run the handler, then settle the next promise with its answer. */
         fun invoke(cx: Context, scope: Scriptable, arg: Any?) {
+            if (capability == null) {
+                handler?.call(cx, scope, Undefined.SCRIPTABLE_UNDEFINED, arrayOf(arg))
+                return
+            }
             try {
                 val result: Any?
                 if (handler == null) {
@@ -427,6 +447,53 @@ public class NativePromise : ScriptableObject() {
                 resolving.reject.call(cx, scope, thisObj, arrayOf(getErrorObject(cx, scope, re)))
             }
             return promise
+        }
+
+        /**
+         * The spec's Await, for the host: attaches [onFulfilled] and [onRejected] to [value] the
+         * way `await value` resumes. A promise is observed without calling its `then`. Any other
+         * thenable has its `then` read once and called from a microtask, and whatever it resolves
+         * with is followed to the end, so neither handler is ever handed a thenable. Exactly one
+         * of them runs, once, from the microtask queue. Returns false, attaching nothing, when
+         * [value] is not thenable, which `await` would hand straight back.
+         */
+        internal fun awaitValue(
+            cx: Context,
+            scope: Scriptable,
+            value: Any?,
+            onFulfilled: Callable,
+            onRejected: Callable,
+        ): Boolean {
+            val top = getTopLevelScope(scope)
+            val promise: NativePromise
+            if (value is NativePromise) {
+                // PromiseResolve(%Promise%, value): the promise itself, unless its constructor
+                // was changed, in which case a new one that adopts it.
+                val ctor = TopLevel.getBuiltinCtor(cx, top, TopLevel.Builtins.Promise)
+                promise = resolveInternal(cx, top, ctor, value) as NativePromise
+            } else {
+                if (!ScriptRuntime.isObject(value)) return false
+                promise = NativePromise()
+                val then = try {
+                    ScriptableObject.getProperty(value as Scriptable, "then")
+                } catch (re: RhinoException) {
+                    // The resolve function rejects when reading `then` throws, so `await` does.
+                    promise.rejectPromise(cx, top, getErrorObject(cx, top, re))
+                    null
+                }
+                if (promise.state == State.PENDING) {
+                    if (then !is Callable) return false
+                    // NewPromiseResolveThenableJob, handed the `then` already read.
+                    cx.enqueueMicrotask(Context.Runnable { promise.callThenable(cx, top, value, then) })
+                }
+            }
+            promise.addReactions(
+                cx,
+                top,
+                Reaction(null, ReactionType.FULFILL, onFulfilled),
+                Reaction(null, ReactionType.REJECT, onRejected),
+            )
+            return true
         }
 
         private fun js_resolve(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {

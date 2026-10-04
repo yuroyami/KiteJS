@@ -132,6 +132,16 @@ as sloppy.
   `Arguments.sharedWithActivation`, which asks the context; and `NativeGlobal.js_eval`, which
   compiles through `evalSpecial` with the caller's mode.
 - Test: `EvalOracleTest.strictModeIsTheModeOfTheCodeThatRuns`.
+### A `then` getter that throws leaves the promise pending for good (D-81)
+
+`new Promise(function (r) { r({ get then() { throw 'boom' } }) })` never settles, and the call to
+`r` throws `'boom'` back at the executor. The same goes for a reaction that returns such an
+object: the promise `then` made for it stays pending. ECMAScript 2015, 25.4.1.3.2 steps 8 and 9
+reject the promise with what was thrown, and the resolve function returns normally; V8 does so.
+
+- Where: `NativePromise.ResolvingFunctions.resolve`, which marks the promise resolved and then
+  reads `then` with nothing around it to catch the error.
+- Test: `EvalOracleTest.aThrowingThenGetterRejectsThePromise`.
 
 ### A getOwnPropertyDescriptor trap answering undefined crashes (D-50)
 

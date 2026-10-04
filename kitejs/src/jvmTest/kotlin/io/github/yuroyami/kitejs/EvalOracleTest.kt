@@ -2321,6 +2321,25 @@ class EvalOracleTest {
     }
 
     /**
+     * Resolving a promise with an object whose `then` getter throws rejects it with what was
+     * thrown, as ECMAScript 2015, 25.4.1.3.2 asks and V8 does. Upstream lets the error escape the
+     * resolve function after marking the promise resolved, so the promise is never settled (D-81).
+     */
+    @Test
+    fun aThrowingThenGetterRejectsThePromise() {
+        val setup = "var poisonLog = []; Promise.resolve(1).then(function (v) { poisonLog.push(v) });" +
+            " new Promise(function (r) { try { r({ get then() { throw 'boom' } }); poisonLog.push('returned') }" +
+            " catch (e) { poisonLog.push('threw:' + e) } }).then(function () { poisonLog.push('ok') }," +
+            " function (e) { poisonLog.push('rej:' + e) });" +
+            " Promise.resolve().then(function () { return { get then() { throw 'b2' } } })" +
+            ".then(null, function (e) { poisonLog.push('rej2:' + e) }); 0"
+        upstream(setup)
+        ported(setup)
+        assertEquals("\"threw:boom,1\"", upstream("poisonLog.join()"))
+        assertEquals("\"returned,1,rej:boom,rej2:b2\"", ported("poisonLog.join()"))
+    }
+
+    /**
      * Array spread when no `Symbol.iterator` is in reach. A real array is still walked by its
      * length, so a hole arrives as undefined and a non-index own property is left out. Each
      * script puts the iterator back so the next one starts clean.
