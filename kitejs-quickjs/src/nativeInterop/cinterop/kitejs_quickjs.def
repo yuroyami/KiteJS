@@ -1,0 +1,5 @@
+headers = kitejs_quickjs.h
+headerFilter = kitejs_quickjs.h
+package = io.github.yuroyami.kitejs.quickjs.cinterop
+staticLibraries = libkitejs_quickjs.a
+linkerOpts.linux = -lm

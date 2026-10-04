@@ -31,6 +31,10 @@ include(":kitejs-api")
 // jvmTest as a differential-testing oracle.
 include(":kitejs-rhino")
 
+// :kitejs-quickjs is QuickJS-ng, the C engine, bound directly: vendored C sources, a small C
+// surface, and a bridge per platform (cinterop, JNI, a WebAssembly module).
+include(":kitejs-quickjs")
+
 // :kitejs is the artifact KiteJS shipped as before it had more than one engine: :kitejs-api with
 // :kitejs-rhino underneath, and the deprecated `KiteJs { }`. It goes away at 1.0.
 include(":kitejs")

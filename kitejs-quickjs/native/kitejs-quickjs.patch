@@ -1,0 +1,181 @@
+--- a/quickjs.c
++++ b/quickjs.c
+@@ -381,6 +381,8 @@
+ 
+     JSInterruptHandler *interrupt_handler;
+     void *interrupt_opaque;
++    JSKiteNowFunc *kite_now;
++    JSKiteTimezoneOffsetFunc *kite_tz_offset;
+ 
+     JSPromiseHook *promise_hook;
+     void *promise_hook_opaque;
+@@ -553,7 +555,9 @@
+ 
+ /* must be large enough to have a negligible runtime cost and small
+    enough to call the interrupt callback often. */
++#ifndef JS_INTERRUPT_COUNTER_INIT
+ #define JS_INTERRUPT_COUNTER_INIT 10000
++#endif
+ 
+ struct JSContext {
+     JSGCObjectHeader header; /* must come first */
+@@ -2552,6 +2556,29 @@
+     return ret;
+ }
+ 
++/* KiteJS: drop every pending job without running it */
++void JS_KiteDiscardPendingJobs(JSRuntime *rt)
++{
++    struct list_head *el, *el1;
++    int i;
++
++    list_for_each_safe(el, el1, &rt->job_list) {
++        JSJobEntry *e = list_entry(el, JSJobEntry, link);
++        list_del(&e->link);
++        for(i = 0; i < e->argc; i++)
++            JS_FreeValueRT(rt, e->argv[i]);
++        js_free_rt(rt, e);
++    }
++}
++
++/* KiteJS: the clock and the time zone Date reads */
++void JS_KiteSetDateHooks(JSRuntime *rt, JSKiteNowFunc *now,
++                         JSKiteTimezoneOffsetFunc *tz_offset)
++{
++    rt->kite_now = now;
++    rt->kite_tz_offset = tz_offset;
++}
++
+ static inline uint32_t atom_get_free(const JSAtomStruct *p)
+ {
+     return (uintptr_t)p >> 1;
+@@ -49127,7 +49154,9 @@
+ 
+ /* OS dependent. d = argv[0] is in ms from 1970. Return the difference
+    between UTC time and local time 'd' in minutes */
+-static int getTimezoneOffset(int64_t time) {
++static int getTimezoneOffset(JSContext *ctx, int64_t time) {
++    if (ctx->rt->kite_tz_offset)
++        return ctx->rt->kite_tz_offset(ctx, time);
+ #if defined(_WIN32)
+     DWORD r;
+     TIME_ZONE_INFORMATION t;
+@@ -57377,7 +57406,7 @@
+     } else {
+         d = dval;     /* assuming -8.64e15 <= dval <= -8.64e15 */
+         if (is_local) {
+-            tz = -getTimezoneOffset(d);
++            tz = -getTimezoneOffset(ctx, d);
+             d += tz * 60000;
+         }
+     }
+@@ -57423,7 +57452,7 @@
+ 
+ /* The spec mandates the use of 'double' and it specifies the order
+    of the operations */
+-static double set_date_fields(double fields[minimum_length(7)], int is_local) {
++static double set_date_fields(JSContext *ctx, double fields[minimum_length(7)], int is_local) {
+     double y, m, dt, ym, mn, day, h, s, milli, time, tv;
+     int yi, mi, i;
+     int64_t days;
+@@ -57477,7 +57506,7 @@
+     /* adjust for local time and clip */
+     if (is_local) {
+         int64_t ti = tv < INT64_MIN ? INT64_MIN : tv >= 0x1p63 ? INT64_MAX : (int64_t)tv;
+-        tv += getTimezoneOffset(ti) * 60000;
++        tv += getTimezoneOffset(ctx, ti) * 60000;
+     }
+     d = time_clip(tv);
+ out:
+@@ -57537,7 +57566,7 @@
+         return JS_NAN;
+ 
+     if (argc > 0)
+-        d = set_date_fields(fields, is_local);
++        d = set_date_fields(ctx, fields, is_local);
+ 
+     return JS_SetThisTimeValue(ctx, this_val, d);
+ }
+@@ -57661,7 +57690,9 @@
+ }
+ 
+ /* OS dependent: return the UTC time in ms since 1970. */
+-static int64_t date_now(void) {
++static int64_t date_now(JSContext *ctx) {
++    if (ctx->rt->kite_now)
++        return ctx->rt->kite_now(ctx);
+     return js__gettimeofday_us() / 1000;
+ }
+ 
+@@ -57679,7 +57710,7 @@
+     }
+     n = argc;
+     if (n == 0) {
+-        val = date_now();
++        val = date_now(ctx);
+     } else if (n == 1) {
+         JSValue v, dv;
+         if (JS_VALUE_GET_TAG(argv[0]) == JS_TAG_OBJECT) {
+@@ -57717,7 +57748,7 @@
+             if (i == 0 && fields[0] >= 0 && fields[0] < 100)
+                 fields[0] += 1900;
+         }
+-        val = (i == n) ? set_date_fields(fields, 1) : NAN;
++        val = (i == n) ? set_date_fields(ctx, fields, 1) : NAN;
+     }
+ has_val:
+     rv = js_create_from_ctor(ctx, new_target, JS_CLASS_DATE);
+@@ -57755,7 +57786,7 @@
+         if (i == 0 && fields[0] >= 0 && fields[0] < 100)
+             fields[0] += 1900;
+     }
+-    return js_float64(set_date_fields(fields, 0));
++    return js_float64(set_date_fields(ctx, fields, 0));
+ }
+ 
+ /* Date string parsing */
+@@ -58211,7 +58242,7 @@
+         if (valid) {
+             for(i = 0; i < 7; i++)
+                 fields1[i] = fields[i];
+-            d = set_date_fields(fields1, is_local) - fields[8] * 60000;
++            d = set_date_fields(ctx, fields1, is_local) - fields[8] * 60000;
+             rv = js_float64(d);
+         }
+     }
+@@ -58223,7 +58254,7 @@
+                            int argc, JSValueConst *argv)
+ {
+     // now()
+-    return js_int64(date_now());
++    return js_int64(date_now(ctx));
+ }
+ 
+ static JSValue js_date_Symbol_toPrimitive(JSContext *ctx, JSValueConst this_val,
+@@ -58270,7 +58301,7 @@
+         return JS_NAN;
+     else
+         /* assuming -8.64e15 <= v <= -8.64e15 */
+-        return js_int64(getTimezoneOffset((int64_t)trunc(v)));
++        return js_int64(getTimezoneOffset(ctx, (int64_t)trunc(v)));
+ }
+ 
+ static JSValue js_date_getTime(JSContext *ctx, JSValueConst this_val,
+--- a/quickjs.h
++++ b/quickjs.h
+@@ -1251,6 +1251,15 @@
+ JS_EXTERN JSContext *JS_GetPendingJobContext(JSRuntime *rt);
+ JS_EXTERN int JS_ExecutePendingJob(JSRuntime *rt, JSContext **pctx);
+ 
++/* KiteJS additions */
++JS_EXTERN void JS_KiteDiscardPendingJobs(JSRuntime *rt);
++/* milliseconds since the epoch */
++typedef int64_t JSKiteNowFunc(JSContext *ctx);
++/* minutes local time is behind UTC at 'time' ms since the epoch, as getTimezoneOffset() answers */
++typedef int JSKiteTimezoneOffsetFunc(JSContext *ctx, int64_t time);
++JS_EXTERN void JS_KiteSetDateHooks(JSRuntime *rt, JSKiteNowFunc *now,
++                                   JSKiteTimezoneOffsetFunc *tz_offset);
++
+ /* Structure to retrieve (de)serialized SharedArrayBuffer objects. */
+ typedef struct JSSABTab {
+     uint8_t **tab;
