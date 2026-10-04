@@ -6,6 +6,7 @@ package io.github.yuroyami.kitejs.api
 
 import io.github.yuroyami.kitejs.rhino.Context
 import io.github.yuroyami.kitejs.rhino.NativeObject
+import io.github.yuroyami.kitejs.rhino.Rhino
 import io.github.yuroyami.kitejs.rhino.ScriptRuntime
 import io.github.yuroyami.kitejs.rhino.Scriptable
 import kotlin.test.Test
@@ -18,7 +19,7 @@ import kotlin.test.assertEquals
  */
 class RealmIntrinsicsTest {
 
-    private fun eval(source: String): String = KiteJs().use { js -> js.evaluate(source).asString() }
+    private fun eval(source: String): String = KiteJs(Rhino).use { js -> js.evaluate(source).asString() }
 
     @Test
     fun the_examples_of_the_issue() {
@@ -75,7 +76,7 @@ class RealmIntrinsicsTest {
         assertEquals("true,string", eval("var SE = SyntaxError; SyntaxError = function () {}; try { eval('(') } catch (e) { [e instanceof SE, typeof e.message].join() }"))
         assertEquals(
             "true,true",
-            KiteJs().use { js ->
+            KiteJs(Rhino).use { js ->
                 js.evaluate(
                     "var r; var AE = AggregateError; AggregateError = function () {};" +
                         " Promise.any([]).catch(function (e) { r = [e instanceof AE, e.constructor === AE].join() });",

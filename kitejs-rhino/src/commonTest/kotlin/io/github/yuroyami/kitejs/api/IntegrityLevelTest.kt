@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.api
 
+import io.github.yuroyami.kitejs.rhino.Rhino
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -15,7 +16,7 @@ import kotlin.test.assertEquals
  */
 class IntegrityLevelTest {
 
-    private fun eval(source: String): String = KiteJs().use { js -> js.evaluate(source).asString() }
+    private fun eval(source: String): String = KiteJs(Rhino).use { js -> js.evaluate(source).asString() }
 
     private val logging =
         "var log = []; var p = new Proxy({ a: 1 }, { defineProperty: function (t, k, d) { log.push(k + ':' + JSON.stringify(d)); return Reflect.defineProperty(t, k, d) }," +

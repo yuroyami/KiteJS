@@ -4,13 +4,17 @@
 
 package io.github.yuroyami.kitejs.api
 
-import io.github.yuroyami.kitejs.rhino.NativeConsole
-
 /** How loud a console message is. */
-public typealias ConsoleLevel = NativeConsole.Level
+public enum class ConsoleLevel { TRACE, DEBUG, INFO, WARN, ERROR }
 
-/** Where `console.log` and its neighbours end up. */
-public typealias ConsolePrinter = NativeConsole.ConsolePrinter
+/**
+ * Where `console.log` and its neighbours end up. Every engine formats the arguments the same way
+ * before they get here: separated by spaces, with `%s`, `%d`, `%i`, `%f`, `%o`, `%O` and `%c` in a
+ * leading string filled in, as a browser console does.
+ */
+public fun interface ConsolePrinter {
+    public fun print(level: ConsoleLevel, text: String)
+}
 
 /** One console message, already formatted. */
 public data class ConsoleMessage(val level: ConsoleLevel, val text: String) {
@@ -21,17 +25,14 @@ public data class ConsoleMessage(val level: ConsoleLevel, val text: String) {
 public object ConsolePrinters {
 
     /** Everything to standard output, one line per call, with the level in front. */
-    public val stdout: ConsolePrinter = ConsolePrinter { cx, scope, level, args, _ ->
-        println("[${level.name.lowercase()}] " + NativeConsole.format(cx, scope, args))
+    public val stdout: ConsolePrinter = ConsolePrinter { level, text ->
+        println("[${level.name.lowercase()}] $text")
     }
 
     /** Everything into [into], so a test can read back what a script printed. */
     public fun collecting(into: MutableList<ConsoleMessage>): ConsolePrinter =
-        ConsolePrinter { cx, scope, level, args, _ ->
-            into.add(ConsoleMessage(level, NativeConsole.format(cx, scope, args)))
-        }
+        ConsolePrinter { level, text -> into.add(ConsoleMessage(level, text)) }
 
     /** Everything to [sink], which decides what to do with it. */
-    public fun of(sink: (ConsoleLevel, String) -> Unit): ConsolePrinter =
-        ConsolePrinter { cx, scope, level, args, _ -> sink(level, NativeConsole.format(cx, scope, args)) }
+    public fun of(sink: (ConsoleLevel, String) -> Unit): ConsolePrinter = ConsolePrinter(sink)
 }

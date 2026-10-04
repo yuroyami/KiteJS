@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.api
 
+import io.github.yuroyami.kitejs.rhino.Rhino
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -386,12 +387,12 @@ class MathDigitsTest {
             });
             wrong.join('\n');
         """.trimIndent().replace("VECTORS", vectors.joinToString(",", "[", "]") { "'$it'" })
-        assertEquals("", KiteJs().use { it.evaluate(script).asString() })
+        assertEquals("", KiteJs(Rhino).use { it.evaluate(script).asString() })
     }
 
     @Test
     fun exp_of_one_is_e() {
-        assertEquals("true,true", KiteJs().use { it.evaluate("[Math.exp(1) === Math.E, Math.exp(-1) === 1 / Math.E].join()").asString() })
+        assertEquals("true,true", KiteJs(Rhino).use { it.evaluate("[Math.exp(1) === Math.E, Math.exp(-1) === 1 / Math.E].join()").asString() })
     }
 
     /** `**` is the same operation as `Math.pow`, on every path the interpreter has. */
@@ -400,6 +401,6 @@ class MathDigitsTest {
         val script = "var xs = [121.60979304462671, -15.96516037825495, 25.76389836613089, 816.6249096393585, 1.0000001]; " +
             "var ys = [21, 29, 33, 4.075537058524787, 1e9]; var r = []; " +
             "for (var i = 0; i < xs.length; i++) { var x = xs[i], y = ys[i]; r.push(x ** y === Math.pow(x, y)); var z = x; z **= y; r.push(z === Math.pow(x, y)) } r.join()"
-        assertEquals(List(10) { "true" }.joinToString(","), KiteJs().use { it.evaluate(script).asString() })
+        assertEquals(List(10) { "true" }.joinToString(","), KiteJs(Rhino).use { it.evaluate(script).asString() })
     }
 }

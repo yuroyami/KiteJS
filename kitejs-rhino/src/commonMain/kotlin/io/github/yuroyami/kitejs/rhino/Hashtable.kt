@@ -4,6 +4,8 @@
 
 package io.github.yuroyami.kitejs.rhino
 
+import io.github.yuroyami.kitejs.api.KBigInt
+
 /**
  * The table behind `Map` and `Set`: a hash map for lookup plus a doubly linked list for insertion
  * order.

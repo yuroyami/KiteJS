@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.rhino
 
+import io.github.yuroyami.kitejs.api.KBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

@@ -8,6 +8,7 @@ import io.github.yuroyami.kitejs.api.JsEngineError
 import io.github.yuroyami.kitejs.api.JsError
 import io.github.yuroyami.kitejs.api.JsValue
 import io.github.yuroyami.kitejs.api.newPromise
+import io.github.yuroyami.kitejs.rhino.Rhino
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -36,7 +37,7 @@ import kotlinx.coroutines.test.runTest
 class ShutdownTest {
 
     private suspend fun TestScope.engine(budget: Int = 0): AsyncKiteJs =
-        asyncKiteJs(StandardTestDispatcher(testScheduler)) { instructionBudget = budget }
+        asyncKiteJs(Rhino, StandardTestDispatcher(testScheduler)) { instructionBudget = budget }
 
     /**
      * Closes [js] and lets the release run, even after a failed assertion, so the engine does not

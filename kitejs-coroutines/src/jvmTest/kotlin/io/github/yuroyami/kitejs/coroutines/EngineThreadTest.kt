@@ -5,6 +5,7 @@
 package io.github.yuroyami.kitejs.coroutines
 
 import io.github.yuroyami.kitejs.api.KiteJs
+import io.github.yuroyami.kitejs.rhino.Rhino
 import java.util.concurrent.Executors
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,8 +17,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
@@ -32,7 +33,7 @@ class EngineThreadTest {
 
     @Test
     fun everyCallRunsOnTheThreadThatHoldsTheEngine() = runBlocking {
-        val js = asyncKiteJs()
+        val js = asyncKiteJs(Rhino)
         try {
             // Callers on several threads at once. A pool dispatcher moves the calls between its
             // threads, and a string method is one of the calls that then fails.
@@ -54,7 +55,7 @@ class EngineThreadTest {
 
     @Test
     fun severalEnginesCanBeOpenAtOnce() = runBlocking {
-        val engines = List(4) { asyncKiteJs() }
+        val engines = List(4) { asyncKiteJs(Rhino) }
         try {
             engines.forEachIndexed { i, js -> js.evaluate("var id = $i") }
             engines.forEachIndexed { i, js -> assertEquals(i.toDouble(), js.evaluate("id").asDouble()) }
@@ -67,11 +68,11 @@ class EngineThreadTest {
     fun closingFromAnotherThreadFreesTheEnginesThread() = runBlocking {
         val thread = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
         try {
-            val first = asyncKiteJs(thread)
+            val first = asyncKiteJs(Rhino, thread)
             first.evaluate("1")
             first.close()
             // A thread holds one engine at a time, so this opens only if the first was released there.
-            val second = asyncKiteJs(thread)
+            val second = asyncKiteJs(Rhino, thread)
             try {
                 assertEquals(2.0, second.evaluate("1 + 1").asDouble())
             } finally {
@@ -84,7 +85,7 @@ class EngineThreadTest {
 
     @Test
     fun closingEndsTheThreadTheEngineWasGiven() = runBlocking {
-        val js = asyncKiteJs()
+        val js = asyncKiteJs(Rhino)
         val home = js.onEngine { Thread.currentThread() }
         js.close()
         home.join(10_000)
@@ -95,7 +96,7 @@ class EngineThreadTest {
     fun anEngineThatFailsToOpenEndsItsThread() = runBlocking {
         var home: Thread? = null
         assertFailsWith<IllegalStateException> {
-            asyncKiteJs {
+            asyncKiteJs(Rhino) {
                 home = Thread.currentThread()
                 error("the host gave up")
             }
@@ -117,12 +118,12 @@ class EngineThreadTest {
         try {
             lateinit var creation: Deferred<AsyncKiteJs>
             creation = CoroutineScope(Dispatchers.Default).async(start = CoroutineStart.LAZY) {
-                asyncKiteJs(thread) { creation.cancel() }
+                asyncKiteJs(Rhino, thread) { creation.cancel() }
             }
             creation.start()
             assertFailsWith<CancellationException> { creation.await() }
             // The thread holds one engine at a time, so this opens only if the first was released.
-            assertEquals(2.0, withContext(thread) { KiteJs().use { it.evaluate("1 + 1").asDouble() } })
+            assertEquals(2.0, withContext(thread) { KiteJs(Rhino).use { it.evaluate("1 + 1").asDouble() } })
         } finally {
             thread.close()
         }
@@ -134,10 +135,10 @@ class EngineThreadTest {
         try {
             val creation = CoroutineScope(Dispatchers.Default).async {
                 coroutineContext.cancel()
-                asyncKiteJs(thread)
+                asyncKiteJs(Rhino, thread)
             }
             assertFailsWith<CancellationException> { creation.await() }
-            val js = asyncKiteJs(thread)
+            val js = asyncKiteJs(Rhino, thread)
             try {
                 assertEquals(2.0, js.evaluate("1 + 1").asDouble())
             } finally {
@@ -153,7 +154,7 @@ class EngineThreadTest {
         var home: Thread? = null
         lateinit var creation: Deferred<AsyncKiteJs>
         creation = CoroutineScope(Dispatchers.Default).async(start = CoroutineStart.LAZY) {
-            asyncKiteJs {
+            asyncKiteJs(Rhino) {
                 home = Thread.currentThread()
                 creation.cancel()
             }

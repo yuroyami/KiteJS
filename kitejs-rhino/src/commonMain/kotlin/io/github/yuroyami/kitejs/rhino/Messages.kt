@@ -4,6 +4,8 @@
 
 package io.github.yuroyami.kitejs.rhino
 
+import io.github.yuroyami.kitejs.api.KBigInt
+
 
 /**
  * KMP replacement for the ResourceBundle + MessageFormat pipeline (ledger D-4).

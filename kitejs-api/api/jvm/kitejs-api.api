@@ -1,0 +1,403 @@
+public final class io/github/yuroyami/kitejs/api/BindScope {
+	public final fun method (Ljava/lang/String;ILkotlin/jvm/functions/Function2;)V
+	public static synthetic fun method$default (Lio/github/yuroyami/kitejs/api/BindScope;Ljava/lang/String;ILkotlin/jvm/functions/Function2;ILjava/lang/Object;)V
+	public final fun property (Ljava/lang/String;Lkotlin/reflect/KMutableProperty1;)V
+	public final fun property (Ljava/lang/String;Lkotlin/reflect/KProperty1;)V
+}
+
+public final class io/github/yuroyami/kitejs/api/ConsoleLevel : java/lang/Enum {
+	public static final field DEBUG Lio/github/yuroyami/kitejs/api/ConsoleLevel;
+	public static final field ERROR Lio/github/yuroyami/kitejs/api/ConsoleLevel;
+	public static final field INFO Lio/github/yuroyami/kitejs/api/ConsoleLevel;
+	public static final field TRACE Lio/github/yuroyami/kitejs/api/ConsoleLevel;
+	public static final field WARN Lio/github/yuroyami/kitejs/api/ConsoleLevel;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/yuroyami/kitejs/api/ConsoleLevel;
+	public static fun values ()[Lio/github/yuroyami/kitejs/api/ConsoleLevel;
+}
+
+public final class io/github/yuroyami/kitejs/api/ConsoleMessage {
+	public fun <init> (Lio/github/yuroyami/kitejs/api/ConsoleLevel;Ljava/lang/String;)V
+	public final fun component1 ()Lio/github/yuroyami/kitejs/api/ConsoleLevel;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Lio/github/yuroyami/kitejs/api/ConsoleLevel;Ljava/lang/String;)Lio/github/yuroyami/kitejs/api/ConsoleMessage;
+	public static synthetic fun copy$default (Lio/github/yuroyami/kitejs/api/ConsoleMessage;Lio/github/yuroyami/kitejs/api/ConsoleLevel;Ljava/lang/String;ILjava/lang/Object;)Lio/github/yuroyami/kitejs/api/ConsoleMessage;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getLevel ()Lio/github/yuroyami/kitejs/api/ConsoleLevel;
+	public final fun getText ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class io/github/yuroyami/kitejs/api/ConsolePrinter {
+	public abstract fun print (Lio/github/yuroyami/kitejs/api/ConsoleLevel;Ljava/lang/String;)V
+}
+
+public final class io/github/yuroyami/kitejs/api/ConsolePrinters {
+	public static final field INSTANCE Lio/github/yuroyami/kitejs/api/ConsolePrinters;
+	public final fun collecting (Ljava/util/List;)Lio/github/yuroyami/kitejs/api/ConsolePrinter;
+	public final fun getStdout ()Lio/github/yuroyami/kitejs/api/ConsolePrinter;
+	public final fun of (Lkotlin/jvm/functions/Function2;)Lio/github/yuroyami/kitejs/api/ConsolePrinter;
+}
+
+public final class io/github/yuroyami/kitejs/api/Converters {
+	public static final field INSTANCE Lio/github/yuroyami/kitejs/api/Converters;
+	public final fun canonical (Ljava/lang/Object;)Ljava/lang/Object;
+	public final fun clearRegistrations ()V
+	public final fun isCollection (Ljava/lang/Object;)Z
+	public final fun register (Lkotlin/jvm/functions/Function1;)V
+	public final fun toEngine (Ljava/lang/Object;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+}
+
+public final class io/github/yuroyami/kitejs/api/HostBindingKt {
+	public static final fun accessor (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;Lio/github/yuroyami/kitejs/api/PropertyFlags;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;)V
+	public static synthetic fun accessor$default (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;Lio/github/yuroyami/kitejs/api/PropertyFlags;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
+	public static final fun bind (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;Ljava/lang/Object;Lkotlin/jvm/functions/Function1;)Lio/github/yuroyami/kitejs/api/JsObject;
+	public static final fun constant (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;Ljava/lang/Object;)V
+	public static final fun constructor (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;ILio/github/yuroyami/kitejs/api/PropertyFlags;Lkotlin/jvm/functions/Function2;)Lio/github/yuroyami/kitejs/api/JsFunction;
+	public static synthetic fun constructor$default (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;ILio/github/yuroyami/kitejs/api/PropertyFlags;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsFunction;
+	public static final fun function (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;ILio/github/yuroyami/kitejs/api/PropertyFlags;Lkotlin/jvm/functions/Function1;)Lio/github/yuroyami/kitejs/api/JsFunction;
+	public static synthetic fun function$default (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;ILio/github/yuroyami/kitejs/api/PropertyFlags;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsFunction;
+	public static final fun getter (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;Lio/github/yuroyami/kitejs/api/PropertyFlags;Lkotlin/jvm/functions/Function0;)V
+	public static synthetic fun getter$default (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;Lio/github/yuroyami/kitejs/api/PropertyFlags;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)V
+	public static final fun method (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;ILio/github/yuroyami/kitejs/api/PropertyFlags;Lkotlin/jvm/functions/Function2;)Lio/github/yuroyami/kitejs/api/JsFunction;
+	public static synthetic fun method$default (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;ILio/github/yuroyami/kitejs/api/PropertyFlags;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsFunction;
+	public static final fun obj (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lio/github/yuroyami/kitejs/api/JsObject;
+	public static synthetic fun obj$default (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsObject;
+	public static final fun property (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;Ljava/lang/Object;Lio/github/yuroyami/kitejs/api/PropertyFlags;)V
+	public static synthetic fun property$default (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;Ljava/lang/Object;Lio/github/yuroyami/kitejs/api/PropertyFlags;ILjava/lang/Object;)V
+	public static final fun setter (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;Lio/github/yuroyami/kitejs/api/PropertyFlags;Lkotlin/jvm/functions/Function1;)V
+	public static synthetic fun setter$default (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;Lio/github/yuroyami/kitejs/api/PropertyFlags;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)V
+}
+
+public abstract interface annotation class io/github/yuroyami/kitejs/api/InternalKiteJsApi : java/lang/annotation/Annotation {
+}
+
+public abstract class io/github/yuroyami/kitejs/api/JsArray : io/github/yuroyami/kitejs/api/JsObject {
+	public fun <init> ()V
+	public final fun add (Ljava/lang/Object;)V
+	public abstract fun getSize ()I
+	public final fun toList ()Ljava/util/List;
+	public final fun values ()Ljava/util/List;
+}
+
+public abstract interface class io/github/yuroyami/kitejs/api/JsEngine {
+	public abstract fun getName ()Ljava/lang/String;
+	public fun load (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public abstract fun newConfig ()Lio/github/yuroyami/kitejs/api/KiteJsConfig;
+	public abstract fun open (Lio/github/yuroyami/kitejs/api/KiteJsConfig;)Lio/github/yuroyami/kitejs/api/KiteJs;
+}
+
+public final class io/github/yuroyami/kitejs/api/JsEngine$DefaultImpls {
+	public static fun load (Lio/github/yuroyami/kitejs/api/JsEngine;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+}
+
+public final class io/github/yuroyami/kitejs/api/JsEngineError : io/github/yuroyami/kitejs/api/JsException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/Throwable;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public final class io/github/yuroyami/kitejs/api/JsEngineKt {
+	public static final fun KiteJs (Lio/github/yuroyami/kitejs/api/JsEngine;Lkotlin/jvm/functions/Function1;)Lio/github/yuroyami/kitejs/api/KiteJs;
+	public static synthetic fun KiteJs$default (Lio/github/yuroyami/kitejs/api/JsEngine;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/yuroyami/kitejs/api/KiteJs;
+}
+
+public final class io/github/yuroyami/kitejs/api/JsError : io/github/yuroyami/kitejs/api/JsException {
+	public static final field Companion Lio/github/yuroyami/kitejs/api/JsError$Companion;
+	public synthetic fun <init> (Ljava/lang/Object;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/Throwable;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getErrorMessage ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getScriptStack ()Ljava/util/List;
+	public final fun getValue-msBJVuE ()Ljava/lang/Object;
+}
+
+public final class io/github/yuroyami/kitejs/api/JsError$Companion {
+	public final fun from-JmzFSBU (Ljava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsError;
+}
+
+public abstract class io/github/yuroyami/kitejs/api/JsException : java/lang/RuntimeException {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/Throwable;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+}
+
+public abstract class io/github/yuroyami/kitejs/api/JsFunction : io/github/yuroyami/kitejs/api/JsObject {
+	public fun <init> ()V
+	public abstract fun bind (Ljava/lang/Object;[Ljava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsFunction;
+	public abstract fun callOn-ss6hNDw (Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;
+	public abstract fun construct ([Ljava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsObject;
+	public fun getArity ()I
+	public final fun invoke-VZQqt38 ([Ljava/lang/Object;)Ljava/lang/Object;
+}
+
+public abstract class io/github/yuroyami/kitejs/api/JsObject {
+	public fun <init> ()V
+	public abstract fun call-ss6hNDw (Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/Object;
+	public abstract fun defineAccessor (Ljava/lang/String;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function1;Lio/github/yuroyami/kitejs/api/PropertyFlags;)V
+	public abstract fun defineValue (Ljava/lang/String;Ljava/lang/Object;Lio/github/yuroyami/kitejs/api/PropertyFlags;)V
+	public abstract fun delete (Ljava/lang/String;)V
+	public abstract fun equals (Ljava/lang/Object;)Z
+	public abstract fun get-VZQqt38 (I)Ljava/lang/Object;
+	public abstract fun get-VZQqt38 (Ljava/lang/String;)Ljava/lang/Object;
+	public abstract fun getEngine ()Lio/github/yuroyami/kitejs/api/KiteJs;
+	public abstract fun getKeys ()Ljava/util/List;
+	public final fun getValue-msBJVuE ()Ljava/lang/Object;
+	public abstract fun has (Ljava/lang/String;)Z
+	public abstract fun hashCode ()I
+	public abstract fun inertText ()Ljava/lang/String;
+	public abstract fun isUsableHere ()Z
+	public abstract fun set (ILjava/lang/Object;)V
+	public abstract fun set (Ljava/lang/String;Ljava/lang/Object;)V
+	public final fun toMap ()Ljava/util/Map;
+	public abstract fun toPrimitive-VZQqt38 (Lio/github/yuroyami/kitejs/api/PrimitiveHint;)Ljava/lang/Object;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/yuroyami/kitejs/api/JsPromiseHandle {
+	public fun <init> (Lio/github/yuroyami/kitejs/api/JsObject;Lio/github/yuroyami/kitejs/api/JsFunction;Lio/github/yuroyami/kitejs/api/JsFunction;)V
+	public final fun getPromise ()Lio/github/yuroyami/kitejs/api/JsObject;
+	public final fun reject (Ljava/lang/Object;)V
+	public final fun resolve (Ljava/lang/Object;)V
+}
+
+public final class io/github/yuroyami/kitejs/api/JsPromiseSupportKt {
+	public static final fun isThenable-JmzFSBU (Ljava/lang/Object;)Z
+	public static final fun newPromise (Lio/github/yuroyami/kitejs/api/KiteJs;)Lio/github/yuroyami/kitejs/api/JsPromiseHandle;
+	public static final fun onSettled-kGFlo64 (Lio/github/yuroyami/kitejs/api/KiteJs;Ljava/lang/Object;Lkotlin/jvm/functions/Function2;)Z
+}
+
+public abstract class io/github/yuroyami/kitejs/api/JsScript {
+	public fun <init> ()V
+	public abstract fun run-msBJVuE ()Ljava/lang/Object;
+}
+
+public final class io/github/yuroyami/kitejs/api/JsStackFrame {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;I)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()I
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;I)Lio/github/yuroyami/kitejs/api/JsStackFrame;
+	public static synthetic fun copy$default (Lio/github/yuroyami/kitejs/api/JsStackFrame;Ljava/lang/String;Ljava/lang/String;IILjava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsStackFrame;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFileName ()Ljava/lang/String;
+	public final fun getFunctionName ()Ljava/lang/String;
+	public final fun getLineNumber ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract class io/github/yuroyami/kitejs/api/JsSymbol {
+	public fun <init> ()V
+	public abstract fun equals (Ljava/lang/Object;)Z
+	public abstract fun getDescription ()Ljava/lang/String;
+	public abstract fun getEngine ()Lio/github/yuroyami/kitejs/api/KiteJs;
+	public abstract fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/yuroyami/kitejs/api/JsSyntaxError : io/github/yuroyami/kitejs/api/JsException {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;IILjava/lang/String;Ljava/lang/Throwable;)V
+	public final fun getColumnNumber ()I
+	public final fun getFileName ()Ljava/lang/String;
+	public final fun getLineNumber ()I
+	public final fun getLineSource ()Ljava/lang/String;
+}
+
+public final class io/github/yuroyami/kitejs/api/JsType : java/lang/Enum {
+	public static final field ARRAY Lio/github/yuroyami/kitejs/api/JsType;
+	public static final field BIGINT Lio/github/yuroyami/kitejs/api/JsType;
+	public static final field BOOLEAN Lio/github/yuroyami/kitejs/api/JsType;
+	public static final field FUNCTION Lio/github/yuroyami/kitejs/api/JsType;
+	public static final field NULL Lio/github/yuroyami/kitejs/api/JsType;
+	public static final field NUMBER Lio/github/yuroyami/kitejs/api/JsType;
+	public static final field OBJECT Lio/github/yuroyami/kitejs/api/JsType;
+	public static final field STRING Lio/github/yuroyami/kitejs/api/JsType;
+	public static final field SYMBOL Lio/github/yuroyami/kitejs/api/JsType;
+	public static final field UNDEFINED Lio/github/yuroyami/kitejs/api/JsType;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/yuroyami/kitejs/api/JsType;
+	public static fun values ()[Lio/github/yuroyami/kitejs/api/JsType;
+}
+
+public final class io/github/yuroyami/kitejs/api/JsUndefined {
+	public static final field INSTANCE Lio/github/yuroyami/kitejs/api/JsUndefined;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/yuroyami/kitejs/api/JsValue {
+	public static final field Companion Lio/github/yuroyami/kitejs/api/JsValue$Companion;
+	public static final fun asArray-impl (Ljava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsArray;
+	public static final fun asArrayOrNull-impl (Ljava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsArray;
+	public static final fun asBigInt-impl (Ljava/lang/Object;)Lio/github/yuroyami/kitejs/api/KBigInt;
+	public static final fun asBoolean-impl (Ljava/lang/Object;)Z
+	public static final fun asDouble-impl (Ljava/lang/Object;)D
+	public static final fun asFunction-impl (Ljava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsFunction;
+	public static final fun asFunctionOrNull-impl (Ljava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsFunction;
+	public static final fun asInt-impl (Ljava/lang/Object;)I
+	public static final fun asLong-impl (Ljava/lang/Object;)J
+	public static final fun asObject-impl (Ljava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsObject;
+	public static final fun asObjectOrNull-impl (Ljava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsObject;
+	public static final fun asString-impl (Ljava/lang/Object;)Ljava/lang/String;
+	public static final fun asSymbol-impl (Ljava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsSymbol;
+	public static final synthetic fun box-impl (Ljava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsValue;
+	public static fun constructor-impl (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/Object;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/Object;Ljava/lang/Object;)Z
+	public final fun getRaw ()Ljava/lang/Object;
+	public static final fun getType-impl (Ljava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsType;
+	public static final fun getTypeOf-impl (Ljava/lang/Object;)Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/Object;)I
+	public static final fun isNull-impl (Ljava/lang/Object;)Z
+	public static final fun isNullish-impl (Ljava/lang/Object;)Z
+	public static final fun isUndefined-impl (Ljava/lang/Object;)Z
+	public static final fun toKotlin-impl (Ljava/lang/Object;)Ljava/lang/Object;
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/Object;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/Object;
+}
+
+public final class io/github/yuroyami/kitejs/api/JsValue$Companion {
+	public final fun getFalse-msBJVuE ()Ljava/lang/Object;
+	public final fun getNullValue-msBJVuE ()Ljava/lang/Object;
+	public final fun getTrue-msBJVuE ()Ljava/lang/Object;
+	public final fun getUndefined-msBJVuE ()Ljava/lang/Object;
+	public final fun of-VZQqt38 (Ljava/lang/Object;)Ljava/lang/Object;
+}
+
+public final class io/github/yuroyami/kitejs/api/KBigInt : java/lang/Comparable {
+	public static final field Companion Lio/github/yuroyami/kitejs/api/KBigInt$Companion;
+	public fun <init> (Ljava/lang/String;I)V
+	public final fun abs ()Lio/github/yuroyami/kitejs/api/KBigInt;
+	public final fun add (Lio/github/yuroyami/kitejs/api/KBigInt;)Lio/github/yuroyami/kitejs/api/KBigInt;
+	public final fun and (Lio/github/yuroyami/kitejs/api/KBigInt;)Lio/github/yuroyami/kitejs/api/KBigInt;
+	public final fun asIntN (I)Lio/github/yuroyami/kitejs/api/KBigInt;
+	public final fun asUintN (I)Lio/github/yuroyami/kitejs/api/KBigInt;
+	public final fun bitLength ()I
+	public fun compareTo (Lio/github/yuroyami/kitejs/api/KBigInt;)I
+	public synthetic fun compareTo (Ljava/lang/Object;)I
+	public final fun compareToDouble (D)I
+	public final fun divide (Lio/github/yuroyami/kitejs/api/KBigInt;)Lio/github/yuroyami/kitejs/api/KBigInt;
+	public final fun divideAndRemainder (Lio/github/yuroyami/kitejs/api/KBigInt;)Lkotlin/Pair;
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public final fun intValueExact ()I
+	public final fun isZero ()Z
+	public final fun longValueExact ()J
+	public final fun mod (Lio/github/yuroyami/kitejs/api/KBigInt;)Lio/github/yuroyami/kitejs/api/KBigInt;
+	public final fun multiply (Lio/github/yuroyami/kitejs/api/KBigInt;)Lio/github/yuroyami/kitejs/api/KBigInt;
+	public final fun negate ()Lio/github/yuroyami/kitejs/api/KBigInt;
+	public final fun not ()Lio/github/yuroyami/kitejs/api/KBigInt;
+	public final fun or (Lio/github/yuroyami/kitejs/api/KBigInt;)Lio/github/yuroyami/kitejs/api/KBigInt;
+	public final fun pow (I)Lio/github/yuroyami/kitejs/api/KBigInt;
+	public final fun remainder (Lio/github/yuroyami/kitejs/api/KBigInt;)Lio/github/yuroyami/kitejs/api/KBigInt;
+	public final fun shiftLeft (I)Lio/github/yuroyami/kitejs/api/KBigInt;
+	public final fun shiftRight (I)Lio/github/yuroyami/kitejs/api/KBigInt;
+	public final fun signum ()I
+	public final fun subtract (Lio/github/yuroyami/kitejs/api/KBigInt;)Lio/github/yuroyami/kitejs/api/KBigInt;
+	public final fun testBit (I)Z
+	public final fun toByte ()B
+	public final fun toDouble ()D
+	public final fun toFloat ()F
+	public final fun toInt ()I
+	public final fun toLong ()J
+	public final fun toShort ()S
+	public fun toString ()Ljava/lang/String;
+	public final fun toString (I)Ljava/lang/String;
+	public final fun xor (Lio/github/yuroyami/kitejs/api/KBigInt;)Lio/github/yuroyami/kitejs/api/KBigInt;
+}
+
+public final class io/github/yuroyami/kitejs/api/KBigInt$Companion {
+	public final fun fromDouble (D)Lio/github/yuroyami/kitejs/api/KBigInt;
+	public final fun fromInt (I)Lio/github/yuroyami/kitejs/api/KBigInt;
+	public final fun fromLong (J)Lio/github/yuroyami/kitejs/api/KBigInt;
+	public final fun getONE ()Lio/github/yuroyami/kitejs/api/KBigInt;
+	public final fun getZERO ()Lio/github/yuroyami/kitejs/api/KBigInt;
+	public final fun parse (Ljava/lang/String;I)Lio/github/yuroyami/kitejs/api/KBigInt;
+	public static synthetic fun parse$default (Lio/github/yuroyami/kitejs/api/KBigInt$Companion;Ljava/lang/String;IILjava/lang/Object;)Lio/github/yuroyami/kitejs/api/KBigInt;
+}
+
+public abstract class io/github/yuroyami/kitejs/api/KiteJs : java/lang/AutoCloseable {
+	public fun <init> ()V
+	public abstract fun close ()V
+	public abstract fun compile (Ljava/lang/String;Ljava/lang/String;)Lio/github/yuroyami/kitejs/api/JsScript;
+	public static synthetic fun compile$default (Lio/github/yuroyami/kitejs/api/KiteJs;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsScript;
+	public abstract fun evaluate-ss6hNDw (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
+	public static synthetic fun evaluate-ss6hNDw$default (Lio/github/yuroyami/kitejs/api/KiteJs;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/Object;
+	public abstract fun getEngine ()Lio/github/yuroyami/kitejs/api/JsEngine;
+	public abstract fun getGlobal ()Lio/github/yuroyami/kitejs/api/JsObject;
+	public abstract fun getVersion ()Ljava/lang/String;
+	public abstract fun newArray ([Ljava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsArray;
+	public abstract fun newConstructor (Ljava/lang/String;ILkotlin/jvm/functions/Function2;)Lio/github/yuroyami/kitejs/api/JsFunction;
+	public abstract fun newFunction (Ljava/lang/String;ILkotlin/jvm/functions/Function2;)Lio/github/yuroyami/kitejs/api/JsFunction;
+	public abstract fun newObject ()Lio/github/yuroyami/kitejs/api/JsObject;
+	public abstract fun runMicrotasks ()V
+	public abstract fun thenableCheck (Lio/github/yuroyami/kitejs/api/JsObject;)Z
+	public abstract fun valueOf-VZQqt38 (Ljava/lang/Object;)Ljava/lang/Object;
+	public abstract fun watchSettlement-cOYhnL4 (Ljava/lang/Object;Lkotlin/jvm/functions/Function2;)Z
+}
+
+public class io/github/yuroyami/kitejs/api/KiteJsConfig {
+	public fun <init> ()V
+	public final fun getClock ()Lkotlin/jvm/functions/Function0;
+	public final fun getConsole ()Lio/github/yuroyami/kitejs/api/ConsolePrinter;
+	public final fun getInstructionBudget ()I
+	public final fun getInterruptWhen ()Lkotlin/jvm/functions/Function0;
+	public final fun getSealBuiltins ()Z
+	public final fun getTimeZone ()Lkotlinx/datetime/TimeZone;
+	public final fun setClock (Lkotlin/jvm/functions/Function0;)V
+	public final fun setConsole (Lio/github/yuroyami/kitejs/api/ConsolePrinter;)V
+	public final fun setInstructionBudget (I)V
+	public final fun setInterruptWhen (Lkotlin/jvm/functions/Function0;)V
+	public final fun setSealBuiltins (Z)V
+	public final fun setTimeZone (Lkotlinx/datetime/TimeZone;)V
+}
+
+public final class io/github/yuroyami/kitejs/api/PrimitiveHint : java/lang/Enum {
+	public static final field NUMBER Lio/github/yuroyami/kitejs/api/PrimitiveHint;
+	public static final field STRING Lio/github/yuroyami/kitejs/api/PrimitiveHint;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lio/github/yuroyami/kitejs/api/PrimitiveHint;
+	public static fun values ()[Lio/github/yuroyami/kitejs/api/PrimitiveHint;
+}
+
+public final class io/github/yuroyami/kitejs/api/PropertyFlags {
+	public fun <init> ()V
+	public fun <init> (ZZZ)V
+	public synthetic fun <init> (ZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getConfigurable ()Z
+	public final fun getEnumerable ()Z
+	public final fun getWritable ()Z
+}
+
+public final class io/github/yuroyami/kitejs/api/dtoa/Decimal {
+	public static final field Companion Lio/github/yuroyami/kitejs/api/dtoa/Decimal$Companion;
+	public static final field MAX_CHARS I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class io/github/yuroyami/kitejs/api/dtoa/Decimal$Companion {
+}
+
+public final class io/github/yuroyami/kitejs/api/dtoa/DecimalFormatter {
+	public static final field INSTANCE Lio/github/yuroyami/kitejs/api/dtoa/DecimalFormatter;
+	public final fun toExponential (DI)Ljava/lang/String;
+	public final fun toFixed (DI)Ljava/lang/String;
+	public final fun toPrecision (DI)Ljava/lang/String;
+}
+
+public final class io/github/yuroyami/kitejs/api/dtoa/DecimalParser {
+	public static final field INSTANCE Lio/github/yuroyami/kitejs/api/dtoa/DecimalParser;
+	public final fun parse (Ljava/lang/String;)Ljava/lang/Double;
+}
+
+public final class io/github/yuroyami/kitejs/api/dtoa/DoubleFormatter {
+	public static final field INSTANCE Lio/github/yuroyami/kitejs/api/dtoa/DoubleFormatter;
+	public final fun toDecimal (D)Lio/github/yuroyami/kitejs/api/dtoa/Decimal;
+	public final fun toString (D)Ljava/lang/String;
+}
+
+public final class io/github/yuroyami/kitejs/api/dtoa/RadixFormatter {
+	public static final field INSTANCE Lio/github/yuroyami/kitejs/api/dtoa/RadixFormatter;
+	public final fun toBaseString (ID)Ljava/lang/String;
+}
+

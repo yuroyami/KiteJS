@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.api
 
+import io.github.yuroyami.kitejs.rhino.Rhino
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -15,7 +16,7 @@ import kotlin.test.assertEquals
  */
 class ConstAssignmentTest {
 
-    private fun eval(source: String): String = KiteJs().use { js -> js.evaluate(source).asString() }
+    private fun eval(source: String): String = KiteJs(Rhino).use { js -> js.evaluate(source).asString() }
 
     private val writes = listOf(
         "c = 2", "c += 1", "c++", "--c", "c &&= 4", "[c] = [2]", "({ c } = { c: 2 })", "for (c in { a: 1 });",

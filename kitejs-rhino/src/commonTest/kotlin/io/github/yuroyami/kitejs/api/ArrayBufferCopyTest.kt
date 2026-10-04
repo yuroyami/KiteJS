@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.api
 
+import io.github.yuroyami.kitejs.rhino.Rhino
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -15,7 +16,7 @@ import kotlin.test.assertEquals
  */
 class ArrayBufferCopyTest {
 
-    private fun eval(source: String): String = KiteJs().use { js -> js.evaluate(source).asString() }
+    private fun eval(source: String): String = KiteJs(Rhino).use { js -> js.evaluate(source).asString() }
 
     /** What [call] did, as the name of the error it threw or `returned`. */
     private fun outcome(setup: String, call: String): String =

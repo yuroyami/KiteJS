@@ -6,6 +6,7 @@ package io.github.yuroyami.kitejs.coroutines
 
 import io.github.yuroyami.kitejs.api.JsError
 import io.github.yuroyami.kitejs.api.JsType
+import io.github.yuroyami.kitejs.rhino.Rhino
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -16,7 +17,7 @@ class AwaitTest {
 
     @Test
     fun aThenableThatAnswersWithAPromiseComesBackAsItsValue() = runTest {
-        val js = asyncKiteJs()
+        val js = asyncKiteJs(Rhino)
         try {
             val v = js.evaluateAwaiting("({ then: function (resolve) { resolve(Promise.resolve(7)) } })")
             assertEquals(JsType.NUMBER, v.type)
@@ -29,7 +30,7 @@ class AwaitTest {
 
     @Test
     fun aThenableThatFailsRejects() = runTest {
-        val js = asyncKiteJs()
+        val js = asyncKiteJs(Rhino)
         try {
             val inner = assertFailsWith<JsError> {
                 js.evaluateAwaiting("({ then: function (r) { r({ then: function (_, j) { j(new TypeError('inner')) } }) } })")
@@ -46,7 +47,7 @@ class AwaitTest {
 
     @Test
     fun aRejectionWhoseReasonCannotBeReadStillEndsTheWait() = runTest {
-        val js = asyncKiteJs()
+        val js = asyncKiteJs(Rhino)
         try {
             for (source in listOf(
                 "Promise.reject({ get name() { throw new Error('bad name') } })",

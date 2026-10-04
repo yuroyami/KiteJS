@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.api
 
+import io.github.yuroyami.kitejs.rhino.Rhino
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -15,14 +16,14 @@ import kotlin.test.assertEquals
 class AsyncFunctionTest {
 
     /** What [source] pushed to `log`, joined, once its microtasks ran. */
-    private fun logged(source: String): String = KiteJs().use { js ->
+    private fun logged(source: String): String = KiteJs(Rhino).use { js ->
         js.evaluate("var log = [];")
         js.evaluate(source)
         js.evaluate("log.join(', ')").asString()
     }
 
     private fun check(expected: String, source: String) {
-        assertEquals(expected, KiteJs().use { js -> js.evaluate(source).asString() }, source)
+        assertEquals(expected, KiteJs(Rhino).use { js -> js.evaluate(source).asString() }, source)
     }
 
     /** What `eval` of [source] throws, or "ok". */

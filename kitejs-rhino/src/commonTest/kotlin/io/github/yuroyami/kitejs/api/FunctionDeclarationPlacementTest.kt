@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.api
 
+import io.github.yuroyami.kitejs.rhino.Rhino
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -14,7 +15,7 @@ import kotlin.test.assertEquals
  */
 class FunctionDeclarationPlacementTest {
 
-    private fun eval(source: String): String = KiteJs().use { js -> js.evaluate(source).asString() }
+    private fun eval(source: String): String = KiteJs(Rhino).use { js -> js.evaluate(source).asString() }
 
     private fun outcome(source: String): String {
         val quoted = source.replace("\\", "\\\\").replace("'", "\\'")

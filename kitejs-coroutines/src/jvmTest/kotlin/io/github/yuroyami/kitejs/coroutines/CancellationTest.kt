@@ -4,10 +4,11 @@
 
 package io.github.yuroyami.kitejs.coroutines
 
+import io.github.yuroyami.kitejs.api.function
+import io.github.yuroyami.kitejs.rhino.Rhino
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import io.github.yuroyami.kitejs.api.function
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -26,7 +27,7 @@ class CancellationTest {
 
     @Test
     fun cancellingTheCallerStopsARunawayScript() = runBlocking {
-        val js = asyncKiteJs()
+        val js = asyncKiteJs(Rhino)
         try {
             val runner = async(Dispatchers.Default) { js.evaluate("for (;;) {}") }
             // Let it get going, on the real clock.
@@ -48,7 +49,7 @@ class CancellationTest {
 
     @Test
     fun aTimeoutAroundTheCallStopsTheScriptToo() = runBlocking {
-        val js = asyncKiteJs()
+        val js = asyncKiteJs(Rhino)
         try {
             val answer = withTimeoutOrNull(1_000) {
                 withContextDefault { js.evaluate("for (;;) {}") }
@@ -62,7 +63,7 @@ class CancellationTest {
 
     @Test
     fun aCancelledCallerGetsCancellation() = runBlocking {
-        val js = asyncKiteJs()
+        val js = asyncKiteJs(Rhino)
         try {
             val runner = async(Dispatchers.Default) { js.evaluate("for (;;) {}") }
             delay(300)
@@ -80,7 +81,7 @@ class CancellationTest {
     /** A chain of reactions that queue one another never branches, and still hears the cancel. */
     @Test
     fun cancellingTheCallerStopsAnEndlessChainOfReactions() = runBlocking {
-        val js = asyncKiteJs()
+        val js = asyncKiteJs(Rhino)
         try {
             val runner = async(Dispatchers.Default) {
                 js.evaluate("var n = 0; function spin() { n++; Promise.resolve().then(spin) } Promise.resolve().then(spin)")
@@ -112,7 +113,7 @@ class CancellationTest {
      */
     @Test
     fun closingTheEngineEndsAWaitOnAnotherThread() = runBlocking {
-        val js = asyncKiteJs()
+        val js = asyncKiteJs(Rhino)
         val never = js.evaluate("new Promise(function () {})")
         val registered = CompletableDeferred<Unit>()
         // Reading `then` happens as the wait is registered, so this says when it is.

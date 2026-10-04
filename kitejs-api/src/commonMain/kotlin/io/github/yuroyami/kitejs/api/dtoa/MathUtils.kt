@@ -20,7 +20,7 @@
  * THE SOFTWARE.
  */
 
-package io.github.yuroyami.kitejs.rhino.dtoa
+package io.github.yuroyami.kitejs.api.dtoa
 
 /**
  * Utilities shared by the other classes in this package. Every method assumes it is called with

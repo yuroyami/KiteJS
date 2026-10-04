@@ -30,12 +30,15 @@ kotlin {
         all {
             languageSettings {
                 optIn("kotlin.experimental.ExperimentalNativeApi")
+                optIn("io.github.yuroyami.kitejs.api.InternalKiteJsApi")
             }
         }
 
         commonMain.dependencies {
-            // The only runtime dependency: time zone rules for Date. Everything else the engine
-            // computes itself, so JVM, JS, iOS and Wasm cannot drift apart.
+            // The API this engine implements, which an embedder programs against.
+            api(projects.kitejsApi)
+            // Time zone rules for Date. Everything else the engine computes itself, so JVM, JS,
+            // iOS and Wasm cannot drift apart.
             implementation(libs.kotlinx.datetime)
         }
 

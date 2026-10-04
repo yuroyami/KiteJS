@@ -20,7 +20,9 @@
  * THE SOFTWARE.
  */
 
-package io.github.yuroyami.kitejs.rhino.dtoa
+package io.github.yuroyami.kitejs.api.dtoa
+
+import io.github.yuroyami.kitejs.api.InternalKiteJsApi
 
 /**
  * Formats a decimal number into a string and keeps the result in a buffer. It is tuned for
@@ -28,6 +30,7 @@ package io.github.yuroyami.kitejs.rhino.dtoa
  *
  * Based on code by Giulietti.
  */
+@InternalKiteJsApi
 public class Decimal internal constructor(
     private val digits: Long,
     private val exponent: Int,

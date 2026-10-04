@@ -4,6 +4,8 @@
 
 package io.github.yuroyami.kitejs.api
 
+import io.github.yuroyami.kitejs.rhino.Rhino
+import io.github.yuroyami.kitejs.rhino.asmReports
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -27,13 +29,13 @@ class AsmParityTest {
     private fun bothWays(source: String): Pair<String, String> {
         var compiled = ""
         var reports = ""
-        KiteJs { asmJs = true }.use { js ->
+        KiteJs(Rhino) { asmJs = true }.use { js ->
             compiled = js.evaluate(source, "asm").toString()
             reports = js.asmReports.joinToString("; ")
         }
         if (!reports.contains(": compiled")) fail("the module did not compile: $reports")
         if (reports.contains("not linked")) fail("the module did not link: $reports")
-        val plain = KiteJs { asmJs = false }.use { js -> js.evaluate(source, "asm").toString() }
+        val plain = KiteJs(Rhino) { asmJs = false }.use { js -> js.evaluate(source, "asm").toString() }
         return compiled to plain
     }
 
@@ -354,7 +356,7 @@ class AsmParityTest {
 
     @Test
     fun a_module_the_compiler_turns_down_still_runs() {
-        KiteJs { asmJs = true }.use { js ->
+        KiteJs(Rhino) { asmJs = true }.use { js ->
             val answer = js.evaluate(
                 """
                 var m = (function (stdlib) {
@@ -375,7 +377,7 @@ class AsmParityTest {
 
     @Test
     fun a_module_given_the_wrong_standard_library_still_runs() {
-        KiteJs { asmJs = true }.use { js ->
+        KiteJs(Rhino) { asmJs = true }.use { js ->
             val answer = js.evaluate(
                 """
                 var m = (function (stdlib) {
@@ -398,7 +400,7 @@ class AsmParityTest {
 
     @Test
     fun the_compiled_module_writes_through_to_a_view_outside_it() {
-        KiteJs { asmJs = true }.use { js ->
+        KiteJs(Rhino) { asmJs = true }.use { js ->
             val answer = js.evaluate(
                 """
                 var heap = new ArrayBuffer(1024);

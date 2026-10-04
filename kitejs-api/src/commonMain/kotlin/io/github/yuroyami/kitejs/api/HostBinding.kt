@@ -4,37 +4,17 @@
 
 package io.github.yuroyami.kitejs.api
 
-import io.github.yuroyami.kitejs.rhino.LambdaConstructor
-import io.github.yuroyami.kitejs.rhino.LambdaFunction
-import io.github.yuroyami.kitejs.rhino.ScriptableObject
-import io.github.yuroyami.kitejs.rhino.SerializableCallable
-import io.github.yuroyami.kitejs.rhino.SerializableConstructable
 import kotlin.reflect.KMutableProperty1
 import kotlin.reflect.KProperty1
 
 /** How a property behaves. The defaults match what `obj.x = 1` gives you in a script. */
 public class PropertyFlags(public val writable: Boolean = true, public val enumerable: Boolean = true, public val configurable: Boolean = true)
 
-private fun PropertyFlags.attributes(): Int {
-    var a = 0
-    if (!writable) a = a or ScriptableObject.READONLY
-    if (!enumerable) a = a or ScriptableObject.DONTENUM
-    if (!configurable) a = a or ScriptableObject.PERMANENT
-    return a
-}
-
-/** The object to bind onto, once its engine is known to be open and on this thread. */
-private fun JsObject.asScriptableObject(): ScriptableObject {
-    contextFor(target)
-    return target as? ScriptableObject ?: throw JsEngineError("this object cannot take host bindings")
-}
-
 // ---- Values ---------------------------------------------------------------------------------
 
 /** Puts a value on the object. */
 public fun JsObject.property(name: String, value: Any?, flags: PropertyFlags = PropertyFlags()) {
-    val holder = asScriptableObject()
-    holder.defineProperty(name, Converters.toEngine(value, contextFor(target), target), flags.attributes())
+    defineValue(name, value, flags)
 }
 
 /** Puts a value that a script can read but not change. */
@@ -46,20 +26,12 @@ public fun JsObject.constant(name: String, value: Any?) {
 
 /** A property computed on every read. */
 public fun JsObject.getter(name: String, flags: PropertyFlags = PropertyFlags(), read: () -> Any?) {
-    val holder = asScriptableObject()
-    val scope = target
-    holder.defineProperty(
-        name,
-        { Converters.toEngine(read(), liveContext(), scope) },
-        null,
-        flags.attributes(),
-    )
+    defineAccessor(name, read, null, flags)
 }
 
 /** A property that only accepts writes. */
 public fun JsObject.setter(name: String, flags: PropertyFlags = PropertyFlags(), write: (JsValue) -> Unit) {
-    val holder = asScriptableObject()
-    holder.defineProperty(name, null, { v -> write(JsValue(v)) }, flags.attributes())
+    defineAccessor(name, null, write, flags)
 }
 
 /** A property with both halves. */
@@ -69,14 +41,7 @@ public fun JsObject.accessor(
     read: () -> Any?,
     write: (JsValue) -> Unit,
 ) {
-    val holder = asScriptableObject()
-    val scope = target
-    holder.defineProperty(
-        name,
-        { Converters.toEngine(read(), liveContext(), scope) },
-        { v -> write(JsValue(v)) },
-        flags.attributes(),
-    )
+    defineAccessor(name, read, write, flags)
 }
 
 // ---- Functions ------------------------------------------------------------------------------
@@ -88,16 +53,9 @@ public fun JsObject.function(
     flags: PropertyFlags = PropertyFlags(enumerable = false),
     body: (List<JsValue>) -> Any?,
 ): JsFunction {
-    val holder = asScriptableObject()
-    val scope = scopeOf(target)
-    val fn = LambdaFunction(
-        scope,
-        name,
-        arity,
-        SerializableCallable { cx, s, _, args -> Converters.toEngine(body(args.map { JsValue(it) }), cx, s) },
-    )
-    holder.defineProperty(name, fn, flags.attributes())
-    return JsFunction(fn)
+    val fn = engine.newFunction(name, arity) { _, args -> body(args) }
+    defineValue(name, fn, flags)
+    return fn
 }
 
 /** A host function that also wants the `this` it was called on. */
@@ -107,18 +65,9 @@ public fun JsObject.method(
     flags: PropertyFlags = PropertyFlags(enumerable = false),
     body: (self: JsValue, args: List<JsValue>) -> Any?,
 ): JsFunction {
-    val holder = asScriptableObject()
-    val scope = scopeOf(target)
-    val fn = LambdaFunction(
-        scope,
-        name,
-        arity,
-        SerializableCallable { cx, s, thisObj, args ->
-            Converters.toEngine(body(JsValue(thisObj), args.map { JsValue(it) }), cx, s)
-        },
-    )
-    holder.defineProperty(name, fn, flags.attributes())
-    return JsFunction(fn)
+    val fn = engine.newFunction(name, arity, body)
+    defineValue(name, fn, flags)
+    return fn
 }
 
 /** A host constructor, callable with `new`. [build] fills in the object it is given. */
@@ -128,27 +77,16 @@ public fun JsObject.constructor(
     flags: PropertyFlags = PropertyFlags(enumerable = false),
     build: (JsObject, List<JsValue>) -> Unit,
 ): JsFunction {
-    val holder = asScriptableObject()
-    val scope = scopeOf(target)
-    val ctor = LambdaConstructor(
-        scope,
-        name,
-        arity,
-        SerializableConstructable { cx, s, args ->
-            val obj = cx.newObject(s)
-            build(JsObject(obj), args.map { JsValue(it) })
-            obj
-        },
-    )
-    holder.defineProperty(name, ctor, flags.attributes())
-    return JsFunction(ctor)
+    val ctor = engine.newConstructor(name, arity, build)
+    defineValue(name, ctor, flags)
+    return ctor
 }
 
 // ---- Nesting --------------------------------------------------------------------------------
 
 /** A nested object, built by [build]. Returns it so you can keep a handle. */
 public fun JsObject.obj(name: String, build: JsObject.() -> Unit = {}): JsObject {
-    val child = JsObject(contextFor(target).newObject(scopeOf(target)))
+    val child = engine.newObject()
     child.build()
     property(name, child)
     return child
@@ -203,17 +141,17 @@ public inline fun <reified T> JsValue.convertTo(): T {
         Int::class -> asInt()
         Long::class -> asLong()
         String::class -> asString()
+        KBigInt::class -> asBigInt()
         JsObject::class -> asObject()
         JsArray::class -> asArray()
         JsFunction::class -> asFunction()
+        JsSymbol::class -> asSymbol()
         List::class -> asArray().toList()
         Map::class -> asObject().toMap()
         else -> toKotlin()
     }
     return out as T
 }
-
-private fun List<JsValue>.at(i: Int): JsValue = getOrElse(i) { JsValue.undefined }
 
 /** A one-argument host function, with the argument and the answer converted for you. */
 public inline fun <reified A, reified R> JsObject.function(

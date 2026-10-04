@@ -1,7 +1,8 @@
 package io.github.yuroyami.kitejs.api
 
-import org.junit.Assume.assumeTrue
+import io.github.yuroyami.kitejs.rhino.Rhino
 import kotlin.test.Test
+import org.junit.Assume.assumeTrue
 
 /**
  * Where the time goes when the engine runs Emscripten shaped code.
@@ -56,7 +57,7 @@ class AsmProfileProbe {
         println("typed (ms): $typed  smallest ${typed.min()}")
     }
 
-    private fun timeOnePass(asm: Boolean): Long = KiteJs {
+    private fun timeOnePass(asm: Boolean): Long = KiteJs(Rhino) {
         instructionBudget = 0
         asmJs = asm
     }.use { js ->
@@ -72,7 +73,7 @@ class AsmProfileProbe {
 
         val passes = ArrayList<Long>()
         val worker = Thread {
-            KiteJs { instructionBudget = 0 }.use { js ->
+            KiteJs(Rhino) { instructionBudget = 0 }.use { js ->
                 // One warm pass, then the passes the sampler sees.
                 repeat(4) {
                     val t0 = System.nanoTime()

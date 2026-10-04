@@ -4,7 +4,8 @@
 
 package io.github.yuroyami.kitejs.rhino
 
-import io.github.yuroyami.kitejs.rhino.dtoa.DecimalParser
+import io.github.yuroyami.kitejs.api.KBigInt
+import io.github.yuroyami.kitejs.api.dtoa.DecimalParser
 
 /**
  * This class implements the JavaScript scanner.

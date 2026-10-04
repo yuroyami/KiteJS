@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.rhino
 
+import io.github.yuroyami.kitejs.api.KBigInt
 import io.github.yuroyami.kitejs.rhino.ast.Assignment
 import io.github.yuroyami.kitejs.rhino.ast.BigIntLiteral
 import io.github.yuroyami.kitejs.rhino.ast.Block

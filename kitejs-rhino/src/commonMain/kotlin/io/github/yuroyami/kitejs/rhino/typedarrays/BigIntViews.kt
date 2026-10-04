@@ -5,7 +5,7 @@
 package io.github.yuroyami.kitejs.rhino.typedarrays
 
 import io.github.yuroyami.kitejs.rhino.Context
-import io.github.yuroyami.kitejs.rhino.KBigInt
+import io.github.yuroyami.kitejs.api.KBigInt
 import io.github.yuroyami.kitejs.rhino.LambdaConstructor
 import io.github.yuroyami.kitejs.rhino.ScriptRuntime
 import io.github.yuroyami.kitejs.rhino.ScriptRuntimeES6

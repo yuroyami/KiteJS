@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.api
 
+import io.github.yuroyami.kitejs.rhino.Rhino
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -29,7 +30,7 @@ class EndlessReactionsTest {
     @Test
     fun aBudgetStopsAnEndlessChain() {
         val outcome = withinTenSeconds {
-            KiteJs { instructionBudget = 10_000 }.use { js ->
+            KiteJs(Rhino) { instructionBudget = 10_000 }.use { js ->
                 val error = runCatching { js.evaluate(endless) }.exceptionOrNull()
                 "${error?.let { it::class.simpleName }} after ${js.evaluate("n").asDouble().toInt()} and then ${js.evaluate("2 + 2").asDouble().toInt()}"
             }
@@ -41,7 +42,7 @@ class EndlessReactionsTest {
     @Test
     fun aHookThatAlwaysAnswersStopEndsAnEndlessChain() {
         val outcome = withinTenSeconds {
-            KiteJs { interruptWhen = { true } }.use { js ->
+            KiteJs(Rhino) { interruptWhen = { true } }.use { js ->
                 runCatching { js.evaluate(endless) }.exceptionOrNull()?.message ?: "no error"
             }
         }

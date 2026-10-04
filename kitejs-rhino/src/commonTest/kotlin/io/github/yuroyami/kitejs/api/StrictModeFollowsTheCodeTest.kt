@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.api
 
+import io.github.yuroyami.kitejs.rhino.Rhino
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -16,7 +17,7 @@ import kotlin.test.assertEquals
  */
 class StrictModeFollowsTheCodeTest {
 
-    private fun eval(source: String): String = KiteJs().use { js -> js.evaluate(source).asString() }
+    private fun eval(source: String): String = KiteJs(Rhino).use { js -> js.evaluate(source).asString() }
 
     /** Statements that each make one failed write, given a frozen `o` and an accessor `a` without a setter. */
     private val failedWrites = listOf(

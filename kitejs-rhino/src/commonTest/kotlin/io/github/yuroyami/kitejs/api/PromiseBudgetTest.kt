@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.api
 
+import io.github.yuroyami.kitejs.rhino.Rhino
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -25,7 +26,7 @@ class PromiseBudgetTest {
 
     @Test
     fun a_budget_stops_a_chain_of_reactions_early() {
-        KiteJs { instructionBudget = 10_000 }.use { js ->
+        KiteJs(Rhino) { instructionBudget = 10_000 }.use { js ->
             assertFailsWith<JsEngineError> { js.evaluate(chain(1_000_000)) }
             val ran = js.number("n")
             assertTrue(ran in 1 until 1_000, "the chain ran $ran reactions under a budget of 10,000 instructions")
@@ -35,7 +36,7 @@ class PromiseBudgetTest {
     @Test
     fun the_interrupt_hook_is_asked_while_reactions_run() {
         var asked = 0
-        KiteJs { interruptWhen = { ++asked > 2 } }.use { js ->
+        KiteJs(Rhino) { interruptWhen = { ++asked > 2 } }.use { js ->
             assertFailsWith<JsEngineError> { js.evaluate(chain(10_000_000)) }
             assertTrue(asked > 2, "the hook was asked $asked times")
             val ran = js.number("n")
@@ -45,7 +46,7 @@ class PromiseBudgetTest {
 
     @Test
     fun a_stop_drops_the_reactions_still_queued() {
-        KiteJs { instructionBudget = 10_000 }.use { js ->
+        KiteJs(Rhino) { instructionBudget = 10_000 }.use { js ->
             assertFailsWith<JsEngineError> { js.evaluate(chain(1_000_000)) }
             val ran = js.number("n")
             // The next call starts clean: the abandoned chain does not pick up again.
@@ -61,7 +62,7 @@ class PromiseBudgetTest {
 
     @Test
     fun a_callback_without_branches_is_counted() {
-        KiteJs { instructionBudget = 100_000 }.use { js ->
+        KiteJs(Rhino) { instructionBudget = 100_000 }.use { js ->
             assertFailsWith<JsEngineError> {
                 js.evaluate("var c = 0; var a = new Array(1000000).fill(0); a.forEach(function () { c++ })")
             }
@@ -71,26 +72,27 @@ class PromiseBudgetTest {
     }
 
     @Test
-    fun a_host_call_and_a_drain_are_each_one_call_to_the_budget() {
-        KiteJs { instructionBudget = 10_000 }.use { js ->
+    fun a_host_call_and_its_drain_are_one_call_to_the_budget() {
+        KiteJs(Rhino) { instructionBudget = 10_000 }.use { js ->
             js.evaluate("var k = 0; function step() { k++; if (k < 1000000) Promise.resolve().then(step) }")
             val step = js.global["step"].asFunction()
-            step()
-            // The host call ran one step and queued the next; draining runs the rest.
-            assertEquals(1.0, js.global["k"].asDouble())
-            assertFailsWith<JsEngineError> { js.runMicrotasks() }
+            // The host call runs one step and then drains what it queued, all within one budget.
+            assertFailsWith<JsEngineError> { step() }
             val ran = js.number("k")
-            assertTrue(ran in 2 until 1_000, "the drain ran $ran reactions under a budget of 10,000")
+            assertTrue(ran in 2 until 1_000, "the call ran $ran reactions under a budget of 10,000")
+            // The stop dropped the reactions still queued, so nothing is left to run.
+            js.runMicrotasks()
+            assertEquals(ran, js.number("k"))
         }
     }
 
     @Test
     fun a_chain_within_its_budget_runs_to_the_end() {
-        KiteJs { instructionBudget = 50_000_000 }.use { js ->
+        KiteJs(Rhino) { instructionBudget = 50_000_000 }.use { js ->
             js.evaluate(chain(10_000))
             assertEquals(10_000, js.number("n"))
         }
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             js.evaluate(chain(10_000))
             assertEquals(10_000, js.number("n"))
         }

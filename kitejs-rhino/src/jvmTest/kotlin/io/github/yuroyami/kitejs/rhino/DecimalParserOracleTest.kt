@@ -4,7 +4,7 @@
 
 package io.github.yuroyami.kitejs.rhino
 
-import io.github.yuroyami.kitejs.rhino.dtoa.DecimalParser
+import io.github.yuroyami.kitejs.api.dtoa.DecimalParser
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

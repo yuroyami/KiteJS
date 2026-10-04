@@ -4,6 +4,8 @@
 
 package io.github.yuroyami.kitejs.rhino
 
+import io.github.yuroyami.kitejs.api.KBigInt
+
 /**
  * The `BigInt` object: the wrapper a bigint gets when script asks it for a property, plus the
  * `BigInt` function and the two static methods that clip a value to a width.

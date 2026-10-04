@@ -4,8 +4,9 @@
 
 package io.github.yuroyami.kitejs.rhino
 
-import io.github.yuroyami.kitejs.rhino.dtoa.DecimalParser
-import io.github.yuroyami.kitejs.rhino.dtoa.DoubleFormatter
+import io.github.yuroyami.kitejs.api.KBigInt
+import io.github.yuroyami.kitejs.api.dtoa.DecimalParser
+import io.github.yuroyami.kitejs.api.dtoa.DoubleFormatter
 import kotlin.math.ceil
 import kotlin.math.floor
 import io.github.yuroyami.kitejs.rhino.ast.FunctionNode
@@ -413,7 +414,7 @@ public object ScriptRuntime {
         if (d == Double.POSITIVE_INFINITY) return "Infinity"
         if (d == Double.NEGATIVE_INFINITY) return "-Infinity"
         if (d == 0.0) return "0"
-        return io.github.yuroyami.kitejs.rhino.dtoa.RadixFormatter.toBaseString(base, d)
+        return io.github.yuroyami.kitejs.api.dtoa.RadixFormatter.toBaseString(base, d)
     }
 
     /** A bigint printed in [base], which is just what [KBigInt] already does. */

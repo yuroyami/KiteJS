@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.rhino
 
+import io.github.yuroyami.kitejs.api.KBigInt
 import java.math.BigInteger
 import kotlin.random.Random
 import kotlin.test.Test

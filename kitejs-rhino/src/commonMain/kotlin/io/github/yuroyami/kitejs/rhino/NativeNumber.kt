@@ -4,7 +4,7 @@
 
 package io.github.yuroyami.kitejs.rhino
 
-import io.github.yuroyami.kitejs.rhino.dtoa.DecimalFormatter
+import io.github.yuroyami.kitejs.api.dtoa.DecimalFormatter
 import kotlin.math.floor
 
 /** The JavaScript `Number` wrapper object. */

@@ -10,7 +10,7 @@ import io.github.yuroyami.kitejs.rhino.Callable
 import io.github.yuroyami.kitejs.rhino.CompoundOperationMap
 import io.github.yuroyami.kitejs.rhino.Constructable
 import io.github.yuroyami.kitejs.rhino.Context
-import io.github.yuroyami.kitejs.rhino.KBigInt
+import io.github.yuroyami.kitejs.api.KBigInt
 import io.github.yuroyami.kitejs.rhino.ExternalArrayData
 import io.github.yuroyami.kitejs.rhino.Function
 import io.github.yuroyami.kitejs.rhino.Intrinsics

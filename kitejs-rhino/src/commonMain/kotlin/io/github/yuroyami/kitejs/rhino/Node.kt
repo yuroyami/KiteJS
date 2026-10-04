@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.rhino
 
+import io.github.yuroyami.kitejs.api.KBigInt
 import io.github.yuroyami.kitejs.rhino.ast.Comment
 import io.github.yuroyami.kitejs.rhino.ast.FunctionNode
 import io.github.yuroyami.kitejs.rhino.ast.Jump

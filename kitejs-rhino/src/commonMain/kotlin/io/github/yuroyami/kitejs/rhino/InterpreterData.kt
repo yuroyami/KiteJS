@@ -4,6 +4,8 @@
 
 package io.github.yuroyami.kitejs.rhino
 
+import io.github.yuroyami.kitejs.api.KBigInt
+
 /** The interpreter's compiled form of a script or function: the icode plus its constant pools. */
 internal class InterpreterData<T : ScriptOrFn<T>>(
     val itsStringTable: Array<String?>,

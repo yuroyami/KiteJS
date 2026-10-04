@@ -20,7 +20,9 @@
  * THE SOFTWARE.
  */
 
-package io.github.yuroyami.kitejs.rhino.dtoa
+package io.github.yuroyami.kitejs.api.dtoa
+
+import io.github.yuroyami.kitejs.api.InternalKiteJsApi
 
 /**
  * Turns a double into a set of digits and an exponent, the same code Jackson and OpenJDK use.
@@ -33,6 +35,7 @@ package io.github.yuroyami.kitejs.rhino.dtoa
  * Divisions are avoided throughout, which helps architectures where they are slow. Section 10 of
  * reference 1 covers that.
  */
+@InternalKiteJsApi
 public object DoubleFormatter {
 
     /** The precision in bits. */

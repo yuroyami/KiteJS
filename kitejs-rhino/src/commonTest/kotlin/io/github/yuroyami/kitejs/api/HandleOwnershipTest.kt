@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.api
 
+import io.github.yuroyami.kitejs.rhino.Rhino
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -18,7 +19,7 @@ class HandleOwnershipTest {
 
     @Test
     fun handles_from_a_closed_engine_refuse_to_run() {
-        val first = KiteJs()
+        val first = KiteJs(Rhino)
         val f = first.evaluate("(function () { return 9 })").asFunction()
         val o = first.evaluate("({ n: 1 })").asObject()
         val a = first.evaluate("[1, 2]").asArray()
@@ -37,7 +38,7 @@ class HandleOwnershipTest {
         assertFailsWith<JsEngineError> { o.function("late") { 0 } }
 
         // A second engine does not bring them back.
-        KiteJs().use {
+        KiteJs(Rhino).use {
             assertFailsWith<JsEngineError> { f() }
             assertFailsWith<JsEngineError> { o["n"] = 2 }
         }
@@ -45,7 +46,7 @@ class HandleOwnershipTest {
 
     @Test
     fun a_refused_handle_runs_none_of_its_script() {
-        val first = KiteJs()
+        val first = KiteJs(Rhino)
         val o = first.evaluate("var hits = 0; ({ get n() { hits++; return 1 }, toString: function () { hits++; return 'x' } })").asObject()
         first.close()
         assertFailsWith<JsEngineError> { o["n"] }
@@ -56,7 +57,7 @@ class HandleOwnershipTest {
 
     @Test
     fun a_revoked_proxy_still_prints_where_its_engine_is_gone() {
-        val first = KiteJs()
+        val first = KiteJs(Rhino)
         val revoked = first.evaluate("var r = Proxy.revocable({}, {}); r.revoke(); r.proxy")
         first.close()
         assertEquals("[object Object]", revoked.toString())
@@ -64,7 +65,7 @@ class HandleOwnershipTest {
 
     @Test
     fun scalars_outlive_their_engine() {
-        val first = KiteJs()
+        val first = KiteJs(Rhino)
         val n = first.evaluate("6 * 7")
         val s = first.evaluate("'kite'")
         val b = first.evaluate("true")
@@ -77,10 +78,10 @@ class HandleOwnershipTest {
 
     @Test
     fun a_handle_cannot_move_to_another_engine() {
-        val first = KiteJs()
+        val first = KiteJs(Rhino)
         val o = first.evaluate("({ n: 1 })").asObject()
         first.close()
-        KiteJs().use { second ->
+        KiteJs(Rhino).use { second ->
             assertFailsWith<JsEngineError> { second.global["borrowed"] = o }
             assertFailsWith<JsEngineError> { second.valueOf(listOf(o)) }
             assertFailsWith<JsEngineError> { second.newArray(o.value) }
@@ -90,7 +91,7 @@ class HandleOwnershipTest {
 
     @Test
     fun a_closed_engine_refuses_new_values_and_closes_once() {
-        val js = KiteJs()
+        val js = KiteJs(Rhino)
         js.close()
         assertFailsWith<JsEngineError> { js.newObject() }
         assertFailsWith<JsEngineError> { js.newArray(1, 2) }
@@ -98,12 +99,12 @@ class HandleOwnershipTest {
         assertFailsWith<JsEngineError> { js.evaluate("1") }
         js.close()
         // The thread is free for the next engine.
-        KiteJs().use { assertEquals(2.0, it.evaluate("1 + 1").asDouble()) }
+        KiteJs(Rhino).use { assertEquals(2.0, it.evaluate("1 + 1").asDouble()) }
     }
 
     @Test
     fun handles_work_while_their_engine_is_open() {
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             val o = js.evaluate("({ n: 1 })").asObject()
             o["n"] = 2
             js.global["kept"] = o

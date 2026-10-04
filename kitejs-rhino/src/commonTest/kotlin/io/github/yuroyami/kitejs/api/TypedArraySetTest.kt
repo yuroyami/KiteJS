@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.api
 
+import io.github.yuroyami.kitejs.rhino.Rhino
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -34,7 +35,7 @@ class TypedArraySetTest {
             "TypeError" to "try { new BigInt64Array(2).set([1]) } catch (e) { e.name }",
             "2,3" to "var a = new Uint8Array(2); a.set(new Float64Array([2.5, 3.9])); a.join()",
         )
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             for ((expected, source) in cases) {
                 assertEquals(expected, js.evaluate(source).asString(), source)
             }
@@ -43,7 +44,7 @@ class TypedArraySetTest {
 
     @Test
     fun the_engine_carries_on_after_a_set_with_no_source() {
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             assertEquals("TypeError", js.evaluate("try { new Float32Array(1).set() } catch (e) { e.name }").asString())
             assertEquals("1,2", js.evaluate("var a = new Int8Array(2); a.set([1, 2]); a.join()").asString())
         }

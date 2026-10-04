@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.api
 
+import io.github.yuroyami.kitejs.rhino.Rhino
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -17,7 +18,7 @@ class ByteOrderTest {
 
     @Test
     fun views_are_little_endian_by_default() {
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             assertEquals(
                 4.0,
                 js.evaluate("var b = new ArrayBuffer(4); new Int32Array(b)[0] = 0x01020304; new Uint8Array(b)[0]").asDouble(),
@@ -34,7 +35,7 @@ class ByteOrderTest {
 
     @Test
     fun a_host_can_ask_for_the_old_order() {
-        KiteJs { littleEndian = false }.use { js ->
+        KiteJs(Rhino) { littleEndian = false }.use { js ->
             assertEquals(
                 1.0,
                 js.evaluate("var b = new ArrayBuffer(4); new Int32Array(b)[0] = 0x01020304; new Uint8Array(b)[0]").asDouble(),
@@ -46,15 +47,15 @@ class ByteOrderTest {
     @Test
     fun the_order_does_not_leak_from_one_engine_to_the_next() {
         val source = "var b = new ArrayBuffer(4); new Int32Array(b)[0] = 0x01020304; new Uint8Array(b)[0]"
-        KiteJs { littleEndian = false }.use { js -> assertEquals(1.0, js.evaluate(source).asDouble()) }
-        KiteJs().use { js -> assertEquals(4.0, js.evaluate(source).asDouble()) }
-        KiteJs { littleEndian = false }.use { js -> assertEquals(1.0, js.evaluate(source).asDouble()) }
+        KiteJs(Rhino) { littleEndian = false }.use { js -> assertEquals(1.0, js.evaluate(source).asDouble()) }
+        KiteJs(Rhino).use { js -> assertEquals(4.0, js.evaluate(source).asDouble()) }
+        KiteJs(Rhino) { littleEndian = false }.use { js -> assertEquals(1.0, js.evaluate(source).asDouble()) }
     }
 
     /** A script that needs a fixed order has DataView, whatever the engine's default is. */
     @Test
     fun data_view_keeps_taking_the_order_per_call() {
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             assertEquals(
                 "16909060,67305985",
                 js.evaluate(

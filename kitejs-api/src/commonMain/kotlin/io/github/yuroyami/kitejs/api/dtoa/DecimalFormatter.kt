@@ -2,7 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-package io.github.yuroyami.kitejs.rhino.dtoa
+package io.github.yuroyami.kitejs.api.dtoa
+
+import io.github.yuroyami.kitejs.api.InternalKiteJsApi
 
 /**
  * `Number.prototype.toFixed`, `toExponential` and `toPrecision`.
@@ -12,6 +14,7 @@ package io.github.yuroyami.kitejs.rhino.dtoa
  * (every double is a finite decimal) and rounds the digit string itself. Same results, same
  * shapes.
  */
+@InternalKiteJsApi
 public object DecimalFormatter {
     private const val MAX_FIXED = 1E21
 

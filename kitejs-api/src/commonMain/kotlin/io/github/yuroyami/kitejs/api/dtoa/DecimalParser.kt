@@ -2,9 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-package io.github.yuroyami.kitejs.rhino.dtoa
+package io.github.yuroyami.kitejs.api.dtoa
 
-import io.github.yuroyami.kitejs.rhino.KBigInt
+import io.github.yuroyami.kitejs.api.InternalKiteJsApi
+
+import io.github.yuroyami.kitejs.api.KBigInt
 
 /**
  * Turns a decimal string into the nearest double, rounding halves to even, on every target.
@@ -16,7 +18,8 @@ import io.github.yuroyami.kitejs.rhino.KBigInt
  *
  * Two paths. Almost every literal a script contains takes the first one.
  */
-internal object DecimalParser {
+@InternalKiteJsApi
+public object DecimalParser {
 
     /** The largest power of ten a double holds exactly. Beyond this a multiply would round twice. */
     private const val MAX_EXACT_POWER = 22
@@ -45,7 +48,7 @@ internal object DecimalParser {
      * Parses [text], which the caller has already checked contains only digits, a dot, an
      * exponent marker and signs. Returns null when it is not a decimal number after all.
      */
-    fun parse(text: String): Double? {
+    public fun parse(text: String): Double? {
         val n = text.length
         if (n == 0) return null
         var i = 0

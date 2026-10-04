@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.api
 
+import io.github.yuroyami.kitejs.rhino.Rhino
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
@@ -28,7 +29,7 @@ class EnginePerThreadTest {
         val workers = (0..1).map { index ->
             thread {
                 try {
-                    KiteJs().use { js ->
+                    KiteJs(Rhino).use { js ->
                         js.evaluate("var mine = 'engine$index'")
                         bothOpen.countDown()
                         assertTrue(bothOpen.await(10, TimeUnit.SECONDS), "the other engine never opened")
@@ -51,11 +52,11 @@ class EnginePerThreadTest {
     /** Each thread's registry is its own, so `Symbol.for` in one engine cannot answer in the other. */
     @Test
     fun the_symbol_registry_is_not_shared_between_engines() {
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             js.evaluate("Symbol.for('shared')")
             assertEquals("shared", js.evaluate("Symbol.keyFor(Symbol.for('shared'))").asString())
         }
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             assertEquals(
                 "true",
                 js.evaluate("Symbol.keyFor(Symbol.for('shared')) === 'shared'").asString(),
@@ -66,8 +67,8 @@ class EnginePerThreadTest {
     /** A second engine on the same thread still fails, and says so. */
     @Test
     fun a_second_engine_on_one_thread_still_fails() {
-        KiteJs().use {
-            val failure = runCatching { KiteJs() }.exceptionOrNull()
+        KiteJs(Rhino).use {
+            val failure = runCatching { KiteJs(Rhino) }.exceptionOrNull()
             assertTrue(failure is JsEngineError, "expected a JsEngineError, got $failure")
             assertTrue(
                 failure.message!!.contains("this thread already has an open engine"),
@@ -92,10 +93,10 @@ class EngineOwnerThreadTest {
 
     @Test
     fun closing_from_another_thread_is_refused_and_leaves_both_engines_alone() {
-        val first = KiteJs()
+        val first = KiteJs(Rhino)
         try {
             onAnotherThread {
-                KiteJs().use { other ->
+                KiteJs(Rhino).use { other ->
                     assertTrue(runCatching { first.evaluate("1 + 2") }.exceptionOrNull() is JsEngineError)
                     assertTrue(runCatching { first.close() }.exceptionOrNull() is JsEngineError)
                     assertEquals("A", other.evaluate("'a'.toUpperCase()").asString())
@@ -107,17 +108,17 @@ class EngineOwnerThreadTest {
             first.close()
         }
         // The thread is free again.
-        KiteJs().use { assertEquals(4.0, it.evaluate("2 + 2").asDouble()) }
+        KiteJs(Rhino).use { assertEquals(4.0, it.evaluate("2 + 2").asDouble()) }
     }
 
     @Test
     fun closing_from_a_thread_with_no_engine_is_refused_too() {
-        val first = KiteJs()
+        val first = KiteJs(Rhino)
         try {
             onAnotherThread {
                 assertTrue(runCatching { first.close() }.exceptionOrNull() is JsEngineError)
                 // And that thread can still open its own.
-                KiteJs().use { assertEquals(1.0, it.evaluate("1").asDouble()) }
+                KiteJs(Rhino).use { assertEquals(1.0, it.evaluate("1").asDouble()) }
             }
             assertEquals(5.0, first.evaluate("2 + 3").asDouble())
         } finally {
@@ -128,13 +129,13 @@ class EngineOwnerThreadTest {
 
     @Test
     fun handles_refuse_another_thread_before_any_script_runs() {
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             val o = js.evaluate("var hits = 0; ({ get n() { hits++; return 1 } })").asObject()
             val f = js.evaluate("(function () { hits++; return 7 })").asFunction()
             onAnotherThread {
                 assertTrue(runCatching { o["n"] }.exceptionOrNull() is JsEngineError)
                 assertTrue(runCatching { f() }.exceptionOrNull() is JsEngineError)
-                KiteJs().use { other ->
+                KiteJs(Rhino).use { other ->
                     assertTrue(runCatching { f() }.exceptionOrNull() is JsEngineError)
                     assertTrue(runCatching { other.global["x"] = o }.exceptionOrNull() is JsEngineError)
                 }

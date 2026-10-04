@@ -23,13 +23,21 @@ kotlin {
     }
 
     sourceSets {
+        all {
+            languageSettings {
+                optIn("io.github.yuroyami.kitejs.api.InternalKiteJsApi")
+            }
+        }
+
         commonMain.dependencies {
-            api(projects.kitejsRhino)
+            api(projects.kitejsApi)
             api(libs.kotlinx.coroutines.core)
         }
 
         commonTest.dependencies {
             implementation(libs.kotlinx.coroutines.test)
+            // Any engine will do for the tests; Rhino needs no native code on any target.
+            implementation(projects.kitejsRhino)
         }
     }
 }

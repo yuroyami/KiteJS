@@ -4,6 +4,9 @@
 
 package io.github.yuroyami.kitejs.api
 
+import io.github.yuroyami.kitejs.rhino.LanguageVersion
+import io.github.yuroyami.kitejs.rhino.Rhino
+import io.github.yuroyami.kitejs.rhino.RhinoConfig
 import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertContains
@@ -16,8 +19,8 @@ import kotlinx.datetime.TimeZone
 /** What an embedder actually touches. Runs on every target. */
 class FacadeTest {
 
-    private fun <T> engine(configure: KiteJsConfig.() -> Unit = {}, body: (KiteJs) -> T): T =
-        KiteJs(configure).use(body)
+    private fun <T> engine(configure: RhinoConfig.() -> Unit = {}, body: (KiteJs) -> T): T =
+        KiteJs(Rhino, configure).use(body)
 
     // ---- Values ------------------------------------------------------------------------------
 
@@ -279,14 +282,14 @@ class FacadeTest {
 
     @Test
     fun aClosedEngineRefusesToRun() {
-        val js = KiteJs()
+        val js = KiteJs(Rhino)
         js.close()
         assertFailsWith<JsEngineError> { js.evaluate("1") }
     }
 
     @Test
     fun twoEnginesAtOnceIsRefusedClearly() = engine { _ ->
-        val e = assertFailsWith<JsEngineError> { KiteJs() }
+        val e = assertFailsWith<JsEngineError> { KiteJs(Rhino) }
         assertContains(e.message ?: "", "this thread already has an open engine")
     }
 
@@ -315,7 +318,7 @@ class FacadeTest {
     @Test
     fun consoleGoesWhereTheEmbedderSaid() {
         val lines = mutableListOf<ConsoleMessage>()
-        KiteJs { console = ConsolePrinters.collecting(lines) }.use { js ->
+        KiteJs(Rhino) { console = ConsolePrinters.collecting(lines) }.use { js ->
             js.evaluate("console.log('hello', 1, true)")
             js.evaluate("console.warn('careful')")
             js.evaluate("console.error('%s went wrong at %d', 'thing', 5)")
@@ -332,7 +335,7 @@ class FacadeTest {
     @Test
     fun consoleCountsAndTimes() {
         val lines = mutableListOf<ConsoleMessage>()
-        KiteJs { console = ConsolePrinters.collecting(lines) }.use { js ->
+        KiteJs(Rhino) { console = ConsolePrinters.collecting(lines) }.use { js ->
             js.evaluate("console.count('a'); console.count('a'); console.count()")
             js.evaluate("console.time('t'); console.timeEnd('t')")
             js.evaluate("console.assert(false, 'nope')")

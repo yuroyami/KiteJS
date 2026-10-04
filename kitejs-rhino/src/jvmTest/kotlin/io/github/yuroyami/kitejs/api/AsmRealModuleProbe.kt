@@ -4,9 +4,11 @@
 
 package io.github.yuroyami.kitejs.api
 
-import org.junit.Assume.assumeTrue
+import io.github.yuroyami.kitejs.rhino.Rhino
+import io.github.yuroyami.kitejs.rhino.asmReports
 import java.io.File
 import kotlin.test.Test
+import org.junit.Assume.assumeTrue
 
 /**
  * Compiles an asm.js module from a file and says what happened.
@@ -26,7 +28,7 @@ class AsmRealModuleProbe {
         val source = file.readText()
         println("source: ${source.length} chars")
 
-        KiteJs { asmJs = true }.use { js ->
+        KiteJs(Rhino) { asmJs = true }.use { js ->
             val started = System.nanoTime()
             js.compile(source, file.name)
             val took = (System.nanoTime() - started) / 1_000_000

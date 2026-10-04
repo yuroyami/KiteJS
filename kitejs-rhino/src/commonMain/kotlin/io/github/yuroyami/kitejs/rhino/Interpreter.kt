@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.rhino
 
+import io.github.yuroyami.kitejs.api.KBigInt
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CALLSPECIAL
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CALLSPECIAL_OPTIONAL
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CALL_ON_SUPER

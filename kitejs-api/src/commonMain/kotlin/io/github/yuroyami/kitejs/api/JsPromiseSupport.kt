@@ -4,16 +4,8 @@
 
 package io.github.yuroyami.kitejs.api
 
-import io.github.yuroyami.kitejs.rhino.Callable
-import io.github.yuroyami.kitejs.rhino.Context
-import io.github.yuroyami.kitejs.rhino.NativePromise
-import io.github.yuroyami.kitejs.rhino.ScriptRuntime
-import io.github.yuroyami.kitejs.rhino.Scriptable
-import io.github.yuroyami.kitejs.rhino.ScriptableObject
-import io.github.yuroyami.kitejs.rhino.Undefined
-
 /** A promise the host controls: hand [promise] to the script, settle it when you are ready. */
-public class JsPromiseHandle internal constructor(
+public class JsPromiseHandle(
     public val promise: JsObject,
     private val resolveFn: JsFunction,
     private val rejectFn: JsFunction,
@@ -47,14 +39,8 @@ public fun KiteJs.newPromise(): JsPromiseHandle {
  */
 public val JsValue.isThenable: Boolean
     get() {
-        val obj = raw as? Scriptable ?: return false
-        if (!ScriptRuntime.isObject(obj)) return false
-        val cx = contextFor(obj)
-        return try {
-            topCall(cx, scopeOf(obj)) { ScriptableObject.getProperty(obj, "then") is Callable }
-        } catch (e: Throwable) {
-            throw translate(e)
-        }
+        val obj = raw as? JsObject ?: return false
+        return obj.engine.thenableCheck(obj)
     }
 
 /**
@@ -68,24 +54,8 @@ public val JsValue.isThenable: Boolean
  * [value] is not thenable at all, which `await` would hand straight back.
  *
  * The callback runs from the microtask queue, which every outermost call into the engine drains
- * as it returns, this one included, so for a promise that has already settled it runs before
- * this returns. An exception it throws comes out of the call that drained the queue.
+ * as it returns, this one included, so for a promise that has already settled it runs before this
+ * returns. An exception it throws comes out of the call that drained the queue.
  */
 public fun KiteJs.onSettled(value: JsValue, onSettled: (JsValue, JsValue?) -> Unit): Boolean =
-    hostCall { cx, scope ->
-        NativePromise.awaitValue(
-            cx,
-            scope,
-            adopt(value.raw, scope),
-            hostHandler { onSettled(JsValue(it), null) },
-            hostHandler { onSettled(JsValue.undefined, JsValue(it)) },
-        )
-    }
-
-/** A handler only the engine calls, never a script, so it needs no function object around it. */
-private fun hostHandler(body: (Any?) -> Unit): Callable = object : Callable {
-    override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-        body(if (args.isNotEmpty()) args[0] else Undefined.instance)
-        return Undefined.instance
-    }
-}
+    watchSettlement(value, onSettled)

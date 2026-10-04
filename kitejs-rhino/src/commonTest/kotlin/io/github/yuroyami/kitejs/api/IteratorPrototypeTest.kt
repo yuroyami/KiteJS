@@ -5,6 +5,7 @@
 package io.github.yuroyami.kitejs.api
 
 import io.github.yuroyami.kitejs.rhino.Context
+import io.github.yuroyami.kitejs.rhino.Rhino
 import io.github.yuroyami.kitejs.rhino.ScriptRuntime
 import io.github.yuroyami.kitejs.rhino.TopLevel
 import kotlin.test.Test
@@ -18,7 +19,7 @@ import kotlin.test.assertEquals
  */
 class IteratorPrototypeTest {
 
-    private fun eval(source: String): String = KiteJs().use { js -> js.evaluate(source).asString() }
+    private fun eval(source: String): String = KiteJs(Rhino).use { js -> js.evaluate(source).asString() }
 
     private val protos =
         "var gp = Object.getPrototypeOf; var IP = gp(gp([][Symbol.iterator]()));" +

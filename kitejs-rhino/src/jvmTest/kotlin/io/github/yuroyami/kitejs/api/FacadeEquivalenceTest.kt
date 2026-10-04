@@ -5,10 +5,13 @@
 package io.github.yuroyami.kitejs.api
 
 import io.github.yuroyami.kitejs.rhino.Context
+import io.github.yuroyami.kitejs.rhino.LanguageVersion
+import io.github.yuroyami.kitejs.rhino.Rhino
 import io.github.yuroyami.kitejs.rhino.RhinoException
 import io.github.yuroyami.kitejs.rhino.ScriptRuntime
 import io.github.yuroyami.kitejs.rhino.Scriptable
 import io.github.yuroyami.kitejs.rhino.Undefined
+import io.github.yuroyami.kitejs.rhino.facade.RhinoKiteJs
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -46,9 +49,9 @@ class FacadeEquivalenceTest {
     }
 
     private fun throughTheFacade(source: String): String =
-        KiteJs { languageVersion = LanguageVersion.ES6 }.use { js ->
+        KiteJs(Rhino) { languageVersion = LanguageVersion.ES6 }.use { js ->
             try {
-                render(js.evaluate(source, "eq.js").raw)
+                render((js as RhinoKiteJs).toRhino(js.evaluate(source, "eq.js")))
             } catch (e: JsError) {
                 "throws " + (if (e.name.isEmpty()) e.errorMessage else "${e.name}: ${e.errorMessage}")
             } catch (e: JsSyntaxError) {

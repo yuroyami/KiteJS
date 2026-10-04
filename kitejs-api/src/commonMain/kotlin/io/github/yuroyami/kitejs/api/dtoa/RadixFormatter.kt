@@ -2,9 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-package io.github.yuroyami.kitejs.rhino.dtoa
+package io.github.yuroyami.kitejs.api.dtoa
 
-import io.github.yuroyami.kitejs.rhino.KBigInt
+import io.github.yuroyami.kitejs.api.InternalKiteJsApi
+
+import io.github.yuroyami.kitejs.api.KBigInt
 import kotlin.math.floor
 
 /**
@@ -16,7 +18,8 @@ import kotlin.math.floor
  * port (D-33); this one keeps upstream's algorithm because there is nothing simpler that gives the
  * same answers.
  */
-internal object RadixFormatter {
+@InternalKiteJsApi
+public object RadixFormatter {
 
     private const val EXP_SHIFT1 = 20
     private const val EXP_MASK = 0x7ff00000
@@ -28,7 +31,7 @@ internal object RadixFormatter {
     private fun baseDigit(digit: Int): Char =
         if (digit >= 10) ('a' - 10 + digit) else ('0' + digit)
 
-    fun toBaseString(base: Int, value: Double): String {
+    public fun toBaseString(base: Int, value: Double): String {
         require(base in 2..36) { "Bad base: $base" }
 
         if (value.isNaN()) return "NaN"

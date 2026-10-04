@@ -4,7 +4,8 @@
 
 package io.github.yuroyami.kitejs.rhino
 
-import io.github.yuroyami.kitejs.rhino.dtoa.DoubleFormatter
+import io.github.yuroyami.kitejs.api.KBigInt
+import io.github.yuroyami.kitejs.api.dtoa.DoubleFormatter
 import kotlin.math.abs
 
 /**

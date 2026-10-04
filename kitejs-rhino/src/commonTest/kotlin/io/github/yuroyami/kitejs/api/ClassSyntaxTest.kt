@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.api
 
+import io.github.yuroyami.kitejs.rhino.Rhino
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -16,7 +17,7 @@ import kotlin.test.assertEquals
 class ClassSyntaxTest {
 
     private fun check(expected: String, source: String) {
-        assertEquals(expected, KiteJs().use { js -> js.evaluate(source).asString() }, source)
+        assertEquals(expected, KiteJs(Rhino).use { js -> js.evaluate(source).asString() }, source)
     }
 
     /** The three checks the issue asks for. */

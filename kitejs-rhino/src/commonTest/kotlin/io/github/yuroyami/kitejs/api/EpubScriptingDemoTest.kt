@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.api
 
+import io.github.yuroyami.kitejs.rhino.Rhino
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -135,7 +136,7 @@ class EpubScriptingDemoTest {
         doc.add("body-2", "p", "Second.")
         doc.add("aside-1", "aside").className = "sidenote"
 
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             bind(js, doc)
             js.evaluate(chapterScript, "chapter1.js")
 
@@ -163,7 +164,7 @@ class EpubScriptingDemoTest {
 
     @Test
     fun theReadingSystemAnswersWhatTheSpecSaysItShould() {
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             bind(js, FakeDocument())
             assertEquals("KiteJS Reader", js.evaluate("navigator.epubReadingSystem.name").asString())
             assertEquals("0.1", js.evaluate("navigator.epubReadingSystem.version").asString())
@@ -176,7 +177,7 @@ class EpubScriptingDemoTest {
     fun aChapterScriptThatThrowsDoesNotTakeTheReaderDown() {
         val doc = FakeDocument()
         doc.add("chapter-title", "h1", "Ok")
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             bind(js, doc)
             val e = kotlin.test.assertFailsWith<JsError> {
                 js.evaluate("document.getElementById('missing').textContent = 'x'", "bad.js")
@@ -191,7 +192,7 @@ class EpubScriptingDemoTest {
     @Test
     fun aChapterScriptCannotRunForever() {
         val doc = FakeDocument()
-        KiteJs { instructionBudget = 200_000 }.use { js ->
+        KiteJs(Rhino) { instructionBudget = 200_000 }.use { js ->
             bind(js, doc)
             kotlin.test.assertFailsWith<JsEngineError> { js.evaluate("for (;;) {}", "runaway.js") }
         }

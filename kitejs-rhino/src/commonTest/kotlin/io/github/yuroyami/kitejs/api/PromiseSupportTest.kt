@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.api
 
+import io.github.yuroyami.kitejs.rhino.Rhino
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -19,7 +20,7 @@ class PromiseSupportTest {
 
     @Test
     fun thenable_means_a_callable_then() {
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             for (source in listOf("1", "'then'", "true", "null", "undefined", "10n", "Symbol('s')")) {
                 assertFalse(js.evaluate(source).isThenable, source)
             }
@@ -41,7 +42,7 @@ class PromiseSupportTest {
 
     @Test
     fun a_then_getter_that_throws_reaches_the_caller() {
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             val value = js.evaluate("({ get then() { throw new RangeError('no then') } })")
             val e = assertFailsWith<JsError> { value.isThenable }
             assertEquals("RangeError", e.name)
@@ -53,7 +54,7 @@ class PromiseSupportTest {
     fun a_scalar_is_not_thenable_anywhere_but_an_object_needs_its_engine() {
         val number: JsValue
         val obj: JsValue
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             number = js.evaluate("42")
             obj = js.evaluate("({ then: function () {} })")
         }
@@ -76,7 +77,7 @@ class PromiseSupportTest {
 
     @Test
     fun a_thenable_is_followed_to_its_end() {
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             assertEquals(true to "ok:7", settle(js, "({ then: function (resolve) { resolve(Promise.resolve(7)) } })"))
             assertEquals(true to "ok:8", settle(js, "({ then: function (r) { r({ then: function (r2) { r2(8) } }) } })"))
             assertEquals(
@@ -90,7 +91,7 @@ class PromiseSupportTest {
 
     @Test
     fun a_thenable_settles_once_and_a_throw_rejects() {
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             assertEquals(true to "ok:1", settle(js, "({ then: function (r) { r(1); r(2) } })"))
             assertEquals(true to "ok:1", settle(js, "({ then: function (r) { r(1); throw new Error('late') } })"))
             assertEquals(true to "error:Error: early", settle(js, "({ then: function () { throw new Error('early') } })"))
@@ -100,7 +101,7 @@ class PromiseSupportTest {
 
     @Test
     fun then_is_read_once() {
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             val source = "var reads = 0; ({ get then() { reads++; return function (r) { r('read') } } })"
             assertEquals(true to "ok:read", settle(js, source))
             assertEquals(1.0, js.evaluate("reads").asDouble())
@@ -109,7 +110,7 @@ class PromiseSupportTest {
 
     @Test
     fun a_promise_is_watched_without_calling_its_then() {
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             val source = "var p = Promise.resolve(5); p.then = function () { throw new Error('called') }; p"
             assertEquals(true to "ok:5", settle(js, source))
         }
@@ -117,7 +118,7 @@ class PromiseSupportTest {
 
     @Test
     fun a_promise_resolved_with_itself_rejects() {
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             val source = "var res; var p = new Promise(function (r) { res = r }); res(p); p"
             val (registered, outcome) = settle(js, source)
             assertTrue(registered)
@@ -127,7 +128,7 @@ class PromiseSupportTest {
 
     @Test
     fun a_value_that_is_not_thenable_registers_nothing() {
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             for (source in listOf("5", "'x'", "({})", "({ then: 5 })", "[]")) {
                 assertEquals(false to "pending", settle(js, source), source)
             }
@@ -136,7 +137,7 @@ class PromiseSupportTest {
 
     @Test
     fun a_reason_that_cannot_be_read_still_makes_an_error() {
-        KiteJs().use { js ->
+        KiteJs(Rhino).use { js ->
             fun from(source: String) = JsError.from(js.evaluate(source))
 
             val badName = from("({ get name() { throw new Error('bad name') }, message: 'm' })")

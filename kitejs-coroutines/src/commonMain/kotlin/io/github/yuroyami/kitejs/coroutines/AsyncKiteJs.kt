@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.coroutines
 
+import io.github.yuroyami.kitejs.api.JsEngine
 import io.github.yuroyami.kitejs.api.JsEngineError
 import io.github.yuroyami.kitejs.api.JsError
 import io.github.yuroyami.kitejs.api.JsFunction
@@ -46,7 +47,7 @@ import kotlin.coroutines.coroutineContext
  * `JsEngineError` rather than running script there.
  *
  * ```
- * val js = asyncKiteJs()
+ * val js = asyncKiteJs(Rhino)
  * js.use { println(js.evaluate("1 + 1").asDouble()) }
  * js.close()
  * ```
@@ -193,16 +194,13 @@ public class AsyncKiteJs internal constructor(
                 if (state.released) return@launch
                 result.fold(
                     onSuccess = {
-                        try {
-                            handle.resolve(it)
-                        } catch (e: Exception) {
-                            // A value the engine cannot take still has to settle the promise.
-                            handle.reject(reasonOf(e))
-                        }
+                        // A value the engine cannot take still has to settle the promise. Settling
+                        // runs the reactions, so what they throw stays out of this catch.
+                        val value = runCatching { engine.valueOf(it) }
+                        value.fold(handle::resolve) { e -> handle.reject(reasonOf(e)) }
                     },
                     onFailure = { handle.reject(reasonOf(it)) },
                 )
-                engine.runMicrotasks()
             }
         }
     }
@@ -274,7 +272,8 @@ internal class EngineState(dispatcher: CoroutineDispatcher) {
 }
 
 /**
- * Builds an engine on a thread of its own.
+ * Builds an engine on [engine], on a thread of its own. The engine is loaded first, which for
+ * QuickJS in a browser compiles its WebAssembly; see [JsEngine.load].
  *
  * The thread that opens an engine holds it, so every call to the engine has to run on that
  * thread. By default the engine gets a new thread, which [AsyncKiteJs.close] ends. A [dispatcher]
@@ -286,16 +285,18 @@ internal class EngineState(dispatcher: CoroutineDispatcher) {
  * the hook between instructions, and a cancelled job answers "stop". That needs an instruction
  * budget to be set, so one is set for you when you do not name one.
  */
-public suspend fun asyncKiteJs(
+public suspend fun <C : KiteJsConfig> asyncKiteJs(
+    engine: JsEngine<C>,
     dispatcher: CoroutineDispatcher = EngineThread(),
-    configure: KiteJsConfig.() -> Unit = {},
+    configure: C.() -> Unit = {},
 ): AsyncKiteJs {
+    engine.load()
     val state = EngineState(dispatcher)
     // Set on the engine's thread and read there too, by the release below, so it needs no lock.
     var built: KiteJs? = null
     try {
         withContext(dispatcher) {
-            built = KiteJs {
+            built = KiteJs(engine) {
                 configure()
                 // Whatever the caller asked for still gets asked; the job check is added to it.
                 val theirs = interruptWhen

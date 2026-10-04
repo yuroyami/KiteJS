@@ -4,6 +4,8 @@
 
 package io.github.yuroyami.kitejs.api
 
+import io.github.yuroyami.kitejs.rhino.LanguageVersion
+import io.github.yuroyami.kitejs.rhino.Rhino
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -19,7 +21,7 @@ class ForInEnumerationTest {
     private val keys = "function keys(o) { var k = []; for (var x in o) k.push(x); return k.join(','); }"
 
     private fun eval(source: String, version: LanguageVersion = LanguageVersion.LATEST): String =
-        KiteJs { languageVersion = version }.use { js -> js.evaluate("$keys $source").asString() }
+        KiteJs(Rhino) { languageVersion = version }.use { js -> js.evaluate("$keys $source").asString() }
 
     @Test
     fun a_proxy_hands_out_the_keys_its_traps_report_though_its_target_lacks_them() {

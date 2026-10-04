@@ -1,6 +1,6 @@
 package io.github.yuroyami.kitejs.rhino
 
-import io.github.yuroyami.kitejs.rhino.dtoa.DecimalFormatter
+import io.github.yuroyami.kitejs.api.dtoa.DecimalFormatter
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
