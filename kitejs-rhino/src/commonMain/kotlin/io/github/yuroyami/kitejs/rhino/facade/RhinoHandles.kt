@@ -81,12 +81,15 @@ internal interface RhinoHandle {
     }
 
     fun defineAccessorProperty(name: String, read: (() -> Any?)?, write: ((JsValue) -> Unit)?, flags: PropertyFlags) {
+        // A real accessor, so a missing half reads as undefined and the descriptor shows get and
+        // set, as one a script defines would. An accessor has no writable flag to carry.
         engine.call(top = false, drain = false) {
             holder().defineProperty(
+                engine.cx,
                 name,
-                read?.let { r -> { engine.toRhino(r()) } },
-                write?.let { w -> { v: Any? -> w(engine.toJs(v)) } },
-                flags.attributes(),
+                read?.let { r -> ScriptableObject.LambdaGetterFunction { engine.toRhino(r()) } },
+                write?.let { w -> ScriptableObject.LambdaSetterFunction { _, v -> w(engine.toJs(v)) } },
+                flags.attributes() and ScriptableObject.READONLY.inv(),
             )
         }
     }

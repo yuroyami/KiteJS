@@ -19,6 +19,7 @@ dependencies {
     dokka(project(":kitejs-api"))
     dokka(project(":kitejs-rhino"))
     dokka(project(":kitejs-coroutines"))
+    dokka(project(":kitejs"))
 }
 
 dokka {

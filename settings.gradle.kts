@@ -31,6 +31,14 @@ include(":kitejs-api")
 // jvmTest as a differential-testing oracle.
 include(":kitejs-rhino")
 
+// :kitejs is the artifact KiteJS shipped as before it had more than one engine: :kitejs-api with
+// :kitejs-rhino underneath, and the deprecated `KiteJs { }`. It goes away at 1.0.
+include(":kitejs")
+
 // :kitejs-coroutines puts an engine behind suspending functions, on a dispatcher that runs one
 // thing at a time. Separate so the engines keep their own dependencies small.
 include(":kitejs-coroutines")
+
+// :kitejs-testkit is the behaviour every engine has to share, written once against :kitejs-api.
+// Each engine module runs it in its own tests. Not published.
+include(":kitejs-testkit")

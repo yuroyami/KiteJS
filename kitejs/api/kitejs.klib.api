@@ -1,0 +1,9 @@
+// Klib ABI Dump
+// Targets: [iosArm64, iosSimulatorArm64, iosX64, js, linuxArm64, linuxX64, macosArm64, mingwX64, wasmJs]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <io.github.yuroyami:kitejs>
+final fun io.github.yuroyami.kitejs.api/KiteJs(kotlin/Function1<io.github.yuroyami.kitejs.rhino/RhinoConfig, kotlin/Unit> = ...): io.github.yuroyami.kitejs.api/KiteJs // io.github.yuroyami.kitejs.api/KiteJs|KiteJs(kotlin.Function1<io.github.yuroyami.kitejs.rhino.RhinoConfig,kotlin.Unit>){}[0]

@@ -66,7 +66,12 @@ public class LambdaAccessorSlot : Slot {
                 getterFunction == null && setterFunction == null,
             )
         }
-        getterFunction?.let { desc.getter = it }
+        // An accessor's descriptor has both halves, a missing one as undefined, as the setter
+        // already did; upstream left a missing getter out altogether.
+        when {
+            getterFunction != null -> desc.getter = getterFunction
+            es6 -> desc.getter = Undefined.instance
+        }
         when {
             setterFunction != null -> desc.setter = setterFunction
             es6 -> desc.setter = Undefined.instance
@@ -93,8 +98,12 @@ public class LambdaAccessorSlot : Slot {
         return super.setValue(value, start, start, isThrow)
     }
 
+    /**
+     * An accessor with no getter reads as undefined (OrdinaryGet, step 7). Upstream fell back to
+     * the slot's own value, which is null, or whatever a data property it replaced held.
+     */
     override fun getValue(start: Scriptable?): Any? {
-        val g = getter ?: return super.getValue(start)
+        val g = getter ?: return if (setter != null) Undefined.instance else super.getValue(start)
         return g.apply(start)
     }
 

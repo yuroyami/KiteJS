@@ -53,6 +53,8 @@ kotlin {
         }
 
         commonTest.dependencies {
+            // The contract every engine keeps, run here against Rhino.
+            implementation(projects.kitejsTestkit)
             // Reading the test262 tree on every target. Test scope only: the engine has no file access.
             implementation(libs.kotlinx.io.core)
         }

@@ -226,6 +226,8 @@ public class NativeConsole private constructor(private val printer: ConsolePrint
             if (arg == null) return "null"
             if (Undefined.isUndefined(arg)) return Undefined.SCRIPTABLE_UNDEFINED.toString()
             if (arg is NativeError) return arg.toString() + "\n" + arg.get("stack")
+            // JSON has no form for these; a browser console prints them as a literal would.
+            if (arg is KBigInt || ScriptRuntime.isSymbol(arg)) return formatString(arg)
             val replacer = SerializableCallable { _, _, _, callArgs ->
                 var value = callArgs[1]
                 while (value is Delegator) value = value.delegee
