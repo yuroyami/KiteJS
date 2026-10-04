@@ -168,10 +168,15 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
         }
     }
 
-    private fun setRange(cx: Context, scope: Scriptable, source: Scriptable, dbloff: Double) {
+    /**
+     * The spec's SetTypedArrayFromArrayLike, for a [source] that is not a typed array: whatever it
+     * is goes through ToObject, so a string sets its characters and undefined or null is a
+     * TypeError, and each element is read with Get, so one the source inherits counts (D-86).
+     */
+    private fun setRange(cx: Context, scope: Scriptable, source: Any?, dbloff: Double) {
         if (isTypedArrayOutOfBounds) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
         val targetLength = length
-        val src = ScriptRuntime.toObject(scope, source)
+        val src = ScriptRuntime.toObject(cx, scope, source)
         val srcLength = AbstractEcmaObjectOperations.lengthOfArrayLike(cx, src)
 
         if (dbloff > targetLength) throw ScriptRuntime.rangeErrorById("msg.typed.array.bad.offset", dbloff)
@@ -179,7 +184,8 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
 
         val targetOffset = dbloff.toInt()
         for (k in 0 until srcLength.toInt()) {
-            js_set(k + targetOffset, source.get(k, source))
+            val value = getProperty(src, k)
+            js_set(k + targetOffset, if (value === Scriptable.NOT_FOUND) Undefined.instance else value)
         }
     }
 
@@ -714,13 +720,14 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
 
         private fun js_setMethod(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any {
             val self = realThis(thisObj)
-            val offset = if (NativeArrayBuffer.isArg(args, 1)) ScriptRuntime.toIntegerOrInfinity(args[1]) else 0.0
+            val offset = ScriptRuntime.toIntegerOrInfinity(args.getOrElse(1) { Undefined.instance })
             if (offset < 0) throw ScriptRuntime.rangeErrorById("msg.typed.array.bad.offset", offset)
-            val source = args[0]
+            // A missing source is undefined, which the array-like path turns into a TypeError.
+            val source = args.getOrElse(0) { Undefined.instance }
             if (source is NativeTypedArrayView) {
                 self.setRange(source, offset)
             } else {
-                self.setRange(cx, scope, ensureScriptable(source), offset)
+                self.setRange(cx, scope, source, offset)
             }
             return Undefined.instance
         }

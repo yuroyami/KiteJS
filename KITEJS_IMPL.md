@@ -512,6 +512,12 @@ Living list. Every entry is a known, deliberate behavior or structure difference
 - D-85: a sort comparator that answers NaN means equal, as SortCompare says. Upstream maps NaN to
   greater with `Double.compare`, so a stable sort can reorder elements that a consistent
   comparator calls equal.
+- D-86: `%TypedArray%.prototype.set` takes a missing source as undefined and puts any source that
+  is not a typed array through ToObject, then reads each element with Get, as
+  SetTypedArrayFromArrayLike says: `set()` is a TypeError a script can catch, `set('123')` writes
+  1, 2 and 3, and an element the source inherits is copied. ToIntegerOrInfinity answers +0 for NaN
+  and -0. Upstream indexes the missing argument, so `set()` escapes as a host
+  ArrayIndexOutOfBoundsException, demands an object, and reads only own elements.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

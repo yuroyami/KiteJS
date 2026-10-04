@@ -194,6 +194,13 @@ class Test262ParityTest {
         )) {
             put(path, "D-84: a Number written into a bigint view is a TypeError here")
         }
+        // set puts a primitive source through ToObject here; upstream demands an object (D-86).
+        for (path in listOf(
+            "built-ins/TypedArray/prototype/set/array-arg-primitive-toobject.js",
+            "built-ins/TypedArray/prototype/set/BigInt/array-arg-primitive-toobject.js",
+        )) {
+            put(path, "D-86: TypedArray set takes any array-like here")
+        }
 
         // Date.prototype[Symbol.toPrimitive] is non-writable here and writable upstream (D-56).
         put(

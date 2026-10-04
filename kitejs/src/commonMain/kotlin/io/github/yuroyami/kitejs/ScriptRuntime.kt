@@ -1122,7 +1122,8 @@ public object ScriptRuntime {
         return toIntegerOrInfinity(toNumber(value))
     }
 
-    public fun toIntegerOrInfinity(d: Double): Double = DoubleConversion.truncate(d)
+    /** NaN and both zeros are +0, as the spec says. Upstream's truncate lets NaN and -0 through. */
+    public fun toIntegerOrInfinity(d: Double): Double = if (d.isNaN() || d == 0.0) 0.0 else DoubleConversion.truncate(d) + 0.0
 
     public fun isNaN(n: Any?): Boolean = (n is Double && n.isNaN()) || (n is Float && n.isNaN())
 

@@ -1041,8 +1041,9 @@ class EvalOracleTest {
         "Date.prototype.getTime.call({})", "Date.prototype.valueOf.call(1)",
         "Object.prototype.toString.call(Date.prototype)",
         "Date.prototype.getTime.call(Date.prototype)",
-        "typeof Date.now()", "Date.now() === Date.now()",
-        "var a = Date.now(); var b = new Date().getTime(); a === b",
+        // Upstream cannot be given the pinned clock, so two reads of it can straddle a millisecond.
+        "typeof Date.now()", "var x = Date.now(), y = Date.now(); y - x >= 0 && y - x < 1000",
+        "var a = Date.now(); var b = new Date().getTime(); b - a >= 0 && b - a < 1000",
     )
 
     @Test
@@ -2055,6 +2056,28 @@ class EvalOracleTest {
             assertTrue(upstream(source) != "\"TypeError\"", "upstream now rejects a Number too, D-84 can be retired: $source")
         }
         assertEquals(upstream("String(BigInt(5)) + String(BigInt.asUintN(8, '257'))"), ported("String(BigInt(5)) + String(BigInt.asUintN(8, '257'))"))
+    }
+
+    /**
+     * `set` treats a missing source as undefined, puts any source through ToObject and reads its
+     * elements with Get (D-86). Upstream indexes the missing argument, which escapes as a host
+     * ArrayIndexOutOfBoundsException, refuses a string or number source, and reads only own
+     * elements.
+     */
+    @Test
+    fun typedArraySetTakesAnyArrayLike() {
+        assertEquals("\"TypeError\"", ported("try { new Uint8Array(2).set(); 'returned' } catch (e) { e.name }"))
+        assertFailsWith<ArrayIndexOutOfBoundsException>("upstream catches a missing source now, D-86 can be retired") {
+            upstream("try { new Uint8Array(2).set(); 'returned' } catch (e) { e.name }")
+        }
+        val sources = mapOf(
+            "var a = new Uint8Array(3); a.set('123'); a.join()" to "\"1,2,3\"",
+            "var a = new Uint8Array(3); var o = Object.create({ 1: 7 }); o.length = 3; o[0] = 5; a.set(o); a.join()" to "\"5,7,0\"",
+        )
+        for ((source, expected) in sources) {
+            assertEquals(expected, ported(source), source)
+            assertTrue(upstream(source) != expected, "upstream agrees now, D-86 can be retired: $source")
+        }
     }
 
     /**

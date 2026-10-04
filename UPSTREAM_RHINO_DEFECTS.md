@@ -153,8 +153,9 @@ view rejects `3n`, and it defaults a missing replacement to 0 where the spec has
 is NaN on a float view. Every copy is made through the global binding of the constructor, so a
 script that reassigns `Uint8Array` or `ArrayBuffer` changes what these methods return.
 
-- Where: `NativeTypedArrayView.js_at`, `js_toReversed`, `js_toSorted`, `js_with` and
-  `sameTypeCopy`, and `ScriptRuntime.getExistingCtor` wherever a built-in looks up an intrinsic.
+- Where: `NativeTypedArrayView.js_at`, `js_toReversed`, `js_toSorted` and `js_with`, which make
+  their copy with `cx.newObject(scope, getClassName(), ...)`, and `ScriptRuntime.getExistingCtor`
+  wherever a built-in looks up an intrinsic.
 - Test: `EvalOracleTest.theCopyingTypedArrayMethodsValidateTheirReceiver`.
 
 ### ToBigInt converts a Number (D-84)
@@ -175,6 +176,17 @@ enough to come out in a different order from V8's, breaking the stability the sp
 
 - Where: `ArrayLikeAbstractOperations.getSortComparatorFromArguments`.
 - Test: `EvalOracleTest.aComparatorAnsweringNaNMeansEqual`.
+
+### TypedArray set with no source crashes, and set takes only objects (D-86)
+
+`set()` reads `args[0]` without checking the length, so a host `ArrayIndexOutOfBoundsException`
+escapes the script's `try`. A source that is not a typed array has to be an object, where the spec
+puts it through ToObject: `set('123')` is a TypeError instead of writing 1, 2 and 3, and `set(5)`
+is a TypeError instead of writing nothing. The elements are then read with `get` on the source
+itself, so an element it inherits from its prototype is skipped.
+
+- Where: `NativeTypedArrayView.js_set` (the prototype method) and `setRange`.
+- Test: `EvalOracleTest.typedArraySetTakesAnyArrayLike`.
 
 ### A getOwnPropertyDescriptor trap answering undefined crashes (D-50)
 
