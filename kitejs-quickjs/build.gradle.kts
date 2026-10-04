@@ -1,5 +1,7 @@
+import com.android.build.api.withAndroid
 import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.konan.target.HostManager
 import java.io.ByteArrayOutputStream
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
@@ -370,6 +372,10 @@ kotlin.targets.withType<KotlinNativeTarget>().configureEach {
         sources.from(cSources.map { nativeDir.file(it) })
         headers.set(nativeDir)
         outputDir.set(layout.buildDirectory.dir("quickjs/native/$konanName"))
+        // Apple targets build only on a Mac. Elsewhere the Kotlin plugin skips their compilations,
+        // and this skips their C, so that a task over every target, such as Dokka's, still runs.
+        val buildable = HostManager().isEnabled(target.konanTarget)
+        onlyIf { buildable }
     }
     target.compilations.getByName("main").cinterops.create("kitejs_quickjs") {
         definitionFile.set(file("src/nativeInterop/cinterop/kitejs_quickjs.def"))
@@ -385,6 +391,16 @@ kotlin.targets.withType<KotlinNativeTarget>().configureEach {
 
 kotlin {
     explicitApi()
+
+    // The default hierarchy, plus jniMain: the JNI bridge the JVM and Android share.
+    applyDefaultHierarchyTemplate {
+        common {
+            group("jni") {
+                withJvm()
+                withAndroid()
+            }
+        }
+    }
 
     @OptIn(ExperimentalAbiValidation::class)
     abiValidation {
@@ -422,14 +438,8 @@ kotlin {
             implementation(projects.kitejsTestkit)
         }
 
-        // The JVM and Android share the JNI bridge, compiled into each; only how the library is
-        // found differs. A source directory rather than a source set keeps the default hierarchy.
         jvmMain {
-            kotlin.srcDir("src/jniMain/kotlin")
             resources.srcDir(buildJni)
-        }
-        androidMain {
-            kotlin.srcDir("src/jniMain/kotlin")
         }
 
         webMain {
@@ -437,3 +447,4 @@ kotlin {
         }
     }
 }
+

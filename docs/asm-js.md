@@ -11,7 +11,7 @@ it, and a module that does not is run as ordinary JavaScript, which is what a br
 ## How to tell what happened
 
 ```kotlin
-KiteJs().use { js ->
+KiteJs(Rhino).use { js ->
     js.evaluate(source, "game.js")
     for (report in js.asmReports) println(report)
 }
@@ -83,7 +83,7 @@ nothing, the same as through a typed array view.
 ## Turning it off
 
 ```kotlin
-KiteJs { asmJs = false }.use { js -> /* ... */ }
+KiteJs(Rhino) { asmJs = false }.use { js -> /* ... */ }
 ```
 
 A module then runs as ordinary JavaScript. The answers are the same either way, so this is only

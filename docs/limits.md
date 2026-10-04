@@ -5,7 +5,7 @@ Running someone else's script means it might not stop. This page is about that.
 ## Stop a script that will not return
 
 ```kotlin
-KiteJs { instructionBudget = 5_000_000 }.use { js ->
+KiteJs(Rhino) { instructionBudget = 5_000_000 }.use { js ->
     js.evaluate("while (true) {}")   // throws JsEngineError
 }
 ```
@@ -35,7 +35,7 @@ Zero, the default, means no limit.
 ```kotlin
 val deadline = TimeSource.Monotonic.markNow() + 2.seconds
 
-KiteJs { interruptWhen = { deadline.hasPassedNow() } }.use { js ->
+KiteJs(Rhino) { interruptWhen = { deadline.hasPassedNow() } }.use { js ->
     js.evaluate(untrustedScript)
 }
 ```
@@ -50,7 +50,7 @@ exactly that, and it chains: whatever you set is still asked.
 ## Take away what a sandbox does not need
 
 ```kotlin
-KiteJs {
+KiteJs(Rhino) {
     safeBuiltins = true    // leaves out the built-ins a sandbox does not want
     sealBuiltins = true    // a script cannot replace Array.prototype.push
     console = null         // no console at all
@@ -62,11 +62,18 @@ and the next script in the same engine gets the redefined one.
 
 ## Memory
 
-There is no memory budget. A script that builds an ever larger array will exhaust the heap, and
-the engine cannot stop it. If that is a real risk for you, run the engine in a process or a
-worker you can kill.
+On QuickJS, set `memoryLimit` and a script that outgrows it ends the call with a
+`JsEngineError`, even when the script tries to catch it, and the engine stays usable:
 
-Weak collections are the one place memory behaves differently by target:
+```kotlin
+KiteJs(QuickJs) { memoryLimit = 64L * 1024 * 1024 }.use { js -> /* ... */ }
+```
+
+Rhino has no memory budget. A script that builds an ever larger array will exhaust the heap, and
+the engine cannot stop it. If that is a real risk for you, use QuickJS, or run the engine in a
+process or a worker you can kill.
+
+Weak collections on Rhino are the one place memory behaves differently by target:
 
 | Target | `WeakMap` and `WeakSet` |
 |---|---|
@@ -86,7 +93,11 @@ code needs to know.
 
 ## Speed
 
-The engine interprets. It does not compile to bytecode or machine code, because iOS does not
+Both engines interpret. QuickJS, being C, ran between 3 and 12 times faster than Rhino on the JVM
+across loops, string building, property writes, recursion and sorting; the rest of this section
+is about Rhino.
+
+Rhino interprets. It does not compile to bytecode or machine code, because iOS does not
 allow that and the port keeps one behaviour everywhere.
 
 Measured against Mozilla Rhino's own interpreter on the JVM, KiteJS runs the same scripts about
@@ -99,14 +110,15 @@ Kotlin and bind it.
 
 ## One engine per thread
 
-An engine belongs to the thread that opened it. Opening a second engine on that same thread
-throws a `JsEngineError` that says so, rather than quietly sharing the first one's state.
+An engine belongs to the thread that opened it. On Rhino, opening a second engine on that same
+thread throws a `JsEngineError` that says so, rather than quietly sharing the first one's state.
+QuickJS keeps each engine's state apart, so one thread can hold several of its engines.
 
 Each thread has its own slot, so two threads can hold two engines at once, and neither sees the
 other's global scope. A program that runs several documents gives each document a thread.
 
 ```kotlin
-val worker = thread { KiteJs().use { js -> js.evaluate(script) } }
+val worker = thread { KiteJs(Rhino).use { js -> js.evaluate(script) } }
 ```
 
 Only that thread can use or close the engine. From another thread, `evaluate`, `close` and the
@@ -127,7 +139,7 @@ Use `asyncKiteJs` when you want the calls serialised for you on a thread of its 
 A script that throws leaves the engine usable. So does one that runs out of budget.
 
 ```kotlin
-KiteJs { instructionBudget = 100_000 }.use { js ->
+KiteJs(Rhino) { instructionBudget = 100_000 }.use { js ->
     runCatching { js.evaluate("for (;;) {}") }
     js.evaluate("1 + 2").asInt()   // 3, the engine is fine
 }

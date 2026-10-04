@@ -5,7 +5,7 @@
 `evaluate` parses and runs a string. It answers the value of the last expression.
 
 ```kotlin
-KiteJs().use { js ->
+KiteJs(Rhino).use { js ->
     js.evaluate("var total = 0; for (var i = 1; i <= 10; i++) total += i; total").asInt()  // 55
 }
 ```

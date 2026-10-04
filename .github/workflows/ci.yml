@@ -1,5 +1,8 @@
 name: CI
 
+# Everything written in Kotlin alone. kitejs-quickjs needs C toolchains, so it has its own
+# workflow, quickjs.yml, and is left out here.
+
 on:
   push:
     branches: [main]
@@ -31,6 +34,7 @@ jobs:
           :kitejs-coroutines:wasmJsNodeTest :kitejs-coroutines:wasmJsBrowserTest
           :kitejs-coroutines:linuxX64Test
           assemble check
+          -x :kitejs-quickjs:assemble -x :kitejs-quickjs:check
 
   apple:
     runs-on: macos-latest

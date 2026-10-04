@@ -4,6 +4,11 @@ KiteJS is a JavaScript engine, not a browser and not Node. This page lists what 
 do here, and what to write instead. Everything below was checked against the engine, not
 remembered.
 
+This page is about Rhino. QuickJS is a different engine with its own, much shorter list: it runs
+the newer syntax and built-ins below, async iteration included, and the gaps it shares with Rhino
+are the ones that come from not being a browser, such as having no DOM and no `fetch`. See
+[Choosing an engine](engines.md).
+
 ## Syntax the parser rejects
 
 These are syntax errors. A script using any of them will not even parse.

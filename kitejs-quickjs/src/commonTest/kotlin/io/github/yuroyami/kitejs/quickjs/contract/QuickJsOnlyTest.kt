@@ -5,6 +5,7 @@
 package io.github.yuroyami.kitejs.quickjs.contract
 
 import io.github.yuroyami.kitejs.api.JsEngineError
+import io.github.yuroyami.kitejs.api.KiteJs
 import io.github.yuroyami.kitejs.quickjs.QuickJs
 import io.github.yuroyami.kitejs.quickjs.QuickJsConfig
 import io.github.yuroyami.kitejs.testkit.EngineContract
@@ -21,6 +22,18 @@ class QuickJsOnlyTest : EngineContract<QuickJsConfig>(QuickJs) {
         assertContains(js.version, "KiteJS")
         assertContains(js.version, "QuickJS-ng")
         assertEquals("QuickJS", js.engine.name)
+    }
+
+    @Test
+    fun twoEnginesOnOneThreadWorkSideBySide() = test {
+        KiteJs(QuickJs).use { a ->
+            KiteJs(QuickJs).use { b ->
+                a.evaluate("var x = 'a'")
+                b.evaluate("var x = 'b'")
+                assertEquals("a", a.evaluate("x").asString())
+                assertEquals("b", b.evaluate("x").asString())
+            }
+        }
     }
 
     @Test

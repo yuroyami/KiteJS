@@ -6,7 +6,7 @@
 which drains when a top level call returns.
 
 ```kotlin
-KiteJs().use { js ->
+KiteJs(Rhino).use { js ->
     js.evaluate("var log = []; Promise.resolve(1).then(function (v) { log.push(v) })")
     js.evaluate("log.join()").asString()   // "1"
 }
@@ -42,7 +42,7 @@ implementation("io.github.yuroyami:kitejs-coroutines:0.2.0")
 ```
 
 ```kotlin
-val js = asyncKiteJs()
+val js = asyncKiteJs(Rhino)
 try {
     println(js.evaluate("2 + 2").asDouble())
 } finally {
@@ -154,7 +154,7 @@ yourself for a deadline or a stop button:
 
 ```kotlin
 val deadline = now() + 2000
-KiteJs { interruptWhen = { now() > deadline } }.use { js -> /* ... */ }
+KiteJs(Rhino) { interruptWhen = { now() > deadline } }.use { js -> /* ... */ }
 ```
 
 Setting `interruptWhen` turns the check on even when you set no instruction budget. Whatever you

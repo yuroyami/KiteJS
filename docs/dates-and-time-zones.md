@@ -3,7 +3,7 @@
 ## Two settings decide what `Date` does
 
 ```kotlin
-KiteJs {
+KiteJs(Rhino) {
     timeZone = TimeZone.of("Europe/Berlin")
     clock = { 1_700_000_000_000.0 }
 }.use { js ->
@@ -22,7 +22,7 @@ A script that reads the time gives a different answer every run. Fix the clock a
 
 ```kotlin
 val fixed = 1_700_000_000_000.0
-KiteJs { clock = { fixed }; timeZone = TimeZone.UTC }.use { js ->
+KiteJs(Rhino) { clock = { fixed }; timeZone = TimeZone.UTC }.use { js ->
     assertEquals("2023-11-14", js.evaluate("new Date().toISOString().slice(0, 10)").asString())
 }
 ```
@@ -31,7 +31,7 @@ A `clock` is a lambda, so it can move:
 
 ```kotlin
 var now = 0.0
-KiteJs { clock = { now } }.use { js ->
+KiteJs(Rhino) { clock = { now } }.use { js ->
     js.evaluate("var t0 = Date.now()")
     now += 5000
     js.evaluate("Date.now() - t0").asDouble()   // 5000.0

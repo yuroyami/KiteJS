@@ -13,25 +13,25 @@ See LICENSE for the full text.
 Rhino vendors third-party number formatting code, which KiteJS ports along with
 it and which keeps its own license:
 
-  io/github/yuroyami/kitejs/dtoa/  (MathUtils, Decimal, DoubleFormatter)
+  io/github/yuroyami/kitejs/rhino/dtoa/  (MathUtils, Decimal, DoubleFormatter)
   Copyright 2018-2020 Raffaello Giulietti, MIT license. This is the Schubfach
   algorithm, the same code OpenJDK and Jackson use. Each file carries the full
   MIT text in its header.
 
-  io/github/yuroyami/kitejs/v8dtoa/DoubleConversion
+  io/github/yuroyami/kitejs/rhino/v8dtoa/DoubleConversion
   Copyright 2011 the V8 project authors, three-clause BSD license. The file
   carries the full text in its header.
 
 KiteJS also carries code that did not come from Rhino, and which keeps its own
 license:
 
-  io/github/yuroyami/kitejs/FdLibm.kt
+  io/github/yuroyami/kitejs/rhino/FdLibm.kt
   A port of fdlibm 5.3, Copyright (C) 1993 and 2004 by Sun Microsystems, Inc.,
   with the fixes FreeBSD's msun library and V8's ieee754.cc made to it. Its
   license grants permission to use, copy, modify and distribute the software
   provided the notice is preserved; the file carries it in its header.
 
-  io/github/yuroyami/kitejs/WeakRef.kt and its four platform actuals
+  io/github/yuroyami/kitejs/rhino/WeakRef.kt and its four platform actuals
   (jvmMain, androidMain, nativeMain, jsMain), plus WeakRefTest
   Copyright 2026 yuroyami, Apache License, Version 2.0. Written for KiteCore
   (https://github.com/yuroyami/KiteCore) and copied here rather than taken as a
@@ -41,6 +41,15 @@ license:
 
   Rhino uses java.util.WeakHashMap for WeakMap and WeakSet, which common Kotlin
   has no equivalent of. WeakRef is what KiteJS builds its own weak-keyed map on.
+
+kitejs-quickjs carries QuickJS-ng 0.17.0 (https://github.com/quickjs-ng/quickjs)
+in kitejs-quickjs/native/quickjs, with the few changes KiteJS needs recorded in
+kitejs-quickjs/native/kitejs-quickjs.patch. QuickJS-ng is Copyright Fabrice
+Bellard, Charlie Gordon, Ben Noordhuis and the QuickJS-ng contributors, under
+the MIT license; the full text is in kitejs-quickjs/native/quickjs/LICENSE and
+in the header of each source file that has one. Every build of kitejs-quickjs,
+the static libraries, the JNI libraries and the WebAssembly module, is compiled
+from that code.
 
 The interpreter path is ported; Rhino's JVM bytecode compiler, E4X/XML support,
 Java interop (LiveConnect) and tooling are out of scope and contain no KiteJS

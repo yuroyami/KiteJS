@@ -71,6 +71,7 @@ plugins:
 nav:
   - Home: index.md
   - Getting started: getting-started.md
+  - Choosing an engine: engines.md
   - Using the engine:
       - Evaluating scripts: evaluating.md
       - Binding host objects: host-objects.md
