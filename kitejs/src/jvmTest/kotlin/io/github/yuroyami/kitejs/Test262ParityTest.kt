@@ -175,6 +175,26 @@ class Test262ParityTest {
         // unit off for powers of two: Math.log2(8) is 2.9999999999999996 (D-73).
         put("built-ins/Math/log2/log2-basicTests.js", "D-73: log2 is fdlibm's here and exact for powers of two")
 
+        // toReversed and toSorted validate their receiver, and with converts a bigint view's
+        // replacement with ToBigInt. Upstream does neither (D-83).
+        for (path in listOf(
+            "built-ins/TypedArray/prototype/toReversed/this-value-invalid.js",
+            "built-ins/TypedArray/prototype/toSorted/this-value-invalid.js",
+            "built-ins/TypedArray/prototype/with/BigInt/early-type-coercion-bigint.js",
+        )) {
+            put(path, "D-83: the ES2023 typed array methods validate and convert as the spec says here")
+        }
+        // ToBigInt turns a Number away here. Upstream converts it the way BigInt() does (D-84).
+        for (path in listOf(
+            "built-ins/TypedArray/prototype/set/BigInt/number-tobigint.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/object-arg/number-tobigint.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/object-arg/undefined-tobigint.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/typedarray-arg/src-typedarray-not-big-throws.js",
+            "built-ins/TypedArrayConstructors/internals/Set/BigInt/number-tobigint.js",
+        )) {
+            put(path, "D-84: a Number written into a bigint view is a TypeError here")
+        }
+
         // Date.prototype[Symbol.toPrimitive] is non-writable here and writable upstream (D-56).
         put(
             "built-ins/Date/prototype/Symbol.toPrimitive/prop-desc.js",

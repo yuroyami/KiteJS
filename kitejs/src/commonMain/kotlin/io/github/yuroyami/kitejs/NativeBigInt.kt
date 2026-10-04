@@ -63,7 +63,7 @@ internal class NativeBigInt(private val bigIntValue: KBigInt) : ScriptableObject
             LambdaConstructor.convertThisObject<NativeBigInt>(thisObj)
 
         private fun js_constructorFunc(args: Array<Any?>): Any =
-            if (args.isNotEmpty()) ScriptRuntime.toBigInt(args[0]) else KBigInt.ZERO
+            if (args.isNotEmpty()) ScriptRuntime.bigIntFromValue(args[0]) else KBigInt.ZERO
 
         private fun js_constructor(): Scriptable =
             throw ScriptRuntime.typeErrorById("msg.no.new", CLASS_NAME)

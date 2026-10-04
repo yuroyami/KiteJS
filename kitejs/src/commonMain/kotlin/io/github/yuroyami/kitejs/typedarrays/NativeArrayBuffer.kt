@@ -6,6 +6,7 @@ package io.github.yuroyami.kitejs.typedarrays
 
 import io.github.yuroyami.kitejs.AbstractEcmaObjectOperations
 import io.github.yuroyami.kitejs.Context
+import io.github.yuroyami.kitejs.Intrinsics
 import io.github.yuroyami.kitejs.LambdaConstructor
 import io.github.yuroyami.kitejs.ScriptRuntime
 import io.github.yuroyami.kitejs.Scriptable
@@ -86,6 +87,7 @@ public class NativeArrayBuffer : ScriptableObject {
                 SerializableConstructable { icx, s, args -> js_constructor(icx, s, args) },
             )
             constructor.setPrototypePropertyAttributes(DONTENUM or READONLY or PERMANENT)
+            Intrinsics.register(scope, CLASS_NAME, constructor)
 
             constructor.defineConstructorMethod(scope, "isView", 1, SerializableCallable { _, _, _, args -> js_isView(args) })
             constructor.definePrototypeMethod(scope, "slice", 2, SerializableCallable { icx, s, thisObj, args -> js_slice(icx, s, thisObj, args) })

@@ -12,6 +12,7 @@ import io.github.yuroyami.kitejs.Context
 import io.github.yuroyami.kitejs.KBigInt
 import io.github.yuroyami.kitejs.ExternalArrayData
 import io.github.yuroyami.kitejs.Function
+import io.github.yuroyami.kitejs.Intrinsics
 import io.github.yuroyami.kitejs.IteratorLikeIterable
 import io.github.yuroyami.kitejs.LambdaConstructor
 import io.github.yuroyami.kitejs.Messages
@@ -188,8 +189,13 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
         return ScriptRuntime.getPropAndThis(elem, "toLocaleString", cx, scope)!!.call(cx, scope, ScriptRuntime.emptyArgs)
     }
 
-    private fun sortTemporaryArray(cx: Context, scope: Scriptable, args: Array<Any?>): Array<Any?> {
-        val working = Array<Any?>(length) { js_get(it) }
+    /**
+     * The spec's SortIndexedProperties over the first [len] elements, which the caller has just
+     * validated: every element is read before the comparator first runs, so a comparator that
+     * detaches the buffer changes nothing that is sorted.
+     */
+    private fun sortTemporaryArray(cx: Context, scope: Scriptable, args: Array<Any?>, len: Int): Array<Any?> {
+        val working = Array<Any?>(len) { js_get(it) }
         if (args.isNotEmpty() && Undefined.instance !== args[0]) {
             val comparator = ArrayLikeAbstractOperations.getSortComparator(cx, scope, args)
             sortStable(working) { a, b -> comparator.compare(a, b) }
@@ -209,8 +215,7 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
 
     /** Builds the result of a method through the species constructor. */
     private fun typedArraySpeciesCreate(cx: Context, scope: Scriptable, args: Array<Any?>, methodName: String): NativeTypedArrayView {
-        val topLevelScope = getTopLevelScope(scope)
-        val defaultConstructor = ScriptRuntime.getExistingCtor(cx, topLevelScope, className)
+        val defaultConstructor = Intrinsics.constructor(cx, scope, className)
         val constructable = AbstractEcmaObjectOperations.speciesConstructor(cx, this, defaultConstructor)
 
         val newArray = constructable.construct(cx, scope, args)
@@ -227,12 +232,12 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
         return newArray
     }
 
-    /** A same-typed array of the same length, for the methods that never consult species. */
-    private fun sameTypeCopy(cx: Context, scope: Scriptable): Scriptable = cx.newObject(
-        scope,
-        className,
-        arrayOf<Any?>(NativeArrayBuffer(length * bytesPerElement), 0, length, bytesPerElement),
-    )
+    /**
+     * The spec's TypedArrayCreateSameType, for the methods that never consult species: a new view
+     * of this type with [len] elements, made by the realm's own constructor for the type.
+     */
+    private fun typedArrayCreateSameType(cx: Context, scope: Scriptable, len: Int): NativeTypedArrayView =
+        Intrinsics.constructor(cx, scope, className).construct(cx, scope, arrayOf<Any?>(len)) as NativeTypedArrayView
 
     public companion object {
         private val TYPED_ARRAY_TAG: Any = "%TypedArray.prototype%"
@@ -309,6 +314,7 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
             }
             constructor.prototype = ta
             (constructor.prototypeProperty as ScriptableObject).prototype = ta.prototypeProperty as Scriptable
+            Intrinsics.register(scope, constructor.functionName, constructor)
         }
 
         /** `%TypedArray%` itself cannot be called or constructed. */
@@ -353,8 +359,10 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
             return if (o.isTypedArrayOutOfBounds) 0 else o.length
         }
 
+        /** The spec's AllocateTypedArrayBuffer, which always uses the realm's own `ArrayBuffer`. */
         private fun makeArrayBuffer(cx: Context, scope: Scriptable, length: Int, bytesPerElement: Int): NativeArrayBuffer =
-            cx.newObject(scope, NativeArrayBuffer.CLASS_NAME, arrayOf<Any?>(length.toDouble() * bytesPerElement)) as NativeArrayBuffer
+            Intrinsics.constructor(cx, scope, NativeArrayBuffer.CLASS_NAME)
+                .construct(cx, scope, arrayOf<Any?>(length.toDouble() * bytesPerElement)) as NativeArrayBuffer
 
         /** The shared constructor body: every concrete view calls this with its own factory. */
         internal fun js_constructor(
@@ -663,9 +671,10 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
                 throw ScriptRuntime.typeErrorById("msg.function.expected")
             }
             val self = realThis(thisObj)
-            val len = self.validateAndGetLength()
-            val working = self.sortTemporaryArray(cx, scope, args)
-            for (i in 0 until len.toInt()) self.js_set(i, working[i])
+            val len = self.validateAndGetLength().toInt()
+            val working = self.sortTemporaryArray(cx, scope, args, len)
+            // A comparator may have detached the buffer, which turns these writes into nothing.
+            for (i in 0 until len) self.js_set(i, working[i])
             return self
         }
 
@@ -737,48 +746,57 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
             return self.typedArraySpeciesCreate(cx, scope, arrayOf<Any?>(self.arrayBuffer, byteOff, len), "subarray")
         }
 
+        // at, toReversed, toSorted and with follow ES2023 step by step: the receiver is validated
+        // and its length taken before anything a script supplies is converted (D-83).
+
         private fun js_at(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val self = realThis(thisObj)
-            var relativeIndex = 0L
-            if (args.isNotEmpty()) relativeIndex = ScriptRuntime.toInteger(args[0]).toLong()
-            val k = if (relativeIndex >= 0) relativeIndex else self.length + relativeIndex
-            if (k < 0 || k >= self.length) return Undefined.instance
-            return getProperty(thisObj!!, k.toInt())
+            val len = self.validateAndGetLength().toDouble()
+            val relativeIndex = ScriptRuntime.toIntegerOrInfinity(args.getOrElse(0) { Undefined.instance })
+            val k = if (relativeIndex >= 0) relativeIndex else len + relativeIndex
+            if (k < 0 || k >= len) return Undefined.instance
+            // The conversion may have detached the buffer, and an element then reads as undefined.
+            return self.js_get(k.toInt())
         }
 
         private fun js_toReversed(cx: Context, scope: Scriptable, thisObj: Scriptable?): Any {
             val self = realThis(thisObj)
-            val result = self.sameTypeCopy(cx, scope)
-            for (k in 0 until self.length) {
-                result.put(k, result, self.js_get(self.length - k - 1))
-            }
+            val len = self.validateAndGetLength().toInt()
+            val result = self.typedArrayCreateSameType(cx, scope, len)
+            for (k in 0 until len) result.js_set(k, self.js_get(len - k - 1))
             return result
         }
 
         private fun js_toSorted(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any {
+            if (NativeArrayBuffer.isArg(args, 0) && args[0] !is Callable) {
+                throw ScriptRuntime.typeErrorById("msg.function.expected")
+            }
             val self = realThis(thisObj)
-            val working = self.sortTemporaryArray(cx, scope, args)
-            val result = self.sameTypeCopy(cx, scope)
-            for (k in 0 until self.length) result.put(k, result, working[k])
+            val len = self.validateAndGetLength().toInt()
+            val result = self.typedArrayCreateSameType(cx, scope, len)
+            val working = self.sortTemporaryArray(cx, scope, args, len)
+            for (k in 0 until len) result.js_set(k, working[k])
             return result
         }
 
         private fun js_with(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any {
             val self = realThis(thisObj)
-            val relativeIndex = if (args.isNotEmpty()) ScriptRuntime.toInteger(args[0]).toLong() else 0L
-            val actualIndex = if (relativeIndex >= 0) relativeIndex else self.length + relativeIndex
-            val argsValue: Any = if (args.size > 1) ScriptRuntime.toNumber(args[1]) else 0.0
+            val len = self.validateAndGetLength().toInt()
+            val relativeIndex = ScriptRuntime.toIntegerOrInfinity(args.getOrElse(0) { Undefined.instance })
+            val actualIndex = if (relativeIndex >= 0) relativeIndex else len + relativeIndex
+            // ToBigInt on a bigint view and ToNumber on the rest, with a missing value undefined.
+            val numericValue = self.toNumeric(args.getOrElse(1) { Undefined.instance })
 
-            if (actualIndex < 0 || actualIndex >= self.length) {
+            // IsValidIntegerIndex, against the view as it is now that the conversions have run.
+            if (self.isTypedArrayOutOfBounds || actualIndex < 0 || actualIndex >= self.length) {
                 throw ScriptRuntime.rangeError(
-                    Messages.getMessageById("msg.typed.array.index.out.of.bounds", relativeIndex, self.length * -1, self.length - 1),
+                    Messages.getMessageById("msg.typed.array.index.out.of.bounds", relativeIndex.toLong(), len * -1, len - 1),
                 )
             }
 
-            val result = self.sameTypeCopy(cx, scope)
-            for (k in 0 until self.length) {
-                result.put(k, result, if (k.toLong() == actualIndex) argsValue else self.js_get(k))
-            }
+            val result = self.typedArrayCreateSameType(cx, scope, len)
+            val index = actualIndex.toInt()
+            for (k in 0 until len) result.js_set(k, if (k == index) numericValue else self.js_get(k))
             return result
         }
 

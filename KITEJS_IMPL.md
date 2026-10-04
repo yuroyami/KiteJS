@@ -495,6 +495,23 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   keep a table, use a `WeakKeyMap` of the collection's own. On WebAssembly, where nothing is weak,
   an entry now goes with its key and a dropped collection stays reachable from its live keys,
   where before every entry stayed until the collection was dropped.
+- D-83: `%TypedArray%.prototype` `at`, `toReversed`, `toSorted` and `with` follow ES2023 step
+  by step: ValidateTypedArray first, so a detached view is a TypeError, then the length, then the
+  conversions of what the script passed. `with` converts its replacement with the view's own
+  conversion (ToBigInt on a bigint view), takes a missing one as undefined, and checks the index
+  against the view as it is after the conversions. The copies come from TypedArrayCreateSameType,
+  and the species default of `map`, `filter`, `slice` and `subarray` and the buffer behind a new
+  view come from the realm's intrinsics, which `Intrinsics` records as each constructor is set up.
+  Upstream skips the validation (`at` answers undefined, `toReversed` and `with` copy a detached
+  view, `toSorted` throws a host ClassCastException), converts every replacement with ToNumber
+  defaulting to 0, and finds the constructors through the global object.
+- D-84: ToBigInt turns a Number away with a TypeError, as ECMAScript 2020, 7.1.13 says, so a
+  Number cannot be written into a bigint view or passed to `BigInt.asIntN`. `BigInt()` keeps
+  NumberToBigInt through `ScriptRuntime.bigIntFromValue`. Upstream's `toBigInt` converts an
+  integral Number for every caller.
+- D-85: a sort comparator that answers NaN means equal, as SortCompare says. Upstream maps NaN to
+  greater with `Double.compare`, so a stable sort can reorder elements that a consistent
+  comparator calls equal.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

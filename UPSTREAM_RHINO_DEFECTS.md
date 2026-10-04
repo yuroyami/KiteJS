@@ -143,6 +143,39 @@ reject the promise with what was thrown, and the resolve function returns normal
   reads `then` with nothing around it to catch the error.
 - Test: `EvalOracleTest.aThrowingThenGetterRejectsThePromise`.
 
+### The ES2023 typed array methods skip receiver validation (D-83)
+
+`at`, `toReversed`, `toSorted` and `with` never call ValidateTypedArray. On a view whose buffer
+was transferred, `at` answers undefined, `toReversed` and `with` return copies, and `toSorted`
+sorts `undefined` values with a cast to `Number`, so a host `ClassCastException` escapes the
+script's `try`. `with` also converts its replacement with ToNumber whatever the view, so a bigint
+view rejects `3n`, and it defaults a missing replacement to 0 where the spec has undefined, which
+is NaN on a float view. Every copy is made through the global binding of the constructor, so a
+script that reassigns `Uint8Array` or `ArrayBuffer` changes what these methods return.
+
+- Where: `NativeTypedArrayView.js_at`, `js_toReversed`, `js_toSorted`, `js_with` and
+  `sameTypeCopy`, and `ScriptRuntime.getExistingCtor` wherever a built-in looks up an intrinsic.
+- Test: `EvalOracleTest.theCopyingTypedArrayMethodsValidateTheirReceiver`.
+
+### ToBigInt converts a Number (D-84)
+
+`ScriptRuntime.toBigInt` converts an integral Number to a bigint, which is what `BigInt()` does
+but not what ToBigInt does: the spec throws a TypeError for every Number. So
+`a[0] = 1` on a `BigInt64Array`, `fill(3)` and `BigInt.asIntN(8, 1)` all succeed where V8 throws.
+
+- Where: `ScriptRuntime.toBigInt`; the Number branch belongs in `NativeBigInt`'s constructor.
+- Test: `EvalOracleTest.aNumberIsNotABigInt`.
+
+### A comparator answering NaN reorders a stable sort (D-85)
+
+SortCompare treats a comparator result of NaN as +0, but the comparator built for `sort` maps it
+through `Double.compare(d, 0.0)`, which makes NaN greater. With a consistent comparator that
+answers NaN for equal elements, `(x, y) => x.k === y.k ? NaN : x.k - y.k`, forty elements are
+enough to come out in a different order from V8's, breaking the stability the spec requires.
+
+- Where: `ArrayLikeAbstractOperations.getSortComparatorFromArguments`.
+- Test: `EvalOracleTest.aComparatorAnsweringNaNMeansEqual`.
+
 ### A getOwnPropertyDescriptor trap answering undefined crashes (D-50)
 
 A Proxy whose `getOwnPropertyDescriptor` trap returns `undefined` for a property the target lacks

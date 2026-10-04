@@ -2031,12 +2031,63 @@ class EvalOracleTest {
         "var a = new BigInt64Array([1n, 2n, 3n]); a.join(',')",
         "var a = new BigInt64Array([1n, 2n, 3n]); a.length",
         "Object.prototype.toString.call(new BigInt64Array(1))",
-        "try { var a = new BigInt64Array(1); a[0] = 1; a[0] } catch(e) { e.name }",
         "var a = new BigInt64Array(1); String(a[5])",
         "new BigInt64Array(2).byteLength",
         "var b = new ArrayBuffer(16); var a = new BigInt64Array(b); a.length",
         "var b = new ArrayBuffer(16); var a = new BigUint64Array(b, 8); a.length",
     ))
+
+    /**
+     * ToBigInt turns a Number away, integral or not, so a Number cannot be written into a bigint
+     * view or handed to `BigInt.asIntN` (D-84). Upstream converts it the way `BigInt()` does.
+     * `BigInt()` itself still takes an integral Number on both.
+     */
+    @Test
+    fun aNumberIsNotABigInt() {
+        val cases = listOf(
+            "try { var a = new BigInt64Array(1); a[0] = 1; String(a[0]) } catch (e) { e.name }",
+            "try { new BigUint64Array(2).fill(3).join() } catch (e) { e.name }",
+            "try { String(BigInt.asIntN(8, 1)) } catch (e) { e.name }",
+            "try { new BigInt64Array([1n]).with(0, 2).join() } catch (e) { e.name }",
+        )
+        for (source in cases) {
+            assertEquals("\"TypeError\"", ported(source), source)
+            assertTrue(upstream(source) != "\"TypeError\"", "upstream now rejects a Number too, D-84 can be retired: $source")
+        }
+        assertEquals(upstream("String(BigInt(5)) + String(BigInt.asUintN(8, '257'))"), ported("String(BigInt(5)) + String(BigInt.asUintN(8, '257'))"))
+    }
+
+    /**
+     * A comparator that answers NaN means equal (D-85), so a stable sort keeps such elements in
+     * order. Upstream makes NaN greater, and forty elements are enough for its TimSort to move them.
+     */
+    @Test
+    fun aComparatorAnsweringNaNMeansEqual() {
+        val source = "var a = []; for (var i = 0; i < 40; i++) a.push({ k: i % 3, i: i });" +
+            " a.sort(function (x, y) { return x.k === y.k ? NaN : x.k - y.k }).map(function (o) { return o.i }).join()"
+        val stable = (0 until 40).sortedBy { it % 3 }.joinToString(",")
+        assertEquals("\"$stable\"", ported(source))
+        assertTrue(upstream(source) != "\"$stable\"", "upstream sorts NaN as equal now, D-85 can be retired")
+    }
+
+    /**
+     * `at`, `toReversed`, `toSorted` and `with` validate their receiver first, so a detached view
+     * is a TypeError, and build their copy with the realm's own constructor (D-83). Upstream skips
+     * the check, answering undefined from `at`, a copy from `toReversed` and a host
+     * ClassCastException from `toSorted`, and makes its copy with whatever the global holds.
+     */
+    @Test
+    fun theCopyingTypedArrayMethodsValidateTheirReceiver() {
+        for (call in listOf("at(0)", "toReversed()", "with(0, 1)")) {
+            val source = "var a = new Uint8Array([1, 2]); a.buffer.transfer(); try { a.$call; 'returned' } catch (e) { e.name }"
+            assertEquals("\"TypeError\"", ported(source), call)
+            assertEquals("\"returned\"", upstream(source), "upstream now validates $call, D-83 can be retired")
+        }
+        val global = "var U = Uint8Array; var a = new U([1, 2]); Uint8Array = function () { throw new Error('global') };" +
+            " try { a.toReversed().join() } catch (e) { e.message }"
+        assertEquals("\"2,1\"", ported(global))
+        assertEquals("\"global\"", upstream(global))
+    }
 
     /**
      * Upstream's `BigUint64Array` reader masks with `0xffffffff`, a Java int literal, which

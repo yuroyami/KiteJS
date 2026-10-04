@@ -274,8 +274,9 @@ public object ArrayLikeAbstractOperations {
                 cmpBuf[1] = y
                 val ret = compare.call(cx, scope, compareThis, cmpBuf)
                 val d = ScriptRuntime.toNumber(ret)
-                val cmp = d.compareTo(0.0)
-                if (cmp < 0) -1 else if (cmp > 0) 1 else 0
+                // NaN means equal, as SortCompare says. Upstream's Double.compare makes it greater,
+                // which lets a stable sort reorder elements the comparator calls equal (D-85).
+                if (d < 0) -1 else if (d > 0) 1 else 0
             },
         )
     }

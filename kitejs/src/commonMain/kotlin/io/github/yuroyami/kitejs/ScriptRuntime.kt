@@ -1499,10 +1499,25 @@ public object ScriptRuntime {
         return if (value is CharSequence) value else toString(value)
     }
 
-    /** ToBigInt. Until phase 5 only a bigint value or a plain decimal string can be converted (D-5). */
+    /** ToBigInt (ECMAScript 2020, 7.1.13): a bigint, a boolean or a string that spells an integer. */
     public fun toBigInt(value: Any?): KBigInt {
         val v = toPrimitive(value, NumberClass)
         if (v is KBigInt) return v
+        // A Number is a TypeError here, even an integral one. Upstream converts it the way
+        // BigInt() does, which lets `1` into a BigInt64Array and into BigInt.asIntN (D-84).
+        if (v == null || Undefined.isUndefined(v) || v is Number) throw typeErrorById("msg.cant.convert.to.bigint", toString(v))
+        if (v is CharSequence) return toBigInt(v.toString())
+        if (v is Boolean) return if (v) KBigInt.ONE else KBigInt.ZERO
+        if (isSymbol(v)) throw typeErrorById("msg.cant.convert.to.bigint", toString(v))
+        throw errorWithClassName("msg.primitive.expected", v)
+    }
+
+    /**
+     * What `BigInt(value)` makes of its argument: NumberToBigInt for a Number, which has to be an
+     * integer, and [toBigInt] for anything else.
+     */
+    internal fun bigIntFromValue(value: Any?): KBigInt {
+        val v = toPrimitive(value, NumberClass)
         if (v is Number) {
             val d = v.toDouble()
             if (d.isNaN() || d.isInfinite() || d != kotlin.math.floor(d)) {
@@ -1510,11 +1525,7 @@ public object ScriptRuntime {
             }
             return KBigInt.parse(numberToString(d, 10))
         }
-        if (v == null || Undefined.isUndefined(v)) throw typeErrorById("msg.cant.convert.to.bigint", toString(v))
-        if (v is CharSequence) return toBigInt(v.toString())
-        if (v is Boolean) return if (v) KBigInt.ONE else KBigInt.ZERO
-        if (isSymbol(v)) throw typeErrorById("msg.cant.convert.to.bigint", toString(v))
-        throw errorWithClassName("msg.primitive.expected", v)
+        return toBigInt(v)
     }
 
     public fun toBigInt(s: String): KBigInt {
