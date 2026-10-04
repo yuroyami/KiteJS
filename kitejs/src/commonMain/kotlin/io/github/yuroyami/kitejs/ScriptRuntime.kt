@@ -850,6 +850,8 @@ public object ScriptRuntime {
 
         override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
             throw typeErrorById("msg.op.not.allowed")
+
+        override val isConstructor: Boolean get() = false
     }
 
     public fun typeErrorThrower(cx: Context): BaseFunction {

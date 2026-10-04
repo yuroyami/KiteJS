@@ -206,10 +206,10 @@ public class NativePromise : ScriptableObject() {
         val reject: Callable
 
         init {
-            if (pc !is Constructable) throw ScriptRuntime.typeErrorById("msg.constructor.expected")
+            if (!AbstractEcmaObjectOperations.isConstructor(pc)) throw ScriptRuntime.typeErrorById("msg.constructor.expected")
             val executorFunc = LambdaFunction(topScope, 2, SerializableCallable { _, _, _, args -> executor(args) })
 
-            promise = pc.construct(topCx, topScope, arrayOf<Any?>(executorFunc))
+            promise = (pc as Constructable).construct(topCx, topScope, arrayOf<Any?>(executorFunc))
 
             if (rawResolve !is Callable) throw ScriptRuntime.typeErrorById("msg.function.expected")
             resolve = rawResolve as Callable

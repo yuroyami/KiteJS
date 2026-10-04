@@ -36,6 +36,18 @@ public class BoundFunction(
         throw ScriptRuntime.typeErrorById("msg.not.ctor")
     }
 
+    /** BoundFunctionCreate gives the bound function a [[Construct]] only when its target has one. */
+    override val isConstructor: Boolean get() = AbstractEcmaObjectOperations.isConstructor(targetFunction)
+
+    /** A bound function's [[Construct]]: a newTarget that is the bound function itself becomes the target. */
+    override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>, newTarget: Scriptable): Scriptable {
+        if (!isConstructor) throw ScriptRuntime.typeErrorById("msg.not.ctor", functionName)
+        val target = targetFunction as Constructable
+        return AbstractEcmaObjectOperations.construct(
+            cx, scope, target, concat(boundArgs, args), if (newTarget === this) target as Scriptable else newTarget,
+        )
+    }
+
     override fun hasInstance(instance: Scriptable): Boolean {
         if (targetFunction is Function) return targetFunction.hasInstance(instance)
         throw ScriptRuntime.typeErrorById("msg.not.ctor")

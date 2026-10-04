@@ -316,6 +316,47 @@ public abstract class ScriptableObject :
             prototypeObject = value
         }
 
+    /**
+     * [[SetPrototypeOf]] as the spec states it, answering whether the prototype was set:
+     * OrdinarySetPrototypeOf (ES 10.1.2.1), whose cycle check walks [[Prototype]] directly and
+     * stops at an object with its own [[GetPrototypeOf]], a proxy, without calling into it; and
+     * for %Object.prototype%, an immutable prototype exotic object, SetImmutablePrototype (ES
+     * 10.4.7). Upstream threw from inside the check, walked through a proxy's getPrototypeOf trap,
+     * and let Object.prototype take a new prototype (D-91).
+     */
+    internal open fun setPrototypeOf(cx: Context, proto: Scriptable?): Boolean {
+        val current = prototype
+        if (proto === current) return true
+        if (current == null && this is NativeObject && isObjectPrototypeOfItsRealm()) return false
+        if (!isExtensible) return false
+        var p = proto
+        while (p != null) {
+            if (p === this) return false
+            if (p is NativeProxy) break
+            p = p.prototype
+        }
+        prototype = proto
+        return true
+    }
+
+    /**
+     * The TypeError for a [setPrototypeOf] that answered false, naming the reason without calling
+     * into script: a proxy refused, the object is not extensible, or the chain would loop.
+     */
+    internal fun prototypeRefusedError(proto: Scriptable?): EcmaError {
+        if (this is NativeProxy) return ScriptRuntime.typeError("proxy refused to set the prototype")
+        if (prototype == null && this is NativeObject && isObjectPrototypeOfItsRealm()) {
+            return ScriptRuntime.typeError("Object.prototype's prototype cannot be changed")
+        }
+        if (!isExtensible) return ScriptRuntime.typeErrorById("msg.not.extensible")
+        return ScriptRuntime.typeErrorById("msg.object.cyclic.prototype", this::class.simpleName)
+    }
+
+    private fun isObjectPrototypeOfItsRealm(): Boolean {
+        val top = getTopLevelScope(this)
+        return top.parentScope == null && top !== this && getObjectPrototype(top) === this
+    }
+
     override var parentScope: Scriptable?
         get() = parentScopeObject
         set(value) {
@@ -1605,14 +1646,35 @@ public abstract class ScriptableObject :
             )
         }
 
-        /** Numeric ids sort ahead of everything else, in numeric order. */
+        /**
+         * OrdinaryOwnPropertyKeys: the array indices in ascending order, then the other strings
+         * and then the symbols, each of those two in the order they were added. An index above Int
+         * range is kept as a string key, so it is recognised by its text. Upstream sorted only the
+         * Int keys to the front, which listed 2147483648 through 4294967294 among the strings
+         * (D-91).
+         */
         private val KEY_COMPARATOR = Comparator<Any?> { o1, o2 ->
+            val i1 = arrayIndexKey(o1)
+            val i2 = arrayIndexKey(o2)
             when {
-                o1 is Int && o2 is Int -> o1.compareTo(o2)
-                o1 is Int -> -1
-                o2 is Int -> 1
-                else -> 0
+                i1 >= 0 && i2 >= 0 -> i1.compareTo(i2)
+                i1 >= 0 -> -1
+                i2 >= 0 -> 1
+                else -> (o1 is Symbol).compareTo(o2 is Symbol)
             }
+        }
+
+        /** The array index (0 to 2^32 - 2) the property key [key] names, or -1 when it names none. */
+        internal fun arrayIndexKey(key: Any?): Long {
+            if (key is Int) return if (key >= 0) key.toLong() else -1
+            if (key !is String || key.isEmpty() || key.length > 10) return -1
+            if (key[0] == '0') return if (key.length == 1) 0 else -1
+            var value = 0L
+            for (c in key) {
+                if (c !in '0'..'9') return -1
+                value = value * 10 + (c - '0')
+            }
+            return if (value <= 4294967294L) value else -1
         }
     }
 }

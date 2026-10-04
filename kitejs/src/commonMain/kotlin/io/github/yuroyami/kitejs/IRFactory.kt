@@ -1601,6 +1601,13 @@ public class IRFactory(
         return result
     }
 
+    /**
+     * Only a call whose callee is the plain name `eval` can be a direct eval (ES 13.3.6.1), so
+     * `this.eval(src)` or `other.eval(src)` is an indirect one that runs in the global scope of
+     * the eval function's realm. Upstream also made a direct eval of a property call named eval
+     * on a global object, which let `this.eval('x')` in a sloppy function read the function's
+     * locals and made another realm's eval run in the caller's realm (D-91).
+     */
     private fun createCallOrNew(nodeType: Int, child: Node): Node {
         var type = Node.NON_SPECIALCALL
         if (child.type == Token.NAME) {
@@ -1609,10 +1616,6 @@ public class IRFactory(
                 type = Node.SPECIALCALL_EVAL
             } else if ("With" == name) {
                 type = Node.SPECIALCALL_WITH
-            }
-        } else if (child.type == Token.GETPROP) {
-            if ("eval" == child.lastChild!!.string) {
-                type = Node.SPECIALCALL_EVAL
             }
         }
         val node = Node(nodeType, child)

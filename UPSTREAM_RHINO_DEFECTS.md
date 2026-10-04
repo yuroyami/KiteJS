@@ -398,6 +398,143 @@ is false", and before it ran the definition adds a second property over the meth
   that is a `Symbol`, and `IdScriptableObject.defineOwnProperty`, which looks up a prototype id
   for a `CharSequence` key only.
 - Test: `EvalOracleTest.theOwnKeysOfAPrototypeNameItsSymbolMethodsBySymbols`.
+### Reflect.construct with a newTarget throws or gives the wrong prototype (D-91)
+
+`Reflect.construct(Map, [], Object)` throws "The constructor for Map may not be invoked as a
+function", and so do Set, Promise, the typed arrays and every other constructor built on
+`LambdaConstructor`. Where it does not throw, the object does not always take newTarget's
+`prototype`: `Reflect.construct(Array, [], N)`, `Reflect.construct(RegExp, ['a'], N)` and
+`Reflect.construct(Object, [], N)` are not instances of `N`. A proxy's `construct` trap receives the
+proxy as newTarget even when `Reflect.construct(P, [], Array)` names another one. ECMAScript 2015,
+9.1.13 (OrdinaryCreateFromConstructor) and 9.1.14 (GetPrototypeFromConstructor) take the prototype
+from newTarget, or from the same intrinsic in newTarget's realm when its `prototype` is not an
+object.
+
+- Where: `NativeReflect.construct`, `BaseFunction`, `LambdaConstructor`, `NativeProxy`.
+- Test: `EvalOracleTest.constructProxiesEnumerationAndJsonFollowTheInternalMethods`;
+  `ConstructAndProxyInternalsTest` (common).
+
+### Arrows, methods and generators are accepted as constructors (D-91)
+
+`Reflect.construct(function () {}, [], () => {})` succeeds, and so does a newTarget that is a
+method, a getter or a generator function; IsConstructor (ECMAScript 2015, 7.2.4) is false for all
+of them, so each is a TypeError. Rhino treats every `Function` as a constructor.
+
+- Where: `NativeReflect.construct`, `AbstractEcmaObjectOperations` (speciesConstructor).
+- Test: `EvalOracleTest.constructProxiesEnumerationAndJsonFollowTheInternalMethods`;
+  `ConstructAndProxyInternalsTest` (common).
+
+### A proxy's getOwnPropertyDescriptor and ownKeys answers are not checked (D-91)
+
+A getOwnPropertyDescriptor trap's answer is read for `value` and the three flags only, so an
+accessor it reports comes back as a data property holding undefined. The trap may report a
+non-configurable property the target does not have, or a descriptor whose `get` is not callable,
+without an error; ECMAScript 2015, 9.5.5 runs the
+answer through ToPropertyDescriptor and IsCompatiblePropertyDescriptor and throws a TypeError for
+both. The ownKeys checks compare the target's keys as they are stored, so the index `0` of a frozen
+array never matches the `'0'` the trap must return and
+`Reflect.ownKeys(new Proxy(Object.freeze([1]), { ownKeys: () => ['length', '0'] }))` throws "proxy
+can't skip a non-configurable property '0'". For a non-extensible target the checks pass and then
+the target's own keys are returned in place of the trap's, so the trap's order is lost.
+
+- Where: `NativeProxy.getOwnPropertyDescriptor` and `getIds`.
+- Test: `EvalOracleTest.constructProxiesEnumerationAndJsonFollowTheInternalMethods`;
+  `ConstructAndProxyInternalsTest` (common).
+
+### Enumerating a proxy skips its getOwnPropertyDescriptor trap (D-91)
+
+`Object.keys` of a proxy lists every key its ownKeys trap returns, including those the
+getOwnPropertyDescriptor trap reports as non-enumerable, and throws "The object is not a string" on
+a symbol among them. `JSON.stringify` of such a proxy crashes with a host
+`ClassCastException: SymbolKey cannot be cast to Number`. `Object.assign`, `Object.entries`,
+`Object.values` and object spread read each key without asking for its descriptor first, where
+EnumerableOwnProperties and CopyDataProperties (ECMAScript 2017, 7.3.21 and 7.3.25) ask
+[[GetOwnProperty]] for each key just before reading it, and `Object.assign` runs the strings and
+then the symbols as two passes. `hasOwnProperty` and `propertyIsEnumerable` on a proxy call its
+`has` trap, so `propertyIsEnumerable` answers true for an inherited property. `Object.assign` does
+not throw when a proxy's set trap or an accessor without a setter refuses the write, and leaves an
+array target's existing elements alone: `Object.assign([1, 2, 3], [4])` is `[1, 2, 3]`.
+
+- Where: `NativeProxy.getIds`, `NativeObject` (`keys`, `assign`, `entries`, `values`,
+  `hasOwnProperty`, `propertyIsEnumerable`), `NewLiteralStorage.spreadObject`, `NativeJSON.jo`.
+- Test: `EvalOracleTest.constructProxiesEnumerationAndJsonFollowTheInternalMethods`;
+  `ConstructAndProxyInternalsTest` (common).
+
+### hasOwnProperty converts the key after `this`, and misses a symbol from ToPrimitive (D-91)
+
+`Object.prototype.hasOwnProperty.call(undefined, key)` throws before it converts `key`, where
+ECMAScript 2015, 19.1.3.2 runs ToPropertyKey first. A key whose `Symbol.toPrimitive` returns a
+symbol is a TypeError in `hasOwnProperty`, `propertyIsEnumerable` and `Object.hasOwn` instead of
+finding the symbol property. `Object.hasOwn.length` is 1; it is 2.
+
+- Where: `NativeObject` (`hasOwnProperty`, `propertyIsEnumerable`, `hasOwn`).
+- Test: `EvalOracleTest.constructProxiesEnumerationAndJsonFollowTheInternalMethods`;
+  `ConstructAndProxyInternalsTest` (common).
+
+### Integer keys from 2^31 are listed in creation order (D-91)
+
+`Object.keys({ b: 1, 2147483648: 1, a: 1 })` is `b,2147483648,a`. OrdinaryOwnPropertyKeys
+(ECMAScript 2015, 9.1.12) lists every array index, up to 2^32 - 2, first and in ascending order, so
+it is `2147483648,b,a`. Rhino sorts only the keys that fit an `int`.
+
+- Where: `ScriptableObject.KEY_COMPARATOR`.
+- Test: `EvalOracleTest.constructProxiesEnumerationAndJsonFollowTheInternalMethods`;
+  `ConstructAndProxyInternalsTest` (common).
+
+### A proxy's setPrototypeOf answer is ignored, and Object.prototype takes a new prototype (D-91)
+
+`Object.setPrototypeOf(proxy, {})` and `proxy.__proto__ = {}` succeed when the proxy's
+setPrototypeOf trap answers false, and `Reflect.setPrototypeOf` answers true; both are a TypeError
+or false per ECMAScript 2015, 9.5.2 and 19.1.2.18. `Object.setPrototypeOf(Object.prototype,
+Object.create(null))` changes the prototype of Object.prototype, which is an immutable prototype
+exotic object (ECMAScript 2016, 9.4.7) whose prototype can only stay null. The cycle check walks on
+through a proxy in the new chain, calling its getPrototypeOf trap, where OrdinarySetPrototypeOf
+stops at the proxy. The `__proto__` getter called with an undefined `this` crashes with a host
+`ClassCastException` instead of throwing a TypeError. Setting a built-in function's prototype to
+null does not stick: the next read puts Function.prototype back.
+
+- Where: `NativeObject` (`setPrototypeOf`, the `__proto__` accessor), `NativeReflect`,
+  `NativeProxy`, `SpecialRef`, `IdFunctionObject.prototype`.
+- Test: `EvalOracleTest.constructProxiesEnumerationAndJsonFollowTheInternalMethods`;
+  `ConstructAndProxyInternalsTest` (common).
+
+### JSON.parse turns -0 into 0, and the reviver walk uses the wrong operations (D-91)
+
+`1 / JSON.parse('-0')` is `Infinity`; the number is `-0`. The reviver gets array indices as
+numbers rather than strings, reads only own properties (an element deleted and then inherited is
+missed), and writes its results back with `put`, which calls a setter the reviver defined on the
+holder and writes into an array the reviver froze, and deletes with the calling code's
+strictness, so a refused delete throws in strict code. InternalizeJSONProperty (ECMAScript 2015,
+24.3.1.1) uses CreateDataProperty, which replaces a configurable accessor and silently fails on a
+frozen holder, and [[Delete]], whose false answer is ignored.
+
+- Where: `json.JsonParser`, `NativeJSON.walk`.
+- Test: `EvalOracleTest.constructProxiesEnumerationAndJsonFollowTheInternalMethods`;
+  `ConstructAndProxyInternalsTest` (common).
+
+### JSON.stringify reads toJSON twice and serializes a proxy for an array as an object (D-91)
+
+`JSON.stringify` asks HasProperty for `toJSON` and then reads it twice, so a `toJSON` getter runs
+twice where SerializeJSONProperty (ECMAScript 2015, 24.3.2.1) reads it once. A proxy for an array
+is serialized as an object, `{"0":1,"1":2}`, where IsArray looks through a proxy; an array replacer
+given as a proxy is ignored, and a hole in a replacer array does not read the prototype. Array
+indices are passed to a replacer function as numbers.
+
+- Where: `NativeJSON.str`, `ja` and `stringify`.
+- Test: `EvalOracleTest.constructProxiesEnumerationAndJsonFollowTheInternalMethods`;
+  `ConstructAndProxyInternalsTest` (common).
+
+### A property call named eval is a direct eval (D-91)
+
+`var x = 'global'; function f() { var x = 'local'; return this.eval('x') } f()` answers `local`,
+and `this.eval('var v = 1')` inside a function declares `v` in the function. Only a call whose
+callee is the plain name `eval` is a direct eval (ECMAScript 2015, 12.3.4.1), so `this.eval` and
+another realm's `other.eval` run in the global scope of the eval function's own realm; V8 answers
+`global`.
+
+- Where: `IRFactory.createCallOrNew`.
+- Test: `EvalOracleTest.constructProxiesEnumerationAndJsonFollowTheInternalMethods`;
+  `ConstructAndProxyInternalsTest` (common).
 
 ### A getOwnPropertyDescriptor trap answering undefined crashes (D-50)
 

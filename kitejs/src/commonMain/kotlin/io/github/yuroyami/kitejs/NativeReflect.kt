@@ -101,44 +101,13 @@ internal class NativeReflect private constructor() : ScriptableObject() {
             }
             val callArgs = ScriptRuntime.getApplyArguments(cx, argumentsList)
 
-            var newTargetPrototype: Any? = null
-            if (args.size > 2) {
-                val newTarget = ensureScriptable(args[2])
-
-                newTargetPrototype = if (newTarget is BaseFunction) {
-                    newTarget.prototypeProperty
-                } else {
-                    newTarget.get("prototype", newTarget)
-                }
-
-                if (newTargetPrototype !is Scriptable ||
-                    ScriptRuntime.isSymbol(newTargetPrototype) ||
-                    Undefined.isUndefined(newTargetPrototype)
-                ) {
-                    newTargetPrototype = null
-                }
-            }
-
-            // Constructable carries no newTarget, so a function constructor is driven by hand here:
-            // build the object, fix its prototype, then call.
-            if (ctor is BaseFunction && newTargetPrototype != null) {
-                val result = ctor.createObject(cx, scope)
-                if (result != null) {
-                    result.prototype = newTargetPrototype as Scriptable
-
-                    val value = ctor.call(cx, scope, result, callArgs)
-                    if (value is Scriptable) return value
-
-                    return result
-                }
-            }
-
-            val newScriptable = ctor.construct(cx, scope, callArgs)
-            if (newTargetPrototype != null) {
-                newScriptable.prototype = newTargetPrototype as Scriptable
-            }
-
-            return newScriptable
+            // Construct(target, args, newTarget). Upstream built a function's object by hand with
+            // newTarget's prototype and then called the function, which for a built-in that can
+            // also be called without `new` returned a fresh object ignoring newTarget and for one
+            // that cannot threw; anything else got newTarget's prototype afterwards, a construct
+            // trap's answer included (D-91).
+            val newTarget = if (args.size > 2) args[2] as Scriptable else ctor as Scriptable
+            return AbstractEcmaObjectOperations.construct(cx, scope, ctor, callArgs, newTarget)
         }
 
         /**
@@ -211,6 +180,10 @@ internal class NativeReflect private constructor() : ScriptableObject() {
         private fun ownKeys(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Scriptable {
             val target = checkTarget(args)
 
+            // A proxy's [[OwnPropertyKeys]] is the trap's list in the trap's order; upstream sorted
+            // it like an ordinary object's, strings before symbols (D-91).
+            if (target is NativeProxy) return cx.newArray(scope, target.ownPropertyKeys())
+
             val strings = ArrayList<Any?>()
             val symbols = ArrayList<Any?>()
 
@@ -241,43 +214,22 @@ internal class NativeReflect private constructor() : ScriptableObject() {
             return AbstractEcmaObjectOperations.set(cx, target, key, value, receiver)
         }
 
+        /**
+         * Reflect.setPrototypeOf: the target's [[SetPrototypeOf]] answer. Upstream checked for
+         * itself and assigned the property, so a proxy's trap result was ignored and a cycle
+         * through a proxy called its getPrototypeOf trap (D-91).
+         */
         private fun setPrototypeOf(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any {
+            // A missing prototype is undefined, which is no object either; upstream's message for it stays.
             if (args.size < 2) {
-                throw ScriptRuntime.typeErrorById(
-                    "msg.method.missing.parameter",
-                    "Reflect.js_setPrototypeOf",
-                    "2",
-                    args.size.toString(),
-                )
+                throw ScriptRuntime.typeErrorById("msg.method.missing.parameter", "Reflect.js_setPrototypeOf", "2", args.size.toString())
             }
-
             val target = checkTarget(args)
-
-            if (target.prototype === args[1]) return true
-
-            if (!target.isExtensible) return false
-
-            if (args[1] == null) {
-                target.prototype = null
-                return true
+            val proto = args[1]
+            if (proto != null && (proto !is Scriptable || !ScriptRuntime.isObject(proto))) {
+                throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(proto))
             }
-
-            if (ScriptRuntime.isSymbol(args[1])) {
-                throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(args[0]))
-            }
-
-            val proto = ensureScriptableObject(args[1])
-            if (target.prototype === proto) return true
-
-            // A prototype chain may not loop back onto the target.
-            var p: Scriptable? = proto
-            while (p != null) {
-                if (target === p) return false
-                p = p.prototype
-            }
-
-            target.prototype = proto
-            return true
+            return target.setPrototypeOf(cx, proto as Scriptable?)
         }
 
         private fun checkTarget(args: Array<Any?>): ScriptableObject {

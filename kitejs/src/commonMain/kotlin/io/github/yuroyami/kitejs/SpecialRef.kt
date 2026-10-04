@@ -24,6 +24,7 @@ internal class SpecialRef private constructor(
         when (type) {
             SPECIAL_NONE -> return ScriptRuntime.setObjectProp(target, name, value, cx)
             SPECIAL_PROTO, SPECIAL_PARENT -> {
+                if (type == SPECIAL_PROTO && cx.languageVersion >= Context.VERSION_ES6) return setProto(cx, value)
                 val obj = ScriptRuntime.toObjectOrNull(cx, value, scope!!)
                 if (obj != null) {
                     // A link back to the target would make a cycle.
@@ -37,24 +38,7 @@ internal class SpecialRef private constructor(
                     if (target is ScriptableObject && !target.isExtensible && cx.languageVersion >= Context.VERSION_1_8) {
                         throw ScriptRuntime.typeErrorById("msg.not.extensible")
                     }
-                    if (cx.languageVersion >= Context.VERSION_ES6) {
-                        val typeOfTarget = ScriptRuntime.typeOf(target)
-                        if (typeOfTarget == "function") {
-                            if (value == null) {
-                                target.prototype = Undefined.SCRIPTABLE_UNDEFINED
-                                return value
-                            }
-                            val typeOfValue = ScriptRuntime.typeOf(value)
-                            if (typeOfValue == "object" || typeOfValue == "function") target.prototype = obj
-                            return value
-                        }
-                        val typeOfValue = ScriptRuntime.typeOf(value)
-                        if (typeOfTarget == "symbol") return value
-                        if ((value != null && typeOfValue != "object") || typeOfTarget != "object") return Undefined.instance
-                        target.prototype = obj
-                    } else {
-                        target.prototype = obj
-                    }
+                    target.prototype = obj
                 } else {
                     target.parentScope = obj
                 }
@@ -62,6 +46,20 @@ internal class SpecialRef private constructor(
             }
             else -> throw Kit.codeBug()
         }
+    }
+
+    /**
+     * `o.__proto__ = v` in ES6 code, which is the Object.prototype.__proto__ setter (ES B.2.2.1.2):
+     * nothing happens unless v is an object or null and o is an object, and o's [[SetPrototypeOf]]
+     * refusing is a TypeError. The assignment's value is v either way. Upstream walked the new
+     * chain itself, through any proxy's getPrototypeOf trap, and wrote the property, so a proxy's
+     * setPrototypeOf trap was skipped and Object.prototype took a new prototype (D-91).
+     */
+    private fun setProto(cx: Context, value: Any?): Any? {
+        if (value != null && (value !is Scriptable || !ScriptRuntime.isObject(value))) return value
+        if (target !is ScriptableObject || !ScriptRuntime.isObject(target)) return value
+        if (!target.setPrototypeOf(cx, value as Scriptable?)) throw target.prototypeRefusedError(value)
+        return value
     }
 
     override fun has(cx: Context): Boolean =

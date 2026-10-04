@@ -88,6 +88,25 @@ public open class JSFunction(
         return thisObj!!
     }
 
+    /** Arrow functions, methods, accessors and generators have no constructor code. */
+    override val isConstructor: Boolean get() = descriptor.constructor != null && homeObject == null
+
+    /**
+     * An ordinary function's [[Construct]] with another [newTarget]: `this` inherits from
+     * newTarget's `prototype`, or from %Object.prototype% of newTarget's realm when that is not an
+     * object (OrdinaryCreateFromConstructor), and is made before the body runs.
+     */
+    override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>, newTarget: Scriptable): Scriptable {
+        if (newTarget === this) return construct(cx, scope, args)
+        val ctor = descriptor.constructor
+        if (ctor == null || homeObject != null) throw ScriptRuntime.typeErrorById("msg.not.ctor", functionName)
+        val thisObj = NativeObject()
+        thisObj.prototype = AbstractEcmaObjectOperations.getPrototypeFromConstructor(cx, newTarget) { getObjectPrototype(it) }
+        thisObj.parentScope = parentScope
+        val res = ctor.execute(cx, this, newTarget, scope, thisObj, args)
+        return res as? Scriptable ?: thisObj
+    }
+
     public val isScript: Boolean
         get() = descriptor.isScript
 

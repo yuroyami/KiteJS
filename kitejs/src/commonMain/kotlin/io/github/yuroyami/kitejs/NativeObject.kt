@@ -36,6 +36,15 @@ public open class NativeObject : ScriptableObject {
             val ctor = object : LambdaConstructor(s, CLASS_NAME, 1, ::js_constructorCall, ::js_constructor) {
                 override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable =
                     js_constructor(cx, scope, args)
+
+                /** With another newTarget, Object ignores its argument and makes an ordinary object (ES 20.1.1.1 step 1). */
+                override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>, newTarget: Scriptable): Scriptable {
+                    if (newTarget === this) return construct(cx, scope, args)
+                    val obj = NativeObject()
+                    obj.prototype = AbstractEcmaObjectOperations.getPrototypeFromConstructor(cx, newTarget) { getObjectPrototype(it) }
+                    obj.parentScope = ScriptableObject.getTopLevelScope(scope)
+                    return obj
+                }
             }
             val proto = NativeObject()
             proto.parentScope = s
@@ -47,7 +56,7 @@ public open class NativeObject : ScriptableObject {
                 defOnCtor(ctor, s, "entries", 1, ::js_entries)
                 defOnCtor(ctor, s, "fromEntries", 1, ::js_fromEntries)
                 defOnCtor(ctor, s, "values", 1, ::js_values)
-                defOnCtor(ctor, s, "hasOwn", 1, ::js_hasOwn)
+                defOnCtor(ctor, s, "hasOwn", 2, ::js_hasOwn)
             }
             defOnCtor(ctor, s, "keys", 1, ::js_keys)
             defOnCtor(ctor, s, "getOwnPropertyNames", 1, ::js_getOwnPropertyNames)
@@ -147,25 +156,33 @@ public open class NativeObject : ScriptableObject {
             return thisObj
         }
 
+        /** Object.prototype.hasOwnProperty: ToPropertyKey comes before ToObject(this) (ES 20.1.3.2). */
         private fun js_hasOwnProperty(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
+            val key = ScriptRuntime.toPropertyKey(if (args.isEmpty()) Undefined.instance else args[0])
             if (cx.languageVersion >= Context.VERSION_1_8 && (thisObj == null || Undefined.isUndefined(thisObj))) {
                 throw ScriptRuntime.typeErrorById("msg." + (if (thisObj == null) "null" else "undef") + ".to.object")
             }
-            val arg = if (args.isEmpty()) Undefined.instance else args[0]
-            return AbstractEcmaObjectOperations.hasOwnProperty(cx, thisObj, arg)
+            return AbstractEcmaObjectOperations.hasOwnPropertyKey(cx, ScriptableObject.ensureScriptable(thisObj), key)
         }
 
         private fun js_propertyIsEnumerable(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
+            // ToPropertyKey comes before ToObject(this), so a key whose conversion throws wins
+            // over a missing this, and a wrapper converting to a symbol is looked up as that symbol.
+            val key = ScriptRuntime.toPropertyKey(if (args.isEmpty()) Undefined.instance else args[0])
             if (cx.languageVersion >= Context.VERSION_1_8 && (thisObj == null || Undefined.isUndefined(thisObj))) {
                 throw ScriptRuntime.typeErrorById("msg." + (if (thisObj == null) "null" else "undef") + ".to.object")
             }
             var result: Boolean
-            val arg = if (args.isEmpty()) Undefined.instance else args[0]
-            if (arg is Symbol) {
-                result = (thisObj as SymbolScriptable).has(arg, thisObj)
-                result = result && isEnumerable(arg, thisObj)
+            // A proxy answers through [[GetOwnProperty]], its getOwnPropertyDescriptor trap; upstream
+            // asked the has trap, which also sees inherited properties (D-91).
+            if (thisObj is NativeProxy) {
+                return ScriptRuntime.wrapBoolean(AbstractEcmaObjectOperations.isOwnEnumerable(cx, thisObj, key))
+            }
+            if (key is Symbol) {
+                result = (thisObj as SymbolScriptable).has(key, thisObj)
+                result = result && isEnumerable(key, thisObj)
             } else {
-                val s = ScriptRuntime.toStringIdOrIndex(arg)
+                val s = ScriptRuntime.toStringIdOrIndex(key)
                 try {
                     val stringId = s.stringId
                     if (stringId == null) {
@@ -205,10 +222,18 @@ public open class NativeObject : ScriptableObject {
             return ScriptRuntime.wrapBoolean(result)
         }
 
+        /**
+         * The `__proto__` getter (ES B.2.2.1.1): ToObject(this), then its prototype. An undefined
+         * `this` is a TypeError; upstream cast it to an object and crashed with a host
+         * ClassCastException (D-91).
+         */
         private fun js_protoGetter(thisObj: Scriptable?): Any? {
-            // 1. Let O be ? ToObject(this value).  2. Return ? O.[[GetPrototypeOf]]().
-            val o = ScriptRuntime.toObject(thisObj!!, thisObj) as ScriptableObject
-            return o.prototype
+            // 1. Let O be ? ToObject(this value).  2. Return ? O.[[GetPrototypeOf]](). Upstream
+            // cast without the check, so a null or undefined this crashed with a host exception (D-91).
+            if (thisObj == null || Undefined.isUndefined(thisObj)) {
+                throw ScriptRuntime.typeErrorById(if (thisObj == null) "msg.null.to.object" else "msg.undef.to.object")
+            }
+            return ScriptRuntime.toObject(thisObj, thisObj).prototype
         }
 
         /** `obj.__proto__ = proto` with the spec's checks. */
@@ -220,8 +245,8 @@ public open class NativeObject : ScriptableObject {
             val o = ScriptRuntimeES6.requireObjectCoercible(null, thisObj, CLASS_NAME, PROTO_PROPERTY)
             if (proto !is Scriptable && proto != null) return
             if (ScriptRuntime.isSymbol(proto)) return
-            if (o !is Scriptable || ScriptRuntime.isSymbol(o)) return
-            setPrototypeOf(o, proto)
+            if (o !is ScriptableObject || !ScriptRuntime.isObject(o)) return
+            if (!o.setPrototypeOf(Context.getContext(), proto as Scriptable?)) throw o.prototypeRefusedError(proto as Scriptable?)
         }
 
         private fun js_defineGetter(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
@@ -277,36 +302,27 @@ public open class NativeObject : ScriptableObject {
             return obj.prototype
         }
 
+        /**
+         * Object.setPrototypeOf: the object is checked for null and undefined first, then the
+         * prototype for being an object or null, and the object's [[SetPrototypeOf]] refusing is a
+         * TypeError (ES 20.1.2.23). Upstream checked the prototype first and decided the refusal
+         * itself, missing a proxy's trap answer and Object.prototype's immutable prototype (D-91).
+         */
         private fun js_setPrototypeOf(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             if (args.size < 2) {
                 throw ScriptRuntime.typeErrorById("msg.method.missing.parameter", "Object.setPrototypeOf", "2", args.size.toString())
-            }
-            val proto = if (args[1] == null) null else ensureScriptable(args[1])
-            if (ScriptRuntime.isSymbol(proto)) {
-                throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(proto))
             }
             val arg0 = args[0]
             if (cx.languageVersion >= Context.VERSION_ES6) {
                 ScriptRuntimeES6.requireObjectCoercible(cx, arg0, OBJECT_TAG, "setPrototypeOf")
             }
-            return setPrototypeOf(arg0, proto)
-        }
-
-        private fun setPrototypeOf(thisObj: Any?, proto: Scriptable?): Any? {
-            if (thisObj !is ScriptableObject) return thisObj
-            if (thisObj.prototype === proto) return thisObj
-            if (!thisObj.isExtensible) {
-                throw ScriptRuntime.typeErrorById("msg.not.extensible")
+            val proto = args[1]
+            if (proto != null && (proto !is Scriptable || !ScriptRuntime.isObject(proto))) {
+                throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(proto))
             }
-            var prototypeProto = proto
-            while (prototypeProto != null) {
-                if (prototypeProto === thisObj) {
-                    throw ScriptRuntime.typeErrorById("msg.object.cyclic.prototype", thisObj::class.simpleName)
-                }
-                prototypeProto = prototypeProto.prototype
-            }
-            thisObj.prototype = proto
-            return thisObj
+            if (arg0 !is ScriptableObject || !ScriptRuntime.isObject(arg0)) return arg0
+            if (!arg0.setPrototypeOf(cx, proto as Scriptable?)) throw arg0.prototypeRefusedError(proto as Scriptable?)
+            return arg0
         }
 
         private fun js_keys(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
@@ -319,31 +335,22 @@ public open class NativeObject : ScriptableObject {
             return cx.newArray(scope, ids)
         }
 
+        /**
+         * Object.entries and Object.values: EnumerableOwnProperties, which asks [[GetOwnProperty]]
+         * for each key just before reading it. Upstream checked every key with `has` instead, which
+         * for a proxy called the has trap the spec never calls and no getOwnPropertyDescriptor trap
+         * at all (D-91).
+         */
         private fun js_entries(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val arg = if (args.isEmpty()) Undefined.instance else args[0]
             val obj = getCompatibleObject(cx, scope, arg)
-            var ids = obj.getIds()
-            var j = 0
-            for (i in ids.indices) {
-                val id = ids[i]
-                if (id is Int) {
-                    if (obj.has(id, obj) && isEnumerable(id, obj)) {
-                        val stringId = ScriptRuntime.toString(id)
-                        val entry = arrayOf(stringId, obj.get(id, obj))
-                        ids[j++] = cx.newArray(scope, entry)
-                    }
-                } else {
-                    val stringId = ScriptRuntime.toString(id)
-                    if (obj.has(stringId, obj) && isEnumerable(stringId, obj)) {
-                        val entry = arrayOf(stringId, obj.get(stringId, obj))
-                        ids[j++] = cx.newArray(scope, entry)
-                    }
-                }
+            val result = ArrayList<Any?>()
+            for (key in AbstractEcmaObjectOperations.ownKeysForEnumeration(obj, false)) {
+                if (!AbstractEcmaObjectOperations.isOwnEnumerable(cx, obj, key!!)) continue
+                val value = AbstractEcmaObjectOperations.getForEnumeration(cx, obj, key)
+                result.add(cx.newArray(scope, arrayOf(ScriptRuntime.toString(key), value)))
             }
-            if (j != ids.size) {
-                ids = ids.copyOf(j)
-            }
-            return cx.newArray(scope, ids)
+            return cx.newArray(scope, result.toTypedArray())
         }
 
         private fun js_fromEntries(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
@@ -365,25 +372,12 @@ public open class NativeObject : ScriptableObject {
         private fun js_values(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val arg = if (args.isEmpty()) Undefined.instance else args[0]
             val obj = getCompatibleObject(cx, scope, arg)
-            var ids = obj.getIds()
-            var j = 0
-            for (i in ids.indices) {
-                val id = ids[i]
-                if (id is Int) {
-                    if (obj.has(id, obj) && isEnumerable(id, obj)) {
-                        ids[j++] = obj.get(id, obj)
-                    }
-                } else {
-                    val stringId = ScriptRuntime.toString(id)
-                    if (obj.has(stringId, obj) && isEnumerable(stringId, obj)) {
-                        ids[j++] = obj.get(stringId, obj)
-                    }
-                }
+            val result = ArrayList<Any?>()
+            for (key in AbstractEcmaObjectOperations.ownKeysForEnumeration(obj, false)) {
+                if (!AbstractEcmaObjectOperations.isOwnEnumerable(cx, obj, key!!)) continue
+                result.add(AbstractEcmaObjectOperations.getForEnumeration(cx, obj, key))
             }
-            if (j != ids.size) {
-                ids = ids.copyOf(j)
-            }
-            return cx.newArray(scope, ids)
+            return cx.newArray(scope, result.toTypedArray())
         }
 
         private fun js_hasOwn(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
@@ -540,6 +534,13 @@ public open class NativeObject : ScriptableObject {
             return arg
         }
 
+        /**
+         * Object.assign: each source's own keys in [[OwnPropertyKeys]] order, symbols among them,
+         * each asked [[GetOwnProperty]] and, when enumerable, read and written with Set(to, key,
+         * value, true). Upstream walked the strings and then the symbols, asked `has` before the
+         * descriptor, and did not throw when a proxy's set trap or an accessor without a setter
+         * refused the write (D-91).
+         */
         private fun js_assign(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val targetObj = if (args.isNotEmpty()) {
                 ScriptRuntime.toObject(cx, scope, args[0])
@@ -550,34 +551,10 @@ public open class NativeObject : ScriptableObject {
                 val source = args[i]
                 if (source == null || Undefined.isUndefined(source)) continue
                 val sourceObj = ScriptRuntime.toObject(cx, scope, source)
-                val ids: Array<Any?> = if (sourceObj is ScriptableObject) {
-                    sourceObj.startCompoundOp(false).use { sourceObj.getIds(it, false, true) }
-                } else {
-                    sourceObj.getIds()
-                }
-                for (key in ids) {
-                    if (key is Int) {
-                        if (sourceObj.has(key, sourceObj) && isEnumerable(key, sourceObj)) {
-                            val v = sourceObj.get(key, sourceObj)
-                            AbstractEcmaObjectOperations.put(cx, targetObj, key, v, true)
-                        }
-                    } else if (key is String) {
-                        val stringId = ScriptRuntime.toString(key)
-                        if (sourceObj.has(stringId, sourceObj) && isEnumerable(stringId, sourceObj)) {
-                            val v = sourceObj.get(stringId, sourceObj)
-                            AbstractEcmaObjectOperations.put(cx, targetObj, stringId, v, true)
-                        }
-                    }
-                }
-                if (sourceObj is ScriptableObject) {
-                    for (key in ids) {
-                        if (key is Symbol) {
-                            if (sourceObj.has(key, sourceObj) && isEnumerable(key, sourceObj)) {
-                                val v = sourceObj.get(key, sourceObj)
-                                AbstractEcmaObjectOperations.put(cx, targetObj, key, v, true)
-                            }
-                        }
-                    }
+                for (key in AbstractEcmaObjectOperations.ownKeysForEnumeration(sourceObj, true)) {
+                    if (!AbstractEcmaObjectOperations.isOwnEnumerable(cx, sourceObj, key!!)) continue
+                    val v = AbstractEcmaObjectOperations.getForEnumeration(cx, sourceObj, key)
+                    AbstractEcmaObjectOperations.setOrThrow(cx, targetObj, key, v)
                 }
             }
             return targetObj

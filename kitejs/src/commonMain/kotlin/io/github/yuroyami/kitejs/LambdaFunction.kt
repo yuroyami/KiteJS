@@ -59,4 +59,5 @@ public open class LambdaFunction : BaseFunction {
     override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable =
         throw ScriptRuntime.typeErrorById("msg.no.new", functionName)
 
+    override val isConstructor: Boolean get() = false
 }

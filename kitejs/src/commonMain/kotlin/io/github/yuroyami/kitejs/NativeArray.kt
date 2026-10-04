@@ -633,22 +633,18 @@ public class NativeArray : ScriptableObject {
             return false
         }
 
+        /**
+         * What Array.from and Array.of fill: a new `this` when IsConstructor says it is a
+         * constructor, otherwise a plain array. Upstream tried every Constructable and took any
+         * TypeError for "not a constructor", so a constructor's own TypeError vanished into a
+         * plain array (D-91).
+         */
         private fun callConstructorOrCreateArray(cx: Context, scope: Scriptable, arg: Scriptable?, length: Long, lengthAlways: Boolean): Scriptable {
-            var result: Scriptable? = null
-            if (arg is Constructable) {
-                try {
-                    val args: Array<Any?> = if (lengthAlways || length > 0) arrayOf(length) else ScriptRuntime.emptyArgs
-                    result = arg.construct(cx, scope, args)
-                } catch (ee: EcmaError) {
-                    if ("TypeError" != ee.name) throw ee
-                    // If we get here then it is likely that the caller is a non-constructor
-                    // or "arg" is not a valid array constructor and we can drop through.
-                }
+            if (AbstractEcmaObjectOperations.isConstructor(arg)) {
+                val args: Array<Any?> = if (lengthAlways || length > 0) arrayOf(length) else ScriptRuntime.emptyArgs
+                return (arg as Constructable).construct(cx, scope, args)
             }
-            if (result == null) {
-                result = cx.newArray(scope, if (length > Int.MAX_VALUE) 0 else length.toInt())
-            }
-            return result
+            return cx.newArray(scope, if (length > Int.MAX_VALUE) 0 else length.toInt())
         }
 
         private fun js_from(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
@@ -1267,7 +1263,7 @@ public class NativeArray : ScriptableObject {
                 if (ScriptRuntime.instanceOf(value, ctor, cx)) return true
             }
             // Otherwise, spec says to only spread things that are arrays.
-            return js_isArray(value)
+            return isArray(value)
         }
 
         // Concatenate arrays in a way that is not sensitive to their length
@@ -1599,7 +1595,7 @@ public class NativeArray : ScriptableObject {
             for (i in 0 until length) {
                 val elem = getRawElem(source, i)
                 if (elem === Scriptable.NOT_FOUND) continue
-                if (depth >= 1 && js_isArray(elem)) {
+                if (depth >= 1 && isArray(elem)) {
                     val arr = flat(cx, scope, elem as Scriptable, depth - 1)
                     val arrLength = getLengthProperty(cx, arr)
                     for (k in 0 until arrLength) {
@@ -1632,7 +1628,7 @@ public class NativeArray : ScriptableObject {
                 if (elem === Scriptable.NOT_FOUND) continue
                 val innerArgs = arrayOf(elem, i, o)
                 val mapCall = f.call(cx, parent, thisArg, innerArgs)
-                if (js_isArray(mapCall)) {
+                if (isArray(mapCall)) {
                     val arr = mapCall as Scriptable
                     val arrLength = getLengthProperty(cx, arr)
                     for (k in 0 until arrLength) {
@@ -1699,11 +1695,12 @@ public class NativeArray : ScriptableObject {
         }
 
         private fun js_isArrayMethod(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
-            args.isNotEmpty() && js_isArray(args[0])
+            args.isNotEmpty() && isArray(args[0])
 
-        private fun js_isArray(o: Any?): Boolean {
+        /** IsArray: an Array exotic object, or a proxy whose target is one; a revoked proxy throws. */
+        internal fun isArray(o: Any?): Boolean {
             if (o !is Scriptable) return false
-            if (o is NativeProxy) return js_isArray(o.getTargetThrowIfRevoked())
+            if (o is NativeProxy) return isArray(o.getTargetThrowIfRevoked())
             return "Array" == o.className
         }
 

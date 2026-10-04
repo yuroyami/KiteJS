@@ -187,4 +187,6 @@ internal class AsmExportFunction(
 
     override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable =
         throw ScriptRuntime.typeError("${fn.name} is not a constructor")
+
+    override val isConstructor: Boolean get() = false
 }

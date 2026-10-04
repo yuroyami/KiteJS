@@ -54,17 +54,24 @@ public open class IdFunctionObject : BaseFunction {
         addAsProperty(declarationScope!!)
     }
 
+    /**
+     * Function.prototype, looked up the first time it is needed. Only a prototype nobody set is
+     * defaulted, so one set to null stays null; upstream defaulted it again on every read, which
+     * undid `Object.setPrototypeOf(Date.now, null)` (D-91).
+     */
+    private var prototypeSet = false
+
     override var prototype: Scriptable?
         get() {
-            var proto = super.prototype
-            if (proto == null) {
-                proto = getFunctionPrototype(declarationScope!!)
-                super.prototype = proto
+            if (!prototypeSet) {
+                if (super.prototype == null) super.prototype = getFunctionPrototype(declarationScope!!)
+                prototypeSet = true
             }
-            return proto
+            return super.prototype
         }
         set(value) {
             super.prototype = value
+            prototypeSet = true
         }
 
     override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
@@ -74,6 +81,8 @@ public open class IdFunctionObject : BaseFunction {
         if (useCallAsConstructor) return null
         throw ScriptRuntime.typeErrorById("msg.not.ctor", functionName)
     }
+
+    override val isConstructor: Boolean get() = useCallAsConstructor
 
     override val arity: Int get() = declaredArity
 

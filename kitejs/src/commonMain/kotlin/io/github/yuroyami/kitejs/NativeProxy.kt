@@ -40,138 +40,134 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
 
     // ---- Property access -----------------------------------------------------------------------
 
-    override fun has(name: String, start: Scriptable): Boolean {
+    override fun has(name: String, start: Scriptable): Boolean = hasProperty(name)
+
+    override fun has(index: Int, start: Scriptable): Boolean = hasProperty(index)
+
+    override fun has(key: Symbol, start: Scriptable): Boolean = hasProperty(key)
+
+    /** [[HasProperty]] (ES 10.5.7). */
+    private fun hasProperty(key: Any): Boolean {
         val target = getTargetThrowIfRevoked()
 
         val trap = getTrap(TRAP_HAS)
         if (trap != null) {
-            val booleanTrapResult = ScriptRuntime.toBoolean(callTrap(trap, arrayOf(target, name)))
+            val p = AbstractEcmaObjectOperations.trapKey(key)
+            val booleanTrapResult = ScriptRuntime.toBoolean(callTrap(trap, arrayOf(target, p)))
             if (!booleanTrapResult) {
-                val targetDesc = target.getOwnPropertyDescriptor(Context.getContext(), name)
-                if (targetDesc != null) {
-                    if (targetDesc.isConfigurable(false) || !target.isExtensible) {
-                        throw ScriptRuntime.typeError(
-                            "proxy can't report an existing own property '$name' as non-existent on a non-extensible object",
-                        )
-                    }
+                val targetDesc = target.getOwnPropertyDescriptor(Context.getContext(), p)
+                if (targetDesc != null && (targetDesc.isConfigurable(false) || !target.isExtensible)) {
+                    throw ScriptRuntime.typeError(
+                        "proxy can't report an existing own property '$p' as non-existent on a non-configurable property or a non-extensible object",
+                    )
                 }
             }
             return booleanTrapResult
         }
 
-        return ScriptableObject.hasProperty(target, name)
-    }
-
-    override fun has(index: Int, start: Scriptable): Boolean {
-        val target = getTargetThrowIfRevoked()
-
-        val trap = getTrap(TRAP_HAS)
-        if (trap != null) {
-            val booleanTrapResult =
-                ScriptRuntime.toBoolean(callTrap(trap, arrayOf(target, ScriptRuntime.toString(index))))
-            if (!booleanTrapResult) {
-                val targetDesc = target.getOwnPropertyDescriptor(Context.getContext(), index)
-                if (targetDesc != null) {
-                    if (targetDesc.isConfigurable(false) || !target.isExtensible) {
-                        throw ScriptRuntime.typeError(NOT_CONFIGURABLE_EXISTENCE)
-                    }
-                }
-            }
-            return booleanTrapResult
+        return when (key) {
+            is Symbol -> ScriptableObject.hasProperty(target, key)
+            is Int -> ScriptableObject.hasProperty(target, key)
+            else -> ScriptableObject.hasProperty(target, key as String)
         }
-
-        return ScriptableObject.hasProperty(target, index)
     }
 
-    override fun has(key: Symbol, start: Scriptable): Boolean {
-        val target = getTargetThrowIfRevoked()
-
-        val trap = getTrap(TRAP_HAS)
-        if (trap != null) {
-            val booleanTrapResult = ScriptRuntime.toBoolean(callTrap(trap, arrayOf(target, key)))
-            if (!booleanTrapResult) {
-                val targetDesc = target.getOwnPropertyDescriptor(Context.getContext(), key)
-                if (targetDesc != null) {
-                    if (targetDesc.isConfigurable(false) || !target.isExtensible) {
-                        throw ScriptRuntime.typeError(NOT_CONFIGURABLE_EXISTENCE)
-                    }
-                }
-            }
-            return booleanTrapResult
-        }
-
-        return ScriptableObject.hasProperty(target, key)
-    }
-
+    /**
+     * The keys a caller asks for, filtered the way EnumerableOwnProperties and the key lists built
+     * on [[OwnPropertyKeys]] filter them: symbols dropped unless [getSymbols], and, unless
+     * [getNonEnumerable], every key the proxy's own [[GetOwnProperty]] does not report as an
+     * enumerable property, so a getOwnPropertyDescriptor trap decides what Object.keys, for-in and
+     * JSON.stringify see. Upstream handed the trap's list back unfiltered, so Object.keys of a
+     * proxy listed non-enumerable keys and threw on a symbol, and JSON.stringify crashed with a
+     * host ClassCastException (D-91).
+     */
     override fun getIds(map: CompoundOperationMap, getNonEnumerable: Boolean, getSymbols: Boolean): Array<Any?> {
+        val keys = ownPropertyKeys()
+        if (getNonEnumerable && getSymbols) return Array(keys.size) { idKey(keys[it]) }
+        val cx = Context.getContext()
+        val result = ArrayList<Any?>(keys.size)
+        for (key in keys) {
+            if (key is Symbol && !getSymbols) continue
+            if (!getNonEnumerable && getOwnPropertyDescriptor(cx, key)?.isEnumerable != true) continue
+            result.add(idKey(key))
+        }
+        return result.toTypedArray()
+    }
+
+    /**
+     * An id in the form [getIds] hands out for every other object: an array index as an Int, so a
+     * caller that goes on to ask has(index) or get(index), as for-in does, reaches an array target's
+     * elements, which are not found under their string names.
+     */
+    private fun idKey(key: Any?): Any? {
+        if (key !is String) return key
+        val id = ScriptRuntime.toStringIdOrIndex(key)
+        return id.stringId ?: id.index
+    }
+
+    /**
+     * [[OwnPropertyKeys]] (ES 10.5.11): the trap's list, in the trap's order, once it is checked
+     * against the target. Keys are compared as property keys, so an index the target lists as a
+     * number matches the string the trap returns; upstream compared the two kinds as they came,
+     * which made every non-configurable index look skipped, and after the checks for a
+     * non-extensible target it answered with the target's own keys in place of the trap's (D-91).
+     */
+    internal fun ownPropertyKeys(): Array<Any?> {
         val target = getTargetThrowIfRevoked()
 
         val trap = getTrap(TRAP_OWN_KEYS)
-        if (trap != null) {
-            val res = callTrap(trap, arrayOf(target))
-            if (res !is Scriptable) throw ScriptRuntime.typeError("ownKeys trap must be an object")
-            if (!ScriptRuntime.isArrayLike(res)) {
-                throw ScriptRuntime.typeError("ownKeys trap must be an array like object")
-            }
+            ?: return target.startCompoundOp(false).use { target.getIds(it, true, true) }.map { AbstractEcmaObjectOperations.trapKey(it!!) }.toTypedArray()
 
-            val cx = Context.getContext()
+        val res = callTrap(trap, arrayOf(target))
+        if (res !is Scriptable || ScriptRuntime.isSymbol(res)) throw ScriptRuntime.typeError("ownKeys trap must return an object")
 
-            val trapResult = AbstractEcmaObjectOperations.createListFromArrayLike(
-                cx,
-                res,
-                { o -> o is CharSequence || o is NativeString || ScriptRuntime.isSymbol(o) },
-                "proxy [[OwnPropertyKeys]] must return an array with only string and symbol elements",
-            )
+        val cx = Context.getContext()
 
-            val extensibleTarget = target.isExtensible
-            // The flags passed in are ignored here: every key has to be looked at.
-            val targetKeys = target.startCompoundOp(false).use { target.getIds(it, true, true) }
+        val trapResult = AbstractEcmaObjectOperations.createListFromArrayLike(
+            cx,
+            res,
+            { o -> o is CharSequence || ScriptRuntime.isSymbol(o) },
+            "proxy [[OwnPropertyKeys]] must return an array with only string and symbol elements",
+        ).map { if (it is CharSequence) it.toString() else it }
 
-            val uncheckedResultKeys = HashSet<Any?>(trapResult)
-            if (uncheckedResultKeys.size != trapResult.size) {
-                throw ScriptRuntime.typeError("ownKeys trap result must not contain duplicates")
-            }
-
-            val targetConfigurableKeys = ArrayList<Any?>()
-            val targetNonconfigurableKeys = ArrayList<Any?>()
-            for (targetKey in targetKeys) {
-                val desc = target.getOwnPropertyDescriptor(cx, targetKey)
-                if (desc != null && desc.isConfigurable(false)) {
-                    targetNonconfigurableKeys.add(targetKey)
-                } else {
-                    targetConfigurableKeys.add(targetKey)
-                }
-            }
-
-            if (extensibleTarget && targetNonconfigurableKeys.size == 0) {
-                return trapResult.toTypedArray()
-            }
-
-            for (key in targetNonconfigurableKeys) {
-                if (!uncheckedResultKeys.contains(key)) {
-                    throw ScriptRuntime.typeError("proxy can't skip a non-configurable property '$key'")
-                }
-                uncheckedResultKeys.remove(key)
-            }
-            if (extensibleTarget) {
-                return trapResult.toTypedArray()
-            }
-
-            for (key in targetConfigurableKeys) {
-                if (!uncheckedResultKeys.contains(key)) {
-                    throw ScriptRuntime.typeError("proxy can't skip a configurable property $key")
-                }
-                uncheckedResultKeys.remove(key)
-            }
-
-            if (uncheckedResultKeys.size > 0) {
-                throw ScriptRuntime.typeError("proxy can't skip properties")
-            }
-
-            // The target is not extensible, so the answer comes from the target itself.
+        val uncheckedResultKeys = LinkedHashSet<Any?>(trapResult)
+        if (uncheckedResultKeys.size != trapResult.size) {
+            throw ScriptRuntime.typeError("ownKeys trap result must not contain duplicates")
         }
 
-        return target.startCompoundOp(false).use { target.getIds(it, getNonEnumerable, getSymbols) }
+        val extensibleTarget = target.isExtensible
+        val targetKeys = target.startCompoundOp(false).use { target.getIds(it, true, true) }
+
+        val targetConfigurableKeys = ArrayList<Any?>()
+        val targetNonconfigurableKeys = ArrayList<Any?>()
+        for (targetKey in targetKeys) {
+            val key = AbstractEcmaObjectOperations.trapKey(targetKey!!)
+            val desc = target.getOwnPropertyDescriptor(cx, key)
+            if (desc != null && desc.isConfigurable(false)) {
+                targetNonconfigurableKeys.add(key)
+            } else {
+                targetConfigurableKeys.add(key)
+            }
+        }
+
+        if (extensibleTarget && targetNonconfigurableKeys.isEmpty()) return trapResult.toTypedArray()
+
+        for (key in targetNonconfigurableKeys) {
+            if (!uncheckedResultKeys.remove(key)) {
+                throw ScriptRuntime.typeError("proxy can't skip a non-configurable property '$key'")
+            }
+        }
+        if (extensibleTarget) return trapResult.toTypedArray()
+
+        for (key in targetConfigurableKeys) {
+            if (!uncheckedResultKeys.remove(key)) {
+                throw ScriptRuntime.typeError("proxy can't skip the property '$key' of a non-extensible target")
+            }
+        }
+        if (uncheckedResultKeys.isNotEmpty()) {
+            throw ScriptRuntime.typeError("proxy can't report a new property on a non-extensible target")
+        }
+        return trapResult.toTypedArray()
     }
 
     override fun get(name: String, start: Scriptable): Any? = get(Context.getContext(), name, start)
@@ -310,52 +306,53 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
 
     // ---- Property descriptors ------------------------------------------------------------------
 
+    /**
+     * [[GetOwnProperty]] (ES 10.5.5). The trap's answer goes through ToPropertyDescriptor and
+     * CompletePropertyDescriptor and is checked against the target's own property before it is
+     * believed. Upstream read only `value` and the three flags out of it, so an accessor came back
+     * as a data property holding undefined, an invalid descriptor was accepted, and a trap could
+     * report a property non-configurable or read-only that the target does not have as such (D-91).
+     */
     override fun getOwnPropertyDescriptor(cx: Context, id: Any?): DescriptorInfo? {
         val target = getTargetThrowIfRevoked()
+        val key = propertyKey(id)
 
-        val trap = getTrap(TRAP_GET_OWN_PROPERTY_DESCRIPTOR)
-        if (trap != null) {
-            val trapResultObj = callTrap(trap, arrayOf(target, id))
-            if (!Undefined.isUndefined(trapResultObj) &&
-                !(trapResultObj is Scriptable && !ScriptRuntime.isSymbol(trapResultObj))
-            ) {
-                throw ScriptRuntime.typeError(
-                    "getOwnPropertyDescriptor trap has to return undefined or an object",
-                )
-            }
+        val trap = getTrap(TRAP_GET_OWN_PROPERTY_DESCRIPTOR) ?: return target.getOwnPropertyDescriptor(cx, key)
 
-            val targetDesc =
-                if (ScriptRuntime.isSymbol(id)) {
-                    target.getOwnPropertyDescriptor(cx, id)
-                } else {
-                    target.getOwnPropertyDescriptor(cx, ScriptRuntime.toString(id))
-                }
-
-            if (Undefined.isUndefined(trapResultObj)) {
-                if (targetDesc == null) return null
-
-                if (targetDesc.isConfigurable(false) || !target.isExtensible) {
-                    throw ScriptRuntime.typeError(
-                        "proxy can't report an existing own property '$id' as non-existent on a non-extensible object",
-                    )
-                }
-                return null
-            }
-
-            val trapResult = trapResultObj as Scriptable
-            val value = getProperty(trapResult, "value")
-            val attributes = applyDescriptorToAttributeBitset(
-                DONTENUM or READONLY or PERMANENT,
-                getProperty(trapResult, "enumerable"),
-                getProperty(trapResult, "writable"),
-                getProperty(trapResult, "configurable"),
-            )
-            return buildDataDescriptor(value, attributes)
+        val trapResultObj = callTrap(trap, arrayOf(target, key))
+        if (!Undefined.isUndefined(trapResultObj) && !(trapResultObj is ScriptableObject && !ScriptRuntime.isSymbol(trapResultObj))) {
+            throw ScriptRuntime.typeError("getOwnPropertyDescriptor trap has to return undefined or an object")
         }
 
-        if (ScriptRuntime.isSymbol(id)) return target.getOwnPropertyDescriptor(cx, id)
+        val targetDesc = target.getOwnPropertyDescriptor(cx, key)
 
-        return target.getOwnPropertyDescriptor(cx, ScriptRuntime.toString(id))
+        if (Undefined.isUndefined(trapResultObj)) {
+            if (targetDesc == null) return null
+            if (targetDesc.isConfigurable(false) || !target.isExtensible) {
+                throw ScriptRuntime.typeError(
+                    "proxy can't report an existing own property '$key' as non-existent on a non-extensible object",
+                )
+            }
+            return null
+        }
+
+        val extensibleTarget = target.isExtensible
+        val resultDesc = DescriptorInfo(trapResultObj as ScriptableObject)
+        checkPropertyDefinition(resultDesc)
+        completePropertyDescriptor(resultDesc)
+
+        if (!AbstractEcmaObjectOperations.isCompatiblePropertyDescriptor(cx, extensibleTarget, resultDesc, targetDesc)) {
+            throw ScriptRuntime.typeError("proxy can't report an incompatible property descriptor for '$key'")
+        }
+        if (resultDesc.isConfigurable(false)) {
+            if (targetDesc == null || targetDesc.isConfigurable) {
+                throw ScriptRuntime.typeError("proxy can't report the configurable or missing property '$key' as non-configurable")
+            }
+            if (resultDesc.isWritable(false) && targetDesc.isWritable) {
+                throw ScriptRuntime.typeError("proxy can't report the writable property '$key' as non-configurable and non-writable")
+            }
+        }
+        return resultDesc
     }
 
     override fun defineOwnProperty(cx: Context, id: Any?, desc: DescriptorInfo): Boolean {
@@ -363,12 +360,13 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
 
         val trap = getTrap(TRAP_DEFINE_PROPERTY)
         if (trap != null) {
+            val key = propertyKey(id)
             val booleanTrapResult = ScriptRuntime.toBoolean(
-                callTrap(trap, arrayOf(target, id, desc.toObject(trap.declarationScope!!))),
+                callTrap(trap, arrayOf(target, key, desc.toObject(trap.declarationScope!!))),
             )
             if (!booleanTrapResult) return false
 
-            val targetDesc = target.getOwnPropertyDescriptor(Context.getContext(), id)
+            val targetDesc = target.getOwnPropertyDescriptor(cx, key)
             val extensibleTarget = target.isExtensible
 
             val settingConfigFalse = desc.isConfigurable(false)
@@ -434,6 +432,11 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
         return booleanTrapResult
     }
 
+    /**
+     * [[GetPrototypeOf]] (ES 10.5.1): the trap's answer has to be an object or null, and for a
+     * non-extensible target the target's own prototype. Writing goes through [setPrototypeOf],
+     * so an engine path that assigns the property still asks the trap, and a refusal throws.
+     */
     override var prototype: Scriptable?
         get() {
             val target = getTargetThrowIfRevoked()
@@ -441,31 +444,41 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
             val trap = getTrap(TRAP_GET_PROTOTYPE_OF) ?: return target.prototype
 
             val handlerProto = callTrap(trap, arrayOf(target))
-            if (Undefined.isUndefined(handlerProto) || ScriptRuntime.isSymbol(handlerProto)) {
+            if (handlerProto != null && (handlerProto !is Scriptable || !ScriptRuntime.isObject(handlerProto))) {
                 throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(handlerProto))
             }
-
-            val handlerProtoScriptable = ensureScriptable(handlerProto)
+            val handlerProtoScriptable = handlerProto as Scriptable?
 
             if (target.isExtensible) return handlerProtoScriptable
-            if (handlerProto !== target.prototype) {
+            if (handlerProtoScriptable !== target.prototype) {
                 throw ScriptRuntime.typeError("getPrototypeOf trap has to return the original prototype")
             }
             return handlerProtoScriptable
         }
         set(value) {
-            val target = getTargetThrowIfRevoked()
-
-            val trap = getTrap(TRAP_SET_PROTOTYPE_OF)
-            if (trap != null) {
-                // The trap's answer decides nothing beyond whether it succeeded: the proxy never
-                // stores a prototype of its own.
-                ScriptRuntime.toBoolean(callTrap(trap, arrayOf(target, value)))
-                return
+            if (!setPrototypeOf(Context.getContext(), value)) {
+                throw ScriptRuntime.typeError("proxy refused to set the prototype")
             }
-
-            target.prototype = value
         }
+
+    /**
+     * [[SetPrototypeOf]] (ES 10.5.2): false when the trap says so, and a TypeError when it claims
+     * success on a non-extensible target whose prototype is not the one asked for. Upstream threw
+     * the trap's answer away, so Object.setPrototypeOf succeeded and Reflect.setPrototypeOf
+     * answered true whatever the trap said, and nothing was checked against the target (D-91).
+     */
+    override fun setPrototypeOf(cx: Context, proto: Scriptable?): Boolean {
+        val target = getTargetThrowIfRevoked()
+
+        val trap = getTrap(TRAP_SET_PROTOTYPE_OF) ?: return target.setPrototypeOf(cx, proto)
+
+        if (!ScriptRuntime.toBoolean(callTrap(trap, arrayOf(target, proto)))) return false
+        if (target.isExtensible) return true
+        if (proto !== target.prototype) {
+            throw ScriptRuntime.typeError("setPrototypeOf trap returned true for a non-extensible target with a different prototype")
+        }
+        return true
+    }
 
     /** Sets the proxy's own prototype without going through [TRAP_SET_PROTOTYPE_OF]. */
     private fun setPrototypeDirect(prototype: Scriptable?) {
@@ -485,6 +498,26 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
     protected fun callTrap(trap: Function, args: Array<Any?>): Any? =
         trap.call(Context.getContext(), trap.declarationScope!!, handlerObj, args)
 
+    /** A property key as a trap receives it: a string or a symbol, never an int index. */
+    private fun propertyKey(id: Any?): Any = when (id) {
+        is Symbol -> id
+        is String -> id
+        else -> ScriptRuntime.toString(id)
+    }
+
+    /** CompletePropertyDescriptor (ES 6.2.6.6): the fields a descriptor leaves out get their defaults. */
+    private fun completePropertyDescriptor(desc: DescriptorInfo) {
+        if (desc.isGenericDescriptor || desc.isDataDescriptor) {
+            if (!desc.hasValue()) desc.value = Undefined.instance
+            if (!desc.hasWritable()) desc.writable = false
+        } else {
+            if (!desc.hasGetter()) desc.getter = Undefined.instance
+            if (!desc.hasSetter()) desc.setter = Undefined.instance
+        }
+        if (!desc.hasEnumerable()) desc.enumerable = false
+        if (!desc.hasConfigurable()) desc.configurable = false
+    }
+
     internal fun getTargetThrowIfRevoked(): ScriptableObject =
         targetObj ?: throw ScriptRuntime.typeError("Illegal operation attempted on a revoked proxy")
 
@@ -492,7 +525,23 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
     internal class NativeProxyFunction(target: ScriptableObject, handler: Scriptable) :
         NativeProxy(target, handler), Function {
 
-        override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable {
+        /**
+         * ProxyCreate decides once whether the proxy gets a [[Construct]], from its target, so a
+         * revoked proxy keeps its answer instead of throwing when asked (D-91).
+         */
+        internal val isConstructor: Boolean = AbstractEcmaObjectOperations.isConstructor(target)
+
+        override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable =
+            construct(cx, scope, args, this)
+
+        /**
+         * [[Construct]] (ES 10.5.13): the trap gets the newTarget the caller passed, and without a
+         * trap the target is constructed with that same newTarget. Upstream passed the proxy itself
+         * to the trap and constructed the target with none, so `Reflect.construct(p, args, F)`
+         * lost F on both paths (D-91).
+         */
+        internal fun construct(cx: Context, scope: Scriptable, args: Array<Any?>, newTarget: Scriptable): Scriptable {
+            if (!isConstructor) throw ScriptRuntime.typeErrorById("msg.not.ctor", typeOf)
             val target = getTargetThrowIfRevoked()
 
             val trap = getTrap(TRAP_CONSTRUCT)
@@ -500,14 +549,14 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
                 // Upstream hands the raw argument array to the trap, which only reads as an array
                 // in script because Java interop wraps it. There is no interop here, so the trap
                 // gets a real JavaScript array, the same way the apply trap does (D-51).
-                val result = callTrap(trap, arrayOf(target, cx.newArray(scope, args), this))
+                val result = callTrap(trap, arrayOf(target, cx.newArray(scope, args), newTarget))
                 if (result !is Scriptable || ScriptRuntime.isSymbol(result)) {
                     throw ScriptRuntime.typeError("Constructor trap has to return a scriptable.")
                 }
-                return result as ScriptableObject
+                return result
             }
 
-            return (target as Constructable).construct(cx, scope, args)
+            return AbstractEcmaObjectOperations.construct(cx, scope, target as Constructable, args, newTarget)
         }
 
         override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
@@ -550,8 +599,6 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
 
         private const val GET_MUST_MATCH = "proxy get has to return the same value as the plain call"
         private const val INCOMPATIBLE_DESCRIPTOR = "proxy can't define an incompatible property descriptor"
-        private const val NOT_CONFIGURABLE_EXISTENCE =
-            "proxy can't check an existing property ' + name + ' existance on an not configurable or not extensible object"
 
         internal fun init(cx: Context, scope: Scriptable, sealed: Boolean): Any {
             val constructor = object : LambdaConstructor(
@@ -569,6 +616,10 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
                     obj.parentScope = scope
                     return obj
                 }
+
+                /** ProxyCreate never reads newTarget: a proxy has no prototype of its own to give. */
+                override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>, newTarget: Scriptable): Scriptable =
+                    construct(cx, scope, args)
             }
 
             constructor.defineConstructorMethod(
@@ -613,7 +664,9 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
             val revocable = cx.newObject(scope) as NativeObject
 
             revocable.put("proxy", revocable, proxy)
-            revocable.put("revoke", revocable, LambdaFunction(scope, "", 0, Revoker(proxy)))
+            // A built-in function that is not a constructor has no `prototype` (ES 10.3); upstream
+            // gave the revoke function one (D-91).
+            revocable.put("revoke", revocable, LambdaFunction(scope, "", 0, Revoker(proxy), false))
             return revocable
         }
     }

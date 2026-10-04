@@ -85,48 +85,58 @@ public class NativeJSON private constructor() : ScriptableObject() {
             return walk(cx, scope, reviver, root, "")
         }
 
-        private fun walk(cx: Context, scope: Scriptable, reviver: Callable, holder: Scriptable, name: Any?): Any? {
-            val property: Any? = if (name is Number) {
-                holder.get(name.toInt(), holder)
-            } else {
-                holder.get(name as String, holder)
-            }
-            if (property is Scriptable) {
-                val v = property
-                if (v is NativeArray) {
-                    val len = v.length
-                    for (i in 0 until len) {
-                        if (i > Int.MAX_VALUE) {
-                            val id = i.toString()
-                            val newElement = walk(cx, scope, reviver, v, id)
-                            if (newElement === Undefined.instance) {
-                                v.delete(id)
-                            } else {
-                                v.put(id, v, newElement)
-                            }
-                        } else {
-                            val idx = i.toInt()
-                            val newElement = walk(cx, scope, reviver, v, idx)
-                            if (newElement === Undefined.instance) {
-                                v.delete(idx)
-                            } else {
-                                v.put(idx, v, newElement)
-                            }
-                        }
-                    }
+        /**
+         * InternalizeJSONProperty (ES 25.5.1.1). The value is read with [[Get]], so an inherited
+         * property counts; an array is recognised with IsArray, a proxy for one included, and walked
+         * to its LengthOfArrayLike; an object is walked over its enumerable own keys; and each
+         * result is deleted or written back with [[Delete]] and CreateDataProperty, neither of which
+         * throws when refused. The reviver gets the key as a string. Upstream read own properties
+         * only, recognised only a real array, wrote back with a put that ran a setter the reviver
+         * had defined and wrote into an array the reviver had frozen, deleted with a delete that
+         * threw in strict code when refused, and passed array indices to the reviver as numbers
+         * (D-91).
+         */
+        private fun walk(cx: Context, scope: Scriptable, reviver: Callable, holder: Scriptable, name: Any): Any? {
+            val property = getValue(holder, name)
+            if (property is Scriptable && ScriptRuntime.isObject(property)) {
+                if (NativeArray.isArray(property)) {
+                    val len = AbstractEcmaObjectOperations.lengthOfArrayLike(cx, property)
+                    for (i in 0 until len) revive(cx, scope, reviver, property, indexKey(i))
                 } else {
-                    val keys = v.getIds()
-                    for (p in keys) {
-                        val newElement = walk(cx, scope, reviver, v, p)
-                        if (newElement === Undefined.instance) {
-                            if (p is Number) v.delete(p.toInt()) else v.delete(p as String)
-                        } else {
-                            if (p is Number) v.put(p.toInt(), v, newElement) else v.put(p as String, v, newElement)
-                        }
-                    }
+                    for (p in property.getIds()) revive(cx, scope, reviver, property, p!!)
                 }
             }
-            return reviver.call(cx, scope, holder, arrayOf(name, property))
+            return reviver.call(cx, scope, holder, arrayOf(name.toString(), property))
+        }
+
+        private fun revive(cx: Context, scope: Scriptable, reviver: Callable, holder: Scriptable, key: Any) {
+            val newElement = walk(cx, scope, reviver, holder, key)
+            if (holder !is ScriptableObject) {
+                if (newElement === Undefined.instance) {
+                    if (key is Int) holder.delete(key) else holder.delete(key.toString())
+                } else {
+                    if (key is Int) holder.put(key, holder, newElement) else holder.put(key.toString(), holder, newElement)
+                }
+                return
+            }
+            if (newElement === Undefined.instance) {
+                AbstractEcmaObjectOperations.delete(cx, holder, key)
+            } else {
+                AbstractEcmaObjectOperations.createDataProperty(cx, holder, key, newElement)
+            }
+        }
+
+        /** The property key for array index [i]: an int where it fits, as the engine stores it, otherwise its string. */
+        private fun indexKey(i: Long): Any = if (i <= Int.MAX_VALUE) i.toInt() else i.toString()
+
+        /** Get(O, P) for a string, int or symbol key, with a missing property read as undefined. */
+        private fun getValue(o: Scriptable, key: Any): Any? {
+            val value = when (key) {
+                is Int -> getProperty(o, key)
+                is Symbol -> getProperty(o, key)
+                else -> getProperty(o, key.toString())
+            }
+            return if (value === Scriptable.NOT_FOUND) Undefined.instance else value
         }
 
         private fun repeat(c: Char, count: Int): String = CharArray(count) { c }.concatToString()
@@ -139,12 +149,17 @@ public class NativeJSON private constructor() : ScriptableObject() {
             var replacerFunction: Callable? = null
             if (replacer is Callable) {
                 replacerFunction = replacer
-            } else if (replacer is NativeArray) {
+            } else if (NativeArray.isArray(replacer)) {
+                // The property list comes from every index up to LengthOfArrayLike, read with
+                // [[Get]], so a proxy for an array works and a hole reads its prototype. Upstream
+                // took only the own indices of a real array (D-91).
+                val replacerObj = replacer as Scriptable
+                val len = AbstractEcmaObjectOperations.lengthOfArrayLike(cx, replacerObj)
                 val propertySet = LinkedHashSet<Any?>()
-                for (i in replacer.indexIds) {
-                    val v = replacer.get(i, replacer)
-                    if (v is String) {
-                        propertySet.add(v)
+                for (i in 0 until len) {
+                    val v = getValue(replacerObj, indexKey(i))
+                    if (v is CharSequence) {
+                        propertySet.add(v.toString())
                     } else if (v is Number || v is NativeString || v is NativeNumber) {
                         propertySet.add(ScriptRuntime.toString(v))
                     }
@@ -179,34 +194,26 @@ public class NativeJSON private constructor() : ScriptableObject() {
             return str("", wrapper, state)
         }
 
-        private fun str(key: Any?, holder: Scriptable, state: StringifyState): Any? {
-            var value: Any?
-            var keyString: String? = null
-            var keyInt = 0
-            if (key is String) {
-                keyString = key
-                value = getProperty(holder, keyString)
-            } else {
-                keyInt = (key as Number).toInt()
-                value = getProperty(holder, keyInt)
-            }
-            if (value is Scriptable && hasProperty(value, "toJSON")) {
+        /**
+         * SerializeJSONProperty (ES 25.5.2.2). `toJSON` is read once with GetV and called when it is
+         * callable, and both it and the replacer get the key as a string. Upstream asked HasProperty
+         * first and then read the method twice, and handed array indices to the replacer as numbers
+         * (D-91).
+         */
+        private fun str(key: Any, holder: Scriptable, state: StringifyState): Any? {
+            val keyString = key.toString()
+            var value = getValue(holder, key)
+            if (value is Scriptable && !ScriptRuntime.isSymbol(value)) {
                 val toJSON = getProperty(value, "toJSON")
-                if (toJSON is Callable) {
-                    value = callMethod(state.cx, value, "toJSON", arrayOf(keyString ?: keyInt.toString()))
-                }
+                if (toJSON is Callable) value = toJSON.call(state.cx, state.scope, value, arrayOf(keyString))
             } else if (value is KBigInt) {
                 val bigInt = ScriptRuntime.toObject(state.cx, state.scope, value)
-                if (hasProperty(bigInt, "toJSON")) {
-                    val toJSON = getProperty(bigInt, "toJSON")
-                    if (toJSON is Callable) {
-                        value = callMethod(state.cx, bigInt, "toJSON", arrayOf(keyString ?: keyInt.toString()))
-                    }
-                }
+                val toJSON = getProperty(bigInt, "toJSON")
+                if (toJSON is Callable) value = toJSON.call(state.cx, state.scope, bigInt, arrayOf(keyString))
             }
             val replacer = state.replacer
             if (replacer != null) {
-                value = replacer.call(state.cx, state.scope, holder, arrayOf(key, value))
+                value = replacer.call(state.cx, state.scope, holder, arrayOf(keyString, value))
             }
             if (ScriptRuntime.isSymbol(value)) return Undefined.instance
             if (value is NativeNumber) {
@@ -234,7 +241,7 @@ public class NativeJSON private constructor() : ScriptableObject() {
                 return "null"
             }
             if (value is Scriptable && value !is Callable) {
-                if (isObjectArrayLike(value)) {
+                if (NativeArray.isArray(value)) {
                     return ja(value, state)
                 }
                 return jo(value, state)
@@ -264,7 +271,7 @@ public class NativeJSON private constructor() : ScriptableObject() {
             val k: Array<Any?> = state.propertyList ?: value.getIds()
             val partial = ArrayList<Any?>()
             for (p in k) {
-                val strP = str(p, value, state)
+                val strP = str(p!!, value, state)
                 if (strP !== Undefined.instance) {
                     var member = quote(p.toString()) + ":"
                     if (state.gap.isNotEmpty()) {
@@ -300,13 +307,11 @@ public class NativeJSON private constructor() : ScriptableObject() {
             val stepback = state.indent
             state.indent = state.indent + state.gap
             val partial = ArrayList<Any?>()
-            val len = (value as NativeArray).length
+            // SerializeJSONArray walks to LengthOfArrayLike, so a proxy for an array is read
+            // through its traps (D-91).
+            val len = AbstractEcmaObjectOperations.lengthOfArrayLike(state.cx, value)
             for (index in 0 until len) {
-                val strP: Any? = if (index > Int.MAX_VALUE) {
-                    str(index.toString(), value, state)
-                } else {
-                    str(index.toInt(), value, state)
-                }
+                val strP: Any? = str(indexKey(index), value, state)
                 if (strP === Undefined.instance) {
                     partial.add("null")
                 } else {
@@ -369,6 +374,5 @@ public class NativeJSON private constructor() : ScriptableObject() {
 
         internal fun isTrailingSurrogate(c: Char): Boolean = c.code in 0xDC00..0xDFFF
 
-        private fun isObjectArrayLike(o: Any?): Boolean = o is NativeArray
     }
 }

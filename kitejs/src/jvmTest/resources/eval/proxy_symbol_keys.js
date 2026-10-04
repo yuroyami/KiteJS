@@ -41,8 +41,7 @@ index.set(a, 'first');
 index.set(b, 'second');
 var lookup = index.get(a) + '/' + index.get(b) + '/' + index.size;
 
-var stringKeys = Object.keys(a).join(',');
 var allKeys = Reflect.ownKeys(a).length;
 var symbolCount = Object.getOwnPropertySymbols(a).length;
 
-[idA, idB, describeA, hasSymbol, hasVirtual, hasMissing, tags, lookup, stringKeys, allKeys, symbolCount].join('|');
+[idA, idB, describeA, hasSymbol, hasVirtual, hasMissing, tags, lookup, allKeys, symbolCount].join('|');

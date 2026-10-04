@@ -93,20 +93,28 @@ public abstract class NewLiteralStorage protected constructor(ids: Array<Any?>?,
         return ScriptRuntime.typeErrorById("msg.not.iterable", name)
     }
 
+    /**
+     * CopyDataProperties: [[GetOwnProperty]] is asked for each key just before its value is read,
+     * so a proxy's traps run in the spec's order and a property a getter deletes is left out.
+     * Upstream listed the enumerable keys first and then read them all (D-91).
+     */
     private fun spreadObject(cx: Context, scope: Scriptable, source: Any?) {
         if (source == null || Undefined.isUndefined(source)) return
         val src = ScriptRuntime.toObject(cx, scope, source)
-        val ids: Array<Any?> =
-            if (src is ScriptableObject) src.startCompoundOp(false).use { src.getIds(it, false, true) }
-            else src.getIds()
-        val newLen = valuesField.size + ids.size
+        val keys = ArrayList<Any?>()
+        val values = ArrayList<Any?>()
+        for (id in AbstractEcmaObjectOperations.ownKeysForEnumeration(src, true)) {
+            if (!AbstractEcmaObjectOperations.isOwnEnumerable(cx, src, id!!)) continue
+            keys.add(id)
+            values.add(AbstractEcmaObjectOperations.getForEnumeration(cx, src, id))
+        }
+        val newLen = valuesField.size + keys.size
         keysField = keysField!!.copyOf(newLen)
         getterSettersField = getterSettersField.copyOf(newLen)
         valuesField = valuesField.copyOf(newLen)
-        for (id in ids) {
-            val value = getPropertyById(src, id)
-            pushKey(id)
-            pushValue(value)
+        for (i in keys.indices) {
+            pushKey(keys[i])
+            pushValue(values[i])
         }
     }
 
@@ -140,13 +148,6 @@ public abstract class NewLiteralStorage protected constructor(ids: Array<Any?>?,
             }
             sourceSkip + adjustment
         }
-    }
-
-    private fun getPropertyById(src: Scriptable, id: Any?): Any? = when {
-        id is String -> ScriptableObject.getProperty(src, id)
-        id is Int -> ScriptableObject.getProperty(src, id)
-        ScriptRuntime.isSymbol(id) -> ScriptableObject.getProperty(src, id as Symbol)
-        else -> throw Kit.codeBug()
     }
 
     protected abstract fun attemptToInferFunctionName(value: Any?)

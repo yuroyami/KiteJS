@@ -615,6 +615,54 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   it, so a non-extensible prototype refused the change as a new property and an extensible one
   got a second copy over the id. `OwnSymbolKeysTest` checks every key of the built-ins on every
   target, and `EvalOracleTest` pins the difference (#76).
+- D-91: [[Construct]] takes a newTarget, IsConstructor is exact, and proxies, enumeration, JSON and
+  [[SetPrototypeOf]] follow the spec's internal methods. `AbstractEcmaObjectOperations` gains
+  IsConstructor (only functions with a [[Construct]]: not arrows, methods, accessors, generators,
+  built-in non-constructors or the revoke function, but `Symbol` and `BigInt`, and a bound function
+  or proxy when its target is one), Construct(F, args, newTarget), GetPrototypeFromConstructor and
+  GetFunctionRealm. `BaseFunction` has a newTarget-aware `construct` that makes the object and then
+  gives it newTarget's `prototype`, or the same intrinsic's prototype in newTarget's realm when that
+  is not an object (found by comparing the constructor with its realm's built-ins, so
+  GeneratorFunction is found too); a script function makes `this` from newTarget before its body
+  runs (`new.target` itself does not parse yet), `Object` ignores its argument, a bound function
+  passes its target on in place of itself, and a proxy hands newTarget to its `construct` trap or
+  forwards it. `Reflect.construct`, species lookups, `Array.from` and `of` and promise capabilities
+  use IsConstructor. A proxy's [[GetOwnProperty]] runs the trap's answer through
+  ToPropertyDescriptor and CompletePropertyDescriptor and checks it against the target (a
+  non-configurable answer for a missing or configurable property, a non-writable one for a writable
+  property, a non-object answer); [[OwnPropertyKeys]] compares keys as property keys, rejects
+  duplicates and returns the trap's list in the trap's order; [[GetPrototypeOf]] requires an object
+  or null and checks a non-extensible target; [[SetPrototypeOf]] is a trap of its own whose false
+  answer stands; and a proxy's ids are filtered through its own [[GetOwnProperty]], with indices as
+  ints, so `Object.keys`, for-in and JSON see what the getOwnPropertyDescriptor trap reports.
+  Objects list integer keys up to 2^32 - 2 first, in ascending order, then strings, then symbols, in
+  creation order. `Object.assign`, `entries`, `values` and object spread ask [[GetOwnProperty]] for
+  each key just before reading it, in one pass over [[OwnPropertyKeys]] with symbols in their place,
+  and `assign` throws when Set is refused and overwrites an array target's elements.
+  `hasOwnProperty`, `Object.hasOwn` (whose `length` is 2) and `propertyIsEnumerable` convert the key
+  first and ask a proxy its getOwnPropertyDescriptor trap. OrdinarySetPrototypeOf answers false
+  instead of throwing, stops its cycle walk at a proxy, and refuses any new prototype for the
+  realm's Object.prototype (an immutable prototype exotic object); `Object.setPrototypeOf`,
+  `Reflect.setPrototypeOf`, the `__proto__` accessor and `o.__proto__ = v` all go through it, the
+  getter throws a TypeError for an undefined `this` instead of crashing, and the setter does nothing
+  for a primitive or a non-object value. A built-in function's prototype set to null stays null.
+  JSON.parse keeps `-0`; the reviver walk is InternalizeJSONProperty, reading with [[Get]],
+  recognising arrays with IsArray (a proxy for one too) to LengthOfArrayLike, writing back with
+  CreateDataProperty and [[Delete]], and passing keys as strings; JSON.stringify reads `toJSON`
+  once, serialises a proxy for an array as an array, passes keys to the replacer as strings, and
+  builds the property list of an array replacer from every index with [[Get]]. Only a call to the
+  plain name `eval` is a direct eval, so `this.eval(src)` and another realm's `other.eval(src)` run
+  in the eval function's own global. Upstream constructs Map, Set, Promise, typed arrays and the
+  other lambda constructors with a newTarget by throwing, gives arrays, regexps and plain objects
+  the wrong prototype, accepts arrows, methods and generators as constructors, ignores a proxy's
+  setPrototypeOf answer and a getOwnPropertyDescriptor trap's invalid descriptor, answers
+  `Reflect.ownKeys` with the target's keys for a non-extensible target, wrongly rejects a frozen
+  array target's index keys, lets `Object.keys` of a proxy list non-enumerable keys and throw on a
+  symbol, crashes `JSON.stringify` with a ClassCastException on a proxy listing a symbol, leaves an
+  array target's elements alone in `Object.assign`, asks `has` where the spec asks for a descriptor,
+  puts integer keys from 2^31 in creation order, lets Object.prototype take a new prototype,
+  re-defaults a built-in function's null prototype, parses `-0` as `0`, reads `toJSON` twice,
+  serialises a proxy for an array as an object, and makes `this.eval` a direct eval.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

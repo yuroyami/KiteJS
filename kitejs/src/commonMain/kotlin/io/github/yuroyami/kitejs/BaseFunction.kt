@@ -157,6 +157,31 @@ public open class BaseFunction : ScriptableObject, Function {
     }
 
     /**
+     * IsConstructor for this function: whether [construct] gets past its own check. A home object
+     * refuses `new` here, since only a method has one; every function kind that refuses it for
+     * another reason says so in its override (D-91).
+     */
+    public open val isConstructor: Boolean get() = homeObject == null
+
+    /**
+     * [[Construct]] with a [newTarget] that need not be this function, as Reflect.construct, a
+     * proxy forwarding to its target and a bound function pass on. The object is made the usual
+     * way and then given the prototype newTarget names, defaulting to this constructor's own as
+     * found in newTarget's realm, which is the spec's OrdinaryCreateFromConstructor for every
+     * built-in that makes its object in [construct]. Upstream set newTarget's prototype on whatever
+     * came back, after calling a constructor that also allows a plain call as a function, so
+     * `Reflect.construct(Array, [], F)` made an array that ignored F and `Map` threw (D-91).
+     */
+    internal open fun construct(cx: Context, scope: Scriptable, args: Array<Any?>, newTarget: Scriptable): Scriptable {
+        if (newTarget === this) return construct(cx, scope, args)
+        val result = construct(cx, scope, args)
+        result.prototype = AbstractEcmaObjectOperations.getPrototypeFromConstructor(cx, newTarget) {
+            AbstractEcmaObjectOperations.intrinsicPrototype(cx, it, this)
+        }
+        return result
+    }
+
+    /**
      * Builds the object that [construct] passes to [call] as `this`. Returning null says that
      * [call] will make the object itself, and [construct] then fixes up its scope and prototype.
      */

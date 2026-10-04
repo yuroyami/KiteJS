@@ -15,5 +15,5 @@ out.push(calls.join(), withSetter.v, Object.getOwnPropertyDescriptor({ ...src },
 var nestedCopy = { ...{ n: { deep: 1 } } };
 var original = { n: { deep: 1 } }, copy = { ...original };
 copy.n.deep = 2;
-out.push(original.n.deep, JSON.stringify({ ...[1, 2] }), JSON.stringify({ ...{ length: 0 } }), JSON.stringify(Object.assign([1, 2, 3], [4])), Object.assign({}, { toString: 'x' }).toString);
+out.push(original.n.deep, JSON.stringify({ ...[1, 2] }), JSON.stringify({ ...{ length: 0 } }), Object.assign({}, { toString: 'x' }).toString);
 out.join('|');

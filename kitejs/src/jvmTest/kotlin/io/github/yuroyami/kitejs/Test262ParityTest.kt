@@ -465,6 +465,260 @@ class Test262ParityTest {
         )) {
             put(path, "D-89: a strict write to a binding that disappeared is a ReferenceError here")
         }
+
+        // IsConstructor is true only for a function with [[Construct]], so a built-in method, an arrow,
+        // a method or a generator is no constructor and no newTarget (D-91).
+        for (path in listOf(
+            "annexB/built-ins/Date/prototype/getYear/not-a-constructor.js",
+            "annexB/built-ins/Date/prototype/setYear/not-a-constructor.js",
+            "annexB/built-ins/Date/prototype/toGMTString/not-a-constructor.js",
+            "built-ins/Date/UTC/not-a-constructor.js",
+            "built-ins/Date/now/not-a-constructor.js",
+            "built-ins/Date/parse/not-a-constructor.js",
+            "built-ins/Date/prototype/getDate/not-a-constructor.js",
+            "built-ins/Date/prototype/getDay/not-a-constructor.js",
+            "built-ins/Date/prototype/getFullYear/not-a-constructor.js",
+            "built-ins/Date/prototype/getHours/not-a-constructor.js",
+            "built-ins/Date/prototype/getMilliseconds/not-a-constructor.js",
+            "built-ins/Date/prototype/getMinutes/not-a-constructor.js",
+            "built-ins/Date/prototype/getMonth/not-a-constructor.js",
+            "built-ins/Date/prototype/getSeconds/not-a-constructor.js",
+            "built-ins/Date/prototype/getTime/not-a-constructor.js",
+            "built-ins/Date/prototype/getTimezoneOffset/not-a-constructor.js",
+            "built-ins/Date/prototype/getUTCDate/not-a-constructor.js",
+            "built-ins/Date/prototype/getUTCDay/not-a-constructor.js",
+            "built-ins/Date/prototype/getUTCFullYear/not-a-constructor.js",
+            "built-ins/Date/prototype/getUTCHours/not-a-constructor.js",
+            "built-ins/Date/prototype/getUTCMilliseconds/not-a-constructor.js",
+            "built-ins/Date/prototype/getUTCMinutes/not-a-constructor.js",
+            "built-ins/Date/prototype/getUTCMonth/not-a-constructor.js",
+            "built-ins/Date/prototype/getUTCSeconds/not-a-constructor.js",
+            "built-ins/Date/prototype/setDate/not-a-constructor.js",
+            "built-ins/Date/prototype/setFullYear/not-a-constructor.js",
+            "built-ins/Date/prototype/setHours/not-a-constructor.js",
+            "built-ins/Date/prototype/setMilliseconds/not-a-constructor.js",
+            "built-ins/Date/prototype/setMinutes/not-a-constructor.js",
+            "built-ins/Date/prototype/setMonth/not-a-constructor.js",
+            "built-ins/Date/prototype/setSeconds/not-a-constructor.js",
+            "built-ins/Date/prototype/setTime/not-a-constructor.js",
+            "built-ins/Date/prototype/setUTCDate/not-a-constructor.js",
+            "built-ins/Date/prototype/setUTCFullYear/not-a-constructor.js",
+            "built-ins/Date/prototype/setUTCHours/not-a-constructor.js",
+            "built-ins/Date/prototype/setUTCMilliseconds/not-a-constructor.js",
+            "built-ins/Date/prototype/setUTCMinutes/not-a-constructor.js",
+            "built-ins/Date/prototype/setUTCMonth/not-a-constructor.js",
+            "built-ins/Date/prototype/setUTCSeconds/not-a-constructor.js",
+            "built-ins/Date/prototype/toDateString/not-a-constructor.js",
+            "built-ins/Date/prototype/toISOString/not-a-constructor.js",
+            "built-ins/Date/prototype/toJSON/not-a-constructor.js",
+            "built-ins/Date/prototype/toLocaleDateString/not-a-constructor.js",
+            "built-ins/Date/prototype/toLocaleString/not-a-constructor.js",
+            "built-ins/Date/prototype/toLocaleTimeString/not-a-constructor.js",
+            "built-ins/Date/prototype/toString/not-a-constructor.js",
+            "built-ins/Date/prototype/toTimeString/not-a-constructor.js",
+            "built-ins/Date/prototype/toUTCString/not-a-constructor.js",
+            "built-ins/Date/prototype/valueOf/not-a-constructor.js",
+            "built-ins/Error/isError/is-a-constructor.js",
+            "built-ins/Error/prototype/toString/not-a-constructor.js",
+            "built-ins/Proxy/revocable/revocation-function-not-a-constructor.js",
+            "built-ins/Reflect/construct/newtarget-is-not-constructor-throws.js",
+            "built-ins/RegExp/prototype/Symbol.match/not-a-constructor.js",
+            "built-ins/RegExp/prototype/Symbol.matchAll/not-a-constructor.js",
+            "built-ins/RegExp/prototype/Symbol.replace/not-a-constructor.js",
+            "built-ins/RegExp/prototype/Symbol.search/not-a-constructor.js",
+            "built-ins/RegExp/prototype/Symbol.split/not-a-constructor.js",
+            "built-ins/RegExp/prototype/exec/not-a-constructor.js",
+            "built-ins/RegExp/prototype/test/not-a-constructor.js",
+            "built-ins/RegExp/prototype/toString/S15.10.6.4_A6.js",
+            "built-ins/RegExp/prototype/toString/S15.10.6.4_A7.js",
+            "built-ins/RegExp/prototype/toString/not-a-constructor.js",
+            "harness/isConstructor.js",
+        )) {
+            put(path, "D-91: IsConstructor is exact here")
+        }
+
+        // [[Construct]] takes a newTarget: the object gets newTarget's `prototype`, or the same intrinsic's
+        // prototype in newTarget's realm when that is not an object, and a proxy passes newTarget on (D-91).
+        for (path in listOf(
+            "built-ins/AggregateError/proto-from-ctor-realm.js",
+            "built-ins/Array/proto-from-ctor-realm-one.js",
+            "built-ins/Array/proto-from-ctor-realm-two.js",
+            "built-ins/Array/proto-from-ctor-realm-zero.js",
+            "built-ins/ArrayBuffer/proto-from-ctor-realm.js",
+            "built-ins/ArrayBuffer/prototype-from-newtarget.js",
+            "built-ins/Boolean/proto-from-ctor-realm.js",
+            "built-ins/DataView/custom-proto-access-throws.js",
+            "built-ins/DataView/custom-proto-if-object-is-used.js",
+            "built-ins/DataView/proto-from-ctor-realm.js",
+            "built-ins/Date/proto-from-ctor-realm-one.js",
+            "built-ins/Date/proto-from-ctor-realm-two.js",
+            "built-ins/Date/proto-from-ctor-realm-zero.js",
+            "built-ins/Error/proto-from-ctor-realm.js",
+            "built-ins/Function/internals/Construct/base-ctor-revoked-proxy-realm.js",
+            "built-ins/Function/internals/Construct/base-ctor-revoked-proxy.js",
+            "built-ins/Function/proto-from-ctor-realm-prototype.js",
+            "built-ins/Function/proto-from-ctor-realm.js",
+            "built-ins/Function/prototype/bind/get-fn-realm-recursive.js",
+            "built-ins/Function/prototype/bind/get-fn-realm.js",
+            "built-ins/Function/prototype/bind/proto-from-ctor-realm.js",
+            "built-ins/GeneratorFunction/proto-from-ctor-realm-prototype.js",
+            "built-ins/Iterator/proto-from-ctor-realm.js",
+            "built-ins/Map/proto-from-ctor-realm.js",
+            "built-ins/NativeErrors/EvalError/proto-from-ctor-realm.js",
+            "built-ins/NativeErrors/RangeError/proto-from-ctor-realm.js",
+            "built-ins/NativeErrors/ReferenceError/proto-from-ctor-realm.js",
+            "built-ins/NativeErrors/SyntaxError/proto-from-ctor-realm.js",
+            "built-ins/NativeErrors/TypeError/proto-from-ctor-realm.js",
+            "built-ins/NativeErrors/URIError/proto-from-ctor-realm.js",
+            "built-ins/Number/proto-from-ctor-realm.js",
+            "built-ins/Object/proto-from-ctor-realm.js",
+            "built-ins/Promise/get-prototype-abrupt.js",
+            "built-ins/Promise/proto-from-ctor-realm.js",
+            "built-ins/Proxy/construct/call-parameters-new-target.js",
+            "built-ins/Proxy/construct/trap-is-null.js",
+            "built-ins/Proxy/construct/trap-is-undefined-no-property.js",
+            "built-ins/Proxy/construct/trap-is-undefined-proto-from-newtarget-realm.js",
+            "built-ins/Proxy/construct/trap-is-undefined.js",
+            "built-ins/Proxy/get-fn-realm-recursive.js",
+            "built-ins/Proxy/get-fn-realm.js",
+            "built-ins/RegExp/proto-from-ctor-realm.js",
+            "built-ins/Set/proto-from-ctor-realm.js",
+            "built-ins/String/proto-from-ctor-realm.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/buffer-arg/custom-proto-access-throws.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/buffer-arg/proto-from-ctor-realm.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/buffer-arg/use-custom-proto-if-object.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/length-arg/custom-proto-access-throws.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/length-arg/proto-from-ctor-realm.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/length-arg/use-custom-proto-if-object.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/no-args/custom-proto-access-throws.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/no-args/proto-from-ctor-realm.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/no-args/use-custom-proto-if-object.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/object-arg/use-custom-proto-if-object.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/typedarray-arg/custom-proto-access-throws.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/typedarray-arg/proto-from-ctor-realm.js",
+            "built-ins/TypedArrayConstructors/ctors/buffer-arg/custom-proto-access-throws.js",
+            "built-ins/TypedArrayConstructors/ctors/buffer-arg/proto-from-ctor-realm.js",
+            "built-ins/TypedArrayConstructors/ctors/buffer-arg/use-custom-proto-if-object.js",
+            "built-ins/TypedArrayConstructors/ctors/length-arg/custom-proto-access-throws.js",
+            "built-ins/TypedArrayConstructors/ctors/length-arg/proto-from-ctor-realm.js",
+            "built-ins/TypedArrayConstructors/ctors/length-arg/use-custom-proto-if-object.js",
+            "built-ins/TypedArrayConstructors/ctors/no-args/custom-proto-access-throws.js",
+            "built-ins/TypedArrayConstructors/ctors/no-args/proto-from-ctor-realm.js",
+            "built-ins/TypedArrayConstructors/ctors/no-args/use-custom-proto-if-object.js",
+            "built-ins/TypedArrayConstructors/ctors/object-arg/use-custom-proto-if-object.js",
+            "built-ins/TypedArrayConstructors/ctors/typedarray-arg/custom-proto-access-throws.js",
+            "built-ins/TypedArrayConstructors/ctors/typedarray-arg/proto-from-ctor-realm.js",
+            "built-ins/TypedArrayConstructors/ctors/typedarray-arg/use-custom-proto-if-object.js",
+            "built-ins/WeakMap/proto-from-ctor-realm.js",
+            "built-ins/WeakSet/proto-from-ctor-realm.js",
+        )) {
+            put(path, "D-91: a constructor takes its prototype from newTarget here")
+        }
+
+        // A proxy validates its getOwnPropertyDescriptor answer, believes its setPrototypeOf answer, and
+        // hands index keys to its traps as strings (D-91).
+        for (path in listOf(
+            "built-ins/Proxy/getOwnPropertyDescriptor/resultdesc-is-invalid-descriptor.js",
+            "built-ins/Proxy/getOwnPropertyDescriptor/resultdesc-is-not-configurable-not-writable-targetdesc-is-writable.js",
+            "built-ins/Proxy/getOwnPropertyDescriptor/resultdesc-is-not-configurable-targetdesc-is-configurable.js",
+            "built-ins/Proxy/getOwnPropertyDescriptor/resultdesc-is-not-configurable-targetdesc-is-undefined.js",
+            "built-ins/Proxy/has/call-in-prototype-index.js",
+            "built-ins/Proxy/ownKeys/trap-is-undefined-target-is-proxy.js",
+            "built-ins/Proxy/set/call-parameters-prototype-index.js",
+            "built-ins/Proxy/set/trap-is-missing-receiver-multiple-calls-index.js",
+            "built-ins/Proxy/setPrototypeOf/internals-call-order.js",
+            "built-ins/Proxy/setPrototypeOf/not-extensible-target-not-same-target-prototype.js",
+            "built-ins/Proxy/setPrototypeOf/toboolean-trap-result-false.js",
+            "built-ins/Proxy/setPrototypeOf/toboolean-trap-result-true-target-is-extensible.js",
+            "built-ins/Proxy/setPrototypeOf/trap-is-missing-target-is-proxy.js",
+            "built-ins/Proxy/setPrototypeOf/trap-is-null-target-is-proxy.js",
+        )) {
+            put(path, "D-91: the proxy's internal methods follow the spec here")
+        }
+
+        // Keys come in [[OwnPropertyKeys]] order with every array index first, and enumeration asks
+        // [[GetOwnProperty]] for each key just before reading it (D-91).
+        for (path in listOf(
+            "built-ins/Object/assign/assignment-to-readonly-property-of-target-must-throw-a-typeerror-exception.js",
+            "built-ins/Object/assign/source-own-prop-error.js",
+            "built-ins/Object/assign/strings-and-symbol-order-proxy.js",
+            "built-ins/Object/defineProperties/proxy-no-ownkeys-returned-keys-order.js",
+            "built-ins/Object/entries/observable-operations.js",
+            "built-ins/Object/freeze/proxy-no-ownkeys-returned-keys-order.js",
+            "built-ins/Object/getOwnPropertyDescriptors/proxy-no-ownkeys-returned-keys-order.js",
+            "built-ins/Object/isFrozen/proxy-no-ownkeys-returned-keys-order.js",
+            "built-ins/Object/isSealed/proxy-no-ownkeys-returned-keys-order.js",
+            "built-ins/Object/keys/property-traps-order-with-proxied-array.js",
+            "built-ins/Object/seal/proxy-no-ownkeys-returned-keys-order.js",
+            "built-ins/Object/values/observable-operations.js",
+            "built-ins/Reflect/ownKeys/return-on-corresponding-order-large-index.js",
+            "language/expressions/object/object-spread-proxy-get-not-called-on-dontenum-keys.js",
+            "language/expressions/object/object-spread-proxy-no-excluded-keys.js",
+            "language/expressions/object/object-spread-proxy-ownkeys-returned-keys-order.js",
+        )) {
+            put(path, "D-91: enumeration asks each key for its descriptor here")
+        }
+
+        // hasOwnProperty, Object.hasOwn and propertyIsEnumerable convert the key before `this`, and a
+        // ToPrimitive that answers a symbol finds the symbol property (D-91).
+        for (path in listOf(
+            "built-ins/Object/hasOwn/length.js",
+            "built-ins/Object/hasOwn/symbol_property_toPrimitive.js",
+            "built-ins/Object/hasOwn/symbol_property_toString.js",
+            "built-ins/Object/hasOwn/symbol_property_valueOf.js",
+            "built-ins/Object/prototype/hasOwnProperty/symbol_property_toPrimitive.js",
+            "built-ins/Object/prototype/hasOwnProperty/symbol_property_toString.js",
+            "built-ins/Object/prototype/hasOwnProperty/symbol_property_valueOf.js",
+            "built-ins/Object/prototype/hasOwnProperty/topropertykey_before_toobject.js",
+            "built-ins/Object/prototype/propertyIsEnumerable/symbol_property_toPrimitive.js",
+            "built-ins/Object/prototype/propertyIsEnumerable/symbol_property_toString.js",
+            "built-ins/Object/prototype/propertyIsEnumerable/symbol_property_valueOf.js",
+        )) {
+            put(path, "D-91: own-property checks convert the key first here")
+        }
+
+        // The __proto__ accessor and Object.setPrototypeOf go through [[SetPrototypeOf]], whose cycle walk
+        // stops at a proxy and which keeps Object.prototype's prototype null (D-91).
+        for (path in listOf(
+            "built-ins/Object/prototype/__proto__/get-to-obj-abrupt.js",
+            "built-ins/Object/prototype/__proto__/set-cycle-shadowed.js",
+            "built-ins/Object/prototype/setPrototypeOf-with-non-circular-values-__proto__.js",
+            "built-ins/Object/prototype/setPrototypeOf-with-non-circular-values.js",
+        )) {
+            put(path, "D-91: [[SetPrototypeOf]] follows the spec here")
+        }
+
+        // JSON.parse keeps -0 and internalizes with [[Get]], IsArray, CreateDataProperty and [[Delete]];
+        // JSON.stringify reads toJSON once, sees a proxy for an array as an array and passes string keys (D-91).
+        for (path in listOf(
+            "built-ins/JSON/parse/revived-proxy.js",
+            "built-ins/JSON/parse/reviver-array-get-prop-from-prototype.js",
+            "built-ins/JSON/parse/reviver-array-length-coerce-err.js",
+            "built-ins/JSON/parse/reviver-array-length-get-err.js",
+            "built-ins/JSON/parse/reviver-call-order.js",
+            "built-ins/JSON/parse/reviver-object-get-prop-from-prototype.js",
+            "built-ins/JSON/parse/reviver-object-non-configurable-prop-create.js",
+            "built-ins/JSON/parse/text-negative-zero.js",
+            "built-ins/JSON/stringify/replacer-array-abrupt.js",
+            "built-ins/JSON/stringify/replacer-array-proxy-revoked-realm.js",
+            "built-ins/JSON/stringify/replacer-array-proxy-revoked.js",
+            "built-ins/JSON/stringify/replacer-array-proxy.js",
+            "built-ins/JSON/stringify/replacer-function-arguments.js",
+            "built-ins/JSON/stringify/replacer-function-object-deleted-property.js",
+            "built-ins/JSON/stringify/replacer-function-result.js",
+            "built-ins/JSON/stringify/value-array-abrupt.js",
+            "built-ins/JSON/stringify/value-array-proxy.js",
+        )) {
+            put(path, "D-91: JSON follows SerializeJSONProperty and InternalizeJSONProperty here")
+        }
+
+        // Only a call to the name eval is a direct eval, so another realm's eval runs in that realm (D-91).
+        for (path in listOf(
+            "language/types/reference/get-value-prop-base-primitive-realm.js",
+            "language/types/reference/put-value-prop-base-primitive-realm.js",
+        )) {
+            put(path, "D-91: a property call of eval is an indirect eval here")
+        }
     }
 
     /**
@@ -521,6 +775,9 @@ class Test262ParityTest {
         )) {
             put(path, "D-89: a refused delete answers false here")
         }
+        // A reviver's undefined answer for a non-configurable property is a [[Delete]] that answers
+        // false. Upstream deletes with the calling code's strictness, so strict code throws (D-91).
+        put("built-ins/JSON/parse/reviver-object-non-configurable-prop-delete.js", "D-91: the reviver's refused delete answers false here")
     }
 
     /**

@@ -19,6 +19,8 @@ internal class NativeScript private constructor(private var script: Script?) : B
     override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable =
         throw Context.reportRuntimeErrorById("msg.script.is.not.constructor")
 
+    override val isConstructor: Boolean get() = false
+
     override val length: Int get() = 0
 
     override val arity: Int get() = 0

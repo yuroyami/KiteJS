@@ -18,12 +18,20 @@ public object AbstractEcmaObjectOperations {
 
     internal fun hasOwnProperty(cx: Context, o: Any?, property: Any?): Boolean {
         val obj = ScriptableObject.ensureScriptable(o)
-        if (property is Symbol) {
-            return ScriptableObject.ensureSymbolScriptable(o).has(property, obj)
-        }
-        val s = ScriptRuntime.toStringIdOrIndex(property)
-        val stringId = s.stringId ?: return obj.has(s.index, obj)
-        return obj.has(stringId, obj)
+        return hasOwnPropertyKey(cx, obj, ScriptRuntime.toPropertyKey(property))
+    }
+
+    /**
+     * HasOwnProperty(O, P) for a key that is already a property key. A proxy answers through
+     * [[GetOwnProperty]]; upstream asked its has trap, which also reports inherited properties,
+     * and converted the key without ToPrimitive, so a key object whose @@toPrimitive returns a
+     * symbol threw (D-91).
+     */
+    internal fun hasOwnPropertyKey(cx: Context, obj: Scriptable, key: Any): Boolean = when {
+        obj is NativeProxy -> obj.getOwnPropertyDescriptor(cx, key) != null
+        key is Symbol -> ScriptableObject.ensureSymbolScriptable(obj).has(key, obj)
+        key is Int -> obj.has(key, obj)
+        else -> obj.has(key.toString(), obj)
     }
 
     internal fun testIntegrityLevel(cx: Context, o: Any?, level: INTEGRITY_LEVEL): Boolean {
@@ -86,10 +94,10 @@ public object AbstractEcmaObjectOperations {
         if (species === Scriptable.NOT_FOUND || species == null || Undefined.isUndefined(species)) {
             return defaultConstructor
         }
-        if (species !is Constructable) {
+        if (!isConstructor(species)) {
             throw ScriptRuntime.typeErrorById("msg.not.ctor", ScriptRuntime.typeOf(species))
         }
-        return species
+        return species as Constructable
     }
 
     // ---- [[Get]], [[Set]] and [[DefineOwnProperty]] as the spec states them ----------------------
@@ -206,6 +214,63 @@ public object AbstractEcmaObjectOperations {
             else -> o.delete(key as String)
         }
         return o.getOwnPropertyDescriptor(cx, key) == null
+    }
+
+    /** Set(O, P, V, true): [[Set]] with O as the receiver, and a refused write is a TypeError. */
+    internal fun setOrThrow(cx: Context, o: Scriptable, key: Any, value: Any?) {
+        if (!set(cx, o, key, value, o)) throw ScriptRuntime.typeErrorById("msg.modify.readonly", key.toString())
+    }
+
+    // ---- Walking enumerable own properties --------------------------------------------------------
+
+    /**
+     * The keys EnumerableOwnProperties and CopyDataProperties walk: every own key of [o], with or
+     * without the symbols, in [[OwnPropertyKeys]] order. Enumerability is not filtered here but by
+     * [isOwnEnumerable] just before each value is read, which is where the spec asks
+     * [[GetOwnProperty]]; filtering first would put every getOwnPropertyDescriptor trap call of a
+     * proxy before the first get, and miss a property a getter makes enumerable or deletes.
+     */
+    internal fun ownKeysForEnumeration(o: Scriptable, symbols: Boolean): Array<Any?> =
+        if (o is ScriptableObject) o.startCompoundOp(false).use { o.getIds(it, true, symbols) } else o.getIds()
+
+    /**
+     * Whether [key] is, at this moment, an own enumerable property of [o]. A proxy answers through
+     * its [[GetOwnProperty]], so its trap is asked once per key; any other object answers from its
+     * own property, which tells the same without building a descriptor.
+     */
+    internal fun isOwnEnumerable(cx: Context, o: Scriptable, key: Any): Boolean {
+        if (o is NativeProxy) return o.getOwnPropertyDescriptor(cx, key)?.isEnumerable == true
+        if (o !is ScriptableObject) {
+            return when (key) {
+                is Symbol -> ScriptableObject.ensureSymbolScriptable(o).has(key, o)
+                is Int -> o.has(key, o)
+                else -> o.has(key.toString(), o)
+            }
+        }
+        return try {
+            when (key) {
+                is Symbol -> o.has(key, o) && (o.getAttributes(key) and ScriptableObject.DONTENUM) == 0
+                is Int -> o.has(key, o) && (o.getAttributes(key) and ScriptableObject.DONTENUM) == 0
+                else -> {
+                    val name = key.toString()
+                    o.has(name, o) && (o.getAttributes(name) and ScriptableObject.DONTENUM) == 0
+                }
+            }
+        } catch (e: RhinoException) {
+            // An object that cannot report attributes for a property it has lists it.
+            true
+        }
+    }
+
+    /** Get(O, P) for one of these walks, through the trap for a proxy and the plain lookup otherwise. */
+    internal fun getForEnumeration(cx: Context, o: Scriptable, key: Any): Any? {
+        val value = when {
+            o is NativeProxy -> o.get(cx, key, o)
+            key is Symbol -> ScriptableObject.getProperty(o, key)
+            key is Int -> ScriptableObject.getProperty(o, key)
+            else -> ScriptableObject.getProperty(o, key.toString())
+        }
+        return if (value === Scriptable.NOT_FOUND) Undefined.instance else value
     }
 
     /** Calls a getter or setter with [receiver] as `this`, converted the way `call` converts it. */
@@ -405,14 +470,75 @@ public object AbstractEcmaObjectOperations {
         return ScriptRuntime.shallowEq(x, y)
     }
 
-    /** IsConstructor: does [argument] have a [[Construct]] method. */
-    public fun isConstructor(cx: Context, argument: Any?): Boolean {
-        if (argument is LambdaConstructor) return true
-        if (argument is LambdaFunction) return false
-        if (argument is NativeProxy.NativeProxyFunction) {
-            return isConstructor(cx, argument.getTargetThrowIfRevoked())
+    /**
+     * IsConstructor: does [argument] have a [[Construct]] method. Every Rhino function implements
+     * [Constructable], so each function kind says for itself whether `new` would get past its own
+     * check; upstream took the interface at its word, which made `Date.now`, arrow functions,
+     * generators, methods and accessors constructors to Reflect.construct and species lookups (D-91).
+     */
+    public fun isConstructor(cx: Context, argument: Any?): Boolean = isConstructor(argument)
+
+    internal fun isConstructor(argument: Any?): Boolean = when (argument) {
+        is NativeProxy.NativeProxyFunction -> argument.isConstructor
+        is BaseFunction -> argument.isConstructor
+        else -> argument is Constructable
+    }
+
+    /**
+     * Construct(F, argumentsList, newTarget). Rhino's [Constructable.construct] knows no newTarget,
+     * which is always F itself there, so a different one goes to the function kind's own
+     * newTarget-aware [[Construct]]; anything else is constructed as it is and given the prototype
+     * newTarget names afterwards.
+     */
+    internal fun construct(cx: Context, scope: Scriptable, f: Constructable, args: Array<Any?>, newTarget: Scriptable): Scriptable =
+        when {
+            f is NativeProxy.NativeProxyFunction -> f.construct(cx, scope, args, newTarget)
+            f is BaseFunction -> f.construct(cx, scope, args, newTarget)
+            newTarget === f -> f.construct(cx, scope, args)
+            else -> {
+                val result = f.construct(cx, scope, args)
+                result.prototype = getPrototypeFromConstructor(cx, newTarget) { result.prototype }
+                result
+            }
         }
-        return argument is Constructable
+
+    /**
+     * GetPrototypeFromConstructor: newTarget's `prototype` when it is an object, otherwise the
+     * intrinsic [intrinsicDefault] picks from the realm [GetFunctionRealm][getFunctionRealm] finds.
+     */
+    internal fun getPrototypeFromConstructor(cx: Context, constructor: Scriptable, intrinsicDefault: (realm: Scriptable) -> Scriptable?): Scriptable? {
+        val proto = get(cx, constructor, "prototype", constructor)
+        if (ScriptRuntime.isObject(proto)) return proto as Scriptable
+        return intrinsicDefault(getFunctionRealm(cx, constructor))
+    }
+
+    /** GetFunctionRealm: the global of the realm [obj] was made in, looking through bound functions and proxies. */
+    internal fun getFunctionRealm(cx: Context, obj: Scriptable): Scriptable = when (obj) {
+        is BoundFunction -> (obj.targetFunction as? Scriptable)?.let { getFunctionRealm(cx, it) } ?: ScriptableObject.getTopLevelScope(obj)
+        is NativeProxy -> getFunctionRealm(cx, obj.getTargetThrowIfRevoked())
+        else -> ScriptableObject.getTopLevelScope(obj)
+    }
+
+    /**
+     * The prototype a built-in constructor [ctor] gives its objects, as found in [realm]: its own
+     * `prototype` in its own realm, otherwise the same intrinsic's in the other realm. Which
+     * intrinsic [ctor] is comes from comparing it with its own realm's built-ins, since a name is
+     * not enough (GeneratorFunction is registered under an internal one); a constructor that is
+     * none of them is looked up by name in [realm], and keeps its own prototype when [realm] has
+     * no such global.
+     */
+    internal fun intrinsicPrototype(cx: Context, realm: Scriptable, ctor: BaseFunction): Scriptable? {
+        val home = ScriptableObject.getTopLevelScope(ctor)
+        if (home === realm) return ctor.prototypeProperty as? Scriptable
+        TopLevel.Builtins.entries.firstOrNull { builtinCtor(home, it) === ctor }?.let { return TopLevel.getBuiltinPrototype(realm, it) }
+        return ScriptableObject.getClassPrototype(realm, ctor.functionName) ?: ctor.prototypeProperty as? Scriptable
+    }
+
+    /** The built-in constructor [type] of the realm whose global is [realm], or whatever its global of that name holds. */
+    private fun builtinCtor(realm: Scriptable, type: TopLevel.Builtins): Any? {
+        (realm as? TopLevel)?.getBuiltinCtor(type)?.let { return it }
+        if (type == TopLevel.Builtins.GeneratorFunction) return ScriptableObject.getTopScopeValue(realm, BaseFunction.GENERATOR_FUNCTION_CLASS)
+        return ScriptableObject.getProperty(realm, type.name)
     }
 
     internal fun isRegExp(cx: Context, scope: Scriptable, argument: Any?): Boolean {

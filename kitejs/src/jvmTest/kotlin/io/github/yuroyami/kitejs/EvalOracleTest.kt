@@ -1520,7 +1520,7 @@ class EvalOracleTest {
         "JSON.stringify([1], function (k, v) { return k === '' ? v : 'r' })", "JSON.stringify({ a: 1 }, [])", "JSON.stringify('x', null, 2)",
         "JSON.stringify(true)", "JSON.stringify(Object(1))", "JSON.stringify([new Number(1), new String('s')])",
         "JSON.stringify({ a: 1 }, null, -1)", "JSON.stringify({ a: 1 }, null, 1.9)", "JSON.stringify({ a: 1 }, null, '')",
-        "JSON.parse('{\"a\":1}').a", "JSON.parse('[1,2,3]').length", "JSON.parse('\"s\"')", "JSON.parse('1e3')", "1 / JSON.parse('-0')",
+        "JSON.parse('{\"a\":1}').a", "JSON.parse('[1,2,3]').length", "JSON.parse('\"s\"')", "JSON.parse('1e3')",
         "JSON.parse('true')", "JSON.parse('null')", "JSON.parse(' [ ] ').length", "JSON.parse('{}')", "JSON.parse('\"\\\\u0041\\\\n\"')",
         "JSON.parse('{\"1\":\"a\",\"b\":2}')[1]", "Object.keys(JSON.parse('{\"b\":1,\"a\":2,\"1\":3}')).join()",
         "JSON.parse('[1,2]', function (k, v) { return typeof v == 'number' ? v + 1 : v }).join()",
@@ -1768,7 +1768,6 @@ class EvalOracleTest {
         "var p = new Proxy({a:1},{}); JSON.stringify(Object.getOwnPropertyDescriptor(p,'a'))",
         "var p = new Proxy({a:1},{getOwnPropertyDescriptor:function(){return undefined;}}); String(Object.getOwnPropertyDescriptor(p,'a'))",
         "var p = new Proxy({a:1,b:2},{}); Object.getOwnPropertyNames(p).join(',')",
-        "var p = new Proxy({a:1},{getOwnPropertyDescriptor:function(t,k){return {value:1,enumerable:false,configurable:true};}}); Object.keys(p).join(',') + '|' + Object.getOwnPropertyNames(p).join(',')",
         "var t={}; var p=new Proxy(t,{defineProperty:function(tt,k,d){tt[k]=d.value; return true;}}); Object.defineProperty(p,'x',{value:9,configurable:true}); t.x",
         "var t={}; var p=new Proxy(t,{}); Object.defineProperty(p,'x',{value:9,configurable:true}); t.x",
         "var proto={z:1}; var p=new Proxy({},{getPrototypeOf:function(){return proto;}}); Object.getPrototypeOf(p) === proto",
@@ -2161,6 +2160,56 @@ class EvalOracleTest {
         for ((source, expected) in sources) {
             assertEquals(expected, ported(source), source)
             assertTrue(upstream(source) != expected, "upstream agrees now, D-89 can be retired: $source")
+        }
+    }
+
+    /**
+     * [[Construct]] takes a newTarget and IsConstructor is exact; a proxy's descriptor, key and
+     * prototype traps are validated and believed; enumeration asks [[GetOwnProperty]] per key; JSON
+     * keeps -0, reads toJSON once and sees a proxy for an array as an array; and only a call to the
+     * name `eval` is a direct eval (D-91). Every expected value is what V8 answers.
+     */
+    @Test
+    fun constructProxiesEnumerationAndJsonFollowTheInternalMethods() {
+        val sources = mapOf(
+            "try { String(Object.getPrototypeOf(Reflect.construct(Map, [], Object)) === Object.prototype) } catch (e) { e.name }" to "\"true\"",
+            "function N() {} String(Object.getPrototypeOf(Reflect.construct(Array, [], N)) === N.prototype)" to "\"true\"",
+            "try { Reflect.construct(function () {}, [], () => {}); 'returned' } catch (e) { e.name }" to "\"TypeError\"",
+            "try { Reflect.construct(function () {}, [], ({ m() {} }).m); 'returned' } catch (e) { e.name }" to "\"TypeError\"",
+            "var P = new Proxy(function () {}, { construct: function (t, a, nt) { return { same: nt === Array } } }); JSON.stringify(Reflect.construct(P, [], Array))"
+                to "\"{\"same\":true}\"",
+            "String(1 / JSON.parse('-0'))" to "\"-Infinity\"",
+            "var p = new Proxy({ a: 1 }, { getOwnPropertyDescriptor: function (t, k) { return { value: 1, enumerable: false, configurable: true } } }); Object.keys(p).join(',') + '|' + Object.getOwnPropertyNames(p).join(',')"
+                to "\"|a\"",
+            "JSON.stringify(Object.assign([1, 2, 3], [4]))" to "\"[4,2,3]\"",
+            "JSON.stringify(Object.keys(new Proxy({}, { ownKeys: function () { return ['a'] }, getOwnPropertyDescriptor: function () { return { value: 1, enumerable: false, configurable: true } } })))"
+                to "\"[]\"",
+            "try { Object.keys(new Proxy({}, { ownKeys: function () { return [Symbol(), 'a'] }, getOwnPropertyDescriptor: function () { return { value: 1, enumerable: true, configurable: true } } })).join() } catch (e) { e.name }"
+                to "\"a\"",
+            "JSON.stringify(new Proxy([1, 2], {}))" to "\"[1,2]\"",
+            "try { Object.setPrototypeOf(new Proxy({}, { setPrototypeOf: function () { return false } }), {}); 'returned' } catch (e) { e.name }" to "\"TypeError\"",
+            "var log = []; var p = new Proxy({ a: 1, b: 2 }, { getOwnPropertyDescriptor: function (t, k) { log.push('gopd:' + k); return Reflect.getOwnPropertyDescriptor(t, k) }, get: function (t, k) { log.push('get:' + k); return t[k] } }); Object.assign({}, p); log.join()"
+                to "\"gopd:a,get:a,gopd:b,get:b\"",
+            "var log = []; var p = new Proxy(Object.create({ x: 1 }), { has: function (t, k) { log.push('has'); return k in t } }); Object.prototype.propertyIsEnumerable.call(p, 'x') + ':' + log.join()"
+                to "\"false:\"",
+            "Object.keys({ b: 1, 4294967294: 1, a: 1 }).join()" to "\"4294967294,b,a\"",
+            "try { Reflect.ownKeys(new Proxy(Object.freeze([1]), { ownKeys: function () { return ['length', '0'] } })).join() } catch (e) { e.name }"
+                to "\"length,0\"",
+            "Reflect.ownKeys(new Proxy(Object.preventExtensions({ a: 1, b: 2 }), { ownKeys: function () { return ['b', 'a'] } })).join()" to "\"b,a\"",
+            "try { Object.getOwnPropertyDescriptor(new Proxy({}, { getOwnPropertyDescriptor: function () { return { value: 1, configurable: false } } }), 'a'); 'returned' } catch (e) { e.name }"
+                to "\"TypeError\"",
+            "var calls = 0; JSON.stringify({ get toJSON() { calls++; return function () { return 'x' } } }) + calls" to "\"\"x\"1\"",
+            "var t = []; JSON.parse('[1]', function (k, v) { t.push(typeof k); return v }); t.join()" to "\"string,string\"",
+            "var x = 'global'; function f() { var x = 'local'; return this.eval('x') } f()" to "\"global\"",
+            "Object.setPrototypeOf(Date.now, null); String(Object.getPrototypeOf(Date.now))" to "\"null\"",
+            "String(Object.hasOwn.length)" to "\"2\"",
+            "var w = {}; var s = Symbol(); w[Symbol.toPrimitive] = function () { return s }; var o = {}; o[s] = 1; try { String(o.hasOwnProperty(w)) } catch (e) { e.name }"
+                to "\"true\"",
+            "try { Object.setPrototypeOf(Object.prototype, Object.create(null)); 'returned' } catch (e) { e.name }" to "\"TypeError\"",
+        )
+        for ((source, expected) in sources) {
+            assertEquals(expected, ported(source), source)
+            assertTrue(upstream(source) != expected, "upstream agrees now, D-91 can be retired: $source")
         }
     }
 

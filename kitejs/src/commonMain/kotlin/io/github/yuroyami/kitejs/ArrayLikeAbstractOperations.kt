@@ -171,8 +171,8 @@ public object ArrayLikeAbstractOperations {
                 if (c == null || c === Scriptable.NOT_FOUND) c = Undefined.instance
             }
             if (!Undefined.isUndefined(c)) {
-                if (c is Constructable) {
-                    return c.construct(cx, scope, arrayOf(length.toDouble()))
+                if (AbstractEcmaObjectOperations.isConstructor(c)) {
+                    return (c as Constructable).construct(cx, scope, arrayOf(length.toDouble()))
                 }
                 throw ScriptRuntime.typeErrorById("msg.ctor.not.found", o)
             }

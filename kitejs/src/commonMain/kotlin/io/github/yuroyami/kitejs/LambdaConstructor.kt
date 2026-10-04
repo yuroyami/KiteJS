@@ -87,6 +87,9 @@ public open class LambdaConstructor : LambdaFunction {
         return fireConstructor(cx, declarationScope!!, args)
     }
 
+    /** A constructor that refuses `new` still has [[Construct]], the way `Symbol` and `BigInt` do. */
+    override val isConstructor: Boolean get() = true
+
     private fun fireConstructor(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable {
         val obj = targetConstructor!!.construct(cx, scope, args)
         obj.prototype = classPrototype
