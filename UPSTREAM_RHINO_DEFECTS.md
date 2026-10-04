@@ -132,6 +132,7 @@ as sloppy.
   `Arguments.sharedWithActivation`, which asks the context; and `NativeGlobal.js_eval`, which
   compiles through `evalSpecial` with the caller's mode.
 - Test: `EvalOracleTest.strictModeIsTheModeOfTheCodeThatRuns`.
+
 ### A `then` getter that throws leaves the promise pending for good (D-81)
 
 `new Promise(function (r) { r({ get then() { throw 'boom' } }) })` never settles, and the call to
