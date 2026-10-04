@@ -104,6 +104,24 @@ class Test262ParityTest {
             put(path, "D-72: upstream rejects the const head, the port parses it and accepts the body")
         }
 
+        // A const in a block is bound afresh each time here, so the harness that parses native
+        // function source, which declares consts in its loops, now works, and the tests that use
+        // it pass. Upstream keeps the first pass's value and its copy of the harness fails (D-74).
+        for (path in listOf(
+            "harness/nativeFunctionMatcher.js",
+            "built-ins/Function/prototype/toString/bound-function.js",
+            "built-ins/Function/prototype/toString/symbol-named-builtins.js",
+        )) {
+            put(path, "D-74: a const in a loop body binds afresh here, so the harness runs")
+        }
+        // Both engines fail this one, at different points: with the harness working, the port
+        // gets as far as a descriptor of a lazily loaded global, whose value is still the
+        // LazilyLoadedCtor placeholder in both engines (D-74, issue 66).
+        put(
+            "built-ins/Function/prototype/toString/built-in-function-object.js",
+            "D-74: both fail; the port's harness runs further and meets the lazy-constructor leak",
+        )
+
         // Math is fdlibm here, as V8 has it. Upstream computes log2 as log(x) * LOG2E, which is a
         // unit off for powers of two: Math.log2(8) is 2.9999999999999996 (D-73).
         put("built-ins/Math/log2/log2-basicTests.js", "D-73: log2 is fdlibm's here and exact for powers of two")

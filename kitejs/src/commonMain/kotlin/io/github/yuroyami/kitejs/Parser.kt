@@ -2233,6 +2233,34 @@ public class Parser(
      *     of the first token of the first variable declaration.
      */
     private fun variables(declType: Int, pos: Int, isStatement: Boolean): VariableDeclaration {
+        // A const in a block belongs to the block, as a let does, and is bound afresh each time
+        // its declaration runs, so one in a loop body takes the value of each pass (D-74).
+        val blockConst = declType == Token.CONST && !blockScopedConst && isInBlockStatement()
+        if (!blockConst) return variablesIn(declType, pos, isStatement)
+        val saved = blockScopedConst
+        blockScopedConst = true
+        try {
+            val pn = variablesIn(declType, pos, isStatement)
+            pn.putIntProp(Node.FRESH_CONST_PROP, 1)
+            return pn
+        } finally {
+            blockScopedConst = saved
+        }
+    }
+
+    /**
+     * Whether a declaration here sits in a `{ ... }` block statement, rather than directly in a
+     * function or script body, a loop or a switch, which keep upstream's function-wide const.
+     */
+    private fun isInBlockStatement(): Boolean {
+        val scope = currentScope ?: return false
+        return compilerEnv.languageVersion >= Context.VERSION_ES6 &&
+            scope !== currentScriptOrFn &&
+            scope::class == Scope::class &&
+            scope.type == Token.BLOCK
+    }
+
+    private fun variablesIn(declType: Int, pos: Int, isStatement: Boolean): VariableDeclaration {
         var end: Int
         val pn = VariableDeclaration(pos)
         pn.type = declType
@@ -2367,11 +2395,12 @@ public class Parser(
         val definingScope = scope.getDefiningScope(name!!)
         val symbol = definingScope?.getSymbol(name)
         val symDeclType = symbol?.declType ?: -1
-        // A const a for head declares shadows an outer name the way a let does.
+        // A const a for head or a block declares shadows an outer name the way a let does, but
+        // not a var or function declared inside its own block (D-72, D-74).
         val loopConst = declType == Token.CONST && blockScopedConst
         val conflicts =
             if (loopConst) {
-                definingScope === scope
+                definingScope === scope || scope.varNamesWithin?.contains(name) == true
             } else {
                 symDeclType == Token.CONST ||
                     declType == Token.CONST ||
@@ -2406,6 +2435,7 @@ public class Parser(
             }
 
             Token.VAR, Token.CONST, Token.FUNCTION -> {
+                if (declType != Token.CONST) noteVarNameInBlocks(name)
                 if (symbol != null) {
                     if (symDeclType == Token.VAR) {
                         addStrictWarning("msg.var.redecl", name)
@@ -2426,6 +2456,16 @@ public class Parser(
             }
 
             else -> throw codeBug()
+        }
+    }
+
+    /** Records a var or function name in every block between here and the function body. */
+    private fun noteVarNameInBlocks(name: String) {
+        var scope = currentScope
+        while (scope != null && scope !== currentScriptOrFn) {
+            val names = scope.varNamesWithin ?: HashSet<String>().also { scope.varNamesWithin = it }
+            names.add(name)
+            scope = scope.parentScope
         }
     }
 

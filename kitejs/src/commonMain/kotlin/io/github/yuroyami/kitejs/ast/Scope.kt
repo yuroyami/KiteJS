@@ -24,6 +24,13 @@ public open class Scope(pos: Int = -1, len: Int = 1) : Jump() {
     /** The current script or function scope. */
     public var top: ScriptNode? = null
 
+    /**
+     * The names declared with `var` or as a function anywhere inside this block, which a `const`
+     * of the block may not reuse. The parser fills it, and only its check for a block-scoped
+     * const reads it (D-74).
+     */
+    internal var varNamesWithin: MutableSet<String>? = null
+
     private var childScopeList: MutableList<Scope>? = null
 
     init {

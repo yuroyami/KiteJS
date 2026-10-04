@@ -398,6 +398,19 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   arguments, `MathDigitsTest` checks V8's digits on every target, and `EvalOracleTest` and
   `Test262ParityTest` pin the four arguments and one file where upstream's answer was the
   wrong one.
+- D-74: a `const` in a `{ ... }` block belongs to the block, as a `let` does, and is bound afresh
+  each time its declaration runs (ECMAScript 2015, 13.3.1). Upstream makes every const one
+  binding for the whole function that only its first initialization sets, so a const in a loop
+  body kept the first pass's value: `for (...) { const k = i }` gave `k` as 0 on every pass. The
+  declaration carries `FRESH_CONST_PROP` and binds through the `INITCONST` icodes of D-72, in a
+  scope object of the block's own when the function keeps scope objects, so a closure keeps the
+  binding of its pass. A var or function declared anywhere inside the block may not share the
+  const's name, which each block tracks in `Scope.varNamesWithin`; an outer var or parameter of
+  the same name is shadowed. A const directly in a function or script body, a loop or a switch is
+  unchanged, which keeps the corpus on upstream's lowering. `Test262ParityTest` lists the
+  test262 harness that parses native function source, which declares consts in its loops and
+  now works here, with the two tests that use it, and a third that both engines fail at
+  different points: it now reaches the lazy-constructor descriptor leak of issue 66.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

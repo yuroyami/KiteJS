@@ -1179,6 +1179,10 @@ public class IRFactory(
                     node.addChildToBack(left)
                 } else {
                     astNodePos.push(v)
+                    // The names a block's const destructures belong to the block too (D-74).
+                    val freshConst = node.getIntProp(Node.FRESH_CONST_PROP, 0) == 1
+                    val savedBlockScopedConst = parser.blockScopedConst
+                    if (freshConst) parser.blockScopedConst = true
                     try {
                         val d = parser.createDestructuringAssignment(
                             node.type,
@@ -1186,8 +1190,10 @@ public class IRFactory(
                             right,
                             Parser.Transformer { transform(it) },
                         )
+                        if (freshConst) markFreshConsts(d)
                         node.addChildToBack(d)
                     } finally {
+                        parser.blockScopedConst = savedBlockScopedConst
                         astNodePos.pop()
                     }
                 }
