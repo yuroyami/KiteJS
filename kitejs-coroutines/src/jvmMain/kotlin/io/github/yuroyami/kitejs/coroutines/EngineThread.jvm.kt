@@ -19,7 +19,7 @@ internal actual class EngineThread actual constructor() : CoroutineDispatcher() 
     // A daemon thread, so an engine that is never closed does not keep the process alive.
     private val thread = newSingleThreadContext("KiteJS engine")
 
-    override fun dispatch(context: CoroutineContext, block: Runnable) = thread.dispatch(context, block)
+    actual override fun dispatch(context: CoroutineContext, block: Runnable) = thread.dispatch(context, block)
 
     actual fun finish(last: () -> Unit) {
         thread.dispatch(EmptyCoroutineContext, Runnable(last))

@@ -12,7 +12,7 @@ import kotlinx.coroutines.Runnable
 // One thread, so every engine is already on it.
 internal actual class EngineThread actual constructor() : CoroutineDispatcher() {
 
-    override fun dispatch(context: CoroutineContext, block: Runnable) = Dispatchers.Default.dispatch(context, block)
+    actual override fun dispatch(context: CoroutineContext, block: Runnable) = Dispatchers.Default.dispatch(context, block)
 
     actual fun finish(last: () -> Unit) = last()
 }

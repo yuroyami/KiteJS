@@ -4,7 +4,9 @@
 
 package io.github.yuroyami.kitejs.coroutines
 
+import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Runnable
 
 /**
  * A thread of its own for one engine, which [asyncKiteJs] makes when it is given no dispatcher.
@@ -15,6 +17,9 @@ import kotlinx.coroutines.CoroutineDispatcher
  * once. JavaScript and WebAssembly have one thread, and every engine runs on it.
  */
 internal expect class EngineThread() : CoroutineDispatcher {
+
+    /** Queues [block] on the engine's thread, or on the one thread there is. */
+    override fun dispatch(context: CoroutineContext, block: Runnable)
 
     /**
      * Runs [last] on the thread after the tasks already queued there, then lets the thread end.

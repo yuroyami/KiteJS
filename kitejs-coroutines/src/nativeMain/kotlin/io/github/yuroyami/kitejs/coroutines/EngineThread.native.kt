@@ -21,7 +21,7 @@ internal actual class EngineThread actual constructor() : CoroutineDispatcher() 
 
     private val thread = newSingleThreadContext("KiteJS engine")
 
-    override fun dispatch(context: CoroutineContext, block: Runnable) = thread.dispatch(context, block)
+    actual override fun dispatch(context: CoroutineContext, block: Runnable) = thread.dispatch(context, block)
 
     actual fun finish(last: () -> Unit) {
         thread.dispatch(EmptyCoroutineContext, Runnable(last))
