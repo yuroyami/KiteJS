@@ -766,6 +766,33 @@ message helper is printed with the Java object's own `toString`, hash and all, i
   `toString` rather than `ScriptRuntime.toString`.
 - Test: `EvalOracleTest.arrayBuiltin` (JVM), which compares the two messages once the Java name is
   mapped back.
+### for-in drops a proxy's keys, and a non-enumerable property hides nothing (D-96)
+
+for-in walks an object by EnumerateObjectProperties (ECMAScript 2015, 13.7.5.15), which takes
+each object's keys from [[OwnPropertyKeys]] and their attributes from [[GetOwnProperty]], skips a
+key whose property is gone by the time the loop reaches it, and leaves out a prototype's property
+when an object before it in the chain has a property of the same name; the informative definition
+counts a key as processed whether it is enumerable or not, and test262 checks that. Rhino checks
+each key it hands out with `has`, which on a proxy is [[HasProperty]], answered by its `has` trap or
+else by its target, remembers only the enumerable keys of the objects it has passed, and before
+any of that asks the object for `__iterator__`, the iterator protocol of JavaScript 1.7:
+
+- `for (k in new Proxy({}, { ownKeys: () => ['a', 'b'], getOwnPropertyDescriptor: (t, k) => ({
+  value: 1, enumerable: k === 'a', configurable: true }) }))` hands out nothing; V8 hands out `a`.
+- A for-in over `new Proxy({ x: 1 }, { has: ... })` calls the `has` trap with `__iterator__` and
+  then `x`; V8 calls it with nothing.
+- A for-in over a proxy whose `getOwnPropertyDescriptor` stops reporting `y` once the loop has
+  started hands out `x,y`; V8 hands out `x`.
+- `var o = Object.create({ x: 1, y: 2 }); Object.defineProperty(o, 'x', { value: 3, enumerable:
+  false })` enumerates `x,y`; V8 enumerates `y`.
+- `{ a: 1, __iterator__: function () { ... } }` enumerates what the function's iterator gives,
+  here nothing; V8 enumerates `a,__iterator__`.
+
+- Where: `ScriptRuntime.enumNext`, which calls `obj.has(id, obj)` for every key, and
+  `enumChangeObject`, which adds only the previous object's `getIds()` to the keys it hides;
+  `ScriptRuntime.enumInit`, which calls `toIterator` for every for-in.
+- Test: `EvalOracleTest.forInFollowsEnumerateObjectProperties`; `ForInEnumerationTest` (common);
+  `language/statements/for-in/12.6.4-2.js` and `order-enumerable-shadowed.js`.
 
 ### A getOwnPropertyDescriptor trap answering undefined crashes (D-50)
 

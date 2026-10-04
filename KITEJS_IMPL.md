@@ -755,6 +755,17 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   error messages the class syntax and these early errors need are the port's own, worded after
   V8's, and the one upstream key whose check widened (`msg.default.args.use.strict`) keeps its
   text beside a new `msg.use.strict.non.simple`.
+- D-96: for-in follows EnumerateObjectProperties. `ScriptRuntime.enumNext` reads a proxy's
+  keys, all its string keys and not only the enumerable ones, through its [[GetOwnProperty]] as
+  the loop reaches each: a key without a property is skipped, and one with a property is
+  remembered and handed out when it is enumerable, with no `has` call. An ordinary object keeps
+  its enumerable keys and the own-property check. Every own key of an object the loop has passed
+  hides a prototype's property of the same name, enumerable or not, and so does a key handed out
+  and deleted afterwards; the loop reads a passed object's full key list only once it reaches a
+  prototype with keys of its own. `__iterator__` is looked up only below ES6. Upstream checked
+  each key with `has`, which a proxy answers from its target, so a key the target lacked was
+  dropped, remembered only the enumerable keys of the objects it passed, and asked every object
+  for `__iterator__` (#90).
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

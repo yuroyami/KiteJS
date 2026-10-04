@@ -937,6 +937,14 @@ class Test262ParityTest {
         )) {
             put(path, "D-95: format-control characters are kept here")
         }
+        // for-in remembers every own key of an object it passed, so a non-enumerable property hides
+        // an inherited enumerable one of the same name (D-96).
+        for (path in listOf(
+            "language/statements/for-in/12.6.4-2.js",
+            "language/statements/for-in/order-enumerable-shadowed.js",
+        )) {
+            put(path, "D-96: for-in follows EnumerateObjectProperties here")
+        }
     }
 
     /**

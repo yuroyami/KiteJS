@@ -2672,6 +2672,32 @@ class EvalOracleTest {
     }
 
     /**
+     * for-in follows EnumerateObjectProperties: a proxy's keys stand on its getOwnPropertyDescriptor
+     * trap alone, read as the loop reaches each, every own key hides a prototype's property of the
+     * same name, enumerable or not, and an ES6 loop asks no object for `__iterator__` (D-96).
+     * Upstream checks each key with `has`, which a proxy answers from its target, remembers only the
+     * enumerable keys, and runs the iterator protocol of JavaScript 1.7. Every expected value is
+     * what V8 answers.
+     */
+    @Test
+    fun forInFollowsEnumerateObjectProperties() {
+        val keys = "function keys(o) { var k = []; for (var x in o) k.push(x); return k.join(','); }"
+        val sources = mapOf(
+            "$keys keys(new Proxy({}, { ownKeys: function () { return ['a', 'b'] }, getOwnPropertyDescriptor: function (t, k) { return { value: 1, enumerable: k === 'a', configurable: true } } }))"
+                to "\"a\"",
+            "$keys var gone = false; var p = new Proxy({ x: 1, y: 2 }, { getOwnPropertyDescriptor: function (t, k) { return gone && k === 'y' ? undefined : Reflect.getOwnPropertyDescriptor(t, k) } });" +
+                " var k = []; for (var x in p) { k.push(x); gone = true } k.join(',')" to "\"x\"",
+            "var log = []; var p = new Proxy({ x: 1 }, { has: function (t, k) { log.push(k); return k in t } }); for (var k in p); log.join()" to "\"\"",
+            "$keys var o = Object.create({ x: 1, y: 2 }); Object.defineProperty(o, 'x', { value: 3, enumerable: false }); keys(o)" to "\"y\"",
+            "$keys keys({ a: 1, __iterator__: function () { return { next: function () { throw StopIteration } } } })" to "\"a,__iterator__\"",
+        )
+        for ((source, expected) in sources) {
+            assertEquals(expected, ported(source), source)
+            assertTrue(upstream(source) != expected, "upstream agrees now, D-96 can be retired: $source")
+        }
+    }
+
+    /**
      * Array spread when no `Symbol.iterator` is in reach. A real array is still walked by its
      * length, so a hole arrives as undefined and a non-index own property is left out. Each
      * script puts the iterator back so the next one starts clean.

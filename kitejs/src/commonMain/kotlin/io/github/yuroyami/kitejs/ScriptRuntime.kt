@@ -2861,7 +2861,12 @@ public object ScriptRuntime {
     private class IdEnumeration {
         var obj: Scriptable? = null
         var ids: Array<Any?>? = null
+        /** The keys that hide a prototype's property of the same name: the own keys of the objects passed. */
         var used: HashSet<Any?>? = null
+        /** Objects passed, each with the keys the loop went through on it, whose keys are not in [used] yet. */
+        var passed: ArrayList<Pair<Scriptable, Array<Any?>>>? = null
+        /** Keys the loop skipped as deleted before it reached them, which hide nothing. */
+        var gone: HashSet<Any?>? = null
         var currentId: Any? = null
         var index = 0
         var enumType = 0
@@ -2890,7 +2895,10 @@ public object ScriptRuntime {
         if (x.obj == null) return x
         x.enumType = enumType
         x.iterator = null
-        if (enumType != ENUMERATE_KEYS_NO_ITERATOR && enumType != ENUMERATE_VALUES_NO_ITERATOR && enumType != ENUMERATE_ARRAY_NO_ITERATOR) {
+        // The `__iterator__` of JavaScript 1.7, which ECMAScript never had (#90).
+        if (enumType != ENUMERATE_KEYS_NO_ITERATOR && enumType != ENUMERATE_VALUES_NO_ITERATOR && enumType != ENUMERATE_ARRAY_NO_ITERATOR &&
+            cx.languageVersion < Context.VERSION_ES6
+        ) {
             x.iterator = toIterator(cx, x.obj!!, enumType == ENUMERATE_KEYS)
         }
         if (x.iterator == null) enumChangeObject(x)
@@ -2945,6 +2953,7 @@ public object ScriptRuntime {
             val obj = x.obj ?: return false
             val ids = x.ids!!
             if (x.index == ids.size) {
+                if (obj !is NativeProxy) passedObjects(x).add(obj to ids)
                 x.obj = obj.prototype
                 enumChangeObject(x)
                 continue
@@ -2952,18 +2961,30 @@ public object ScriptRuntime {
             val id = ids[x.index++]
             if (x.used?.contains(id) == true) continue
             if (id is Symbol) continue
-            if (id is String) {
-                // Deleted since the ids were taken.
-                if (!obj.has(id, obj)) continue
-                x.currentId = id
-            } else {
-                val intId = (id as Number).toInt()
-                if (!obj.has(intId, obj)) continue
-                x.currentId = if (x.enumNumbers) intId else intId.toString()
+            if (obj is NativeProxy) {
+                // EnumerateObjectProperties (ES 14.7.5.9) reads a key's attributes from [[GetOwnProperty]]
+                // as the loop reaches it: no property, and the key is skipped; one, and it hides the
+                // prototypes' key of the same name, and is handed out when it is enumerable. A check with
+                // `has` asked the target, which lacks every key the trap makes up (#90).
+                val desc = obj.getOwnPropertyDescriptor(cx, id) ?: continue
+                (x.used ?: HashSet<Any?>().also { x.used = it }).add(id)
+                if (!desc.isEnumerable) continue
+                x.currentId = if (id is String) id else (id as Number).toInt().let { if (x.enumNumbers) it else it.toString() }
+                return true
             }
+            // Deleted since the ids were taken.
+            val present = if (id is String) obj.has(id, obj) else obj.has((id as Number).toInt(), obj)
+            if (!present) {
+                (x.gone ?: HashSet<Any?>().also { x.gone = it }).add(id)
+                continue
+            }
+            x.currentId = if (id is String) id else (id as Number).toInt().let { if (x.enumNumbers) it else it.toString() }
             return true
         }
     }
+
+    private fun passedObjects(x: IdEnumeration): ArrayList<Pair<Scriptable, Array<Any?>>> =
+        x.passed ?: ArrayList<Pair<Scriptable, Array<Any?>>>().also { x.passed = it }
 
     private fun enumNextInOrder(enumObj: IdEnumeration, cx: Context): Boolean {
         val iterator = enumObj.iterator!!
@@ -2999,17 +3020,33 @@ public object ScriptRuntime {
         return if (s.stringId == null) obj.get(s.index, obj) else obj.get(s.stringId, obj)
     }
 
+    /**
+     * Moves the loop on to the first object from [IdEnumeration.obj] up its prototype chain that has
+     * keys to go through: the enumerable ones of an ordinary object, and every string key of a proxy,
+     * whose attributes [enumNext] reads one key at a time.
+     */
     private fun enumChangeObject(x: IdEnumeration) {
         var ids: Array<Any?>? = null
-        while (x.obj != null) {
-            ids = x.obj!!.getIds()
+        while (true) {
+            val obj = x.obj ?: break
+            ids = if (obj is NativeProxy) obj.allIds else obj.getIds()
             if (ids.isNotEmpty()) break
-            x.obj = x.obj!!.prototype
+            if (obj !is NativeProxy) passedObjects(x).add(obj to ids)
+            x.obj = obj.prototype
         }
-        val previous = x.ids
-        if (x.obj != null && previous != null) {
+        val passed = x.passed
+        if (x.obj != null && !passed.isNullOrEmpty()) {
+            // Every own key of an object passed hides a prototype's property of the same name, enumerable
+            // or not, so a non-enumerable property hides an inherited enumerable one (#90), and so does a
+            // key handed out and deleted afterwards. The keys are read only now that a prototype has keys
+            // of its own, so a loop that never reaches one reads no more than the enumerable keys.
             val used = x.used ?: HashSet<Any?>().also { x.used = it }
-            for (p in previous) used.add(p)
+            val gone = x.gone
+            for ((o, went) in passed) {
+                for (id in went) if (gone == null || id !in gone) used.add(id)
+                used.addAll(if (o is ScriptableObject) o.allIds else o.getIds())
+            }
+            passed.clear()
         }
         x.ids = ids
         x.index = 0
