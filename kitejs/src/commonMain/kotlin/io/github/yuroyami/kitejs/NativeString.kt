@@ -82,6 +82,23 @@ internal class NativeString internal constructor(private val string: CharSequenc
         return super.getOwnPropertyDescriptor(cx, id)
     }
 
+    /**
+     * A character is a read-only, non-configurable own property, so defining it only checks that
+     * the descriptor agrees with it (ECMAScript 2015, 9.4.3.2 with 9.1.6.2). Upstream put a new
+     * slot beside the character instead, which a non-extensible String object refused, so freezing
+     * one threw, and on an extensible one the definition seemed to work and changed nothing (D-88).
+     */
+    override fun defineOwnProperty(cx: Context, id: Any?, desc: DescriptorInfo, checkValid: Boolean): Boolean {
+        if (id !is Symbol && cx.languageVersion >= Context.VERSION_ES6) {
+            val s = ScriptRuntime.toStringIdOrIndex(id)
+            if (s.stringId == null && s.index >= 0 && s.index < string.length) {
+                val current = defaultIndexPropertyDescriptor(string[s.index].toString())
+                return AbstractEcmaObjectOperations.isCompatiblePropertyDescriptor(cx, isExtensible, desc, current)
+            }
+        }
+        return super.defineOwnProperty(cx, id, desc, checkValid)
+    }
+
     private fun defaultIndexPropertyDescriptor(value: Any?): DescriptorInfo =
         DescriptorInfo(true, false, false, Scriptable.NOT_FOUND, Scriptable.NOT_FOUND, value)
 

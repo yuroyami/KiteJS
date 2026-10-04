@@ -1185,10 +1185,7 @@ class EvalOracleTest {
         "var a = new Int8Array([1, 2, 3]); Object.keys(a).join()",
         "var a = new Int8Array([1, 2, 3]); var n = 0; for (var k in a) n++; n",
         "var a = new Int8Array([1, 2, 3]); JSON.stringify(a)",
-        "var a = new Int8Array([1, 2, 3]); Object.getOwnPropertyDescriptor(a, '0').value",
-        "var a = new Int8Array([1, 2, 3]); Object.getOwnPropertyDescriptor(a, '0').writable",
         "var a = new Int8Array(1); Object.defineProperty(a, '0', { value: 5 }); a[0]",
-        "var a = new Int8Array(1); try { Object.defineProperty(a, '0', { get: function () {} }) } catch (e) { e.name }",
 
         // The prototype methods.
         "new Int8Array([3, 1, 2]).sort().join()", "new Int8Array([3, 1, 2]).sort(function (a, b) { return b - a }).join()",
@@ -2100,6 +2097,39 @@ class EvalOracleTest {
         for ((source, expected) in sources) {
             assertEquals(expected, ported(source), source)
             assertTrue(upstream(source) != expected, "upstream agrees now, D-87 can be retired: $source")
+        }
+    }
+
+    /**
+     * Typed arrays implement the integer-indexed exotic object methods for every canonical numeric
+     * key, Object.defineProperty throws when a definition is refused, and seal and freeze send
+     * partial descriptors through each object's own [[DefineOwnProperty]] (D-88). Upstream has no
+     * element descriptors, lists either the elements or the ordinary keys, lets an invalid index
+     * reach the prototype without converting the value, ignores a refused definition, and turns a
+     * computed property into null when a partial descriptor makes it plain.
+     */
+    @Test
+    fun typedArraysAreIntegerIndexedExoticObjects() {
+        val sources = mapOf(
+            "var a = new Uint8Array([7]); var before = Object.getOwnPropertyDescriptor(a, '0'); try { Object.defineProperty(a, '0.5', { value: 9 }); String(before) + ':' + a[0] } catch (e) { e.name + ':' + a[0] }"
+                to "\"TypeError:7\"",
+            "var a = new Uint8Array([7]); a.foo = 8; a[Symbol('s')] = 9; Object.keys(a).join(',') + ':' + Reflect.ownKeys(a).map(String).join(',')"
+                to "\"0,foo:0,foo,Symbol(s)\"",
+            "var a = new Uint8Array([7]); Object.setPrototypeOf(a, { NaN: 9 }); var n = 0; a['-1'] = { valueOf: function () { n++; return 1 } }; a.NaN + ':' + n"
+                to "\"undefined:1\"",
+            "'use strict'; var a = new Uint8Array([7]); try { delete a[0]; 'returned' } catch (e) { e.name }" to "\"TypeError\"",
+            "var a = new Int8Array([1, 2, 3]); var d = Object.getOwnPropertyDescriptor(a, '0'); d.value + ':' + d.writable" to "\"1:true\"",
+            "var a = new Int8Array(1); try { Object.defineProperty(a, '0', { get: function () {} }) } catch (e) { e.name }" to "\"TypeError\"",
+            "var p = new Proxy({}, { defineProperty: function () { return false } }); try { Object.defineProperty(p, 'x', { value: 1 }); 'returned' } catch (e) { e.name }"
+                to "\"TypeError\"",
+            "var log = []; var p = new Proxy({ a: 1 }, { defineProperty: function (t, k, d) { log.push(k + ':' + JSON.stringify(d)); return Reflect.defineProperty(t, k, d) } }); Object.seal(p); log.join(' ')"
+                to "\"a:{\"configurable\":false}\"",
+            "var old = Error.stackTraceLimit; Object.defineProperty(Error, 'stackTraceLimit', { writable: false }); Error.stackTraceLimit === old"
+                to "true",
+        )
+        for ((source, expected) in sources) {
+            assertEquals(expected, ported(source), source)
+            assertTrue(upstream(source) != expected, "upstream agrees now, D-88 can be retired: $source")
         }
     }
 

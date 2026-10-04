@@ -30,29 +30,43 @@ public object AbstractEcmaObjectOperations {
         if (obj.isExtensible) return false
         val ids = obj.startCompoundOp(false).use { obj.getIds(it, true, true) }
         for (name in ids) {
-            val desc = obj.getOwnPropertyDescriptor(cx, name)!!
+            val desc = obj.getOwnPropertyDescriptor(cx, name) ?: continue
             if (desc.isConfigurable) return false
             if (level == INTEGRITY_LEVEL.FROZEN && desc.isDataDescriptor && desc.isWritable) return false
         }
         return true
     }
 
-    /** SetIntegrityLevel: seals or freezes [o]. Returns false when it cannot be made non-extensible. */
+    /**
+     * SetIntegrityLevel (ECMAScript 2015, 7.3.14): seals or freezes [o], answering false when it
+     * cannot be made non-extensible. Each key gets DefinePropertyOrThrow with only the fields the
+     * level changes, so an object that refuses, as a typed array refuses for its elements, makes it
+     * a TypeError; sealing reads no descriptors at all. Upstream redefined every key from its full
+     * current descriptor and ignored a refusal (D-88).
+     */
     internal fun setIntegrityLevel(cx: Context, o: Any?, level: INTEGRITY_LEVEL): Boolean {
         val obj = ScriptableObject.ensureScriptableObject(o)
         if (!obj.preventExtensions()) return false
         val ids = obj.startCompoundOp(false).use { obj.getIds(it, true, true) }
+        val nf = Scriptable.NOT_FOUND
         for (key in ids) {
-            val desc = obj.getOwnPropertyDescriptor(cx, key)!!
-            if (level == INTEGRITY_LEVEL.SEALED) {
-                if (desc.isConfigurable) {
-                    desc.configurable = false
-                    obj.defineOwnProperty(cx, key, desc, false)
-                }
+            val desc = if (level == INTEGRITY_LEVEL.SEALED) {
+                ScriptableObject.DescriptorInfo(nf, nf, false, nf, nf, nf)
             } else {
-                if (desc.isDataDescriptor && desc.isWritable) desc.writable = false
-                if (desc.isConfigurable) desc.configurable = false
-                obj.defineOwnProperty(cx, key, desc, false)
+                val current = obj.getOwnPropertyDescriptor(cx, key) ?: continue
+                if (current.isAccessorDescriptor) {
+                    ScriptableObject.DescriptorInfo(nf, nf, false, nf, nf, nf)
+                } else {
+                    ScriptableObject.DescriptorInfo(nf, false, false, nf, nf, nf)
+                }
+            }
+            // The public form, which a proxy overrides; the internal one would define the key on
+            // the proxy object itself and never reach the trap.
+            if (!obj.defineOwnProperty(cx, key, desc)) {
+                throw ScriptRuntime.typeErrorById(
+                    "msg.define.refused",
+                    if (key is Symbol) key.toString() else ScriptRuntime.toString(key),
+                )
             }
         }
         return true

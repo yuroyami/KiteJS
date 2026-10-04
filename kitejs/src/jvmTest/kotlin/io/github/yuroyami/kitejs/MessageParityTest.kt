@@ -17,11 +17,14 @@ import org.mozilla.javascript.ScriptRuntime as UpstreamScriptRuntime
 class MessageParityTest {
 
     /**
-     * Two keys upstream's code uses but its properties file never defines. Asking upstream for one
-     * of them raises a missing-resource error rather than returning text, so there is nothing to
-     * compare against and the port writes its own wording (D-49).
+     * Keys upstream's code uses but its properties file never defines (D-49), and keys for errors
+     * only the port raises, such as a refused definition (D-88). Asking upstream for one of them
+     * raises a missing-resource error rather than returning text, so there is nothing to compare
+     * against and the port writes its own wording.
      */
-    private val addedByThePort = setOf("msg.missing.argument", "msg.typed.array.abstract.ctor", "msg.func.decl.not.in.block")
+    private val addedByThePort = setOf(
+        "msg.missing.argument", "msg.typed.array.abstract.ctor", "msg.func.decl.not.in.block", "msg.define.refused",
+    )
 
     private fun portedKeys(): List<String> {
         val field = Messages::class.java.getDeclaredField("en")

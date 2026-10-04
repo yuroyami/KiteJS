@@ -444,11 +444,16 @@ public open class NativeObject : ScriptableObject {
         private fun js_defineProperty(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val arg = if (args.isEmpty()) Undefined.instance else args[0]
             val obj = ensureScriptableObject(arg)
-            val name = if (args.size < 2) Undefined.instance else args[1]
+            // The key is converted before the descriptor is read, and only once (ES2015 19.1.2.4).
+            val key = ScriptRuntime.toPropertyKey(if (args.size < 2) Undefined.instance else args[1])
             val descArg = if (args.size < 3) Undefined.instance else args[2]
             val desc = DescriptorInfo(ensureScriptableObject(descArg))
             checkPropertyDefinition(desc)
-            obj.defineOwnProperty(cx, name, desc)
+            // DefinePropertyOrThrow: a refusal, which a typed array or a proxy can answer, is a
+            // TypeError (D-88).
+            if (!obj.defineOwnProperty(cx, key, desc)) {
+                throw ScriptRuntime.typeErrorById("msg.define.refused", if (key is Symbol) key.toString() else ScriptRuntime.toString(key))
+            }
             return obj
         }
 

@@ -7,6 +7,7 @@ package io.github.yuroyami.kitejs.typedarrays
 import io.github.yuroyami.kitejs.AbstractEcmaObjectOperations
 import io.github.yuroyami.kitejs.ArrayLikeAbstractOperations
 import io.github.yuroyami.kitejs.Callable
+import io.github.yuroyami.kitejs.CompoundOperationMap
 import io.github.yuroyami.kitejs.Constructable
 import io.github.yuroyami.kitejs.Context
 import io.github.yuroyami.kitejs.KBigInt
@@ -24,6 +25,7 @@ import io.github.yuroyami.kitejs.ScriptableObject
 import io.github.yuroyami.kitejs.SerializableCallable
 import io.github.yuroyami.kitejs.SymbolKey
 import io.github.yuroyami.kitejs.Undefined
+import kotlin.math.truncate
 
 /**
  * The parent of the nine numeric views. Each shows one buffer through one element type, and writes
@@ -47,69 +49,120 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
     }
 
     // ---- The exotic index behaviour -------------------------------------------------------------
+    //
+    // Every canonical numeric name belongs to the view (ECMAScript 2024, 10.4.5). A valid index is
+    // an element, writable, enumerable and configurable, and any other numeric name, such as "-1",
+    // "1.5", "-0", "NaN" or "Infinity", is absent without the prototype ever being asked; a value
+    // written to one is still converted. Names that only look numeric, such as "01", are ordinary
+    // properties. Upstream let the invalid ones fall through to ordinary lookup, truncated a
+    // fraction to an element, and kept elements out of the descriptor and own-key operations
+    // (D-88).
 
     override fun get(index: Int, start: Scriptable): Any? = js_get(index)
 
     override fun get(name: String, start: Scriptable): Any? {
-        val num = ScriptRuntime.canonicalNumericIndexString(name)
-        if (num != null) {
-            val ix = toIndex(num)
-            if (ix >= 0) return js_get(ix)
-        }
-        return super.get(name, start)
+        val num = ScriptRuntime.canonicalNumericIndexString(name) ?: return super.get(name, start)
+        return if (isValidIntegerIndex(num)) js_get(num.toInt()) else Undefined.instance
     }
 
     override fun has(index: Int, start: Scriptable): Boolean = !checkIndex(index)
 
     override fun has(name: String, start: Scriptable): Boolean {
-        val num = ScriptRuntime.canonicalNumericIndexString(name)
-        if (num != null) {
-            val ix = toIndex(num)
-            if (ix >= 0) return !checkIndex(ix)
-        }
-        return super.has(name, start)
+        val num = ScriptRuntime.canonicalNumericIndexString(name) ?: return super.has(name, start)
+        return isValidIntegerIndex(num)
     }
 
+    /**
+     * [[Set]] for an index: written here when this view is the receiver, which converts the value
+     * even when the index is out of range, and otherwise an ordinary property of the receiver,
+     * made only when the index is valid here.
+     */
     override fun put(index: Int, start: Scriptable, value: Any?) {
-        js_set(index, value)
+        if (start === this) {
+            js_set(index, value)
+        } else if (!checkIndex(index)) {
+            start.put(index, start, value)
+        }
     }
 
     override fun put(name: String, start: Scriptable, value: Any?) {
-        val num = ScriptRuntime.canonicalNumericIndexString(name)
-        if (num != null) {
-            val ix = toIndex(num)
-            if (ix >= 0) js_set(ix, value)
-        } else {
-            super.put(name, start, value)
+        val num = ScriptRuntime.canonicalNumericIndexString(name) ?: return super.put(name, start, value)
+        if (start === this) {
+            setElement(num, value)
+        } else if (isValidIntegerIndex(num)) {
+            start.put(num.toInt(), start, value)
         }
     }
 
-    override fun delete(index: Int) {}
+    override fun delete(index: Int) {
+        if (!checkIndex(index)) refuseDelete(index)
+    }
 
     override fun delete(name: String) {
-        // Elements cannot be deleted; anything that is not an index is an ordinary property.
-        if (ScriptRuntime.canonicalNumericIndexString(name) == null) super.delete(name)
+        // An element cannot be deleted and an invalid numeric name is never there, so only an
+        // ordinary name can go.
+        val num = ScriptRuntime.canonicalNumericIndexString(name) ?: return super.delete(name)
+        if (isValidIntegerIndex(num)) refuseDelete(name)
     }
 
-    override fun getIds(): Array<Any?> = Array(length) { it }
+    /** Strict code is told that an element cannot be deleted, as for any property that stays. */
+    private fun refuseDelete(key: Any) {
+        if (Context.getContext().isStrictMode) {
+            throw ScriptRuntime.typeErrorById("msg.delete.property.with.configurable.false", key)
+        }
+    }
+
+    override fun endsLookup(name: String): Boolean = ScriptRuntime.canonicalNumericIndexString(name) != null
+
+    override fun endsLookup(index: Int): Boolean = true
+
+    /** The valid indices in order, then the ordinary properties, as [[OwnPropertyKeys]] says. */
+    override fun getIds(map: CompoundOperationMap, getNonEnumerable: Boolean, getSymbols: Boolean): Array<Any?> {
+        val ordinary = super.getIds(map, getNonEnumerable, getSymbols)
+        val elements = if (isTypedArrayOutOfBounds) 0 else length
+        if (elements == 0) return ordinary
+        val ids = arrayOfNulls<Any?>(elements + ordinary.size)
+        for (i in 0 until elements) ids[i] = i
+        ordinary.copyInto(ids, elements)
+        return ids
+    }
+
+    override fun getOwnPropertyDescriptor(cx: Context, id: Any?): DescriptorInfo? {
+        val num = numericKey(id) ?: return super.getOwnPropertyDescriptor(cx, id)
+        if (!isValidIntegerIndex(num)) return null
+        return DescriptorInfo(true, true, true, js_get(num.toInt()))
+    }
 
     override fun defineOwnProperty(cx: Context, id: Any?, desc: DescriptorInfo, checkValid: Boolean): Boolean {
-        if (id is CharSequence) {
-            val num = ScriptRuntime.canonicalNumericIndexString(id.toString())
-            if (num != null) {
-                val idx = num.toInt()
-                if (checkIndex(idx)) return false
-                // An element is always writable, enumerable and non-configurable, and never an
-                // accessor, so a descriptor that says otherwise is refused.
-                if (desc.isConfigurable(false)) return false
-                if (desc.isEnumerable(false)) return false
-                if (desc.isAccessorDescriptor) return false
-                if (desc.isWritable(false)) return false
-                if (desc.hasValue()) js_set(idx, desc.value)
-                return true
-            }
-        }
-        return super.defineOwnProperty(cx, id, desc, checkValid)
+        val num = numericKey(id) ?: return super.defineOwnProperty(cx, id, desc, checkValid)
+        if (!isValidIntegerIndex(num)) return false
+        // An element is always a writable, enumerable and configurable data property, so a
+        // descriptor that says otherwise is refused.
+        if (desc.isConfigurable(false) || desc.isEnumerable(false)) return false
+        if (desc.isAccessorDescriptor || desc.isWritable(false)) return false
+        if (desc.hasValue()) setElement(num, desc.value)
+        return true
+    }
+
+    /** TypedArraySetElement: the value is converted first, then written if the index is valid. */
+    private fun setElement(index: Double, value: Any?) {
+        val converted = toNumeric(value)
+        if (isValidIntegerIndex(index)) js_set(index.toInt(), converted)
+    }
+
+    /** IsValidIntegerIndex: an integral, non-negative, in-range number on an attached view. */
+    private fun isValidIntegerIndex(index: Double): Boolean {
+        if (isTypedArrayOutOfBounds) return false
+        if (index.isNaN() || index.isInfinite() || index != truncate(index)) return false
+        if (index == 0.0 && 1.0 / index < 0) return false
+        return index >= 0 && index < length
+    }
+
+    /** The number a property key spells when it is a canonical numeric name, or null. */
+    private fun numericKey(id: Any?): Double? = when {
+        ScriptRuntime.isSymbol(id) -> null
+        id is Int -> id.toDouble()
+        else -> ScriptRuntime.canonicalNumericIndexString(ScriptRuntime.toString(id))
     }
 
     /** True when the index is not usable. */
@@ -336,12 +389,6 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
             target: (Context, Scriptable, Scriptable?, Array<Any?>) -> Any?,
         ) {
             typedArray.definePrototypeMethod(scope, name, length, SerializableCallable { cx, s, thisObj, args -> target(cx, s, thisObj, args) })
-        }
-
-        /** A positive index when the double names one, and -1 otherwise. */
-        private fun toIndex(num: Double): Int {
-            val ix = num.toInt()
-            return if (ix.toDouble() == num && ix >= 0) ix else -1
         }
 
         private fun realThis(thisObj: Scriptable?): NativeTypedArrayView =

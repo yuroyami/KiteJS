@@ -102,6 +102,11 @@ public class NativeArray : ScriptableObject {
     }
 
     override fun put(index: Int, start: Scriptable, value: Any?) {
+        if (start === this && index >= 0 && this.length <= index && (lengthAttr and READONLY) != 0) {
+            // An index at or past a read-only length cannot be created (ECMAScript 2015, 9.4.2.1).
+            if (Context.isCurrentContextStrict) throw ScriptRuntime.typeErrorById("msg.modify.readonly", "length")
+            return
+        }
         val slot = if (denseOnly) null else map.query(null, index)
         val d = dense
         if (start === this &&
@@ -129,11 +134,11 @@ public class NativeArray : ScriptableObject {
             }
         }
         super.put(index, start, value)
-        if (start === this && (lengthAttr and READONLY) == 0) {
-            if (this.length <= index) {
-                this.length = index.toLong() + 1
-                this.modCount++
-            }
+        // The length follows only an element that now exists; a non-extensible array refuses a
+        // new one, and upstream grew the length anyway (D-88).
+        if (start === this && this.length <= index && map.query(null, index) != null) {
+            this.length = index.toLong() + 1
+            this.modCount++
         }
     }
 
@@ -231,29 +236,49 @@ public class NativeArray : ScriptableObject {
         return super.getOwnPropertyDescriptor(cx, id)
     }
 
+    /**
+     * ArrayDefineOwnProperty (ECMAScript 2015, 9.4.2.1) for an index: one at or past a read-only
+     * length is refused, and the length grows only once the element is defined. Upstream grew the
+     * length first, whatever its attributes and whether or not the definition then failed (D-88).
+     */
     override fun defineOwnProperty(cx: Context, id: Any?, desc: DescriptorInfo, checkValid: Boolean): Boolean {
         val index = toArrayIndex(id)
+        if (index != -1L && index >= length && (lengthAttr and READONLY) != 0) return false
+        if (index != -1L) leaveDenseMode()
+        if (!super.defineOwnProperty(cx, id, desc, checkValid)) return false
         if (index >= length) {
             length = index + 1
             modCount++
         }
-        val d = dense
-        if (index != -1L && d != null) {
-            // Move everything into the slot map, keeping the attributes intact.
-            dense = null
-            denseOnly = false
-            for (i in d.indices) {
-                if (d[i] !== Scriptable.NOT_FOUND) {
-                    if (!isExtensible) setAttributes(i, 0)
-                    put(i, this, d[i])
-                }
-            }
-        }
-        super.defineOwnProperty(cx, id, desc, checkValid)
         if ("length" == id) {
             lengthAttr = getAttributes("length") // Update cached attributes value for length property
+            if ((lengthAttr and READONLY) != 0) leaveDenseMode()
         }
         return true
+    }
+
+    /**
+     * The dense fast paths of push, unshift and the rest grow the array without asking, so an
+     * array that may not grow keeps its elements in the slot map, where every write is checked.
+     * Upstream left an empty array dense when it was frozen, and any array dense when it was only
+     * made non-extensible, so push still appended to it (D-88).
+     */
+    override fun preventExtensions(): Boolean {
+        leaveDenseMode()
+        return super.preventExtensions()
+    }
+
+    /** Moves the elements into the slot map, keeping their attributes intact. */
+    private fun leaveDenseMode() {
+        val d = dense ?: return
+        dense = null
+        denseOnly = false
+        for (i in d.indices) {
+            if (d[i] !== Scriptable.NOT_FOUND) {
+                if (!isExtensible) setAttributes(i, 0)
+                put(i, this, d[i])
+            }
+        }
     }
 
     private fun createLengthProp() {

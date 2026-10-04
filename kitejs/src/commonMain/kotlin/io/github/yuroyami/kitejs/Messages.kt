@@ -234,6 +234,7 @@ internal object Messages {
         "msg.no.new" to "{0} objects may not be constructed using \"new\"",
         "msg.not.ctor" to "\"{0}\" is not a constructor.",
         "msg.not.extensible" to "Cannot add properties to this object because extensible is false.",
+        "msg.define.refused" to "Cannot define property {0}",
         "msg.obj.getter.parms" to "Expected static or delegated getter {0} to take a ScriptableObject parameter.",
         "msg.object.not.symbolscriptable" to "Object {0} does not support Symbol keys",
         "msg.prop.not.found" to "Property {0} not found.",

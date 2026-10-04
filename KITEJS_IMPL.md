@@ -530,6 +530,38 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   detached, a throwing `constructor` getter blocks the transfer, and a species constructor that
   calls `transfer` recurses until the host stack overflows. It also rejects `transfer(-0.5)`,
   which ToIndex makes 0, and checks for detachment before converting the length.
+- D-88: Typed arrays are integer-indexed exotic objects (ECMAScript 2024, 10.4.5). Every
+  property name that is a CanonicalNumericIndexString stays on the element path, valid index or
+  not: a read of an invalid one is undefined without asking the prototype, `in` is false, a write
+  converts the value for the element type first and then ignores the index (also through a
+  prototype chain, where a valid index is written onto the receiver), a valid element cannot be
+  deleted (a TypeError in strict code), and `ScriptableObject.getBase` stops at the view through a
+  new `endsLookup` hook so the lookup never continues past it. Elements have data descriptors that
+  are writable, enumerable and configurable, `defineOwnProperty` refuses an invalid index, a
+  non-configurable, non-enumerable, read-only or accessor definition, and converts a value only
+  once the index is known to be valid, and both `getIds` overloads list the live indices followed
+  by the ordinary keys. `Object.defineProperty` and `Object.defineProperties` convert the key
+  before the descriptor and throw a TypeError when a definition is refused, rather than ignoring
+  the false. `setIntegrityLevel` sends the spec's partial descriptors (`{configurable: false}`,
+  and `{configurable: false, writable: false}` for frozen data properties) through each object's
+  public [[DefineOwnProperty]], so proxies and exotic objects see them and a refusal throws; a
+  String object answers for its characters by comparing against their fixed descriptors, and an
+  arguments object gives a live argument its slot before the definition is checked and ends the
+  mapping only when `writable` is present and false. A computed property made plain by a partial
+  descriptor keeps its computed value. Because those partial descriptors reach ordinary objects
+  too, the non-configurable check compares only the fields a descriptor has, so sealing or
+  freezing twice works; the descriptor reader is ToPropertyDescriptor, asking HasProperty before
+  each read in the spec's order and making the flags booleans; and an array that becomes
+  non-extensible or gets a read-only length leaves dense mode, refuses an index at or past that
+  length (a TypeError in strict code), and grows its length only for an element that was really
+  created. Sealing a non-empty typed array is therefore a TypeError,
+  as the spec requires since ES2021 made elements configurable; V8 still seals it. Upstream
+  falls through to ordinary lookup for every invalid index, lists either the elements or the
+  ordinary keys, has no element descriptors, narrows a fractional index to an int, ignores a
+  refused definition, defines descriptors with every missing field defaulted, converts a
+  computed property to null, reads a missing `enumerable` or `value` as false or undefined when
+  checking a non-configurable property, reads descriptor fields without HasProperty, and lets a
+  frozen or non-extensible array keep growing through its dense fast paths.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

@@ -176,22 +176,35 @@ internal open class Arguments(private val activation: NativeCall, cx: Context) :
     }
 
     override fun defineOwnProperty(cx: Context, id: Any?, desc: DescriptorInfo, checkValid: Boolean): Boolean {
+        val index = argIndex(id)
+        if (index >= 0 && !super.has(index, this)) {
+            // The argument is an own property already, kept outside the slot map, so it gets its
+            // slot first and the definition is checked against it. Upstream treated it as a new
+            // property, which a non-extensible arguments object refuses, so freezing one threw,
+            // and a partial descriptor took defaults for every field it left out (D-88).
+            super.defineOwnProperty(cx, id, getOwnPropertyDescriptor(cx, id)!!, false)
+        }
         super.defineOwnProperty(cx, id, desc, checkValid)
-        if (ScriptRuntime.isSymbol(id)) return true
-        val d = ScriptRuntime.toNumber(id)
-        val index = d.toInt()
-        if (d != index.toDouble()) return true
-        val value = arg(index)
-        if (value === Scriptable.NOT_FOUND) return true
+        if (index < 0) return true
         if (desc.isAccessorDescriptor) {
             removeArg(index)
             return true
         }
         val newValue = desc.value
-        if (newValue === Scriptable.NOT_FOUND) return true
-        replaceArg(index, newValue)
-        if (isFalse(desc.writable)) removeArg(index)
+        if (newValue !== Scriptable.NOT_FOUND) replaceArg(index, newValue)
+        // A mapping ends once the property is read-only, with or without a new value (ES2015
+        // 9.4.4.2); the slot holds the value from then on.
+        if (desc.hasWritable() && !ScriptRuntime.toBoolean(desc.writable)) removeArg(index)
         return true
+    }
+
+    /** The index [id] names when it is a live argument, or -1. */
+    private fun argIndex(id: Any?): Int {
+        if (ScriptRuntime.isSymbol(id) || id is Scriptable) return -1
+        val d = ScriptRuntime.toNumber(id)
+        val index = d.toInt()
+        if (d != index.toDouble() || index < 0) return -1
+        return if (arg(index) === Scriptable.NOT_FOUND) -1 else index
     }
 
     /** What `<function>.arguments` gives in ES6: a copy that refuses every write. */

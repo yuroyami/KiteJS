@@ -202,6 +202,109 @@ class Test262ParityTest {
             put(path, "D-86: TypedArray set takes any array-like here")
         }
 
+        // Typed arrays are integer-indexed exotic objects here: every canonical numeric key stays on the
+        // element path, elements have descriptors and own keys, and a write converts first (D-88).
+        for (path in listOf(
+            "built-ins/TypedArrayConstructors/internals/DefineOwnProperty/BigInt/key-is-not-canonical-index.js",
+            "built-ins/TypedArrayConstructors/internals/DefineOwnProperty/BigInt/key-is-numericindex-accessor-desc-throws.js",
+            "built-ins/TypedArrayConstructors/internals/DefineOwnProperty/BigInt/key-is-numericindex-desc-not-configurable-throws.js",
+            "built-ins/TypedArrayConstructors/internals/DefineOwnProperty/BigInt/key-is-numericindex-desc-not-enumerable-throws.js",
+            "built-ins/TypedArrayConstructors/internals/DefineOwnProperty/BigInt/key-is-numericindex-desc-not-writable-throws.js",
+            "built-ins/TypedArrayConstructors/internals/DefineOwnProperty/BigInt/key-is-numericindex.js",
+            "built-ins/TypedArrayConstructors/internals/DefineOwnProperty/BigInt/non-extensible-redefine-key.js",
+            "built-ins/TypedArrayConstructors/internals/DefineOwnProperty/key-is-not-canonical-index.js",
+            "built-ins/TypedArrayConstructors/internals/DefineOwnProperty/key-is-numericindex-accessor-desc-throws.js",
+            "built-ins/TypedArrayConstructors/internals/DefineOwnProperty/key-is-numericindex-desc-not-configurable-throws.js",
+            "built-ins/TypedArrayConstructors/internals/DefineOwnProperty/key-is-numericindex-desc-not-enumerable-throws.js",
+            "built-ins/TypedArrayConstructors/internals/DefineOwnProperty/key-is-numericindex-desc-not-writable-throws.js",
+            "built-ins/TypedArrayConstructors/internals/DefineOwnProperty/key-is-numericindex.js",
+            "built-ins/TypedArrayConstructors/internals/DefineOwnProperty/non-extensible-redefine-key.js",
+            "built-ins/TypedArrayConstructors/internals/Delete/BigInt/indexed-value-ab-strict.js",
+            "built-ins/TypedArrayConstructors/internals/Delete/BigInt/key-is-not-minus-zero-strict.js",
+            "built-ins/TypedArrayConstructors/internals/Delete/BigInt/key-is-out-of-bounds-strict.js",
+            "built-ins/TypedArrayConstructors/internals/Delete/indexed-value-ab-strict.js",
+            "built-ins/TypedArrayConstructors/internals/Delete/key-is-not-minus-zero-strict.js",
+            "built-ins/TypedArrayConstructors/internals/Delete/key-is-out-of-bounds-strict.js",
+            "built-ins/TypedArrayConstructors/internals/Get/BigInt/key-is-not-integer.js",
+            "built-ins/TypedArrayConstructors/internals/Get/BigInt/key-is-not-minus-zero.js",
+            "built-ins/TypedArrayConstructors/internals/Get/BigInt/key-is-out-of-bounds.js",
+            "built-ins/TypedArrayConstructors/internals/Get/key-is-not-integer.js",
+            "built-ins/TypedArrayConstructors/internals/Get/key-is-not-minus-zero.js",
+            "built-ins/TypedArrayConstructors/internals/Get/key-is-out-of-bounds.js",
+            "built-ins/TypedArrayConstructors/internals/GetOwnProperty/BigInt/index-prop-desc.js",
+            "built-ins/TypedArrayConstructors/internals/GetOwnProperty/index-prop-desc.js",
+            "built-ins/TypedArrayConstructors/internals/HasProperty/BigInt/abrupt-from-ordinary-has-parent-hasproperty.js",
+            "built-ins/TypedArrayConstructors/internals/HasProperty/BigInt/key-is-lower-than-zero.js",
+            "built-ins/TypedArrayConstructors/internals/HasProperty/BigInt/key-is-minus-zero.js",
+            "built-ins/TypedArrayConstructors/internals/HasProperty/BigInt/key-is-not-integer.js",
+            "built-ins/TypedArrayConstructors/internals/HasProperty/abrupt-from-ordinary-has-parent-hasproperty.js",
+            "built-ins/TypedArrayConstructors/internals/HasProperty/key-is-lower-than-zero.js",
+            "built-ins/TypedArrayConstructors/internals/HasProperty/key-is-minus-zero.js",
+            "built-ins/TypedArrayConstructors/internals/HasProperty/key-is-not-integer.js",
+            "built-ins/TypedArrayConstructors/internals/OwnPropertyKeys/BigInt/integer-indexes-and-string-and-symbol-keys-.js",
+            "built-ins/TypedArrayConstructors/internals/OwnPropertyKeys/BigInt/integer-indexes-and-string-keys.js",
+            "built-ins/TypedArrayConstructors/internals/OwnPropertyKeys/BigInt/integer-indexes.js",
+            "built-ins/TypedArrayConstructors/internals/OwnPropertyKeys/integer-indexes-and-string-and-symbol-keys-.js",
+            "built-ins/TypedArrayConstructors/internals/OwnPropertyKeys/integer-indexes-and-string-keys.js",
+            "built-ins/TypedArrayConstructors/internals/OwnPropertyKeys/integer-indexes.js",
+            "built-ins/TypedArrayConstructors/internals/Set/BigInt/key-is-canonical-invalid-index-prototype-chain-set.js",
+            "built-ins/TypedArrayConstructors/internals/Set/BigInt/tonumber-value-throws.js",
+            "built-ins/TypedArrayConstructors/internals/Set/key-is-canonical-invalid-index-prototype-chain-set.js",
+            "built-ins/TypedArrayConstructors/internals/Set/tonumber-value-throws.js",
+            "language/statements/with/set-mutable-binding-binding-deleted-with-typed-array-in-proto-chain.js",
+        )) {
+            put(path, "D-88: typed arrays implement the integer-indexed exotic object methods here")
+        }
+        // Seal, freeze and defineProperty send partial descriptors through each object's own
+        // [[DefineOwnProperty]], a refusal is a TypeError, and only the fields a descriptor has are
+        // compared (D-88).
+        for (path in listOf(
+            "built-ins/Object/defineProperties/15.2.3.7-6-a-184.js",
+            "built-ins/Object/defineProperties/15.2.3.7-6-a-185.js",
+            "built-ins/Object/defineProperties/15.2.3.7-6-a-282.js",
+            "built-ins/Object/defineProperty/15.2.3.6-4-188.js",
+            "built-ins/Object/defineProperty/15.2.3.6-4-189.js",
+            "built-ins/Object/defineProperty/15.2.3.6-4-293-1.js",
+            "built-ins/Object/defineProperty/15.2.3.6-4-293-3.js",
+            "built-ins/Object/defineProperty/15.2.3.6-4-293-4.js",
+            "built-ins/Object/defineProperty/15.2.3.6-4-336.js",
+            "built-ins/Object/freeze/proxy-with-defineProperty-handler.js",
+            "built-ins/Object/seal/proxy-with-defineProperty-handler.js",
+            "built-ins/Proxy/defineProperty/trap-is-missing-target-is-proxy.js",
+            "built-ins/Proxy/defineProperty/trap-is-undefined-target-is-proxy.js",
+        )) {
+            put(path, "D-88: definitions use partial descriptors and a refusal throws here")
+        }
+        // An arguments object gives a live argument its slot before a definition is checked, so a
+        // non-configurable or read-only argument keeps the mapping rules the spec gives it (D-88).
+        for (path in listOf(
+            "language/arguments-object/mapped/mapped-arguments-nonconfigurable-3.js",
+            "language/arguments-object/mapped/mapped-arguments-nonconfigurable-delete-1.js",
+            "language/arguments-object/mapped/mapped-arguments-nonconfigurable-nonwritable-1.js",
+            "language/arguments-object/mapped/mapped-arguments-nonconfigurable-nonwritable-2.js",
+            "language/arguments-object/mapped/mapped-arguments-nonconfigurable-nonwritable-5.js",
+            "language/arguments-object/mapped/mapped-arguments-nonconfigurable-strict-delete-1.js",
+            "language/arguments-object/mapped/mapped-arguments-nonwritable-nonconfigurable-1.js",
+            "language/arguments-object/mapped/mapped-arguments-nonwritable-nonconfigurable-2.js",
+            "language/arguments-object/mapped/mapped-arguments-nonwritable-nonconfigurable-3.js",
+            "language/arguments-object/mapped/mapped-arguments-nonwritable-nonconfigurable-4.js",
+            "language/arguments-object/mapped/nonconfigurable-descriptors-basic.js",
+            "language/arguments-object/mapped/nonconfigurable-descriptors-set-value-by-arguments.js",
+            "language/arguments-object/mapped/nonconfigurable-descriptors-set-value-with-define-property.js",
+            "language/arguments-object/mapped/nonconfigurable-descriptors-with-param-assign.js",
+            "language/arguments-object/mapped/nonconfigurable-nonenumerable-nonwritable-descriptors-basic.js",
+            "language/arguments-object/mapped/nonconfigurable-nonwritable-descriptors-basic.js",
+            "language/arguments-object/mapped/nonconfigurable-nonwritable-descriptors-define-property-consecutive.js",
+            "language/arguments-object/mapped/nonwritable-nonconfigurable-descriptors-basic.js",
+            "language/arguments-object/mapped/nonwritable-nonconfigurable-descriptors-set-by-arguments.js",
+            "language/arguments-object/mapped/nonwritable-nonconfigurable-descriptors-set-by-param.js",
+            "language/arguments-object/mapped/nonwritable-nonenumerable-nonconfigurable-descriptors-basic.js",
+            "language/arguments-object/mapped/nonwritable-nonenumerable-nonconfigurable-descriptors-set-by-arguments.js",
+            "language/arguments-object/mapped/nonwritable-nonenumerable-nonconfigurable-descriptors-set-by-param.js",
+        )) {
+            put(path, "D-88: arguments objects define their mapped properties as the spec says here")
+        }
+
         // Date.prototype[Symbol.toPrimitive] is non-writable here and writable upstream (D-56).
         put(
             "built-ins/Date/prototype/Symbol.toPrimitive/prop-desc.js",
@@ -243,6 +346,23 @@ class Test262ParityTest {
         // A labelled function as the body of a with is an early error here (D-76). In strict code
         // the with is an error already, in both engines.
         put("language/statements/with/labelled-fn-stmt.js", "D-76: a function declaration as a statement body is an early error here")
+    }
+
+    /**
+     * Like [knownDifferences], for files whose two engines disagree only in strict mode, where a
+     * failed write throws. Outside strict mode both still let it pass silently, so a file-wide
+     * entry would read as stale there.
+     */
+    private val knownStrictDifferences = buildMap {
+        // An array whose length is read-only leaves dense mode, so push, unshift and splice reach
+        // the length write that throws (D-88).
+        for (path in listOf(
+            "built-ins/Array/prototype/push/set-length-zero-array-length-is-non-writable.js",
+            "built-ins/Array/prototype/splice/S15.4.4.12_A6.1_T2.js",
+            "built-ins/Array/prototype/unshift/set-length-zero-array-length-is-non-writable.js",
+        )) {
+            put(path, "D-88: an array with a read-only length stops growing here")
+        }
     }
 
     /**
@@ -307,7 +427,9 @@ class Test262ParityTest {
                 // What the port did here, for the other targets to match (Test262SliceTest).
                 expectations.append(relative).append(if (strict) "\tstrict\t" else "\tsloppy\t")
                     .append(ported).append('\n')
-                val known = relative in knownDifferences || (!strict && relative in knownSloppyDifferences)
+                val known = relative in knownDifferences ||
+                    (!strict && relative in knownSloppyDifferences) ||
+                    (strict && relative in knownStrictDifferences)
                 if (upstream != ported) {
                     val mode = if (strict) "strict" else "non-strict"
                     if (known) {

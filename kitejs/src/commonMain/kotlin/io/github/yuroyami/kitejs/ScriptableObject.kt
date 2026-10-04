@@ -494,12 +494,20 @@ public abstract class ScriptableObject :
             checkPropertyDefinition(desc)
             descs[i] = desc
         }
-        for (i in ids.indices) defineOwnProperty(cx, ids[i], descs[i]!!)
+        for (i in ids.indices) {
+            // DefinePropertyOrThrow: an object that refuses a definition, as a typed array or a
+            // proxy can, makes it a TypeError rather than a silent no-op (D-88).
+            if (!defineOwnProperty(cx, ids[i], descs[i]!!)) {
+                throw ScriptRuntime.typeErrorById("msg.define.refused", ids[i].let { if (it is Symbol) it.toString() else ScriptRuntime.toString(it) })
+            }
+        }
     }
 
     public fun defineOwnProperty(cx: Context, id: Any?, desc: ScriptableObject): Boolean {
-        checkPropertyDefinition(desc)
-        return defineOwnProperty(cx, id, DescriptorInfo(desc), true)
+        // The descriptor object is read once; its getters are user code.
+        val info = DescriptorInfo(desc)
+        checkPropertyDefinition(info)
+        return defineOwnProperty(cx, id, info, true)
     }
 
     public open fun defineOwnProperty(cx: Context, id: Any?, desc: DescriptorInfo): Boolean =
@@ -549,15 +557,30 @@ public abstract class ScriptableObject :
 
         internal var accessorDescriptor: Boolean = false
 
-        /** Reads a descriptor out of a script object. */
+        /**
+         * Reads a descriptor out of a script object: ToPropertyDescriptor (ECMAScript 2015,
+         * 6.2.4.5). Each field is asked for with HasProperty before it is read, in the spec's
+         * order, and the three flags become booleans. Upstream read every field with a bare get
+         * in its own order and kept the raw values, so a proxy descriptor answering undefined for
+         * `get` looked like an accessor and `{enumerable: 1}` compared unequal to true (D-88).
+         */
         public constructor(desc: ScriptableObject) {
-            enumerable = getProperty(desc, "enumerable")
-            writable = getProperty(desc, "writable")
-            configurable = getProperty(desc, "configurable")
-            getter = getProperty(desc, "get")
-            setter = getProperty(desc, "set")
-            value = getProperty(desc, "value")
+            enumerable = field(desc, "enumerable", true)
+            configurable = field(desc, "configurable", true)
+            value = field(desc, "value", false)
+            writable = field(desc, "writable", true)
+            getter = field(desc, "get", false)
+            setter = field(desc, "set", false)
             accessorDescriptor = getter !== Scriptable.NOT_FOUND || setter !== Scriptable.NOT_FOUND
+        }
+
+        private companion object {
+            /** Field [name] of [desc], or [Scriptable.NOT_FOUND] when it has none. */
+            fun field(desc: ScriptableObject, name: String, flag: Boolean): Any? {
+                if (!hasProperty(desc, name)) return Scriptable.NOT_FOUND
+                val v = getProperty(desc, name).let { if (it === Scriptable.NOT_FOUND) Undefined.instance else it }
+                return if (flag) ScriptRuntime.toBoolean(v) else v
+            }
         }
 
         public constructor(enumerable: Boolean, writable: Boolean, configurable: Boolean, value: Any?) {
@@ -649,7 +672,10 @@ public abstract class ScriptableObject :
         if (isTrue(info.configurable)) {
             throw ScriptRuntime.typeErrorById("msg.change.configurable.false.to.true", id)
         }
-        if (((current.attributes and DONTENUM) == 0) != isTrue(info.enumerable)) {
+        // Only the fields the descriptor has are compared (ECMAScript 2015, 9.1.6.3 step 4);
+        // upstream read a missing enumerable or value as false or undefined, so sealing or
+        // freezing an object twice, which sends partial descriptors, threw (D-88).
+        if (info.hasEnumerable() && ((current.attributes and DONTENUM) == 0) != isTrue(info.enumerable)) {
             throw ScriptRuntime.typeErrorById("msg.change.enumerable.with.configurable.false", id)
         }
 
@@ -669,7 +695,7 @@ public abstract class ScriptableObject :
                     }
                     val currentValue =
                         if (current is BuiltInSlot<*>) current.getValue(null) else current.value
-                    if (!sameValue(info.value, currentValue)) {
+                    if (info.hasValue() && !sameValue(info.value, currentValue)) {
                         throw ScriptRuntime.typeErrorById("msg.change.value.with.writable.false", id)
                     }
                 }
@@ -894,6 +920,16 @@ public abstract class ScriptableObject :
     internal open fun getOwnPropertyDescriptor(cx: Context, id: Any?): DescriptorInfo? =
         querySlot(cx, id)?.getPropertyDescriptor(cx, this)
 
+    /**
+     * True when this object answers for [name] itself whether or not it has it, so a lookup that
+     * reaches it never goes on to the prototype. A typed array does this for every canonical
+     * numeric name (D-88); an ordinary object never does.
+     */
+    internal open fun endsLookup(name: String): Boolean = false
+
+    /** The same as the string form, for a name that is an array index. */
+    internal open fun endsLookup(index: Int): Boolean = false
+
     internal fun querySlot(cx: Context, id: Any?): Slot? {
         if (id is Symbol) return map.query(id, 0)
         val s = ScriptRuntime.toStringIdOrIndex(id)
@@ -1062,8 +1098,14 @@ public abstract class ScriptableObject :
                 }
             } else {
                 if (!s.isValueSlot && info.isDataDescriptor) {
-                    // Turn a slot that is not a plain value slot back into one.
+                    // Turn a slot that is not a plain value slot back into one. A computed data
+                    // property, such as a String object's length, keeps the value it answers, where
+                    // upstream kept the raw field, null for those, so a descriptor without a value,
+                    // like the one freezing uses, lost it (D-88). An accessor turned into data
+                    // starts out undefined, as the spec says.
+                    val computed = if (s is LambdaSlot) s.getValue(owner) else Scriptable.NOT_FOUND
                     s = Slot(s)
+                    if (computed !== Scriptable.NOT_FOUND) s.value = computed
                 }
                 if (info.value !== Scriptable.NOT_FOUND) {
                     s.value = info.value
@@ -1296,7 +1338,7 @@ public abstract class ScriptableObject :
         }
 
         public fun putProperty(obj: Scriptable, name: String, value: Any?) {
-            val base = getBase(obj, name) ?: obj
+            val base = getBase(obj, name, true) ?: obj
             base.put(name, obj, value)
         }
 
@@ -1322,7 +1364,7 @@ public abstract class ScriptableObject :
         }
 
         public fun putProperty(obj: Scriptable, index: Int, value: Any?) {
-            val base = getBase(obj, index) ?: obj
+            val base = getBase(obj, index, true) ?: obj
             base.put(index, obj, value)
         }
 
@@ -1383,19 +1425,30 @@ public abstract class ScriptableObject :
             return funObj.call(cx, getTopLevelScope(obj), obj, args)
         }
 
-        internal fun getBase(start: Scriptable, name: String): Scriptable? {
+        internal fun getBase(start: Scriptable, name: String): Scriptable? = getBase(start, name, false)
+
+        /**
+         * The object in the chain that has [name], or null. A lookup stops at an object that
+         * [endsLookup] the name: there it is absent, unless the lookup is for a write, which that
+         * object then takes itself, as a typed array's [[Set]] does for a numeric name (D-88).
+         */
+        private fun getBase(start: Scriptable, name: String, forWrite: Boolean): Scriptable? {
             var obj: Scriptable? = start
             do {
                 if (obj!!.has(name, start)) break
+                if (obj is ScriptableObject && obj.endsLookup(name)) return if (forWrite) obj else null
                 obj = obj.prototype
             } while (obj != null)
             return obj
         }
 
-        internal fun getBase(start: Scriptable, index: Int): Scriptable? {
+        internal fun getBase(start: Scriptable, index: Int): Scriptable? = getBase(start, index, false)
+
+        private fun getBase(start: Scriptable, index: Int, forWrite: Boolean): Scriptable? {
             var obj: Scriptable? = start
             do {
                 if (obj!!.has(index, start)) break
+                if (obj is ScriptableObject && obj.endsLookup(index)) return if (forWrite) obj else null
                 obj = obj.prototype
             } while (obj != null)
             return obj

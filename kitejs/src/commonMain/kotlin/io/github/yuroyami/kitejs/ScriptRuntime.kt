@@ -998,15 +998,28 @@ public object ScriptRuntime {
     }
 
     /**
-     * The number a property name stands for when it is a canonical numeric index, or null. A typed
-     * array treats those names as element positions and everything else as ordinary properties.
+     * CanonicalNumericIndexString (ECMAScript 2024, 7.1.21): the number a property name spells
+     * exactly, or null. A typed array owns every such name, and only a valid index among them is an
+     * element. "-0" is negative zero and "NaN" is NaN, both of them numeric names that are never a
+     * valid index; upstream answered -Infinity for the first and null for the second (D-88).
      */
     public fun canonicalNumericIndexString(arg: String): Double? {
-        if ("-0" == arg) return Double.NEGATIVE_INFINITY
+        if ("-0" == arg) return -0.0
         val num = toNumber(arg)
-        // "NaN" is deliberately not a number here.
-        if (num.isNaN()) return null
         return if (toString(num) == arg) num else null
+    }
+
+    /**
+     * ToPropertyKey (ECMAScript 2015, 7.1.14), in the form the engine keys properties by: a symbol
+     * stays a symbol, a name that is an array index becomes that index as an Int, and anything else
+     * becomes a string. An object is converted once, with the string hint.
+     */
+    internal fun toPropertyKey(value: Any?): Any {
+        if (isSymbol(value)) return value as Symbol
+        val key = toPrimitive(value, StringClass)
+        if (isSymbol(key)) return key as Symbol
+        val id = toStringIdOrIndex(key)
+        return id.stringId ?: id.index
     }
 
     /** ToIndex: a non-negative integer that fits the safe range, or a RangeError. */

@@ -207,6 +207,68 @@ scope that is not a `TopLevel` is whatever the global `ArrayBuffer` holds.
   `validateNewByteLength`.
 - Test: `EvalOracleTest.arrayBufferSliceRechecksAndTransferSkipsSpecies`.
 
+### Typed arrays are not integer-indexed exotic objects (D-88)
+
+`NativeTypedArrayView` handles only property names that convert to a valid element index. Any
+other canonical numeric name, such as `'-1'`, `'1.5'`, `'NaN'` or `'-0'`, falls through to the
+ordinary path, so a read finds the prototype's property of that name, `in` answers from the
+prototype, and a write skips the value conversion, so a BigInt view silently accepts a Number and
+a `valueOf` never runs. `defineOwnProperty` narrows a fractional index to an int, so
+`Object.defineProperty(a, '0.5', {value: 9})` overwrites element 0, and defining `'NaN'` reports
+success. There is no `getOwnPropertyDescriptor` for elements, so `Object.getOwnPropertyDescriptor`
+answers undefined for a real element, `getIds()` returns only the indices while the compound
+`getIds` used by `Reflect.ownKeys` returns only the ordinary keys, and a valid element deleted in
+strict code reports success.
+
+- Where: `NativeTypedArrayView.get`, `has`, `put`, `delete`, `getIds` and `defineOwnProperty`.
+- Test: `EvalOracleTest.typedArraysAreIntegerIndexedExoticObjects`.
+
+### A refused definition is ignored, and seal and freeze send full descriptors (D-88)
+
+`Object.defineProperty` and `Object.defineProperties` drop the boolean that `defineOwnProperty`
+returns, so a proxy `defineProperty` trap answering false, or an exotic object refusing a
+definition, leaves the script believing it succeeded, and the key is converted after the
+descriptor instead of before. `setIntegrityLevel` builds a complete descriptor for every key and
+calls the protected four-argument `defineOwnProperty`, so a proxy's trap is skipped altogether,
+missing fields take defaults the spec never asks for, and a trap answering false does not throw.
+When such a descriptor turns a computed (`LambdaSlot`) property into a plain one, `setSlotValue`
+stores the descriptor's absent value as null, so
+`Object.defineProperty(Error, 'stackTraceLimit', {writable: false})` loses the limit.
+
+- Where: `NativeObject.js_defineProperty`, `ScriptableObject.defineOwnProperties`,
+  `AbstractEcmaObjectOperations.setIntegrityLevel` and `ScriptableObject.setSlotValue`.
+- Test: `EvalOracleTest.typedArraysAreIntegerIndexedExoticObjects`.
+
+### A non-configurable property rejects descriptors that leave fields out (D-88)
+
+`checkPropertyChangeForSlot` compares `enumerable` and `value` whether or not the descriptor has
+them, reading a missing one as false or undefined. On an enumerable non-configurable property,
+`Object.defineProperty(o, 'x', {value: 1})` with the same value, `{}`, or `{set: undefined}` on an
+accessor all throw where ValidateAndApplyPropertyDescriptor accepts them. The descriptor reader
+`DescriptorInfo(ScriptableObject)` is not ToPropertyDescriptor either: it reads each field with a
+bare get, without HasProperty, so a proxy whose `get` trap answers undefined for a missing `get`
+reads as data and accessor at once and throws; it reads the fields in its own order; and it keeps
+the raw values of the three flags, so `{enumerable: 1}` fails `isCompatiblePropertyDescriptor`
+against `true`, which makes a proxy's `defineProperty` invariant check throw for a valid answer.
+
+- Where: `ScriptableObject.checkPropertyChangeForSlot` and `ScriptableObject.DescriptorInfo`.
+- Test: `IntegrityLevelTest.partial_descriptors_compare_only_the_fields_they_have` (common).
+
+### Arrays keep growing after they are frozen or their length is read-only (D-88)
+
+The dense fast path of `push` and `unshift` appends without asking whether the array may grow, and
+`Object.preventExtensions` leaves a dense array dense, so `push` still appends to it. An empty
+frozen array only escaped by accident, because freezing redefined its length with a value.
+`NativeArray.put` grows the length after `super.put` even when the write was refused, so writing
+past the end of a non-extensible array changes its length, and a read-only length does not stop an
+index past it being created. `defineOwnProperty` grows the length before defining the element,
+whatever the length's attributes and whether or not the definition then fails, so
+`Object.defineProperty(a, 3, {value: 4})` succeeds on a three element array with a read-only
+length.
+
+- Where: `NativeArray.put`, `NativeArray.defineOwnProperty`, `js_push` and `js_unshift`.
+- Test: `IntegrityLevelTest.arrays_stop_growing_once_they_may_not` (common).
+
 ### A getOwnPropertyDescriptor trap answering undefined crashes (D-50)
 
 A Proxy whose `getOwnPropertyDescriptor` trap returns `undefined` for a property the target lacks
