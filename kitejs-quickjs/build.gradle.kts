@@ -1,5 +1,8 @@
 import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import java.io.ByteArrayOutputStream
+import java.util.Base64
+import java.util.zip.GZIPOutputStream
 import javax.inject.Inject
 
 plugins {
@@ -20,40 +23,6 @@ plugins {
  *   Android         a JNI library per ABI, from the NDK
  *   JS and Wasm     one wasm32-wasi module from zig, embedded in the Kotlin code and compiled at load
  */
-kotlin {
-    explicitApi()
-
-    @OptIn(ExperimentalAbiValidation::class)
-    abiValidation {
-    }
-
-    sourceSets {
-        all {
-            languageSettings {
-                optIn("io.github.yuroyami.kitejs.api.InternalKiteJsApi")
-                optIn("kotlin.concurrent.atomics.ExperimentalAtomicApi")
-            }
-        }
-
-        commonMain.dependencies {
-            api(projects.kitejsApi)
-            implementation(libs.kotlinx.datetime)
-        }
-
-        jsMain.dependencies {
-            implementation(npm("@js-joda/timezone", "2.3.0"))
-        }
-
-        wasmJsMain.dependencies {
-            implementation(npm("@js-joda/timezone", "2.3.0"))
-        }
-
-        commonTest.dependencies {
-            implementation(projects.kitejsTestkit)
-        }
-    }
-}
-
 // ---- The C sources ------------------------------------------------------------------------------
 
 val nativeDir = layout.projectDirectory.dir("native")
@@ -61,6 +30,148 @@ val cSources = listOf("quickjs/quickjs.c", "quickjs/dtoa.c", "quickjs/libregexp.
 
 /** The settings every toolchain compiles with live in native/kitejs_config.h, included first. */
 val cFlags = listOf("-O2", "-include", nativeDir.file("kitejs_config.h").asFile.absolutePath)
+
+// ---- The JVM: a JNI library per desktop platform, cross-compiled with zig ---------------------
+
+/** Builds with `zig cc`, which cross-compiles to every desktop OS and to WebAssembly from any of them. */
+abstract class ZigCompile : DefaultTask() {
+    @get:Inject
+    abstract val exec: ExecOperations
+
+    @get:Input
+    abstract val zig: Property<String>
+
+    @get:Input
+    abstract val target: Property<String>
+
+    @get:Input
+    abstract val flags: ListProperty<String>
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val sources: ConfigurableFileCollection
+
+    @get:OutputFile
+    abstract val output: RegularFileProperty
+
+    @TaskAction
+    fun build() {
+        val out = output.get().asFile
+        out.parentFile.mkdirs()
+        exec.exec {
+            commandLine(
+                listOf(zig.get(), "cc", "-target", target.get(), "-g0", "-s", "-o", out.absolutePath) +
+                    flags.get() + sources.files.map { it.absolutePath },
+            )
+        }
+        // zig leaves the import library and debug data next to a DLL; only the library is wanted.
+        out.parentFile.listFiles()!!.filter { it != out }.forEach { it.delete() }
+    }
+}
+
+/** zig from the kitejs.zig property, the ZIG environment variable, or the PATH. */
+val zigPath: Provider<String> = providers.gradleProperty("kitejs.zig")
+    .orElse(providers.environmentVariable("ZIG"))
+    .orElse("zig")
+
+/** jni.h from the JDK the build runs on; native/jni/include supplies jni_md.h for every platform. */
+val jdkInclude: Provider<String> = javaToolchains.launcherFor {
+    languageVersion.set(JavaLanguageVersion.of(21))
+}.map { it.metadata.installationPath.dir("include").asFile.absolutePath }
+
+/** The desktop platforms the jar carries a library for: resource folder, zig target, file name. */
+val jniPlatforms = listOf(
+    Triple("linux-x86_64", "x86_64-linux-gnu.2.17", "libkitejs_quickjs.so"),
+    Triple("linux-aarch64", "aarch64-linux-gnu.2.17", "libkitejs_quickjs.so"),
+    Triple("macos-x86_64", "x86_64-macos", "libkitejs_quickjs.dylib"),
+    Triple("macos-aarch64", "aarch64-macos", "libkitejs_quickjs.dylib"),
+    Triple("windows-x86_64", "x86_64-windows-gnu", "kitejs_quickjs.dll"),
+)
+
+val jniOutput = layout.buildDirectory.dir("quickjs/jni")
+
+val jniTasks = jniPlatforms.map { (platform, zigTarget, fileName) ->
+    tasks.register<ZigCompile>("buildQuickJsJni" + platform.split('-').joinToString("") { it.replaceFirstChar(Char::uppercase) }) {
+        group = "build"
+        description = "Builds the QuickJS JNI library for $platform with zig."
+        zig.set(zigPath)
+        target.set(zigTarget)
+        flags.set(
+            jdkInclude.map { include ->
+                listOf("-shared", "-fPIC", "-fvisibility=hidden") + cFlags + listOf("-I$include", "-I${nativeDir.dir("jni/include").asFile}", "-I${nativeDir.asFile}") +
+                    (if (platform.startsWith("linux")) listOf("-lm") else emptyList())
+            },
+        )
+        sources.from(cSources.map { nativeDir.file(it) } + nativeDir.file("jni/kitejs_quickjs_jni.c"))
+        output.set(jniOutput.map { it.file("jni/$platform/$fileName") })
+    }
+}
+
+/** Every desktop JNI library, laid out as the jar's resources. */
+val buildJni = tasks.register("buildQuickJsJni") {
+    group = "build"
+    description = "Builds the QuickJS JNI library for every desktop platform."
+    dependsOn(jniTasks)
+    outputs.dir(jniOutput)
+}
+
+// ---- JS and Wasm: one WebAssembly module, embedded in the Kotlin code ---------------------------
+
+/** Every function kitejs_quickjs.h declares, which the module exports. */
+val wasmExports: List<String> = Regex("""\b(kite_[a-z_]+)\(""")
+    .findAll(nativeDir.file("kitejs_quickjs.h").asFile.readText())
+    .map { it.groupValues[1] }
+    .filter { it != "kite_set_host" }
+    .distinct()
+    .toList()
+
+val buildWasm = tasks.register<ZigCompile>("buildQuickJsWasm") {
+    group = "build"
+    description = "Builds QuickJS as a WebAssembly module with zig."
+    zig.set(zigPath)
+    target.set("wasm32-wasi")
+    flags.set(
+        listOf("-mexec-model=reactor") + cFlags + listOf("-I${nativeDir.asFile}", "-Wl,-z,stack-size=1048576") +
+            wasmExports.map { "-Wl,--export=$it" },
+    )
+    sources.from(cSources.map { nativeDir.file(it) })
+    output.set(layout.buildDirectory.file("quickjs/wasm/kitejs_quickjs.wasm"))
+}
+
+/**
+ * The module, gzipped and in base64, as Kotlin source the JS and Wasm targets compile in. A string
+ * constant has a size limit, so it is split into chunks the loader joins.
+ */
+abstract class EmbedWasm : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val wasm: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun embed() {
+        val gzipped = ByteArrayOutputStream().also { bytes ->
+            GZIPOutputStream(bytes).use { it.write(wasm.get().asFile.readBytes()) }
+        }.toByteArray()
+        val base64 = Base64.getEncoder().encodeToString(gzipped)
+        val chunks = base64.chunked(60_000).joinToString(",\n") { "    \"$it\"" }
+        val dir = outputDir.get().asFile.resolve("io/github/yuroyami/kitejs/quickjs/bridge")
+        dir.deleteRecursively()
+        dir.mkdirs()
+        dir.resolve("QuickJsWasm.kt").writeText(
+            "/* Generated by the build from native/: QuickJS as WebAssembly, gzipped, in base64. */\n" +
+                "package io.github.yuroyami.kitejs.quickjs.bridge\n\n" +
+                "internal val QUICKJS_WASM: Array<String> = arrayOf(\n$chunks,\n)\n",
+        )
+    }
+}
+
+val embedWasm = tasks.register<EmbedWasm>("embedQuickJsWasm") {
+    wasm.set(buildWasm.flatMap { it.output })
+    outputDir.set(layout.buildDirectory.dir("generated/quickjs/webMain/kotlin"))
+}
 
 // ---- Kotlin/Native: a static library per target, from Kotlin/Native's own clang ---------------
 
@@ -147,5 +258,55 @@ kotlin.targets.withType<KotlinNativeTarget>().configureEach {
     }
     tasks.named(target.compilations.getByName("main").cinterops.getByName("kitejs_quickjs").interopProcessingTaskName) {
         dependsOn(buildLibrary)
+    }
+}
+
+// ---- The module ---------------------------------------------------------------------------------
+
+kotlin {
+    explicitApi()
+
+    @OptIn(ExperimentalAbiValidation::class)
+    abiValidation {
+    }
+
+    sourceSets {
+        all {
+            languageSettings {
+                optIn("io.github.yuroyami.kitejs.api.InternalKiteJsApi")
+                optIn("kotlin.concurrent.atomics.ExperimentalAtomicApi")
+            }
+        }
+
+        commonMain.dependencies {
+            api(projects.kitejsApi)
+            implementation(libs.kotlinx.datetime)
+        }
+
+        jsMain.dependencies {
+            implementation(npm("@js-joda/timezone", "2.3.0"))
+        }
+
+        wasmJsMain.dependencies {
+            implementation(npm("@js-joda/timezone", "2.3.0"))
+        }
+
+        commonTest.dependencies {
+            implementation(projects.kitejsTestkit)
+        }
+
+        // The JVM and Android share the JNI bridge, compiled into each; only how the library is
+        // found differs. A source directory rather than a source set keeps the default hierarchy.
+        jvmMain {
+            kotlin.srcDir("src/jniMain/kotlin")
+            resources.srcDir(buildJni)
+        }
+        androidMain {
+            kotlin.srcDir("src/jniMain/kotlin")
+        }
+
+        webMain {
+            kotlin.srcDir(embedWasm)
+        }
     }
 }
