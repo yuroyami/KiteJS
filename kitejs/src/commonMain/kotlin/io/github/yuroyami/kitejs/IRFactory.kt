@@ -14,6 +14,8 @@ import io.github.yuroyami.kitejs.ast.AstRoot
 import io.github.yuroyami.kitejs.ast.BigIntLiteral
 import io.github.yuroyami.kitejs.ast.Block
 import io.github.yuroyami.kitejs.ast.BreakStatement
+import io.github.yuroyami.kitejs.ast.ClassElement
+import io.github.yuroyami.kitejs.ast.ClassNode
 import io.github.yuroyami.kitejs.ast.ComputedPropertyKey
 import io.github.yuroyami.kitejs.ast.ConditionalExpression
 import io.github.yuroyami.kitejs.ast.ContinueStatement
@@ -127,6 +129,8 @@ public class IRFactory(
                 return transformForLoop(node as ForLoop)
             }
             Token.FUNCTION -> return transformFunction(node as FunctionNode)
+            Token.CLASS -> return transformClass(node as ClassNode)
+            Token.NEW_TARGET -> return node
             Token.GENEXPR -> return transformGenExpr(node as GeneratorExpression)
             Token.GETELEM -> return transformElementGet(node as ElementGet)
             Token.GETPROP -> return transformPropertyGet(node as PropertyGet)
@@ -554,6 +558,10 @@ public class IRFactory(
                     val entry = defaultParams[i]
                     val nameEntry = defaultParams[i - 1]
                     if (entry is AstNode && nameEntry is String) {
+                        val defaultValue = transform(entry)
+                        // A parameter's default names an anonymous function or class after the
+                        // parameter (ECMAScript 2015, 13.3.3.7, SingleNameBinding).
+                        inferNameIfMissing(Name(entry.position, nameEntry), defaultValue, null)
                         val paramInit = createIf(
                             createBinary(
                                 Token.SHEQ,
@@ -565,7 +573,7 @@ public class IRFactory(
                                 createAssignment(
                                     Token.ASSIGN,
                                     parser.createName(nameEntry),
-                                    transform(entry),
+                                    defaultValue,
                                 ),
                                 body.lineno,
                                 body.column,
@@ -595,7 +603,10 @@ public class IRFactory(
                 val a = pair[0]
                 val b = pair[1]
                 if (b is AstNode) {
-                    a.replaceChild(b, transform(b))
+                    val transformed = transform(b)
+                    a.replaceChild(b, transformed)
+                    // A default for a plain name names an anonymous function or class after it.
+                    if (pair.size > 2) inferNameIfMissing(pair[2], transformed, null)
                 }
             }
 
@@ -644,9 +655,89 @@ public class IRFactory(
             if (transformedTarget.getIntProp(Node.SUPER_PROPERTY_ACCESS, 0) == 1) {
                 call.putIntProp(Node.SUPER_PROPERTY_ACCESS, 1)
             }
+            if (transformedTarget.type == Token.SUPER) {
+                call.putIntProp(Node.SUPER_CALL_PROP, 1)
+            }
             return call
         } finally {
             astNodePos.pop()
+        }
+    }
+
+    /**
+     * A class becomes one CLASS node: its heritage expression if it has one, then one node per
+     * element, a METHOD, GET, SET, FIELD or STATIC_BLOCK whose child is the key and whose
+     * FUNCTION_PROP is the function it carries. The class's own FUNCTION_PROP is its constructor.
+     * The code generator turns that into the class definition operations.
+     */
+    private fun transformClass(cls: ClassNode): Node {
+        astNodePos.push(cls)
+        // Every part of a class is strict mode code, its heritage and computed keys included, so
+        // a function written there is strict too (ECMAScript 2015, 10.2.1).
+        val savedStrict = outerScopeIsStrict
+        outerScopeIsStrict = true
+        try {
+            val node = Node(Token.CLASS)
+            node.setLineColumnNumber(cls.lineno, cls.column)
+            var flags = 0
+            cls.superClass?.let {
+                node.addChildToBack(transform(it))
+                flags = flags or Node.CLASS_HAS_HERITAGE
+            }
+            if (cls.className != null) flags = flags or Node.CLASS_HAS_BINDING
+            node.putIntProp(Node.CLASS_FLAGS_PROP, flags)
+            if (cls.privateNames.isNotEmpty()) node.putProp(Node.PRIVATE_NAMES_PROP, cls.privateNames.toTypedArray())
+            node.putIntProp(Node.FUNCTION_PROP, transformFunction(cls.constructor).getExistingIntProp(Node.FUNCTION_PROP))
+            for (e in cls.elements) {
+                val element = Node(
+                    when (e.kind) {
+                        ClassElement.GETTER -> Token.GET
+                        ClassElement.SETTER -> Token.SET
+                        ClassElement.FIELD -> Token.FIELD
+                        ClassElement.STATIC_BLOCK -> Token.STATIC_BLOCK
+                        else -> Token.METHOD
+                    },
+                )
+                var elementFlags = if (e.isStatic) Node.CLASS_STATIC else 0
+                e.key?.let { element.addChildToBack(transformClassElementKey(it)) }
+                val fn = e.value
+                if (fn != null) {
+                    // A field whose initializer is an anonymous function or class names it after
+                    // the field (ECMAScript 2022, 15.7.10, NamedEvaluation).
+                    if (e.kind == ClassElement.FIELD && isAnonymousFunctionDefinition((fn.body!!.firstChild as ReturnStatement).returnValue)) {
+                        elementFlags = elementFlags or Node.CLASS_NAMED_INITIALIZER
+                    }
+                    element.putIntProp(Node.FUNCTION_PROP, transformFunction(fn).getExistingIntProp(Node.FUNCTION_PROP))
+                }
+                element.putIntProp(Node.CLASS_FLAGS_PROP, elementFlags)
+                node.addChildToBack(element)
+            }
+            return node
+        } finally {
+            outerScopeIsStrict = savedStrict
+            astNodePos.pop()
+        }
+    }
+
+    /**
+     * A key the source spells out becomes a string or number; a computed one, its expression; a
+     * private name, the lookup of the Private Name the class scope binds to it.
+     */
+    private fun transformClassElementKey(key: AstNode): Node = when (key) {
+        is Name -> if (key.identifier!!.startsWith('#')) key else Node.newString(key.identifier!!)
+        is StringLiteral -> Node.newString(key.value!!)
+        is ComputedPropertyKey -> transform(key.expression!!)
+        else -> transform(key)
+    }
+
+    /** IsAnonymousFunctionDefinition (ECMAScript 2015, 14.1.10): a nameless function, arrow function or class. */
+    private fun isAnonymousFunctionDefinition(expr: AstNode?): Boolean {
+        var e = expr
+        while (e is ParenthesizedExpression) e = e.expression
+        return when (e) {
+            is FunctionNode -> e.functionType == FunctionNode.ARROW_FUNCTION || e.functionName == null
+            is ClassNode -> e.className == null
+            else -> false
         }
     }
 
@@ -826,15 +917,8 @@ public class IRFactory(
         }
     }
 
-    private fun transformLiteral(node: AstNode): Node {
-        // Trying to call super as a function. See 15.4.2 Static Semantics: HasDirectSuper. This
-        // has to change when classes land, because calling super() in a class constructor is
-        // allowed.
-        if (node.parent is FunctionCall && node.type == Token.SUPER) {
-            parser.reportError("msg.super.shorthand.function")
-        }
-        return node
-    }
+    // The parser has already decided where super() and super.x may stand (HasDirectSuper).
+    private fun transformLiteral(node: AstNode): Node = node
 
     private fun transformName(node: Name): Node = node
 
@@ -1272,7 +1356,8 @@ public class IRFactory(
             propagateRequiresArgumentObjectFromNestedArrowFunctions(fnNode)
         }
 
-        if (functionType == FunctionNode.FUNCTION_EXPRESSION) {
+        // A class binds its own name in a scope of its own, not inside its constructor.
+        if (functionType == FunctionNode.FUNCTION_EXPRESSION && fnNode.classConstructorKind == FunctionNode.NOT_CLASS_CONSTRUCTOR) {
             val name = fnNode.functionName
             if (name != null && name.length() != 0 && fnNode.getSymbol(name.identifier!!) == null) {
                 // A function expression needs its own name as a variable, unless one is already
@@ -1776,25 +1861,8 @@ public class IRFactory(
         throw Kit.codeBug()
     }
 
-    /** Infers a function name when the right side is missing one. */
     private fun inferNameIfMissing(left: Any?, right: Node?, prefix: String?) {
-        if (parser.compilerEnv.languageVersion < Context.VERSION_ES6) {
-            return
-        }
-
-        if (left is Name && right != null && right.type == Token.FUNCTION) {
-            if (left.identifier == NativeObject.PROTO_PROPERTY) {
-                // Ignore this odd edge case.
-                return
-            }
-
-            val fnIndex = right.getExistingIntProp(Node.FUNCTION_PROP)
-            val functionNode = parser.currentScriptOrFn!!.getFunctionNode(fnIndex)
-            if (functionNode.type != 0 && functionNode.functionName == null) {
-                functionNode.functionName =
-                    if (prefix != null) left.withPrefix(prefix) else left
-            }
-        }
+        parser.inferNameIfMissing(left, right, prefix)
     }
 
     private fun propagateSuperFromLhs(result: Node, left: Node): Node {

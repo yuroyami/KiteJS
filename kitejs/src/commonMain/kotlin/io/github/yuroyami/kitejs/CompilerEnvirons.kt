@@ -71,6 +71,18 @@ public class CompilerEnvirons {
     /** Allows usage of "super" everywhere, simulating that we are inside a method. */
     public var allowSuper: Boolean = false
 
+    /** Allows `super(...)`, for eval code that a derived class constructor runs. */
+    public var allowSuperCall: Boolean = false
+
+    /** Allows `new.target` outside a function, for eval code that a function runs. */
+    public var allowNewTarget: Boolean = false
+
+    /** For direct eval code in a class body, the private names the enclosing classes declare. */
+    public var privateNames: Set<String>? = null
+
+    /** For direct eval code in a class field initializer, where `arguments` is a syntax error. */
+    public var inClassFieldInitializer: Boolean = false
+
     public var inEval: Boolean = false
 
     public var activationNames: Set<String>? = null

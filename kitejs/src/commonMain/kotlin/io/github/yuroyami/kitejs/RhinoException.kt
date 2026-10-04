@@ -103,7 +103,9 @@ public abstract class RhinoException : RuntimeException {
         if (sourceName != null) initSourceName(sourceName)
         if (line != 0) initLineNumber(line)
         if (lineSource != null) initLineSource(lineSource)
-        if (columnNumber != 0) initColumnNumber(columnNumber)
+        // A position the parser works out from a node of a desugared tree can land before its
+        // line's start; such a column is dropped rather than failing the error being reported.
+        if (columnNumber > 0) initColumnNumber(columnNumber)
     }
 
     /** The interpreter frame that was live when this was thrown, if any. */

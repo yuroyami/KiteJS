@@ -31,7 +31,8 @@ public class KeywordLiteral : AstNode {
                     value == Token.UNDEFINED ||
                     value == Token.TRUE ||
                     value == Token.FALSE ||
-                    value == Token.DEBUGGER)
+                    value == Token.DEBUGGER ||
+                    value == Token.NEW_TARGET)
             ) {
                 throw IllegalArgumentException("Invalid node type: $value")
             }
@@ -52,6 +53,7 @@ public class KeywordLiteral : AstNode {
             Token.TRUE -> sb.append("true")
             Token.FALSE -> sb.append("false")
             Token.DEBUGGER -> sb.append("debugger;\n")
+            Token.NEW_TARGET -> sb.append("new.target")
             else -> throw IllegalStateException("Invalid keyword literal type: $type")
         }
         return sb.toString()

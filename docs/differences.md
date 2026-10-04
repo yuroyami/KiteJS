@@ -10,11 +10,12 @@ These are syntax errors. A script using any of them will not even parse.
 
 | Not supported | Write instead |
 |---|---|
-| `class A { }`, `extends`, `super` | A constructor function and `prototype` |
 | `import` and `export` | Nothing. Concatenate the sources, or bind a loader function yourself |
 | `async function`, `await` | `Promise` with `.then`, or a host function that suspends |
 | `for await (... of ...)` | Iterate the promises and await each one |
 | `var [a, ...rest] = list` | `var a = list[0], rest = list.slice(1)` |
+| `var { a, ...rest } = obj` | `var a = obj.a, rest = Object.assign({}, obj); delete rest.a` |
+| `var { [key]: v } = obj` | `var v = obj[key]` |
 | `return` outside a function | Wrap the script in a function and call it |
 | The regular expression flags `d` and `v` | Read `exec` results for positions; use `u` for Unicode |
 
@@ -98,6 +99,28 @@ hundred. Where that argument is an integer power, the answer here is the correct
 ignore their locale argument. `Date.prototype.toString` prints the zone's id rather than its
 abbreviation. See [Dates and time zones](dates-and-time-zones.md).
 
+### A `let`, `const` or class is readable before its declaration
+
+A browser throws a `ReferenceError` when code reaches a `let`, `const` or class binding before
+its declaration has run. Here the binding is there from the start of its block and holds
+`undefined` until then, so `new C()` above `class C {}` throws a `TypeError` for calling
+`undefined` rather than a `ReferenceError`. Code that runs in a browser runs the same here.
+
+### Leaving a `for-of` early does not close the iterator
+
+A `break`, `return` or throw out of a `for-of` loop, or an array pattern that takes fewer
+elements than the iterable has, never calls the iterator's `return` method, so a generator's
+`finally` block does not run then. Call `it.return()` yourself where the cleanup matters.
+
+### Older scoping rules for parameters and block functions
+
+A parameter default runs in the body's scope, so it cannot read `arguments` and a closure made
+in it sees the body's `var`s. A function declared inside a block belongs to the whole enclosing
+function, in strict code too, and a `for (let ...)` body's function sees the last value of the
+loop variable. In sloppy code `yield` outside a generator is still a keyword, and `for ([k, v]
+in obj)` reads keys and values the JavaScript 1.7 way. Code that avoids these corners runs the
+same as in a browser.
+
 ## Things that work here and not in a browser
 
 The engine keeps some behaviour a browser dropped, because a script written for it may rely on
@@ -111,8 +134,9 @@ that:
 ## Everything else
 
 The rest of ES5.1 and most of ES2015 and later is there and tested: `let`, `const` (also in a
-`for` head, as in `for (const x of xs)`, with a fresh binding on every pass), arrow
-functions, template literals and tagged templates, destructuring in declarations and parameters,
+`for` head, as in `for (const x of xs)`, with a fresh binding on every pass), classes (with
+`extends`, `super`, `new.target`, public and private fields, private methods and accessors,
+`#x in obj`, static fields and static blocks), arrow functions, template literals and tagged templates, destructuring in declarations and parameters,
 default and rest parameters, computed keys, getters and setters in object literals, generators
 and `yield*`, `Symbol` and every well-known symbol, `Map`, `Set`, `WeakMap`, `WeakSet`,
 `Promise`, `Proxy`, `Reflect`, `BigInt`, typed arrays and `DataView`, optional chaining, nullish

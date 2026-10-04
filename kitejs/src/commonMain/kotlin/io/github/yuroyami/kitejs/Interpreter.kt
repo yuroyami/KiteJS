@@ -84,6 +84,14 @@ import io.github.yuroyami.kitejs.Icode.Companion.Icode_CALL_SPREAD
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_NEW_SPREAD
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_INITCONST
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_INITCONSTVAR
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_CLASS_BEGIN
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_CLASS_CTOR
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_CLASS_ELEMENT
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_CLASS_END
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_NEW_TARGET
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_SUPER_CTOR
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_SUPER_CALL
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_SUPER_CALL_SPREAD
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_SPREAD
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_STARTSUB
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_SWAP
@@ -190,6 +198,15 @@ public class Interpreter : Evaluator {
         var savedCallOp = 0
         var throwable: Any? = null
 
+        /**
+         * What new.target evaluates to: the constructor `new` named, undefined for a call, and
+         * null in code outside every function, where the parser does not let it be written.
+         */
+        var newTarget: Any? = null
+
+        /** The `this` binding of the derived class constructor this frame runs in, or null. */
+        var thisBinding: ThisBinding? = null
+
         constructor(cx: Context, thisObj: Scriptable?, fnOrScript: ScriptOrFn<*>, code: InterpreterData<*>, parentFrame: CallFrame?, previousInterpreterFrame: CallFrame?) {
             idata = code
             useActivation = fnOrScript.descriptor!!.requiresActivationFrame
@@ -245,6 +262,8 @@ public class Interpreter : Evaluator {
             savedStackTop = original.savedStackTop
             savedCallOp = original.savedCallOp
             throwable = original.throwable
+            newTarget = original.newTarget
+            thisBinding = original.thisBinding
         }
 
         /** A copy that shares the stack arrays, to keep the parent chain right for stack traces. */
@@ -280,6 +299,8 @@ public class Interpreter : Evaluator {
             savedStackTop = original.savedStackTop
             savedCallOp = original.savedCallOp
             throwable = original.throwable
+            newTarget = original.newTarget
+            thisBinding = original.thisBinding
         }
 
         fun initializeArgs(cx: Context, callerScope: Scriptable, argsIn: Array<Any?>, argsDblIn: DoubleArray?, boundArgsIn: Array<Any?>?, argShiftIn: Int, argCount: Int, homeObject: Scriptable?) {
@@ -470,6 +491,7 @@ public class Interpreter : Evaluator {
                 Icode_GETVAR1, Icode_SETVAR1, Icode_SETCONSTVAR1 -> return 1 + 1
                 Icode_LINE -> return 1 + 2
                 Icode_LITERAL_NEW_OBJECT -> return 1 + 1
+                Icode_CLASS_CTOR, Icode_CLASS_ELEMENT -> return 1 + 1
                 Icode_REG_BIGINT1 -> return 1 + 1
                 Icode_REG_BIGINT2 -> return 1 + 2
                 Icode_REG_BIGINT4 -> return 1 + 4
@@ -531,15 +553,18 @@ public class Interpreter : Evaluator {
             ScriptRuntime.initFunction(cx, scope, fn, fn.descriptor.functionType, parent.isEvalFunction)
         }
 
-        internal fun <T : ScriptOrFn<T>> interpret(ifun: T, idata: InterpreterData<T>, cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
+        internal fun <T : ScriptOrFn<T>> interpret(ifun: T, idata: InterpreterData<T>, cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>, newTarget: Any?): Any? {
             if (!ScriptRuntime.hasTopCall(cx)) throw Kit.codeBug()
             // A call from native code, such as a forEach callback or a Promise reaction, is charged
             // like a call from script, before any frame exists to unwind (D-77).
             cx.addInstructionCount(INVOCATION_COST)
-            val frame = initFrame(cx, scope, thisObj, ifun.homeObject, args, null, null, 0, args.size, ifun, idata, null)
+            val frame = initFrame(cx, scope, thisObj, ifun.homeObject, args, null, null, 0, args.size, ifun, idata, null, newTarget)
             frame.isContinuationsTopFrame = cx.isContinuationsTopCall
             cx.isContinuationsTopCall = false
-            return interpretLoop(cx, frame, null)
+            val result = interpretLoop(cx, frame, null)
+            val binding = frame.thisBinding
+            if (binding != null && ifun.descriptor!!.isDerivedConstructor) return ClassRuntime.derivedConstructResult(result, binding)
+            return result
         }
 
         internal fun resumeGenerator(cx: Context, scope: Scriptable, operation: Int, savedState: Any?, value: Any?): Any? {
@@ -700,7 +725,20 @@ public class Interpreter : Evaluator {
                 if (parent != null) {
                     var newFrame = parent
                     if (newFrame.frozen) newFrame = newFrame.cloneFrozen()
-                    setCallResult(newFrame, frame.result, frame.resultDbl)
+                    var result = frame.result
+                    val binding = frame.thisBinding
+                    if (binding != null && frame.fnOrScript.descriptor!!.isDerivedConstructor) {
+                        // What a derived constructor returns is checked once its frame is gone,
+                        // so a TypeError from the check is thrown where `new` was, and no catch
+                        // in the constructor sees it.
+                        try {
+                            result = ClassRuntime.derivedConstructResult(if (result === DBL_MRK) ScriptRuntime.wrapNumber(frame.resultDbl) else result, binding)
+                        } catch (ex: Throwable) {
+                            newFrame.savedCallOp = 0
+                            return NewState.ThrowableResult(newFrame, ex)
+                        }
+                    }
+                    setCallResult(newFrame, result, frame.resultDbl)
                     return NewState.StateContinueResult(newFrame, state.indexReg)
                 }
                 return NewState.StateBreakResult(frame)
@@ -1074,7 +1112,7 @@ public class Interpreter : Evaluator {
                 Token.GETPROP_SUPER, Token.GETPROPNOWARN_SUPER -> {
                     val superObject = stack[state.stackTop]
                     if (superObject === DBL_MRK) throw Kit.codeBug()
-                    stack[state.stackTop] = ScriptRuntime.getSuperProp(superObject, state.stringReg!!, cx, frame.scope!!, frame.thisObj, op == Token.GETPROPNOWARN_SUPER)
+                    stack[state.stackTop] = ScriptRuntime.getSuperProp(superObject, state.stringReg!!, cx, frame.scope!!, thisValue(frame), op == Token.GETPROPNOWARN_SUPER)
                     return null
                 }
                 Token.SETPROP -> {
@@ -1090,7 +1128,7 @@ public class Interpreter : Evaluator {
                     if (rhs === DBL_MRK) rhs = ScriptRuntime.wrapNumber(sDbl[state.stackTop])
                     val superObject = stack[state.stackTop - 1]
                     if (superObject === DBL_MRK) throw Kit.codeBug()
-                    stack[--state.stackTop] = ScriptRuntime.setSuperProp(superObject, state.stringReg!!, rhs, cx, frame.scope!!, frame.thisObj)
+                    stack[--state.stackTop] = ScriptRuntime.setSuperProp(superObject, state.stringReg!!, rhs, cx, frame.scope!!, thisValue(frame))
                     return null
                 }
                 Icode_PROP_INC_DEC -> {
@@ -1114,8 +1152,8 @@ public class Interpreter : Evaluator {
                     if (superObject === DBL_MRK) throw Kit.codeBug()
                     val id = stack[state.stackTop + 1]
                     stack[state.stackTop] =
-                        if (id !== DBL_MRK) ScriptRuntime.getSuperElem(superObject, id, cx, frame.scope!!, frame.thisObj)
-                        else ScriptRuntime.getSuperIndex(superObject, sDbl[state.stackTop + 1], cx, frame.scope!!, frame.thisObj)
+                        if (id !== DBL_MRK) ScriptRuntime.getSuperElem(superObject, id, cx, frame.scope!!, thisValue(frame))
+                        else ScriptRuntime.getSuperIndex(superObject, sDbl[state.stackTop + 1], cx, frame.scope!!, thisValue(frame))
                     return null
                 }
                 Token.SETELEM -> {
@@ -1138,8 +1176,8 @@ public class Interpreter : Evaluator {
                     if (superObject === DBL_MRK) throw Kit.codeBug()
                     val id = stack[state.stackTop + 1]
                     stack[state.stackTop] =
-                        if (id !== DBL_MRK) ScriptRuntime.setSuperElem(superObject, id, rhs, cx, frame.scope!!, frame.thisObj)
-                        else ScriptRuntime.setSuperIndex(superObject, sDbl[state.stackTop + 1], rhs, cx, frame.scope!!, frame.thisObj)
+                        if (id !== DBL_MRK) ScriptRuntime.setSuperElem(superObject, id, rhs, cx, frame.scope!!, thisValue(frame))
+                        else ScriptRuntime.setSuperIndex(superObject, sDbl[state.stackTop + 1], rhs, cx, frame.scope!!, thisValue(frame))
                     return null
                 }
                 Icode_ELEM_INC_DEC -> {
@@ -1324,10 +1362,18 @@ public class Interpreter : Evaluator {
                     return null
                 }
                 Token.THIS -> {
-                    stack[++state.stackTop] = frame.thisObj
+                    stack[++state.stackTop] = thisValue(frame)
+                    return null
+                }
+                Icode_NEW_TARGET -> {
+                    stack[++state.stackTop] = frame.newTarget ?: Undefined.instance
                     return null
                 }
                 Token.SUPER -> {
+                    // A super property reference asks for `this` first, so in a derived class
+                    // constructor before super() it is a ReferenceError ahead of anything else in
+                    // the expression (ECMAScript 2015, 12.3.5.1).
+                    frame.thisBinding?.get()
                     val homeObject = frame.fnOrScript.homeObject
                     stack[++state.stackTop] = if (homeObject == null) Undefined.instance else homeObject.prototype
                     return null
@@ -1361,6 +1407,85 @@ public class Interpreter : Evaluator {
             val stack = frame.stack
             val sDbl = frame.sDbl
             when (op) {
+                // Class definitions and super() calls run once per class or per construction, so
+                // they live here, out of the hot dispatch method (D-95).
+                Icode_CLASS_BEGIN -> {
+                    // The index is one past the constructor's for a class with a name of its own.
+                    val bindingName = if (state.indexReg > 0) frame.fnOrScript.descriptor!!.getFunction(state.indexReg - 1).name else null
+                    val builder = ClassRuntime.begin(frame.scope!!, bindingName)
+                    frame.scope = builder.classScope
+                    stack[++state.stackTop] = builder
+                    return null
+                }
+                Icode.Icode_CLASS_PRIVATE_NAMES -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val names = frame.idata.literalIds!![state.indexReg] as Array<String>
+                    frame.scope = ClassRuntime.privateScope(frame.scope!!, names)
+                    return null
+                }
+                Icode_CLASS_CTOR -> {
+                    val flags = 0xFF and frame.idata.itsICode[frame.pc].toInt()
+                    ++frame.pc
+                    val hasHeritage = (flags and Node.CLASS_HAS_HERITAGE) != 0
+                    var superclass: Any? = null
+                    if (hasHeritage) {
+                        superclass = stack[state.stackTop]
+                        if (superclass === DBL_MRK) superclass = ScriptRuntime.wrapNumber(sDbl[state.stackTop])
+                        --state.stackTop
+                    }
+                    val builder = stack[state.stackTop] as ClassBuilder
+                    if (hasHeritage) ClassRuntime.heritage(cx, builder, superclass)
+                    val proto = ClassRuntime.newPrototype(builder)
+                    val desc = frame.fnOrScript.descriptor!!.getFunction(state.indexReg)
+                    val f = JSFunction(cx, frame.scope!!, desc, frame.thisObj, proto)
+                    ClassRuntime.defineConstructor(builder, f, hasHeritage)
+                    return null
+                }
+                Icode_CLASS_ELEMENT -> {
+                    val flags = 0xFF and frame.idata.itsICode[frame.pc].toInt()
+                    ++frame.pc
+                    var key: Any? = null
+                    if ((flags and Icode.CLASS_ELEMENT_KIND_MASK) != Icode.CLASS_ELEMENT_STATIC_BLOCK) {
+                        key = stack[state.stackTop]
+                        if (key === DBL_MRK) key = ScriptRuntime.wrapNumber(sDbl[state.stackTop])
+                        --state.stackTop
+                    }
+                    val builder = stack[state.stackTop] as ClassBuilder
+                    var fn: JSFunction? = null
+                    if ((flags and Icode.CLASS_ELEMENT_HAS_FUNCTION) != 0) {
+                        val home: Scriptable = if ((flags and Icode.CLASS_ELEMENT_STATIC) != 0) builder.constructor else builder.prototype
+                        fn = createMethod(cx, frame, state.indexReg, home)
+                    }
+                    ClassRuntime.defineElement(cx, builder, flags, key, fn)
+                    return null
+                }
+                Icode_CLASS_END -> {
+                    val builder = stack[state.stackTop] as ClassBuilder
+                    frame.scope = builder.outerScope
+                    stack[state.stackTop] = ClassRuntime.end(cx, builder)
+                    return null
+                }
+                Icode_SUPER_CTOR -> {
+                    stack[++state.stackTop] = frame.thisBinding!!.function.prototype
+                    return null
+                }
+                Icode_SUPER_CALL, Icode_SUPER_CALL_SPREAD -> {
+                    if (state.instructionCounting) addInvocationCount(cx, frame)
+                    val args: Array<Any?>
+                    if (op == Icode_SUPER_CALL_SPREAD) {
+                        args = ScriptRuntime.getApplyArguments(cx, stack[state.stackTop])
+                        --state.stackTop
+                    } else {
+                        state.stackTop -= state.indexReg
+                        args = getArgsArray(stack, sDbl, state.stackTop + 1, state.indexReg)
+                    }
+                    val binding = frame.thisBinding!!
+                    val result = ClassRuntime.superConstruct(cx, frame.scope!!, stack[state.stackTop], args, binding.newTarget)
+                    binding.bind(result)
+                    ClassRuntime.initializeInstanceElements(cx, result, binding.function)
+                    stack[state.stackTop] = result
+                    return null
+                }
                 Token.ENTERWITH -> {
                     var lhs = stack[state.stackTop]
                     if (lhs === DBL_MRK) lhs = ScriptRuntime.wrapNumber(sDbl[state.stackTop])
@@ -1790,7 +1915,7 @@ public class Interpreter : Evaluator {
                 val outArgs = getArgsArray(stack, sDbl, state.stackTop + 1, state.indexReg)
                 val function = result?.callable
                 stack[state.stackTop] = ScriptRuntime.callSpecial(
-                    cx, function, result?.thisObj, outArgs, frame.scope!!, frame.thisObj, callType,
+                    cx, function, result?.thisObj, outArgs, frame.scope!!, callerThis(frame), callType,
                     frame.fnOrScript.descriptor!!.sourceName, sourceLine, isOptionalChainingCall,
                 )
             }
@@ -1808,7 +1933,7 @@ public class Interpreter : Evaluator {
             var fun_: Callable? = result.callable
             var funThisObj: Scriptable? = result.thisObj
             val funHomeObj = if (fun_ is BaseFunction) fun_.homeObject else null
-            if (op == Icode_CALL_ON_SUPER) funThisObj = frame.thisObj
+            if (op == Icode_CALL_ON_SUPER) funThisObj = thisValue(frame)
             if (op == Token.REF_CALL) {
                 val outArgs = getArgsArray(stack, sDbl, state.stackTop + 1, state.indexReg)
                 stack[state.stackTop] = ScriptRuntime.callRef(fun_!!, funThisObj, outArgs, cx)
@@ -1872,6 +1997,9 @@ public class Interpreter : Evaluator {
                     break
                 }
             }
+            if (fun_ is JSFunction && fun_.descriptor.isClassConstructor) {
+                throw ScriptRuntime.typeErrorById("msg.class.not.new", fun_.functionName)
+            }
             if (fun_ is JSFunction && fun_.descriptor.code is InterpreterData<*>) {
                 val ifun = fun_
                 @Suppress("UNCHECKED_CAST")
@@ -1897,7 +2025,7 @@ public class Interpreter : Evaluator {
                 }
                 val calleeFrame = initFrame(
                     cx, calleeScope, ifun.getFunctionThis(funThisObj), funHomeObj, stack, sDbl, boundArgs,
-                    state.stackTop + 1, state.indexReg, ifun, idata, callParentFrame,
+                    state.stackTop + 1, state.indexReg, ifun, idata, callParentFrame, Undefined.instance,
                 )
                 if (op != Icode_TAIL_CALL) {
                     frame.savedStackTop = state.stackTop
@@ -1915,17 +2043,25 @@ public class Interpreter : Evaluator {
             if (state.instructionCounting) addInvocationCount(cx, frame)
             state.stackTop -= state.indexReg
             var lhs = frame.stack[state.stackTop]
-            if (lhs is JSFunction && lhs.constructorCode is InterpreterData<*>) {
+            if (lhs is JSFunction && lhs.constructorCode is InterpreterData<*> && !(lhs.descriptor.isClassConstructor && lhs.descriptor.isDefaultConstructor)) {
                 val f = lhs
                 @Suppress("UNCHECKED_CAST")
                 val idata = f.constructorCode as InterpreterData<JSFunction>
-                if (cx.languageVersion >= Context.VERSION_ES6 && f.homeObject != null) {
+                val isClass = f.descriptor.isClassConstructor
+                if (cx.languageVersion >= Context.VERSION_ES6 && f.homeObject != null && !isClass) {
                     throw ScriptRuntime.typeErrorById("msg.not.ctor", f.functionName)
                 }
-                val newInstance = if (f.homeObject == null) f.createObject(cx, frame.scope!!) else null
+                // A derived class constructor has no `this` until it calls super(); a base class
+                // puts its fields on the new object before the body runs.
+                val newInstance = when {
+                    isClass && f.descriptor.isDerivedConstructor -> null
+                    isClass -> f.createObject(cx, frame.scope!!)!!.also { ClassRuntime.initializeInstanceElements(cx, it, f) }
+                    f.homeObject == null -> f.createObject(cx, frame.scope!!)
+                    else -> null
+                }
                 val calleeFrame = initFrame(
                     cx, frame.scope!!, newInstance, newInstance, frame.stack, frame.sDbl, null,
-                    state.stackTop + 1, state.indexReg, f, idata, frame,
+                    state.stackTop + 1, state.indexReg, f, idata, frame, f,
                 )
                 frame.stack[state.stackTop] = newInstance
                 frame.savedStackTop = state.stackTop
@@ -2036,11 +2172,53 @@ public class Interpreter : Evaluator {
         private fun <T : ScriptOrFn<T>> initFrame(
             cx: Context, callerScope: Scriptable, thisObj: Scriptable?, homeObj: Scriptable?, args: Array<Any?>, argsDbl: DoubleArray?,
             boundArgs: Array<Any?>?, argShift: Int, argCount: Int, fnOrScript: T, code: InterpreterData<T>, parentFrame: CallFrame?,
+            newTarget: Any?,
         ): CallFrame {
             val frame = CallFrame(cx, thisObj, fnOrScript, code, parentFrame, if (parentFrame == null) cx.lastInterpreterFrame as CallFrame? else parentFrame.previousInterpreterFrame)
+            val desc = fnOrScript.descriptor!!
+            when {
+                desc.functionType == FunctionNode.ARROW_FUNCTION -> {
+                    // An arrow function sees the new.target and `this` of the code it was made in.
+                    val fn = fnOrScript as JSFunction
+                    frame.newTarget = fn.lexicalNewTarget
+                    frame.thisBinding = fn.lexicalThisBinding
+                }
+                desc.functionType != 0 -> {
+                    frame.newTarget = newTarget
+                    if (desc.isDerivedConstructor && newTarget is Scriptable) frame.thisBinding = ThisBinding(fnOrScript as JSFunction, newTarget)
+                }
+                desc.isEvalFunction -> {
+                    // Direct eval code sees those of the function it is called from, which keeps
+                    // them on its activation, since a function that calls eval always has one.
+                    var s: Scriptable? = callerScope
+                    while (s != null && s !is NativeCall) s = s.parentScope
+                    if (s is NativeCall) {
+                        frame.newTarget = s.newTarget
+                        frame.thisBinding = s.thisBinding
+                    }
+                }
+            }
             frame.initializeArgs(cx, callerScope, args, argsDbl, boundArgs, argShift, argCount, homeObj)
+            if (desc.functionType != 0) {
+                (frame.scope as? NativeCall)?.let {
+                    it.newTarget = frame.newTarget
+                    it.thisBinding = frame.thisBinding
+                }
+            }
             enterFrame(cx, frame, args, false)
             return frame
+        }
+
+        /** GetThisBinding: in a derived class constructor, a ReferenceError until super() runs. */
+        private fun thisValue(frame: CallFrame): Scriptable? {
+            val binding = frame.thisBinding
+            return if (binding != null) binding.get() else frame.thisObj
+        }
+
+        /** The `this` direct eval code is handed; its own frame asks the binding, if there is one. */
+        private fun callerThis(frame: CallFrame): Scriptable? {
+            val binding = frame.thisBinding
+            return if (binding != null) binding.value ?: Undefined.SCRIPTABLE_UNDEFINED else frame.thisObj
         }
 
         private fun enterFrame(cx: Context, frame: CallFrame, args: Array<Any?>, continuationRestart: Boolean) {
@@ -2153,7 +2331,12 @@ public class Interpreter : Evaluator {
             val desc = frame.fnOrScript.descriptor!!.getFunction(index)
             val isArrow = desc.functionType == FunctionNode.ARROW_FUNCTION
             val homeObject = if (isArrow) frame.fnOrScript.homeObject else null
-            return JSFunction(cx, frame.scope!!, desc, frame.thisObj, homeObject)
+            val fn = JSFunction(cx, frame.scope!!, desc, frame.thisObj, homeObject)
+            if (isArrow) {
+                fn.lexicalThisBinding = frame.thisBinding
+                fn.lexicalNewTarget = frame.newTarget
+            }
+            return fn
         }
 
         private fun createMethod(cx: Context, frame: CallFrame, index: Int, homeObject: Scriptable): JSFunction {

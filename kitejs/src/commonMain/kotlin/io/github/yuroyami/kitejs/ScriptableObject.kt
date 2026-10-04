@@ -26,6 +26,12 @@ public abstract class ScriptableObject :
     private var associatedValues: MutableMap<Any, Any>? = null
 
     /**
+     * The object's [[PrivateElements]] (ECMAScript 2022, 6.1.7.2): a field's value, or null for a
+     * method or accessor, whose functions the [PrivateName] itself holds.
+     */
+    internal var privateElements: HashMap<PrivateName, Any?>? = null
+
+    /**
      * Raw storage for the extensible flag. `putImpl` reads it directly, the way upstream reads the
      * field rather than the accessor, so a subclass that overrides [isExtensible] does not change
      * the hot assignment path (D-8).

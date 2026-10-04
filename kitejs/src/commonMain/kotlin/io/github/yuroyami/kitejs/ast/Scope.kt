@@ -25,11 +25,16 @@ public open class Scope(pos: Int = -1, len: Int = 1) : Jump() {
     public var top: ScriptNode? = null
 
     /**
-     * The names declared with `var` or as a function anywhere inside this block, which a `const`
-     * of the block may not reuse. The parser fills it, and only its check for a block-scoped
-     * const reads it (D-74).
+     * The names declared with `var` anywhere inside this block, which a `let`, `const` or class
+     * of the block may not reuse (ECMAScript 2015, 13.2.1.1). The parser fills it and reads it.
      */
     internal var varNamesWithin: MutableSet<String>? = null
+
+    /**
+     * The functions declared directly in this block, which are as lexical as a `let` there
+     * (ECMAScript 2015, 13.2.1.2), whatever Annex B then hoists out of the block.
+     */
+    internal var functionNamesWithin: MutableSet<String>? = null
 
     private var childScopeList: MutableList<Scope>? = null
 

@@ -18,12 +18,27 @@ class MessageParityTest {
 
     /**
      * Keys upstream's code uses but its properties file never defines (D-49), and keys for errors
-     * only the port raises, such as a refused definition (D-88). Asking upstream for one of them
-     * raises a missing-resource error rather than returning text, so there is nothing to compare
-     * against and the port writes its own wording.
+     * only the port raises, such as a refused definition (D-88) or the class syntax and the early
+     * errors upstream never checks (D-95). Asking upstream for one of them raises a missing-resource
+     * error rather than returning text, so there is nothing to compare against and the port writes
+     * its own wording, after V8's where V8 has one.
      */
     private val addedByThePort = setOf(
         "msg.missing.argument", "msg.typed.array.abstract.ctor", "msg.func.decl.not.in.block", "msg.define.refused",
+        // D-95: classes, private names, new.target and super.
+        "msg.class.dup.ctor", "msg.class.extends", "msg.class.extends.proto", "msg.class.field.name",
+        "msg.class.init.arguments", "msg.class.name", "msg.class.not.in.block", "msg.class.not.new",
+        "msg.class.private.constructor", "msg.class.private.dup", "msg.class.special.ctor",
+        "msg.class.static.prototype", "msg.derived.ctor.return", "msg.new.target", "msg.new.target.name",
+        "msg.no.brace.after.class", "msg.no.brace.class", "msg.no.semi.class.field", "msg.private.alone",
+        "msg.private.delete", "msg.private.host", "msg.private.in", "msg.private.method.write",
+        "msg.private.no.getter", "msg.private.no.setter", "msg.private.read", "msg.private.super",
+        "msg.private.twice", "msg.private.undeclared", "msg.private.write", "msg.super.alone",
+        "msg.super.call", "msg.super.not.ctor", "msg.super.twice", "msg.this.before.super",
+        "msg.uninitialized.binding",
+        // D-95: early errors of plain functions that upstream lets through.
+        "msg.getter.params", "msg.setter.params", "msg.keyword.escaped", "msg.rest.default",
+        "msg.use.strict.non.simple",
     )
 
     private fun portedKeys(): List<String> {

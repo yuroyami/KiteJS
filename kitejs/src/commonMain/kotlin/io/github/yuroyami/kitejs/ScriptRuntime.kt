@@ -630,7 +630,9 @@ public object ScriptRuntime {
     public fun notFunctionError(value: Any?): RuntimeException = notFunctionError(value, value)
 
     public fun notFunctionError(value: Any?, messageHelper: Any?): RuntimeException {
-        val msg = JavaNumbers.toString(messageHelper)
+        // Upstream printed undefined by the Java object's own toString, as
+        // "org.mozilla.javascript.Undefined@255316f2 is not a function".
+        val msg = if (Undefined.isUndefined(messageHelper)) "undefined" else JavaNumbers.toString(messageHelper)
         if (value === Scriptable.NOT_FOUND) return typeErrorById("msg.function.not.found", msg)
         return typeErrorById("msg.isnt.function", msg, typeOf(value))
     }
@@ -1941,6 +1943,7 @@ public object ScriptRuntime {
     }
 
     public fun `in`(a: Any?, b: Any?, cx: Context): Boolean {
+        if (a is PrivateName) return ClassRuntime.hasPrivateElement(b, a)
         if (b !is Scriptable) throw typeErrorById("msg.in.not.object")
         return hasObjectElem(b, a, cx)
     }
@@ -2042,8 +2045,11 @@ public object ScriptRuntime {
 
     public fun getObjectElem(obj: Any?, elem: Any?, cx: Context): Any? = getObjectElem(obj, elem, cx, getTopCallScope(cx))
 
-    public fun getObjectElem(obj: Any?, elem: Any?, cx: Context, scope: Scriptable): Any? =
-        getObjectElem(asScriptableOrThrowUndefReadError(cx, scope, obj, elem), elem, cx)
+    public fun getObjectElem(obj: Any?, elem: Any?, cx: Context, scope: Scriptable): Any? {
+        // `o.#x` is compiled as an element access whose key is the Private Name.
+        if (elem is PrivateName) return ClassRuntime.privateGet(cx, toObject(cx, scope, obj), elem)
+        return getObjectElem(asScriptableOrThrowUndefReadError(cx, scope, obj, elem), elem, cx)
+    }
 
     public fun getSuperElem(superObject: Any?, elem: Any?, cx: Context, scope: Scriptable, thisObject: Any?): Any? {
         val superScriptable = asScriptableOrThrowUndefReadError(cx, scope, superObject, elem)
@@ -2133,6 +2139,10 @@ public object ScriptRuntime {
     public fun setObjectElem(obj: Any?, elem: Any?, value: Any?, cx: Context): Any? = setObjectElem(obj, elem, value, cx, getTopCallScope(cx))
 
     public fun setObjectElem(obj: Any?, elem: Any?, value: Any?, cx: Context, scope: Scriptable): Any? {
+        if (elem is PrivateName) {
+            ClassRuntime.privateSet(cx, toObject(cx, scope, obj), elem, value)
+            return value
+        }
         verifyIsScriptableOrComplainWriteErrorInEs5Strict(obj, elem, value, cx)
         return setObjectElem(asScriptableOrThrowUndefWriteError(cx, scope, obj, elem, value), elem, value, cx)
     }
@@ -2573,12 +2583,17 @@ public object ScriptRuntime {
     private fun getElemAndThisInner(obj: Any?, elem: Any?, cx: Context, scope: Scriptable, isOptionalChainingCall: Boolean): LookupResult? {
         val thisObj: Scriptable
         val value: Any?
-        if (isSymbol(elem)) {
+        // `o?.[k]()` with a nullish o, like `o?.k()`, short-circuits to undefined.
+        if (isOptionalChainingCall && (obj == null || Undefined.isUndefined(obj))) return null
+        if (elem is PrivateName) {
+            thisObj = toObjectOrNull(cx, obj, scope) ?: throw undefCallError(obj, elem.description)
+            value = ClassRuntime.privateGet(cx, thisObj, elem)
+        } else if (isSymbol(elem)) {
             thisObj = toObjectOrNull(cx, obj, scope) ?: throw undefCallError(obj, elem.toString())
             value = ScriptableObject.getProperty(thisObj, elem as Symbol)
         } else {
             val s = toStringIdOrIndex(elem)
-            if (s.stringId != null) return getPropAndThis(obj, s.stringId, cx, scope)
+            if (s.stringId != null) return getPropAndThisInner(obj, s.stringId, cx, scope, isOptionalChainingCall)
             thisObj = toObjectOrNull(cx, obj, scope) ?: throw undefCallError(obj, elem.toString())
             value = ScriptableObject.getProperty(thisObj, s.index)
         }
@@ -2718,11 +2733,21 @@ public object ScriptRuntime {
         val sourceName = makeUrlForGeneratedScript(true, filename, lineNumber)
         val reporter = DefaultErrorReporter.forEval(cx.errorReporter)
         val evaluator = Context.createInterpreter()
-        val homeObject = if (scope is NativeCall) scope.homeObject else null
+        // The function eval is called from: a function that calls eval always has an activation,
+        // so the nearest one on the scope chain is its own, even from inside a block or a catch.
+        var s: Scriptable? = scope
+        while (s != null && s !is NativeCall) s = s.parentScope
+        val call = s as NativeCall?
+        val homeObject = call?.homeObject
         val script = cx.compileString(x.toString(), evaluator, reporter, sourceName, 1, null) { compilerEnvs ->
             compilerEnvs.strictMode = strictCaller
-            val isInsideMethod = scope is NativeCall && scope.homeObject != null
-            compilerEnvs.allowSuper = isInsideMethod
+            compilerEnvs.allowSuper = homeObject != null
+            // PerformEval (ECMAScript 2022, 19.2.1.1): super() in a derived class constructor,
+            // or an arrow function in one, and new.target in any function.
+            compilerEnvs.allowSuperCall = call?.thisBinding != null
+            compilerEnvs.allowNewTarget = call?.newTarget != null
+            compilerEnvs.privateNames = ClassRuntime.privateNamesInScope(scope)
+            compilerEnvs.inClassFieldInitializer = ClassRuntime.inClassFieldInitializer(call)
             compilerEnvs.inEval = true
             compilerEnvs.setHomeObject(homeObject)
         }

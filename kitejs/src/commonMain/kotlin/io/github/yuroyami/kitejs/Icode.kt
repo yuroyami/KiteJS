@@ -143,8 +143,33 @@ internal abstract class Icode {
         // for (const x of xs)
         const val Icode_INITCONST = Icode_NEW_SPREAD - 1
         const val Icode_INITCONSTVAR = Icode_INITCONST - 1
+        // Class definitions (ECMAScript 2015, 14.5; ECMAScript 2022, 15.7): enter the class scope,
+        // make the constructor and prototype, define one element, and finish the class.
+        const val Icode_CLASS_BEGIN = Icode_INITCONSTVAR - 1
+        const val Icode_CLASS_CTOR = Icode_CLASS_BEGIN - 1
+        const val Icode_CLASS_ELEMENT = Icode_CLASS_CTOR - 1
+        const val Icode_CLASS_END = Icode_CLASS_ELEMENT - 1
+        // new.target, and super(...) with and without a spread argument
+        const val Icode_NEW_TARGET = Icode_CLASS_END - 1
+        const val Icode_SUPER_CTOR = Icode_NEW_TARGET - 1
+        const val Icode_SUPER_CALL = Icode_SUPER_CTOR - 1
+        const val Icode_SUPER_CALL_SPREAD = Icode_SUPER_CALL - 1
         // Last icode
-        const val MIN_ICODE = Icode_INITCONSTVAR
+        // Binds a class body's private names, in a scope of their own, before its constructor is made.
+        const val Icode_CLASS_PRIVATE_NAMES = Icode_SUPER_CALL_SPREAD - 1
+
+        const val MIN_ICODE = Icode_CLASS_PRIVATE_NAMES
+
+        // The operand byte of CLASS_ELEMENT: the kind of element in the low bits, then flags.
+        const val CLASS_ELEMENT_METHOD = 0
+        const val CLASS_ELEMENT_GETTER = 1
+        const val CLASS_ELEMENT_SETTER = 2
+        const val CLASS_ELEMENT_FIELD = 3
+        const val CLASS_ELEMENT_STATIC_BLOCK = 4
+        const val CLASS_ELEMENT_KIND_MASK = 7
+        const val CLASS_ELEMENT_STATIC = 8
+        const val CLASS_ELEMENT_HAS_FUNCTION = 16
+        const val CLASS_ELEMENT_NAMED = 32
 
         fun bytecodeName(bytecode: Int): String {
             if (!validBytecode(bytecode)) {
@@ -252,6 +277,15 @@ internal abstract class Icode {
             Icode_NEW_SPREAD -> "NEW_SPREAD"
             Icode_INITCONST -> "INITCONST"
             Icode_INITCONSTVAR -> "INITCONSTVAR"
+            Icode_CLASS_BEGIN -> "CLASS_BEGIN"
+            Icode_CLASS_CTOR -> "CLASS_CTOR"
+            Icode_CLASS_ELEMENT -> "CLASS_ELEMENT"
+            Icode_CLASS_END -> "CLASS_END"
+            Icode_NEW_TARGET -> "NEW_TARGET"
+            Icode_SUPER_CTOR -> "SUPER_CTOR"
+            Icode_SUPER_CALL -> "SUPER_CALL"
+            Icode_SUPER_CALL_SPREAD -> "SUPER_CALL_SPREAD"
+            Icode_CLASS_PRIVATE_NAMES -> "CLASS_PRIVATE_NAMES"
                 // An icode with no name.
                 else -> throw IllegalStateException(bytecode.toString())
             }

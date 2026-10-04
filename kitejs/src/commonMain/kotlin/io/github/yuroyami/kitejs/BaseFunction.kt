@@ -15,6 +15,9 @@ public open class BaseFunction : ScriptableObject, Function {
     private var prototypePropertyValue: Any? = null
     private var argumentsObj: Any? = Scriptable.NOT_FOUND
     private var nameValue: Any? = null
+
+    /** A value defined over `length`, such as a class's static `length` method, or NOT_FOUND. */
+    private var lengthValue: Any? = Scriptable.NOT_FOUND
     private var isGeneratorFunctionField: Boolean = false
 
     /**
@@ -38,7 +41,7 @@ public open class BaseFunction : ScriptableObject, Function {
     }
 
     protected open fun createProperties() {
-        defineBuiltInProperty(this, "length", DONTENUM or READONLY, ::lengthGetter)
+        defineBuiltInProperty(this, "length", DONTENUM or READONLY, ::lengthGetter, ::lengthSetter)
         defineBuiltInProperty(this, "name", DONTENUM or READONLY, ::nameGetter, ::nameSetter)
         if (includeNonStandardProps()) {
             defineBuiltInProperty(
@@ -263,7 +266,9 @@ public open class BaseFunction : ScriptableObject, Function {
         }
         // The object just made has to stay grounded.
         if (proto !== obj) obj.prototype = proto
-        obj.defineProperty("constructor", this, DONTENUM)
+        // A generator function's prototype is an empty object with no constructor back to the
+        // function (ECMAScript 2015, 14.4.13); upstream gives it one.
+        if (!isGeneratorFunction) obj.defineProperty("constructor", this, DONTENUM)
         return obj
     }
 
@@ -283,7 +288,23 @@ public open class BaseFunction : ScriptableObject, Function {
 
         // ---- The built-in property accessors -------------------------------------------------
 
-        private fun lengthGetter(function: BaseFunction, start: Scriptable?): Any = function.length
+        private fun lengthGetter(function: BaseFunction, start: Scriptable?): Any? =
+            if (function.lengthValue !== Scriptable.NOT_FOUND) function.lengthValue else function.length
+
+        /**
+         * `length` is configurable, so defining it anew, as Object.defineProperty or a class's
+         * static `length` method does, replaces its value; upstream kept the computed one.
+         */
+        private fun lengthSetter(
+            function: BaseFunction,
+            value: Any?,
+            owner: Scriptable,
+            start: Scriptable,
+            isThrow: Boolean,
+        ): Boolean {
+            function.lengthValue = value
+            return true
+        }
 
         private fun arityGetter(function: BaseFunction, start: Scriptable?): Any = function.arity
 

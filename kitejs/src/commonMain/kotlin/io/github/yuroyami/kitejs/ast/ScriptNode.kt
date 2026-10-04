@@ -165,8 +165,12 @@ public open class ScriptNode(pos: Int = -1) : Scope(pos) {
     public open val isShorthand: Boolean
         get() = false
 
-    // Overridden in FunctionNode.
-    public open fun putDestructuringRvalues(left: Node, right: Node) {}
+    /**
+     * Records a default [right] that IRFactory transforms later in place inside [left]; [name],
+     * when given, is the plain name the default is for, which names an anonymous function or class.
+     * Overridden in FunctionNode.
+     */
+    public open fun putDestructuringRvalues(left: Node, right: Node, name: Name? = null) {}
 
     internal fun addSymbol(symbol: Symbol) {
         if (variableNames != null) codeBug()

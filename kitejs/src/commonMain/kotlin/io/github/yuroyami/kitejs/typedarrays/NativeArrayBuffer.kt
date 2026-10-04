@@ -9,6 +9,7 @@ import io.github.yuroyami.kitejs.Context
 import io.github.yuroyami.kitejs.Intrinsics
 import io.github.yuroyami.kitejs.LambdaConstructor
 import io.github.yuroyami.kitejs.ScriptRuntime
+import io.github.yuroyami.kitejs.ScriptRuntimeES6
 import io.github.yuroyami.kitejs.Scriptable
 import io.github.yuroyami.kitejs.ScriptableObject
 import io.github.yuroyami.kitejs.SerializableCallable
@@ -89,6 +90,9 @@ public class NativeArrayBuffer : ScriptableObject {
             Intrinsics.register(scope, CLASS_NAME, constructor)
 
             constructor.defineConstructorMethod(scope, "isView", 1, SerializableCallable { _, _, _, args -> js_isView(args) })
+            // A subclass reaches its own constructor through the inherited getter, which slice
+            // then uses as the species (ECMAScript 2015, 24.1.3.3); upstream has none.
+            ScriptRuntimeES6.addSymbolSpecies(cx, scope, constructor)
             constructor.definePrototypeMethod(scope, "slice", 2, SerializableCallable { icx, s, thisObj, args -> js_slice(icx, s, thisObj, args) })
             constructor.definePrototypeMethod(scope, "transfer", 0, SerializableCallable { icx, s, thisObj, args -> js_transfer(icx, s, thisObj, args) })
             constructor.definePrototypeMethod(scope, "transferToFixedLength", 0, SerializableCallable { icx, s, thisObj, args -> js_transfer(icx, s, thisObj, args) })

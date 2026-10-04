@@ -64,8 +64,10 @@ class EvalOracleTest {
         try {
             render(ucx.evaluateString(uscope, source, "test.js", 1, null))
         } catch (e: org.mozilla.javascript.RhinoException) {
-            // The port names classes without the package (D-23).
+            // The port names classes without the package (D-23), and calls undefined undefined
+            // where upstream printed the Java object in "is not a function" (D-95).
             "throws " + normalise(e.details().replace("org.mozilla.javascript.", ""))
+                .replace("Undefined@ is not a function", "undefined is not a function")
         }
 
     private fun ported(source: String): String =

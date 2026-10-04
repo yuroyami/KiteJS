@@ -50,6 +50,18 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
     public val requiresArgumentObject: Boolean get() = (flags and REQUIRES_ARGUMENT_OBJECT_FLAG) != 0
     public val declaredAsFunctionExpression: Boolean get() = (flags and DECLARED_AS_FUNCTION_EXPRESSION_FLAG) != 0
 
+    /** A class constructor, which [[Call]] refuses and [[Construct]] runs with class semantics. */
+    public val isClassConstructor: Boolean get() = (flags and IS_CLASS_CONSTRUCTOR_FLAG) != 0
+
+    /** The constructor of a class with `extends`, whose `this` is only bound by super(). */
+    public val isDerivedConstructor: Boolean get() = (flags and IS_DERIVED_CONSTRUCTOR_FLAG) != 0
+
+    /** A constructor the class did not write. */
+    public val isDefaultConstructor: Boolean get() = (flags and IS_DEFAULT_CONSTRUCTOR_FLAG) != 0
+
+    /** The function that computes a class field's initial value. */
+    public val isClassFieldInitializer: Boolean get() = (flags and IS_CLASS_FIELD_INITIALIZER_FLAG) != 0
+
     public val rawSource: String get() = wholeSource!!.substring(rawSourceStart, rawSourceEnd)
 
     public fun getParamOrVarConst(index: Int): Boolean = paramIsConst[index]
@@ -107,6 +119,10 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
         public var requiresActivationFrame: Boolean = false
         public var requiresArgumentObject: Boolean = false
         public var declaredAsFunctionExpression: Boolean = false
+        public var isClassConstructor: Boolean = false
+        public var isDerivedConstructor: Boolean = false
+        public var isDefaultConstructor: Boolean = false
+        public var isClassFieldInitializer: Boolean = false
         public var securityDomain: Any? = null
         public var functionType: Int = 0
 
@@ -148,6 +164,10 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
             f = f or (if (requiresActivationFrame) REQUIRES_ACTIVATION_FRAME_FLAG else 0)
             f = f or (if (requiresArgumentObject) REQUIRES_ARGUMENT_OBJECT_FLAG else 0)
             f = f or (if (declaredAsFunctionExpression) DECLARED_AS_FUNCTION_EXPRESSION_FLAG else 0)
+            f = f or (if (isClassConstructor) IS_CLASS_CONSTRUCTOR_FLAG else 0)
+            f = f or (if (isDerivedConstructor) IS_DERIVED_CONSTRUCTOR_FLAG else 0)
+            f = f or (if (isDefaultConstructor) IS_DEFAULT_CONSTRUCTOR_FLAG else 0)
+            f = f or (if (isClassFieldInitializer) IS_CLASS_FIELD_INITIALIZER_FLAG else 0)
 
             val result = JSDescriptor<T>(
                 code!!.build(),
@@ -188,5 +208,9 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
         const val REQUIRES_ACTIVATION_FRAME_FLAG = 1 shl 10
         const val REQUIRES_ARGUMENT_OBJECT_FLAG = 1 shl 11
         const val DECLARED_AS_FUNCTION_EXPRESSION_FLAG = 1 shl 12
+        const val IS_CLASS_CONSTRUCTOR_FLAG = 1 shl 13
+        const val IS_DERIVED_CONSTRUCTOR_FLAG = 1 shl 14
+        const val IS_DEFAULT_CONSTRUCTOR_FLAG = 1 shl 15
+        const val IS_CLASS_FIELD_INITIALIZER_FLAG = 1 shl 16
     }
 }

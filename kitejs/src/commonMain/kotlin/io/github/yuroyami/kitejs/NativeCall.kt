@@ -15,6 +15,12 @@ public class NativeCall : IdScriptableObject {
     internal val isStrict: Boolean
     internal var parentActivationCall: NativeCall? = null
 
+    /** The new.target of the call, for direct eval code to see; null outside every function. */
+    internal var newTarget: Any? = null
+
+    /** The `this` binding of the derived class constructor the call runs in, for direct eval code. */
+    internal var thisBinding: ThisBinding? = null
+
     internal constructor() : super() {
         function = null
         originalArgs = ScriptRuntime.emptyArgs

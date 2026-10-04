@@ -33,11 +33,21 @@ class Test262ParityTest {
 
     /** Upstream's list, copied. A test needing any of these is not run by either engine. */
     private val unsupportedFeatures = setOf(
-        "Atomics", "IsHTMLDDA", "async-functions", "async-iteration", "class",
-        "class-fields-private", "class-fields-public", "default-arg", "new.target",
+        "Atomics", "IsHTMLDDA", "async-functions", "async-iteration", "decorators", "default-arg",
         "object-rest", "regexp-dotall", "regexp-unicode-property-escapes",
         "resizable-arraybuffer", "SharedArrayBuffer", "tail-call-optimization", "Temporal",
         "upsert", "u180e",
+    )
+
+    /**
+     * Folders upstream's properties file skips whole because upstream has no class syntax, which
+     * the port runs anyway (D-95). Upstream fails to parse every file in them, so they only add
+     * to the port's own outcomes and to the cannot-parse list.
+     */
+    private val portOnlyFolders = listOf(
+        "language/expressions/class",
+        "language/expressions/new.target",
+        "language/statements/class",
     )
 
     /**
@@ -744,6 +754,189 @@ class Test262ParityTest {
         )) {
             put(path, "D-93: the iterator prototypes inherit %IteratorPrototype% here")
         }
+
+        // Class syntax runs here; upstream cannot parse it (D-95).
+        for (path in listOf(
+            "language/statements/switch/scope-lex-class.js",
+            "staging/sm/fields/bug1587574.js",
+        )) {
+            put(path, "D-95: classes run here")
+        }
+        // A method, getter or setter of an object literal keeps its source text from its name on,
+        // which upstream cuts short (D-95).
+        for (path in listOf(
+            "built-ins/Function/prototype/toString/generator-method.js",
+            "built-ins/Function/prototype/toString/getter-object.js",
+            "built-ins/Function/prototype/toString/method-computed-property-name.js",
+            "built-ins/Function/prototype/toString/method-object.js",
+            "built-ins/Function/prototype/toString/setter-object.js",
+        )) {
+            put(path, "D-95: a method's source text is the whole definition here")
+        }
+        // A let conflicts with a var or function of its scope, with a var in a block inside it and
+        // with a parameter, a var with the let, const, class or block function of every block it
+        // hoists out of, and a catch parameter with a lexical name of its block; upstream lets them
+        // all through (D-95).
+        for (path in listOf(
+            "language/block-scope/syntax/redeclaration/fn-scope-var-name-redeclaration-attempt-with-function.js",
+            "language/block-scope/syntax/redeclaration/fn-scope-var-name-redeclaration-attempt-with-generator.js",
+            "language/block-scope/syntax/redeclaration/function-declaration-attempt-to-redeclare-with-var-declaration-nested-in-function.js",
+            "language/block-scope/syntax/redeclaration/function-name-redeclaration-attempt-with-let.js",
+            "language/block-scope/syntax/redeclaration/function-name-redeclaration-attempt-with-var.js",
+            "language/block-scope/syntax/redeclaration/generator-name-redeclaration-attempt-with-let.js",
+            "language/block-scope/syntax/redeclaration/generator-name-redeclaration-attempt-with-var.js",
+            "language/block-scope/syntax/redeclaration/inner-block-var-name-redeclaration-attempt-with-function.js",
+            "language/block-scope/syntax/redeclaration/inner-block-var-name-redeclaration-attempt-with-generator.js",
+            "language/block-scope/syntax/redeclaration/inner-block-var-name-redeclaration-attempt-with-let.js",
+            "language/block-scope/syntax/redeclaration/inner-block-var-redeclaration-attempt-after-function.js",
+            "language/block-scope/syntax/redeclaration/inner-block-var-redeclaration-attempt-after-generator.js",
+            "language/block-scope/syntax/redeclaration/inner-block-var-redeclaration-attempt-after-let.js",
+            "language/block-scope/syntax/redeclaration/var-name-redeclaration-attempt-with-function.js",
+            "language/block-scope/syntax/redeclaration/var-name-redeclaration-attempt-with-generator.js",
+            "language/block-scope/syntax/redeclaration/var-name-redeclaration-attempt-with-let.js",
+            "language/block-scope/syntax/redeclaration/var-redeclaration-attempt-after-function.js",
+            "language/block-scope/syntax/redeclaration/var-redeclaration-attempt-after-generator.js",
+            "language/expressions/object/method-definition/generator-param-redecl-let.js",
+            "language/expressions/object/method-definition/name-param-redecl.js",
+            "language/statements/for-in/head-let-bound-names-in-stmt.js",
+            "language/statements/for-of/head-let-bound-names-in-stmt.js",
+            "language/statements/for/head-let-bound-names-in-stmt.js",
+            "language/statements/switch/syntax/redeclaration/function-name-redeclaration-attempt-with-let.js",
+            "language/statements/switch/syntax/redeclaration/function-name-redeclaration-attempt-with-var.js",
+            "language/statements/switch/syntax/redeclaration/generator-name-redeclaration-attempt-with-let.js",
+            "language/statements/switch/syntax/redeclaration/generator-name-redeclaration-attempt-with-var.js",
+            "language/statements/switch/syntax/redeclaration/var-name-redeclaration-attempt-with-function.js",
+            "language/statements/switch/syntax/redeclaration/var-name-redeclaration-attempt-with-generator.js",
+            "language/statements/switch/syntax/redeclaration/var-name-redeclaration-attempt-with-let.js",
+            "language/statements/try/early-catch-function.js",
+            "language/statements/try/early-catch-lex.js",
+        )) {
+            put(path, "D-95: lexical declarations conflict with vars, functions and parameters here")
+        }
+        // A strict function has no own arguments property, which upstream gives every function (D-95).
+        for (path in listOf(
+            "language/expressions/function/forbidden-ext/b1/func-expr-strict-forbidden-ext-direct-access-prop-arguments.js",
+            "language/statements/function/forbidden-ext/b1/cls-expr-meth-forbidden-ext-direct-access-prop-arguments.js",
+        )) {
+            put(path, "D-95: a strict function has no own arguments here")
+        }
+        // A destructuring default names the anonymous function it gets, as a plain initializer
+        // does; upstream leaves it nameless (D-95). Each pattern comes as an arrow, a
+        // parenthesized function, a function and a generator.
+        for ((folder, stems) in listOf(
+            "language/expressions/arrow-function/dstr" to listOf("ary-ptrn-elem-id-init", "dflt-ary-ptrn-elem-id-init", "dflt-obj-ptrn-id-init"),
+            "language/expressions/assignment/dstr" to listOf("array-elem-init", "obj-id-init", "obj-prop-elem-init"),
+            "language/expressions/function/dstr" to listOf("ary-ptrn-elem-id-init", "dflt-ary-ptrn-elem-id-init", "dflt-obj-ptrn-id-init", "obj-ptrn-id-init"),
+            "language/expressions/generators/dstr" to listOf("ary-ptrn-elem-id-init", "dflt-ary-ptrn-elem-id-init", "dflt-obj-ptrn-id-init", "obj-ptrn-id-init"),
+            "language/expressions/object/dstr" to listOf("gen-meth-ary-ptrn-elem-id-init", "gen-meth-dflt-ary-ptrn-elem-id-init", "gen-meth-dflt-obj-ptrn-id-init", "gen-meth-obj-ptrn-id-init", "meth-ary-ptrn-elem-id-init", "meth-dflt-ary-ptrn-elem-id-init", "meth-dflt-obj-ptrn-id-init", "meth-obj-ptrn-id-init"),
+            "language/statements/const/dstr" to listOf("ary-ptrn-elem-id-init", "obj-ptrn-id-init"),
+            "language/statements/for-of/dstr" to listOf("array-elem-init", "let-ary-ptrn-elem-id-init", "let-obj-ptrn-id-init", "obj-prop-elem-init", "var-ary-ptrn-elem-id-init", "var-obj-ptrn-id-init"),
+            "language/statements/for/dstr" to listOf("let-ary-ptrn-elem-id-init", "let-obj-ptrn-id-init", "var-ary-ptrn-elem-id-init", "var-obj-ptrn-id-init"),
+            "language/statements/function/dstr" to listOf("ary-ptrn-elem-id-init", "dflt-ary-ptrn-elem-id-init", "dflt-obj-ptrn-id-init", "obj-ptrn-id-init"),
+            "language/statements/generators/dstr" to listOf("ary-ptrn-elem-id-init", "dflt-ary-ptrn-elem-id-init", "dflt-obj-ptrn-id-init", "obj-ptrn-id-init"),
+            "language/statements/let/dstr" to listOf("ary-ptrn-elem-id-init", "obj-ptrn-id-init"),
+            "language/statements/try/dstr" to listOf("ary-ptrn-elem-id-init", "obj-ptrn-id-init"),
+            "language/statements/variable/dstr" to listOf("ary-ptrn-elem-id-init", "obj-ptrn-id-init"),
+        )) {
+            for (stem in stems) {
+                for (kind in listOf("arrow", "cover", "fn", "gen")) {
+                    put("$folder/$stem-fn-name-$kind.js", "D-95: a destructuring default names its function here")
+                }
+            }
+        }
+        // ArrayBuffer has its Symbol.species getter, which upstream lacks (D-95).
+        for (path in listOf(
+            "built-ins/ArrayBuffer/Symbol.species/length.js",
+            "built-ins/ArrayBuffer/Symbol.species/return-value.js",
+            "built-ins/ArrayBuffer/Symbol.species/symbol-species-name.js",
+            "built-ins/ArrayBuffer/Symbol.species/symbol-species.js",
+        )) {
+            put(path, "D-95: ArrayBuffer[Symbol.species] is there here")
+        }
+        // A "use strict" body needs a simple parameter list, which upstream checks for defaults only (D-95).
+        for (path in listOf(
+            "language/expressions/arrow-function/array-destructuring-param-strict-body.js",
+            "language/expressions/arrow-function/object-destructuring-param-strict-body.js",
+            "language/expressions/function/array-destructuring-param-strict-body.js",
+            "language/expressions/function/object-destructuring-param-strict-body.js",
+            "language/expressions/function/rest-param-strict-body.js",
+            "language/expressions/generators/array-destructuring-param-strict-body.js",
+            "language/expressions/generators/object-destructuring-param-strict-body.js",
+            "language/expressions/generators/rest-param-strict-body.js",
+            "language/expressions/object/method-definition/gen-meth-array-destructuring-param-strict-body.js",
+            "language/expressions/object/method-definition/gen-meth-object-destructuring-param-strict-body.js",
+            "language/expressions/object/method-definition/gen-meth-rest-param-strict-body.js",
+            "language/expressions/object/method-definition/meth-array-destructuring-param-strict-body.js",
+            "language/expressions/object/method-definition/meth-object-destructuring-param-strict-body.js",
+            "language/expressions/object/method-definition/meth-rest-param-strict-body.js",
+            "language/statements/function/array-destructuring-param-strict-body.js",
+            "language/statements/function/object-destructuring-param-strict-body.js",
+            "language/statements/function/rest-param-strict-body.js",
+            "language/statements/generators/array-destructuring-param-strict-body.js",
+            "language/statements/generators/object-destructuring-param-strict-body.js",
+            "language/statements/generators/rest-param-strict-body.js",
+        )) {
+            put(path, "D-95: \"use strict\" needs a simple parameter list here")
+        }
+        // A rest parameter takes no default, which upstream allows (D-95).
+        for (path in listOf(
+            "language/expressions/function/dflt-params-rest.js",
+            "language/expressions/generators/dflt-params-rest.js",
+            "language/expressions/object/method-definition/gen-meth-dflt-params-rest.js",
+            "language/expressions/object/method-definition/meth-dflt-params-rest.js",
+            "language/statements/function/dflt-params-rest.js",
+            "language/statements/generators/dflt-params-rest.js",
+        )) {
+            put(path, "D-95: a rest parameter has no default here")
+        }
+        // A generator function's prototype has no constructor, which upstream gives it (D-95).
+        for (path in listOf(
+            "language/expressions/generators/prototype-own-properties.js",
+            "language/statements/generators/prototype-own-properties.js",
+        )) {
+            put(path, "D-95: a generator's prototype has no constructor here")
+        }
+        // `yield *` may go on after a line break, and `yield` then a line break then `*` is no `yield*`; upstream gets both wrong (D-95).
+        for (path in listOf(
+            "language/expressions/generators/yield-star-after-newline.js",
+            "language/expressions/generators/yield-star-before-newline.js",
+            "language/expressions/object/method-definition/yield-star-after-newline.js",
+            "language/expressions/object/method-definition/yield-star-before-newline.js",
+            "language/statements/generators/yield-star-after-newline.js",
+            "language/statements/generators/yield-star-before-newline.js",
+        )) {
+            put(path, "D-95: yield* follows the line break rules here")
+        }
+        // A reserved word spelled with an escape is no keyword, which upstream takes as the keyword itself (D-95).
+        for (path in listOf(
+            "language/expressions/object/method-definition/escaped-get-e.js",
+            "language/expressions/object/method-definition/escaped-get-g.js",
+            "language/expressions/object/method-definition/escaped-get-t.js",
+            "language/expressions/object/method-definition/escaped-get.js",
+            "language/expressions/object/method-definition/escaped-set-e.js",
+            "language/expressions/object/method-definition/escaped-set-s.js",
+            "language/expressions/object/method-definition/escaped-set-t.js",
+            "language/expressions/object/method-definition/escaped-set.js",
+            "language/literals/boolean/false-with-unicode.js",
+            "language/literals/boolean/true-with-unicode.js",
+            "language/literals/null/null-with-unicode.js",
+            "language/statements/for-of/escaped-of.js",
+        )) {
+            put(path, "D-95: an escaped keyword is no keyword here")
+        }
+        // A getter takes no parameter, which upstream allows (D-95).
+        for (path in listOf(
+            "language/expressions/object/getter-param-dflt.js",
+        )) {
+            put(path, "D-95: a getter takes no parameter here")
+        }
+        // Format-control characters stay in the source, which upstream drops outside strings (D-95).
+        for (path in listOf(
+            "language/literals/regexp/S7.8.5_A1.1_T2.js",
+            "language/literals/regexp/S7.8.5_A2.1_T2.js",
+        )) {
+            put(path, "D-95: format-control characters are kept here")
+        }
     }
 
     /**
@@ -846,7 +1039,7 @@ class Test262ParityTest {
             if (filter.isNotEmpty() && !relative.startsWith(filter)) continue
             // _FIXTURE files are imported by other tests, never run on their own.
             if (relative.endsWith("_FIXTURE.js")) continue
-            if (properties.isSkipped(relative)) { skipped++; continue }
+            if (properties.isSkipped(relative) && portOnlyFolders.none { relative.startsWith("$it/") }) { skipped++; continue }
 
             val source = file.readText()
             val meta = Test262FrontMatter.parse(source)

@@ -85,7 +85,14 @@ class IcodeParityTest {
             // call takes them as one array. Upstream's parser rejects that syntax.
             // A const a for head declares, bound afresh on every pass, by name and by frame slot
             // (D-72). Upstream's parser rejects that syntax too.
-            listOf("Icode_CALL_SPREAD", "Icode_INITCONST", "Icode_INITCONSTVAR", "Icode_NEW_SPREAD"),
+            // A class definition, `new.target` and the `super` call of a derived constructor
+            // (D-95), which upstream has no syntax for.
+            listOf(
+                "Icode_CALL_SPREAD", "Icode_CLASS_BEGIN", "Icode_CLASS_CTOR", "Icode_CLASS_ELEMENT",
+                "Icode_CLASS_END", "Icode_CLASS_PRIVATE_NAMES", "Icode_INITCONST", "Icode_INITCONSTVAR",
+                "Icode_NEW_SPREAD", "Icode_NEW_TARGET", "Icode_SUPER_CALL", "Icode_SUPER_CALL_SPREAD",
+                "Icode_SUPER_CTOR",
+            ),
             extras.keys.toList(),
         )
         val lowestUpstream = upstream.values.min()

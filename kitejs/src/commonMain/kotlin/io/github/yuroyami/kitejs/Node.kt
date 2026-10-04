@@ -823,7 +823,24 @@ public open class Node : Iterable<Node> {
         public const val NUMBER_OF_SPREAD: Int = 32
         // The port's own: a const a loop declares, given its value afresh on every pass (D-72).
         internal const val FRESH_CONST_PROP: Int = 33
-        public const val LAST_PROP: Int = FRESH_CONST_PROP
+
+        /**
+         * On a class: [CLASS_HAS_HERITAGE] and [CLASS_HAS_BINDING]. On a class element:
+         * [CLASS_STATIC] and [CLASS_NAMED_INITIALIZER].
+         */
+        internal const val CLASS_FLAGS_PROP: Int = 34
+
+        /** Marks the call `super(...)` in a derived class constructor. */
+        internal const val SUPER_CALL_PROP: Int = 35
+
+        /** On a class: the private names its body declares, as an array of strings. */
+        internal const val PRIVATE_NAMES_PROP: Int = 36
+        public const val LAST_PROP: Int = PRIVATE_NAMES_PROP
+
+        internal const val CLASS_HAS_HERITAGE: Int = 1
+        internal const val CLASS_HAS_BINDING: Int = 2
+        internal const val CLASS_STATIC: Int = 1
+        internal const val CLASS_NAMED_INITIALIZER: Int = 2
         public const val FIRST_PROP: Int = FUNCTION_PROP
 
         // Values of ISNUMBER_PROP: which of the children are Number types.
@@ -914,6 +931,9 @@ public open class Node : Iterable<Node> {
             SUPER_PROPERTY_ACCESS -> "super_property_access"
             NUMBER_OF_SPREAD -> "number_of_spread"
             FRESH_CONST_PROP -> "fresh_const"
+            CLASS_FLAGS_PROP -> "class_flags"
+            SUPER_CALL_PROP -> "super_call"
+            PRIVATE_NAMES_PROP -> "private_names"
             else -> throw Kit.codeBug()
         }
 

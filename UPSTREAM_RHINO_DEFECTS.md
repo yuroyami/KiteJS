@@ -626,6 +626,147 @@ them, so a replaced global crashes the host with a `ClassCastException`:
 - Test: `EvalOracleTest.replacedGlobalsDoNotReachWhatTheEngineMakes`; `RealmIntrinsicsTest`
   (common).
 
+### A reserved word spelled with an escape is taken as the keyword (D-95)
+
+ECMAScript 2015, 11.6.2 makes a reserved word a keyword only when it is spelled without escapes;
+spelled with one it is an IdentifierName, good as a property name and an early error wherever an
+identifier is expected. Rhino reads `\u0069f` as `if` itself, so `({ \u0069f: 1 })` is a syntax
+error, `n\u0065w.target` and `for (x \u006ff y)` are accepted as `new.target` and `of`, and
+`var \u0069f`, `tru\u0065` as a name, `g\u0065t x() {}` as a getter and an escaped `yield` in a
+generator all parse. V8 answers the opposite in every case.
+
+- Where: `TokenStream.getToken`, which looks an escaped word up in the keyword table like any
+  other.
+- Test: `SyntaxConformanceTest.escaped_keywords` (common).
+
+### Format-control characters are dropped from the source (D-95)
+
+ECMAScript 3, 7.1 removed format-control characters (Unicode category Cf) before scanning;
+ECMAScript 5 keeps them: ZWNJ and ZWJ are identifier parts, any of them may appear in strings,
+templates, regular expressions and comments, and one anywhere else is an error. Rhino still drops
+them outside strings and templates, so `var a\u200D = 5; a` followed by a literal ZWJ reads two
+different names (the escape keeps the character, the literal loses it), `/a<ZWJ>b/.source` has
+two characters instead of three, and a stray `1<LRM>;` parses.
+
+- Where: `TokenStream.getChar`, which skips `isJSFormatChar` characters at every language
+  version.
+- Test: `SyntaxConformanceTest.format_control_characters` (common).
+
+### Accessors take any parameter list (D-95)
+
+A getter takes no parameter and a setter exactly one, which may not be a rest parameter
+(ECMAScript 2015, 14.3.1). Rhino accepts `({ get x(a) {} })`, `({ set x() {} })`,
+`({ set x(a, b) {} })` and `({ set x(...a) {} })`; V8 throws a SyntaxError for each.
+
+- Where: `Parser.methodDefinition`, which marks the function a getter or setter without looking
+  at its parameters.
+- Test: `SyntaxConformanceTest.accessor_parameters` (common).
+
+### A for head refuses `in` between brackets (D-95)
+
+Only the bare expression of a `for (init; ...)` head loses the `in` operator; array and object
+literals, computed keys, element accesses and template substitutions take it back (ECMAScript
+2015, 12.2, where each is `[+In]`). Rhino turns it off for everything but parentheses, call
+arguments and the middle of a conditional, so `for (var o = { [a in b]: 1 }; ;)`,
+`for (var a = [x in y]; ;)` and `for (var v = o[k in o]; ;)` are syntax errors.
+
+- Where: `Parser`, whose `inForInit` flag only `parenExpr`, `argumentList` and `condExpr`
+  reset.
+- Test: `SyntaxConformanceTest.in_between_brackets_in_a_for_head` (common).
+
+### A rest parameter cannot be a pattern, and may have a default (D-95)
+
+ECMAScript 2016, 14.1 lets a rest parameter be a binding pattern, as in `function f(...[a, b])`,
+which Rhino rejects with "missing formal parameter". It also accepts `function f(...a = [])`,
+which has no grammar, and lets a body with `"use strict"` follow a parameter list that has a
+pattern or a rest parameter, where 14.1.2 wants a simple list; Rhino only checks for defaults.
+
+- Where: `Parser.parseFunctionParams` and the directive prologue of `Parser.parseFunctionBody`.
+- Test: `SyntaxConformanceTest.rest_parameters_and_simple_lists` (common).
+
+### A yield takes a whole Expression and wants parentheses in a list (D-95)
+
+The operand of a yield is one AssignmentExpression (ECMAScript 2015, 14.4), so
+`yield 1, yield 2` yields twice and `[...g()]` of `function* g() { yield 1, 2 }` is `[1]`. Rhino
+parses the operand as a comma Expression, and keeps JavaScript 1.7's rule that a yield after a
+comma or in an argument list be parenthesized, so `f(yield 1)` and `yield 1, yield 2` are syntax
+errors. `yield *` followed by a line break loses its operand and throws a TypeError at run time,
+and `yield` then a line break then `* 1` is taken as `yield* 1` where it is an early error.
+
+- Where: `Parser.returnOrYield`, `Parser.expr` and `Parser.argumentList`.
+- Test: `SyntaxConformanceTest.yield_operands` (common).
+
+### Redeclarations across blocks go unreported (D-95)
+
+A `let`, `const` or class conflicts with a `var` of its own scope, with a `var` declared in any
+block inside it and with a parameter, and a function declared in a block is lexical there
+(ECMAScript 2015, 13.2.1.1, 13.15.1 and 14.1.2). Rhino reports none of `{ var f; let f; }`,
+`{ { var f; } let f; }`, `let f; { var f; }`, `{ function f() {} var f; }`,
+`try {} catch (e) { let e; }`, `for (let x of []) { var x; }` or `function f(a) { let a; }`.
+
+- Where: `Parser.defineSymbol`, which compares a name with the one scope that defines it.
+- Test: `SyntaxConformanceTest.declaration_clashes` (common).
+
+### An anonymous function in a destructuring default stays nameless (D-95)
+
+NamedEvaluation gives an anonymous function, arrow, generator or class the name of the binding
+it initializes, in a pattern's default as much as in a plain initializer (ECMAScript 2015,
+12.14.5.2 and 13.3.3.6). Rhino names `var f = function () {}` but not
+`var [f = function () {}] = []`, `var { g = () => 1 } = {}` or a parameter default, whose `name`
+is the empty string.
+
+- Where: `IRFactory`, whose name inference runs for plain initializers only.
+- Test: `SyntaxConformanceTest.named_evaluation_in_patterns` (common).
+
+### ArrayBuffer has no Symbol.species, and generator prototypes have a constructor (D-95)
+
+`ArrayBuffer[Symbol.species]` is undefined, where ECMAScript 2015, 24.1.3.3 defines a getter
+returning `this`. A generator function's `prototype` gets a `constructor` property like an
+ordinary function's, which 25.2.4.2 leaves out. And `Object.defineProperty(f, 'length',
+{ value: 5 })` succeeds on a function without changing what `f.length` answers.
+
+- Where: `NativeArrayBuffer.init`; `BaseFunction.setupDefaultPrototype`; `BaseFunction`'s
+  `length` slot, which has no setter.
+- Test: `SyntaxConformanceTest.built_ins` (common).
+
+### A method's source text starts at its parenthesis, and strict functions own `arguments` (D-95)
+
+`Function.prototype.toString` of a method, getter, setter or generator method of an object
+literal answers the text from its parameter list on, as in `() { return 1; }`, where ECMAScript
+2019, 19.2.3.5 wants the whole MethodDefinition, `m() { return 1; }` or `get x() { ... }`. And a
+strict function has own `arguments` and `arity` properties like a sloppy one, where ECMAScript
+2015, 16.1 forbids an own `arguments` on a strict function.
+
+- Where: `Parser.methodDefinition`, which records the function's source start at the
+  parenthesis; `BaseFunction.createProperties`, which asks the context rather than the function
+  whether it is strict.
+- Test: `ClassSyntaxTest.source_text` (common).
+
+### Number, string and BigInt keys go wrong in literals and patterns (D-95)
+
+A BigInt literal as a key names the property its decimal digits spell (ECMAScript 2020,
+12.2.6.5), so `({ 1n: true })[1]` is `true`. Rhino crashes the host with a
+`NullPointerException` in its code generator on `{ 9n: true }`, and calls `Kit.codeBug` on
+`var { 1n: a } = o`. A destructuring pattern also reads a number key cut to an int, so
+`var { 1.5: a } = { '1.5': 7, 1: 3 }` binds 3, and reads a string key by name, so
+`var { '0': a } = [5]` misses the array element and binds `undefined`.
+
+- Where: `Parser.getPropKey`, which has no case for `BigIntLiteral`; `Parser.destructuringObject`,
+  which builds `GETELEM` with `number.toInt()` and `GETPROP` for a string.
+- Test: `SyntaxConformanceTest.literal_keys` (common).
+
+### Calling undefined names a Java object in the message (D-95)
+
+`[1].map()`, or any call whose callee the engine reports by value rather than by name, throws
+`TypeError: org.mozilla.javascript.Undefined@255316f2 is not a function, it is undefined.`: the
+message helper is printed with the Java object's own `toString`, hash and all, instead of as
+`undefined`.
+
+- Where: `ScriptRuntime.notFunctionError(Object, Object)`, which formats the helper with
+  `toString` rather than `ScriptRuntime.toString`.
+- Test: `EvalOracleTest.arrayBuiltin` (JVM), which compares the two messages once the Java name is
+  mapped back.
+
 ### A getOwnPropertyDescriptor trap answering undefined crashes (D-50)
 
 A Proxy whose `getOwnPropertyDescriptor` trap returns `undefined` for a property the target lacks

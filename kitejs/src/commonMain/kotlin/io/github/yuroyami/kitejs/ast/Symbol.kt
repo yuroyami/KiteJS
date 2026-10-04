@@ -39,6 +39,13 @@ public class Symbol() {
     /** The scope in which this symbol is entered. */
     public var containingTable: Scope? = null
 
+    /**
+     * A function symbol that only functions declared in blocks put in the function's table,
+     * which Annex B hoists as long as nothing lexical of the function body uses the name, so a
+     * `let` there does not conflict with it.
+     */
+    internal var onlyFromBlocks: Boolean = false
+
     public constructor(declType: Int, name: String?) : this() {
         this.name = name
         this.declType = declType

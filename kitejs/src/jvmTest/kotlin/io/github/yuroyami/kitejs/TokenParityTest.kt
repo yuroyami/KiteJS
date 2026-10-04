@@ -72,7 +72,8 @@ class TokenParityTest {
             "DOTDOTDOT" to (Token.DOTDOTDOT to RhinoToken.DOTDOTDOT),
             "NULLISH_COALESCING" to (Token.NULLISH_COALESCING to RhinoToken.NULLISH_COALESCING),
             "QUESTION_DOT" to (Token.QUESTION_DOT to RhinoToken.QUESTION_DOT),
-            "LAST_TOKEN" to (Token.LAST_TOKEN to RhinoToken.LAST_TOKEN),
+            // The port's own tokens for class syntax (D-95) start where upstream's list ends.
+            "LAST_TOKEN" to (Token.CLASS to RhinoToken.LAST_TOKEN),
         )
         for ((name, values) in pairs) {
             assertEquals(values.second, values.first, "Token.$name diverges from upstream")
@@ -80,8 +81,16 @@ class TokenParityTest {
     }
 
     @Test
+    fun thePortsOwnTokensFollowUpstreamsAndHaveNames() {
+        assertEquals(RhinoToken.LAST_TOKEN, Token.CLASS)
+        for (code in Token.CLASS until Token.LAST_TOKEN) {
+            assertEquals(true, Token.typeToName(code).isNotEmpty(), "token $code has no name")
+        }
+    }
+
+    @Test
     fun typeToNameMatchesUpstreamAcrossTheWholeRange() {
-        for (code in Token.FIRST_TOKEN..Token.LAST_TOKEN) {
+        for (code in Token.FIRST_TOKEN until RhinoToken.LAST_TOKEN) {
             val upstream = try {
                 RhinoToken.typeToName(code)
             } catch (e: IllegalStateException) {

@@ -37,6 +37,12 @@ public object CodeGenUtils {
         if (fn.isInStrictMode) builder.isStrict = true
         if (fn.isES6Generator) builder.isES6Generator = true
         if (fn.isShorthand) builder.isShorthand = true
+        if (fn.isClassFieldInitializer) builder.isClassFieldInitializer = true
+        if (fn.classConstructorKind != FunctionNode.NOT_CLASS_CONSTRUCTOR) {
+            builder.isClassConstructor = true
+            builder.isDerivedConstructor = fn.classConstructorKind == FunctionNode.DERIVED_CLASS_CONSTRUCTOR
+            builder.isDefaultConstructor = fn.isDefaultClassConstructor
+        }
         fillInCommon(builder, fn)
     }
 
@@ -78,8 +84,10 @@ public object CodeGenUtils {
     public fun <T : ScriptOrFn<T>> setConstructor(builder: JSDescriptor.Builder<T>, scriptOrFn: ScriptNode) {
         if (scriptOrFn is FunctionNode) {
             val isArrow = scriptOrFn.functionType == FunctionNode.ARROW_FUNCTION
+            // A class constructor is the one method definition that constructs.
+            val isClassConstructor = scriptOrFn.classConstructorKind != FunctionNode.NOT_CLASS_CONSTRUCTOR
             builder.constructor =
-                if (isArrow || scriptOrFn.isMethodDefinition || scriptOrFn.isGenerator) JSCode.NullBuilder()
+                if (!isClassConstructor && (isArrow || scriptOrFn.isMethodDefinition || scriptOrFn.isGenerator)) JSCode.NullBuilder()
                 else builder.code
         } else {
             builder.constructor = JSCode.NullBuilder()

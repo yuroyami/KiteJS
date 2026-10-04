@@ -235,7 +235,13 @@ public object Token {
     public const val DOTDOTDOT: Int = TAGGED_TEMPLATE_LITERAL + 1 // spread/rest ...
     public const val NULLISH_COALESCING: Int = DOTDOTDOT + 1 // nullish coalescing (??)
     public const val QUESTION_DOT: Int = NULLISH_COALESCING + 1 // optional chaining operator (?.)
-    public const val LAST_TOKEN: Int = QUESTION_DOT + 1
+    public const val CLASS: Int = QUESTION_DOT + 1 // ES6 class keyword, and the class node of the tree and the IR
+    public const val EXTENDS: Int = CLASS + 1 // ES6 extends keyword
+    public const val NEW_TARGET: Int = EXTENDS + 1 // ES6 new.target
+    public const val FIELD: Int = NEW_TARGET + 1 // ES2022 class field, in the IR of a class
+    public const val STATIC_BLOCK: Int = FIELD + 1 // ES2022 class static block, in the IR of a class
+    public const val PRIVATE_NAME: Int = STATIC_BLOCK + 1 // ES2022 #name, in a class body
+    public const val LAST_TOKEN: Int = PRIVATE_NAME + 1
 
     /**
      * Returns a name for the token. If the engine is compiled with certain hardcoded
@@ -444,6 +450,12 @@ public object Token {
         TAGGED_TEMPLATE_LITERAL -> "TAGGED_TEMPLATE_LITERAL"
         DOTDOTDOT -> "DOTDOTDOT"
         QUESTION_DOT -> "QUESTION_DOT"
+        CLASS -> "CLASS"
+        EXTENDS -> "EXTENDS"
+        NEW_TARGET -> "NEW_TARGET"
+        FIELD -> "FIELD"
+        STATIC_BLOCK -> "STATIC_BLOCK"
+        PRIVATE_NAME -> "PRIVATE_NAME"
         // Token without name
         else -> throw IllegalStateException(token.toString())
     }
@@ -484,6 +496,8 @@ public object Token {
         INSTANCEOF -> "instanceof"
         THROW -> "throw"
         TRY -> "try"
+        CLASS -> "class"
+        EXTENDS -> "extends"
         else -> null
     }
 

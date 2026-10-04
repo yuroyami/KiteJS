@@ -704,6 +704,57 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   and `Map.groupBy`, `Promise.any` and `Error.captureStackTrace` built through the global binding
   and crashed the host with a ClassCastException once a script replaced it, `TopLevel` or not
   (#77).
+- D-95: Class syntax (ECMAScript 2015, 14.5; ECMAScript 2022, 15.7), which upstream has none of.
+  The parser makes a `ClassNode` whose constructor, methods, accessors, field initializers and
+  static blocks are functions of their own, with `extends`, `super` calls and properties,
+  `new.target`, computed keys, public and private fields, private methods and accessors, `#x in
+  obj`, static fields and static blocks, and the early errors of a class body (a duplicate or
+  special constructor, a static `prototype`, a field named `constructor`, `super()` outside a
+  derived constructor, `arguments` in an initializer, an undeclared or duplicate private name, a
+  `delete` of one). `IRFactory` lowers it to a `CLASS` node, and the code generator to
+  `CLASS_PRIVATE_NAMES`, `CLASS_BEGIN`, `CLASS_CTOR`, one `CLASS_ELEMENT` per element and
+  `CLASS_END`, which `ClassRuntime` runs: ClassDefinitionEvaluation with the heritage checks, the
+  prototype chain, a read-only `prototype`, methods and accessors defined non-enumerable with
+  their home object, fields and private methods recorded on the constructor, static elements run
+  in order and the inner binding initialized last, with a temporal dead zone of its own until
+  then. A class constructor throws when called, and its [[Construct]] makes `this` from
+  newTarget's prototype and puts the fields on it for a base class, or leaves `this` to `super()`
+  for a derived one, through a `ThisBinding` the constructor's arrow functions and eval code
+  share, and checks the returned value when the frame exits. A default derived constructor passes
+  its arguments on without the array iterator. Private names are fresh per class evaluation, an
+  object's private elements are a map on `ScriptableObject`, and `#x in obj`, reads, writes,
+  calls, `++`, compound and logical assignment all go through them with the TypeErrors the spec
+  asks for. Class bodies are strict. Eval code in a field initializer keeps the initializer's
+  rules (no `arguments`, no `super()`), through `CompilerEnvirons.inClassFieldInitializer`.
+  Making class syntax pass test262 also fixed parser and runtime defects upstream shares with
+  plain functions: NamedEvaluation of anonymous functions and classes in destructuring defaults
+  and parameter defaults; a method's source text is its whole definition (its raw source bounds
+  start at the name, its node keeps upstream's position, which the parser oracle compares); a
+  strict function has
+  no own `arguments` or `arity`; ArrayBuffer[Symbol.species]; no `constructor` on a generator's
+  prototype; a redefinable function `length`; a reserved word spelled with an escape is no
+  keyword, fine as a property name and an error as an identifier; getters take no parameter and
+  setters exactly one; `in` is allowed between brackets, braces and backquotes in a `for` head;
+  a rest parameter may be a pattern and takes no default; "use strict" needs a simple parameter
+  list; ZWNJ and ZWJ are identifier parts and format-control characters are kept from ES2015 on;
+  `yield 1, yield 2` and `f(yield 1)` need no parentheses and a yield's operand is one
+  AssignmentExpression; `yield *` may continue on the next line and `yield` before a line break
+  and `*` is no `yield*`; a `let`, a `var` and a block function clash across blocks the way V8
+  reports it; `get` before a line break and `*` is a field; a BigInt key names its digits in an
+  object literal and a pattern, and a pattern reads a number key as its string form and a string
+  key as an element, so `{ 1.5: a }` and `{ '0': a }` find their properties. The redeclaration checks still let a
+  sloppy block function and a `var` share a name (Annex B). Lexical bindings other than a class's
+  inner binding still have no temporal dead zone (docs/differences.md). The test262 parity test
+  runs `language/statements/class`, `language/expressions/class` and
+  `language/expressions/new.target`, which upstream's properties file skips; what still fails
+  there is async code (#12), arrow rest parameters (#71) and gaps plain functions share, each
+  filed as an issue of its own: rest elements, rest properties and computed keys in patterns
+  (#81), JavaScript 1.7's for-in destructuring (#82), iterator closing (#83), the parameter
+  scope (#84), block-scoped functions (#85), `yield` as an identifier (#86), the restricted
+  `caller` and `arguments` (#87), errors made in the catching realm (#88) and WeakRef (#89). The
+  error messages the class syntax and these early errors need are the port's own, worded after
+  V8's, and the one upstream key whose check widened (`msg.default.args.use.strict`) keeps its
+  text beside a new `msg.use.strict.non.simple`.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

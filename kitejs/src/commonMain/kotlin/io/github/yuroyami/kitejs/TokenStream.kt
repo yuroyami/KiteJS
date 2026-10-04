@@ -128,7 +128,7 @@ internal class TokenStream(
                 "break" -> Token.BREAK
                 "case" -> Token.CASE
                 "catch" -> Token.CATCH
-                "class" -> Token.RESERVED
+                "class" -> Token.CLASS
                 "const" -> Token.CONST
                 "continue" -> Token.CONTINUE
                 "debugger" -> Token.DEBUGGER
@@ -137,7 +137,7 @@ internal class TokenStream(
                 "do" -> Token.DO
                 "else" -> Token.ELSE
                 "export" -> Token.RESERVED
-                "extends" -> Token.RESERVED
+                "extends" -> Token.EXTENDS
                 "finally" -> Token.FINALLY
                 "for" -> Token.FOR
                 "function" -> Token.FUNCTION
@@ -309,6 +309,16 @@ internal class TokenStream(
 
             if (c == '@'.code) return Token.XMLATTR
 
+            // A private name, `#` and an identifier with nothing between (ECMAScript 2022, 12.7).
+            var isPrivateName = false
+            if (c == '#'.code && parser.compilerEnv.languageVersion >= Context.VERSION_ES6) {
+                val next = peekChar()
+                if (next == '\\'.code || next == '$'.code || next == '_'.code || Characters.isUnicodeIdentifierStart(next)) {
+                    isPrivateName = true
+                    c = getChar()
+                }
+            }
+
             // identifier/keyword/instanceof?
             // watch out for starting with a <backslash>
             val identifierStart: Boolean
@@ -388,7 +398,8 @@ internal class TokenStream(
                         } else {
                             if (c == EOF_CHAR ||
                                 c == BYTE_ORDER_MARK.code ||
-                                !(Characters.isUnicodeIdentifierPart(c) || c == '$'.code)
+                                !(Characters.isUnicodeIdentifierPart(c) || c == '$'.code ||
+                                    c == 0x200c || c == 0x200d)
                             ) {
                                 break@identLoop
                             }
@@ -405,6 +416,18 @@ internal class TokenStream(
                 var str = getStringFromBuffer() // mutates tokenEnd to point to cursor
                 tokenEnd = savedTokenEnd // restore tokenEnd
 
+                if (isPrivateName) {
+                    if (containsEscape && !isValidIdentifierName(str)) {
+                        parser.reportError("msg.invalid.escape")
+                        return Token.ERROR
+                    }
+                    // Never a keyword: `#if` is as good a private name as `#x`.
+                    this.string = internString("#$str")
+                    return Token.PRIVATE_NAME
+                }
+
+                identifierEscaped = containsEscape
+                if (containsEscape) escapedNames.add(tokenBeg)
                 if (!containsEscape || parser.compilerEnv.languageVersion >= Context.VERSION_ES6) {
                     // OPT we shouldn't have to make a string (object!) to check if it's
                     // a keyword.
@@ -415,6 +438,17 @@ internal class TokenStream(
                         parser.compilerEnv.languageVersion,
                         parser.inUseStrictDirective,
                     )
+                    if (result != Token.EOF && containsEscape) {
+                        // A keyword spelled with an escape is no keyword (ECMAScript 2015,
+                        // 11.6.2): it is a name, fine as a property name and an error as an
+                        // identifier when the word is reserved here. Upstream took it as the
+                        // keyword itself.
+                        val contextual = result == Token.UNDEFINED || str == "await" ||
+                            ((result == Token.LET || result == Token.YIELD) && !parser.inUseStrictDirective)
+                        if (!contextual) escapedReservedWords.add(tokenBeg)
+                        this.string = internString(str)
+                        return Token.NAME
+                    }
                     if (result != Token.EOF) {
                         if ((result == Token.LET || result == Token.YIELD) &&
                             parser.compilerEnv.languageVersion < Context.VERSION_1_7
@@ -1423,7 +1457,16 @@ internal class TokenStream(
         return c
     }
 
-    private fun getChar(): Int = getChar(true, false)
+    /**
+     * Whether the scanner drops format-control characters, as ECMAScript 3, 7.1 had it. Since
+     * ECMAScript 5 they stay: ZWNJ and ZWJ go on in identifiers, any of them in strings,
+     * templates, regular expressions and comments, and one anywhere else is an error. Upstream
+     * dropped them at every version, so `a\u200D` and `a` followed by a literal ZWJ named
+     * different variables there.
+     */
+    private val skipsFormatChars = parser.compilerEnv.languageVersion < Context.VERSION_ES6
+
+    private fun getChar(): Int = getChar(skipsFormatChars, false)
 
     private fun getChar(skipFormattingChars: Boolean): Int = getChar(skipFormattingChars, false)
 
@@ -1472,7 +1515,7 @@ internal class TokenStream(
         }
     }
 
-    private fun getCharIgnoreLineEnd(): Int = getChar(true, true)
+    private fun getCharIgnoreLineEnd(): Int = getChar(skipsFormatChars, true)
 
     private fun getCharIgnoreLineEnd(skipFormattingChars: Boolean): Int =
         getChar(skipFormattingChars, true)
@@ -1628,6 +1671,19 @@ internal class TokenStream(
     // but saves lots of code.
     var string: String? = ""
         private set
+
+    /** True when the name just scanned was spelled with at least one `\u` escape. */
+    internal var identifierEscaped: Boolean = false
+        private set
+
+    /**
+     * Where each reserved word spelled with an escape begins. Such a word scans as a plain name,
+     * good as a property name, and the parser turns it away wherever it would be an identifier.
+     */
+    internal val escapedReservedWords: HashSet<Int> = HashSet()
+
+    /** Where each name spelled with an escape begins, so `g\u0065t x() {}` is no getter. */
+    internal val escapedNames: HashSet<Int> = HashSet()
 
     var number: Double = 0.0
         private set

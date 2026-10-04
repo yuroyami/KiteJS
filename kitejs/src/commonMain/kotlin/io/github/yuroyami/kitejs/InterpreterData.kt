@@ -46,7 +46,7 @@ internal class InterpreterData<T : ScriptOrFn<T>>(
         if (asm != null && newTarget == null) {
             io.github.yuroyami.kitejs.asm.AsmLink.link(cx, scope, asm, args)?.let { return it }
         }
-        return Interpreter.interpret(executableObject, this, cx, scope, thisObj as Scriptable?, args)
+        return Interpreter.interpret(executableObject, this, cx, scope, thisObj as Scriptable?, args, newTarget)
     }
 
     override fun resume(cx: Context, executableObject: T, state: Any?, scope: Scriptable, operation: Int, value: Any?): Any? =

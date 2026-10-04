@@ -15,6 +15,8 @@ import io.github.yuroyami.kitejs.ast.BigIntLiteral
 import io.github.yuroyami.kitejs.ast.Block
 import io.github.yuroyami.kitejs.ast.BreakStatement
 import io.github.yuroyami.kitejs.ast.CatchClause
+import io.github.yuroyami.kitejs.ast.ClassElement
+import io.github.yuroyami.kitejs.ast.ClassNode
 import io.github.yuroyami.kitejs.ast.Comment
 import io.github.yuroyami.kitejs.ast.ComputedPropertyKey
 import io.github.yuroyami.kitejs.ast.ConditionalExpression
@@ -123,9 +125,27 @@ public class Parser(
     // See PerFunctionVariables below.
     internal var currentScriptOrFn: ScriptNode? = null
     private var insideMethod = false
+
+    /** Set in a derived class constructor and the arrow functions in it, where `super(...)` may be called. */
+    private var superCallAllowed = false
+
+    /** Set in a function that is not an arrow function, where `new.target` means something. */
+    private var newTargetAllowed = false
+
+    /**
+     * Set in a class field initializer or static block, and the arrow functions in them, where
+     * `arguments` and `yield` are early errors (ECMAScript 2022, 15.7.1).
+     */
+    private var inClassInitializer = false
+
+    /** Set in a class static block outside any function in it, where `return` is an early error. */
+    private var inStaticBlock = false
     internal var currentScope: Scope? = null
     private var endFlags = 0
     private var inForInit = false // bound temporarily during forStatement()
+
+    /** Set while the clause of an `if` about to be parsed is a function declaration. */
+    private var ifClauseFunction = false
 
     /**
      * Set while the names a `for` head declares with `const` are defined. Such a const belongs to
@@ -538,6 +558,9 @@ public class Parser(
         if (inUseStrictDirective) {
             root.isInStrictMode = true
         }
+        superCallAllowed = compilerEnv.allowSuperCall
+        newTargetAllowed = compilerEnv.allowNewTarget
+        inClassInitializer = compilerEnv.inClassFieldInitializer
 
         try {
             while (true) {
@@ -564,7 +587,7 @@ public class Parser(
                     n = lastScannedComment()
                     consumeToken()
                 } else {
-                    n = statement()
+                    n = statementListItem()
                     if (inDirectivePrologue) {
                         val directive = getDirective(n)
                         if (directive == null) {
@@ -651,14 +674,18 @@ public class Parser(
                             n = function(FunctionNode.FUNCTION_STATEMENT)
                         }
                         else -> {
-                            n = statement()
+                            n = statementListItem()
                             if (inDirectivePrologue) {
                                 val directive = getDirective(n)
                                 if (directive == null) {
                                     inDirectivePrologue = false
                                 } else if ("use strict" == directive) {
-                                    if (fnNode.defaultParams != null) {
-                                        reportError("msg.default.args.use.strict")
+                                    // Only a simple parameter list may sit before the directive
+                                    // (ECMAScript 2016, 14.1.2). Upstream checked defaults alone.
+                                    if (fnNode.defaultParams != null || fnNode.hasRestParameter ||
+                                        fnNode.getProp(Node.DESTRUCTURING_PARAMS) != null
+                                    ) {
+                                        reportError("msg.use.strict.non.simple")
                                     }
                                     inUseStrictDirective = true
                                     fnNode.isInStrictMode = true
@@ -772,6 +799,24 @@ public class Parser(
                         consumeToken()
                         restStartLineno = lineNumber()
                         restStartColumn = columnNumber()
+
+                        val next = peekToken()
+                        if ((next == Token.LB || next == Token.LC) &&
+                            compilerEnv.languageVersion >= Context.VERSION_ES6
+                        ) {
+                            // A pattern after the dots takes the rest array apart (ECMAScript
+                            // 2016, 14.1: BindingRestElement), and has no default. Upstream took
+                            // only a name.
+                            val pattern = destructuringPrimaryExpr()
+                            if (peekToken() == Token.ASSIGN) reportError("msg.rest.default")
+                            markDestructuring(pattern)
+                            fnNode.addParam(pattern)
+                            val pname = currentScriptOrFn!!.getNextTempName()
+                            defineSymbol(Token.LP, pname, false)
+                            if (destructuring == null) destructuring = HashMap()
+                            destructuring[pname] = pattern
+                            continue
+                        }
                     }
 
                     if (matchToken(Token.UNDEFINED, true) ||
@@ -786,7 +831,7 @@ public class Parser(
                             )
                         }
 
-                        val paramNameNode = createNameNode()
+                        val paramNameNode = rejectEscapedReservedWord(createNameNode())
                         if (wasRest) {
                             paramNameNode.setLineColumnNumber(restStartLineno, restStartColumn)
                         }
@@ -805,6 +850,7 @@ public class Parser(
                         }
 
                         if (matchToken(Token.ASSIGN, true)) {
+                            if (wasRest) reportError("msg.rest.default")
                             if (compilerEnv.languageVersion >= Context.VERSION_ES6) {
                                 fnNode.putDefaultParams(paramName, assignExpr())
                             } else {
@@ -844,18 +890,33 @@ public class Parser(
 
     private fun function(type: Int): FunctionNode = function(type, false)
 
-    private fun function(type: Int, isMethodDefiniton: Boolean): FunctionNode {
+    /**
+     * [sourceStart] is where a method's source text starts, which is its name or the `get`,
+     * `set` or `*` before it rather than the parenthesis this is called at; -1 for a function,
+     * whose text starts at the current token. Only the raw source bounds take it: the node keeps
+     * upstream's position. [classConstructorKind] marks a class constructor.
+     */
+    private fun function(
+        type: Int,
+        isMethodDefiniton: Boolean,
+        sourceStart: Int = -1,
+        classConstructorKind: Int = FunctionNode.NOT_CLASS_CONSTRUCTOR,
+        isGeneratorMethod: Boolean = false,
+    ): FunctionNode {
         var isGenerator = false
         var syntheticType = type
+        val inIfClause = ifClauseFunction
+        ifClauseFunction = false
         val baseLineno = lineNumber() // line number where the source starts
         val functionSourceStart = ts.tokenBeg // start of the "function" keyword
+        val functionTextStart = if (sourceStart >= 0) sourceStart else functionSourceStart
         val functionStartColumn = columnNumber()
         var name: Name? = null
         var memberExprNode: AstNode? = null
 
         do {
             if (matchToken(Token.NAME, true) || matchToken(Token.UNDEFINED, true)) {
-                name = createNameNode(true, Token.NAME)
+                name = rejectEscapedReservedWord(createNameNode(true, Token.NAME))
                 if (inUseStrictDirective) {
                     val id = name.identifier
                     if ("eval" == id || "arguments" == id) {
@@ -899,13 +960,16 @@ public class Parser(
             name.length() > 0
         ) {
             // Function statements define a symbol in the enclosing scope.
-            defineSymbol(Token.FUNCTION, name.identifier!!)
+            defineSymbol(Token.FUNCTION, name.identifier!!, false, inIfClause)
         }
 
         val fnNode = FunctionNode(functionSourceStart, name)
         fnNode.isMethodDefinition = isMethodDefiniton
         fnNode.functionType = type
-        if (isGenerator) {
+        fnNode.classConstructorKind = classConstructorKind
+        // A generator method is known to be one before its body, which may not use `yield` as a
+        // name either.
+        if (isGenerator || isGeneratorMethod) {
             fnNode.isES6Generator = true
         }
         if (lpPos != -1) fnNode.lp = lpPos - functionSourceStart
@@ -914,13 +978,21 @@ public class Parser(
 
         val savedVars = PerFunctionVariables(fnNode)
         val wasInsideMethod = insideMethod
+        val savedSuperCallAllowed = superCallAllowed
+        val savedNewTargetAllowed = newTargetAllowed
+        val savedInClassInitializer = inClassInitializer
+        val savedInStaticBlock = inStaticBlock
         insideMethod = isMethodDefiniton
+        superCallAllowed = classConstructorKind == FunctionNode.DERIVED_CLASS_CONSTRUCTOR
+        newTargetAllowed = true
+        inClassInitializer = false
+        inStaticBlock = false
         try {
             parseFunctionParams(fnNode)
             val body = parseFunctionBody(type, fnNode)
             fnNode.body = body
             val end = functionSourceStart + body.position + body.length
-            fnNode.setRawSourceBounds(functionSourceStart, end)
+            fnNode.setRawSourceBounds(functionTextStart, end)
             fnNode.length = end - functionSourceStart
 
             if (compilerEnv.strictMode && !fnNode.body!!.hasConsistentReturnUsage()) {
@@ -935,6 +1007,10 @@ public class Parser(
         } finally {
             savedVars.restore()
             insideMethod = wasInsideMethod
+            superCallAllowed = savedSuperCallAllowed
+            newTargetAllowed = savedNewTargetAllowed
+            inClassInitializer = savedInClassInitializer
+            inStaticBlock = savedInStaticBlock
         }
 
         if (memberExprNode != null) {
@@ -970,7 +1046,11 @@ public class Parser(
         val paramNames = HashSet<String>()
 
         val savedVars = PerFunctionVariables(fnNode)
-        // Intentionally not overwriting insideMethod: it propagates from the enclosing function.
+        // Intentionally not overwriting insideMethod: it propagates from the enclosing function,
+        // and so do super(), new.target and the restrictions of a class initializer. Only a
+        // return is the arrow function's own again.
+        val savedInStaticBlock = inStaticBlock
+        inStaticBlock = false
         try {
             if (params is ParenthesizedExpression) {
                 fnNode.setParens(0, params.length)
@@ -1009,6 +1089,7 @@ public class Parser(
             fnNode.length = end - functionSourceStart
         } finally {
             savedVars.restore()
+            inStaticBlock = savedInStaticBlock
         }
 
         if (fnNode.isGenerator) {
@@ -1117,7 +1198,7 @@ public class Parser(
 
         var tt = peekToken()
         while (tt > Token.EOF && tt != Token.RC) {
-            block.addChild(statement())
+            block.addChild(statementListItem())
             tt = peekToken()
         }
         block.length = ts.tokenBeg - pos
@@ -1151,8 +1232,26 @@ public class Parser(
         return data
     }
 
+    /**
+     * A statement where a declaration may stand too (ECMAScript 2015, 13, StatementListItem):
+     * in a block, a function or script body, a case clause or a static block, but not as the
+     * body of an if, a loop, a label or a with.
+     */
+    private fun statementListItem(): AstNode {
+        listItemPending = true
+        return statement()
+    }
+
+    /** Set by [statementListItem] for the [statement] it calls, which takes it and clears it. */
+    private var listItemPending = false
+
+    /** Whether the statement being parsed is a StatementListItem. */
+    private var inStatementListItem = false
+
     private fun statement(): AstNode {
         val pos = ts.tokenBeg
+        inStatementListItem = listItemPending
+        listItemPending = false
         try {
             val pn = statementHelper()
             if (pn != null) {
@@ -1244,7 +1343,16 @@ public class Parser(
                 }
             }
 
-            Token.RETURN, Token.YIELD -> pn = returnOrYield(tt, false)
+            // Since ECMAScript 2015 a yield is an expression like any other, so a statement can
+            // go on past it, as in `yield 1, yield 2;`.
+            Token.RETURN, Token.YIELD -> if (tt == Token.YIELD && compilerEnv.languageVersion >= Context.VERSION_ES6) {
+                lineno = ts.lineno
+                column = ts.tokenColumn
+                pn = ExpressionStatement(expr(false), !insideFunctionBody())
+                pn.setLineColumnNumber(lineno, column)
+            } else {
+                pn = returnOrYield(tt, false)
+            }
 
             Token.DEBUGGER -> {
                 consumeToken()
@@ -1270,6 +1378,12 @@ public class Parser(
             Token.FUNCTION -> {
                 consumeToken()
                 return function(FunctionNode.FUNCTION_EXPRESSION_STATEMENT)
+            }
+
+            Token.CLASS -> {
+                consumeToken()
+                if (!inStatementListItem) reportError("msg.class.not.in.block")
+                return classDeclaration()
             }
 
             Token.DEFAULT -> pn = defaultXmlNamespace()
@@ -1335,7 +1449,9 @@ public class Parser(
         var elsePos = -1
         val pn = IfStatement(pos)
         val data = condition()
+        ifClauseFunction = peekToken() == Token.FUNCTION
         val ifTrue = getNextStatementAfterInlineComments(pn)
+        ifClauseFunction = false
         checkControlBody(ifTrue, isIfBody = true)
         var ifFalse: AstNode? = null
         if (matchToken(Token.ELSE, true)) {
@@ -1344,7 +1460,9 @@ public class Parser(
                 consumeToken()
             }
             elsePos = ts.tokenBeg - pos
+            ifClauseFunction = peekToken() == Token.FUNCTION
             ifFalse = statement()
+            ifClauseFunction = false
             checkControlBody(ifFalse, isIfBody = true)
         }
         val end = getNodeEnd(ifFalse ?: ifTrue)
@@ -1441,7 +1559,7 @@ public class Parser(
                             tt = peekToken()
                             continue
                         }
-                        caseNode.addStatement(statement()) // updates the length
+                        caseNode.addStatement(statementListItem()) // updates the length
                         tt = peekToken()
                     }
                     pn.addCase(caseNode)
@@ -1592,7 +1710,7 @@ public class Parser(
                 cond = expr(false) // object being iterated
             } else if (compilerEnv.languageVersion >= Context.VERSION_ES6 &&
                 matchToken(Token.NAME, true) &&
-                "of" == ts.string
+                "of" == ts.string && !ts.identifierEscaped
             ) {
                 isForOf = true
                 inPos = ts.tokenBeg - forPos
@@ -1787,7 +1905,7 @@ public class Parser(
                                 mustMatchToken(Token.NAME, "msg.bad.catchcond", true)
                             }
 
-                            varName = createNameNode()
+                            varName = rejectEscapedReservedWord(createNameNode())
                             getAndResetJsDoc()?.let { varName.jsDocNode = it }
                             val varNameString = varName.identifier
                             if ("undefined" == varNameString) {
@@ -1834,6 +1952,18 @@ public class Parser(
                 } finally {
                     hasUndefinedBeenRedefined = previous
                     popScope()
+                }
+                // The catch parameter conflicts with a let, const, class or function the block
+                // declares directly (ECMAScript 2015, 13.15.1), though not with a var (B.3.5). A
+                // pattern's names are checked when IRFactory declares them with let.
+                if (varName is Name) {
+                    val paramName = varName.identifier!!
+                    val clash = when (catchScope.getSymbol(paramName)?.declType) {
+                        Token.LET -> "msg.let.redecl"
+                        Token.CONST -> "msg.const.redecl"
+                        else -> if (catchScope.functionNamesWithin?.contains(paramName) == true) "msg.fn.redecl" else null
+                    }
+                    if (clash != null) addError(clash, paramName)
                 }
 
                 tryEnd = getNodeEnd(catchScope)
@@ -1921,7 +2051,7 @@ public class Parser(
         val column = columnNumber()
         var breakLabel: Name? = null
         if (peekTokenOrEOL() == Token.NAME) {
-            breakLabel = createNameNode()
+            breakLabel = rejectEscapedReservedWord(createNameNode())
             end = getNodeEnd(breakLabel)
         }
 
@@ -1958,7 +2088,7 @@ public class Parser(
         val column = columnNumber()
         var label: Name? = null
         if (peekTokenOrEOL() == Token.NAME) {
-            label = createNameNode()
+            label = rejectEscapedReservedWord(createNameNode())
             end = getNodeEnd(label)
         }
 
@@ -2046,6 +2176,10 @@ public class Parser(
         if (!insideFunctionBody()) {
             reportError(if (tt == Token.RETURN) "msg.bad.return" else "msg.bad.yield")
         }
+        // A static block is a body of its own but no function a script calls, and a class
+        // initializer is no generator (ECMAScript 2022, 15.7.1).
+        if (tt == Token.RETURN && inStaticBlock) reportError("msg.bad.return")
+        if (tt == Token.YIELD && inClassInitializer) reportError("msg.bad.yield")
         consumeToken()
         val lineno = lineNumber()
         val column = columnNumber()
@@ -2053,25 +2187,42 @@ public class Parser(
         var end = ts.tokenEnd
 
         var yieldStar = false
+        // No line break may come between `yield` and its `*` (ECMAScript 2015, 14.4).
         if (tt == Token.YIELD &&
             compilerEnv.languageVersion >= Context.VERSION_ES6 &&
-            peekToken() == Token.MUL
+            peekTokenOrEOL() == Token.MUL
         ) {
             yieldStar = true
             consumeToken()
         }
 
         var e: AstNode? = null
-        // Ugly, but a semicolon must not be required here.
-        when (val next = peekTokenOrEOL()) {
-            Token.SEMI, Token.RC, Token.RB, Token.RP, Token.EOF, Token.EOL, Token.ERROR -> {}
-            else -> {
-                // Take extra care to preserve language compatibility for a bare "yield".
-                if (!(next == Token.YIELD &&
-                        compilerEnv.languageVersion < Context.VERSION_ES6)
-                ) {
+        val es6Yield = tt == Token.YIELD && compilerEnv.languageVersion >= Context.VERSION_ES6
+        if (yieldStar) {
+            // `yield*` always has an operand, which may start on the next line.
+            e = assignExpr()
+            end = getNodeEnd(e)
+        } else {
+            // Ugly, but a semicolon must not be required here.
+            when (val next = peekTokenOrEOL()) {
+                Token.SEMI, Token.RC, Token.RB, Token.RP, Token.EOF, Token.EOL, Token.ERROR -> {}
+                // Nor can a comma or colon start the operand of a yield, as in `yield, yield` or
+                // `a ? yield : yield`.
+                Token.COMMA, Token.COLON -> if (!es6Yield) {
                     e = expr(false)
                     end = getNodeEnd(e)
+                }
+                else -> {
+                    // Take extra care to preserve language compatibility for a bare "yield".
+                    if (!(next == Token.YIELD &&
+                            compilerEnv.languageVersion < Context.VERSION_ES6)
+                    ) {
+                        // The operand of a yield is one AssignmentExpression (ECMAScript 2015,
+                        // 14.4), so `yield 1, yield 2` yields twice; a return takes a whole
+                        // Expression.
+                        e = if (es6Yield) assignExpr() else expr(false)
+                        end = getNodeEnd(e)
+                    }
                 }
             }
         }
@@ -2224,10 +2375,11 @@ public class Parser(
             recordLabel(expr as Label, bundle)
         }
 
-        // No more labels; now parse the labeled statement.
+        // No more labels; now parse the labeled statement, which is no list item of its own.
         try {
             currentLabel = bundle
             if (stmt == null) {
+                inStatementListItem = false
                 stmt = statementHelper()
                 val ntt = peekToken()
                 if (ntt == Token.COMMENT && stmt!!.lineno == lastScannedComment().lineno) {
@@ -2326,7 +2478,7 @@ public class Parser(
                 } else {
                     mustMatchToken(Token.NAME, "msg.bad.var", true)
                 }
-                name = createNameNode()
+                name = rejectEscapedReservedWord(createNameNode())
                 name.setLineColumnNumber(lineNumber(), columnNumber())
                 if (inUseStrictDirective) {
                     val id = ts.string
@@ -2414,7 +2566,11 @@ public class Parser(
         defineSymbol(declType, name, false)
     }
 
-    internal fun defineSymbol(declType: Int, name: String?, ignoreNotInBlock: Boolean) {
+    /**
+     * [ifClause] marks a function declared as the clause of an `if`, which Annex B.3.4 treats as
+     * if it sat in a block of its own: it is lexical in no block the parser has open.
+     */
+    internal fun defineSymbol(declType: Int, name: String?, ignoreNotInBlock: Boolean, ifClause: Boolean = false) {
         if (name == null) {
             if (compilerEnv.ideMode) { // stay robust in IDE mode
                 return
@@ -2430,13 +2586,22 @@ public class Parser(
         // A const a for head or a block declares shadows an outer name the way a let does, but
         // not a var or function declared inside its own block (D-72, D-74).
         val loopConst = declType == Token.CONST && blockScopedConst
+        val inBlock = scope !== currentScriptOrFn
         val conflicts =
             if (loopConst) {
-                definingScope === scope || scope.varNamesWithin?.contains(name) == true
+                definingScope === scope || clashesWithBlock(scope, name)
             } else {
                 symDeclType == Token.CONST ||
                     declType == Token.CONST ||
-                    (definingScope === scope && symDeclType == Token.LET)
+                    (definingScope === scope && symDeclType == Token.LET) ||
+                    // A let or class conflicts with whatever else its own scope declares, a var
+                    // or function included, with a var declared in a block inside it and with a
+                    // function declared in its own block (ECMAScript 2015, 13.2.1.1); upstream
+                    // lets all of them through.
+                    (declType == Token.LET && ((definingScope === scope && !symbol!!.onlyFromBlocks) || clashesWithBlock(scope, name))) ||
+                    // A function declared in a block is lexical there, so a var of the block or
+                    // of a block inside it conflicts with it.
+                    (declType == Token.FUNCTION && inBlock && !ifClause && scope.varNamesWithin?.contains(name) == true)
             }
         if (symbol != null && conflicts) {
             addError(
@@ -2450,6 +2615,11 @@ public class Parser(
                 name,
             )
             return
+        }
+        // A var conflicts with a let, const, class or block function of every block it hoists
+        // out of, and with a let, const or class of the function body itself.
+        if (declType == Token.VAR) {
+            lexicalDeclarationAround(name)?.let { addError(it, name); return }
         }
         if (loopConst) {
             scope.putSymbol(Symbol(declType, name))
@@ -2467,15 +2637,20 @@ public class Parser(
             }
 
             Token.VAR, Token.CONST, Token.FUNCTION -> {
-                if (declType != Token.CONST) noteVarNameInBlocks(name)
+                if (declType == Token.VAR) noteVarNameInBlocks(name)
+                val fromBlock = declType == Token.FUNCTION && inBlock
+                if (fromBlock && !ifClause) {
+                    (scope.functionNamesWithin ?: HashSet<String>().also { scope.functionNamesWithin = it }).add(name)
+                }
                 if (symbol != null) {
                     if (symDeclType == Token.VAR) {
                         addStrictWarning("msg.var.redecl", name)
                     } else if (symDeclType == Token.LP) {
                         addStrictWarning("msg.var.hides.arg", name)
                     }
+                    if (!fromBlock) symbol.onlyFromBlocks = false
                 } else {
-                    currentScriptOrFn!!.putSymbol(Symbol(declType, name))
+                    currentScriptOrFn!!.putSymbol(Symbol(declType, name).also { it.onlyFromBlocks = fromBlock })
                 }
             }
 
@@ -2491,10 +2666,34 @@ public class Parser(
         }
     }
 
-    /** Records a var or function name in every block between here and the function body. */
+    /** Whether a var inside [scope], or a function declared directly in it, already uses [name]. */
+    private fun clashesWithBlock(scope: Scope, name: String): Boolean =
+        scope.varNamesWithin?.contains(name) == true || scope.functionNamesWithin?.contains(name) == true
+
+    /**
+     * The message for a lexical declaration of [name] that a var declared here would hoist past:
+     * a let, const or class of any scope up to the function body, or a function declared directly
+     * in a block on the way. Null when there is none. The walk stops at the nearest function or
+     * script, which IRFactory relies on when it declares a destructured var after parsing.
+     */
+    private fun lexicalDeclarationAround(name: String): String? {
+        var s = currentScope
+        while (s != null) {
+            when (s.getSymbol(name)?.declType) {
+                Token.LET -> return "msg.let.redecl"
+                Token.CONST -> if (s !is ScriptNode) return "msg.const.redecl"
+            }
+            if (s is ScriptNode) break
+            if (s.functionNamesWithin?.contains(name) == true) return "msg.fn.redecl"
+            s = s.parentScope
+        }
+        return null
+    }
+
+    /** Records a var name in every block between here and the function body. */
     private fun noteVarNameInBlocks(name: String) {
         var scope = currentScope
-        while (scope != null && scope !== currentScriptOrFn) {
+        while (scope != null && scope !== currentScriptOrFn && scope !is ScriptNode) {
             val names = scope.varNamesWithin ?: HashSet<String>().also { scope.varNamesWithin = it }
             names.add(name)
             scope = scope.parentScope
@@ -2509,7 +2708,11 @@ public class Parser(
             if (compilerEnv.strictMode && !pn.hasSideEffects()) {
                 addStrictWarning("msg.no.side.effects", "", pos, nodeEnd(pn) - pos)
             }
-            if (peekToken() == Token.YIELD) reportError("msg.yield.parenthesized")
+            // JavaScript 1.7 wanted a yield after a comma parenthesized; ECMAScript 2015 takes
+            // `yield 1, yield 2` as it is.
+            if (peekToken() == Token.YIELD && compilerEnv.languageVersion < Context.VERSION_ES6) {
+                reportError("msg.yield.parenthesized")
+            }
             if (allowTrailingComma && peekToken() == Token.RP) {
                 pn.putIntProp(Node.TRAILING_COMMA, 1)
                 return pn
@@ -2692,7 +2895,7 @@ public class Parser(
     }
 
     private fun relExpr(): AstNode {
-        var pn = shiftExpr()
+        var pn = if (peekToken() == Token.PRIVATE_NAME) privateInExpr() else shiftExpr()
         while (true) {
             val tt = peekToken()
             val opPos = ts.tokenBeg
@@ -2709,6 +2912,20 @@ public class Parser(
                 else -> return pn
             }
         }
+    }
+
+    /** RelationalExpression : PrivateIdentifier `in` ShiftExpression (ECMAScript 2022, 13.10). */
+    private fun privateInExpr(): AstNode {
+        consumeToken()
+        val name = privateNameNode()
+        if (inForInit || peekToken() != Token.IN) {
+            reportError("msg.private.alone", name.identifier, name.position, name.length)
+            return makeErrorNode()
+        }
+        usePrivateName(name)
+        consumeToken()
+        val opPos = ts.tokenBeg
+        return InfixExpression(Token.IN, name, shiftExpr(), opPos)
     }
 
     private fun shiftExpr(): AstNode {
@@ -2831,7 +3048,12 @@ public class Parser(
                 consumeToken()
                 line = lineNumber()
                 column = columnNumber()
-                node = UnaryExpression(tt, ts.tokenBeg, unaryExpr())
+                val opPos = ts.tokenBeg
+                val operand = unaryExpr()
+                var target = operand
+                while (target is ParenthesizedExpression) target = target.expression!!
+                if (target is ElementGet && isPrivateNameNode(target.element)) reportError("msg.private.delete")
+                node = UnaryExpression(tt, opPos, operand)
                 node.setLineColumnNumber(line, column)
                 return node
             }
@@ -2892,7 +3114,9 @@ public class Parser(
                     // Handles f1(a,) without breaking f1(a,b
                     break
                 }
-                if (peekToken() == Token.YIELD) {
+                // An argument is an AssignmentExpression, so `f(yield 1)` needs no parentheses
+                // since ECMAScript 2015 (12.3); JavaScript 1.7 wanted them.
+                if (peekToken() == Token.YIELD && compilerEnv.languageVersion < Context.VERSION_ES6) {
                     reportError("msg.yield.parenthesized")
                 }
                 // ECMAScript 2015, 12.3.6 Argument Lists: an argument may be `...expression`, in
@@ -2939,6 +3163,17 @@ public class Parser(
             val pos = ts.tokenBeg
             val lineno = lineNumber()
             val column = columnNumber()
+            if (peekToken() == Token.DOT) {
+                // new.target (ECMAScript 2015, 12.3.8), which only a function gives a meaning.
+                consumeToken()
+                if (!(matchToken(Token.NAME, true) && "target" == ts.string && !ts.identifierEscaped)) {
+                    reportError("msg.new.target.name")
+                }
+                if (!newTargetAllowed) reportError("msg.new.target")
+                val target = KeywordLiteral(pos, ts.tokenEnd - pos, Token.NEW_TARGET)
+                target.setLineColumnNumber(lineno, column)
+                return memberExprTail(allowCallSyntax, target)
+            }
             val nx = NewExpression(pos)
 
             val target = memberExpr(false)
@@ -3055,7 +3290,7 @@ public class Parser(
     }
 
     private fun taggedTemplateLiteral(pn: AstNode): AstNode {
-        val templateLiteral = templateLiteral(true)
+        val templateLiteral = allowingIn { templateLiteral(true) }
         val tagged = TaggedTemplateLiteral()
         tagged.target = pn
         tagged.templateLiteral = templateLiteral
@@ -3098,6 +3333,23 @@ public class Parser(
             Token.NAME -> {
                 // Handles: name, ns::name, ns::*, ns::[expr]
                 ref = propertyName(-1, memberTypeFlags)
+            }
+
+            Token.PRIVATE_NAME -> {
+                // MemberExpression . PrivateIdentifier, an element access whose key is the private
+                // name the enclosing class body binds (ECMAScript 2022, 13.3.1).
+                if (pn.type == Token.SUPER) {
+                    reportError("msg.private.super")
+                    return makeErrorNode()
+                }
+                val name = privateNameNode()
+                usePrivateName(name)
+                val g = ElementGet(pn.position, ts.tokenEnd - pn.position)
+                g.target = pn
+                g.element = name
+                g.setLineColumnNumber(lineno, column)
+                if (isOptionalChain) g.type = Token.QUESTION_DOT
+                return g
             }
 
             Token.MUL -> {
@@ -3185,7 +3437,7 @@ public class Parser(
 
     private fun makeElemGet(pn: AstNode, lb: Int): ElementGet {
         val pos = pn.position
-        val expr = expr(false)
+        val expr = allowingIn { expr(false) }
         var end = getNodeEnd(expr)
         var rb = -1
         if (mustMatchToken(Token.RB, "msg.no.bracket.index", true)) {
@@ -3305,12 +3557,12 @@ public class Parser(
 
             Token.LB -> {
                 consumeToken()
-                return arrayLiteral()
+                return allowingIn { arrayLiteral() }
             }
 
             Token.LC -> {
                 consumeToken()
-                return objectLiteral()
+                return allowingIn { objectLiteral() }
             }
 
             Token.LET -> {
@@ -3380,23 +3632,36 @@ public class Parser(
             }
 
             Token.SUPER -> {
-                if (((insideFunctionParams() || insideFunctionBody()) && insideMethod) ||
-                    compilerEnv.allowSuper
-                ) {
-                    consumeToken()
-                    pos = ts.tokenBeg
-                    end = ts.tokenEnd
-                    val keywordLiteral = KeywordLiteral(pos, end - pos, tt)
-                    keywordLiteral.setLineColumnNumber(lineNumber(), columnNumber())
-                    return keywordLiteral
-                } else {
-                    reportError("msg.super.shorthand.function")
+                consumeToken()
+                pos = ts.tokenBeg
+                end = ts.tokenEnd
+                val lineno = lineNumber()
+                val column = columnNumber()
+                // `super` is only ever the start of a call, a property access or an element access
+                // (ECMAScript 2015, 12.3.5 and 12.3.7). The call belongs in a derived class
+                // constructor, the accesses in a method, including the ones of a class.
+                when (peekToken()) {
+                    Token.LP -> if (!superCallAllowed) reportError("msg.super.call")
+                    Token.DOT, Token.LB, Token.QUESTION_DOT -> {
+                        if (!(((insideFunctionParams() || insideFunctionBody()) && insideMethod) || compilerEnv.allowSuper)) {
+                            reportError("msg.super.shorthand.function")
+                        }
+                    }
+                    else -> reportError("msg.super.alone")
                 }
+                val keywordLiteral = KeywordLiteral(pos, end - pos, tt)
+                keywordLiteral.setLineColumnNumber(lineno, column)
+                return keywordLiteral
+            }
+
+            Token.CLASS -> {
+                consumeToken()
+                return classDefinition(false)
             }
 
             Token.TEMPLATE_LITERAL -> {
                 consumeToken()
-                return templateLiteral(false)
+                return allowingIn { templateLiteral(false) }
             }
 
             Token.RESERVED -> {
@@ -3422,6 +3687,21 @@ public class Parser(
         // Should only be reachable in IDE or error-recovery mode.
         consumeToken()
         return makeErrorNode()
+    }
+
+    /**
+     * Runs [block] with the `in` operator back on. Only the bare expression of a `for` head loses
+     * it: anything between brackets, braces or backquotes takes it again (ECMAScript 2015, 12.2:
+     * ArrayLiteral, ObjectLiteral, ComputedPropertyName and TemplateLiteral are all `[+In]`).
+     */
+    private inline fun <T> allowingIn(block: () -> T): T {
+        val wasInForInit = inForInit
+        inForInit = false
+        try {
+            return block()
+        } finally {
+            inForInit = wasInForInit
+        }
     }
 
     private fun parenExpr(): AstNode {
@@ -3472,6 +3752,7 @@ public class Parser(
         val namePos = ts.tokenBeg
         val nameLineno = lineNumber()
         val nameColumn = columnNumber()
+        rejectEscapedReservedWord(namePos, nameString)
         if (0 != (ttFlagged and TI_CHECK_LABEL) && peekToken() == Token.COLON) {
             // Do not consume the colon: it is the unwind indicator that returns to
             // statementHelper.
@@ -3483,6 +3764,10 @@ public class Parser(
         // Not a label. Peeking the next token to check for a colon has clobbered ts.tokenBeg and
         // ts.tokenEnd, so the name bounds go into instance vars that createNameNode reads.
         saveNameTokenData(namePos, nameString, nameLineno, nameColumn)
+
+        // A class field initializer or static block has no arguments of its own to show
+        // (ECMAScript 2022, 15.7.1, ContainsArguments).
+        if (inClassInitializer && "arguments" == nameString) reportError("msg.class.init.arguments")
 
         if (compilerEnv.xmlAvailable) {
             return propertyName(-1, 0)
@@ -3750,6 +4035,465 @@ public class Parser(
         }
     }
 
+    /**
+     * A class declaration binds its name in the enclosing block the way `let` does (ECMAScript
+     * 2015, 13.1.3 and 14.5.15), so it becomes `let Name = class Name { ... }`, and the class keeps
+     * a binding of its own for its body.
+     */
+    private fun classDeclaration(): AstNode {
+        val pos = ts.tokenBeg
+        val lineno = lineNumber()
+        val column = columnNumber()
+        val cls = classDefinition(true)
+        val name = cls.className ?: return cls
+        defineSymbol(Token.LET, name.identifier)
+        val decl = VariableDeclaration(pos, getNodeEnd(cls) - pos)
+        decl.type = Token.LET
+        decl.isStatement = true
+        val init = VariableInitializer(pos, getNodeEnd(cls) - pos)
+        val target = Name(name.position, name.identifier!!)
+        target.setLineColumnNumber(name.lineno, name.column)
+        init.target = target
+        init.initializer = cls
+        init.setLineColumnNumber(lineno, column)
+        decl.addVariable(init)
+        decl.setLineColumnNumber(lineno, column)
+        return decl
+    }
+
+    /**
+     * Parses a class after its `class` keyword (ECMAScript 2015, 14.5; ECMAScript 2022, 15.7). The
+     * whole class is strict mode code. The constructor, each method, each field initializer and
+     * each static block become functions of their own, and a class without a constructor gets one
+     * made up for it, which the runtime knows to only pass its arguments on.
+     */
+    private fun classDefinition(isStatement: Boolean): ClassNode {
+        if (currentToken != Token.CLASS) codeBug()
+        val pos = ts.tokenBeg
+        val lineno = lineNumber()
+        val column = columnNumber()
+        val pn = ClassNode(pos)
+        pn.setLineColumnNumber(lineno, column)
+        pn.isStatement = isStatement
+
+        val savedStrictMode = inUseStrictDirective
+        inUseStrictDirective = true
+        try {
+            if (matchToken(Token.NAME, true) || matchToken(Token.UNDEFINED, true)) {
+                val name = rejectEscapedReservedWord(createNameNode(true, Token.NAME))
+                val id = name.identifier
+                if ("eval" == id || "arguments" == id) reportError("msg.bad.id.strict", id)
+                pn.className = name
+            } else if (isStatement) {
+                reportError("msg.class.name")
+            }
+            if (matchToken(Token.EXTENDS, true)) {
+                pn.superClass = memberExpr(true)
+            }
+            mustMatchToken(Token.LC, "msg.no.brace.class", true)
+            val derived = pn.superClass != null
+            var ctor: FunctionNode? = null
+            // The heritage sees the private names of the enclosing classes; the body sees these too.
+            val privateScope = PrivateNameScope(privateNameScope)
+            privateNameScope = privateScope
+
+            bodyLoop@ while (true) {
+                var tt = peekToken()
+                if (tt == Token.COMMENT) {
+                    consumeToken()
+                    continue
+                }
+                when (tt) {
+                    Token.RC, Token.EOF, Token.ERROR -> break@bodyLoop
+                    Token.SEMI -> {
+                        consumeToken()
+                        continue@bodyLoop
+                    }
+                }
+                getAndResetJsDoc()
+                val elementStart = ts.tokenBeg
+                var isStatic = false
+                if (isClassModifier(tt, "static")) {
+                    consumeToken()
+                    tt = peekToken()
+                    if (tt == Token.LC) {
+                        consumeToken()
+                        pn.elements.add(ClassElement(ClassElement.STATIC_BLOCK, true, null, classStaticBlock()))
+                        continue@bodyLoop
+                    }
+                    if (isClassElementNameEnd(tt)) {
+                        // The element is named static.
+                        pushBackName("static", elementStart)
+                    } else {
+                        isStatic = true
+                    }
+                }
+                val methodStart = pendingClassElementName?.position ?: ts.tokenBeg
+                var kind = ClassElement.METHOD
+                var isGenerator = false
+                tt = peekToken()
+                if (tt == Token.MUL) {
+                    consumeToken()
+                    isGenerator = true
+                } else if (isClassModifier(tt, "get") || isClassModifier(tt, "set")) {
+                    val word = ts.string!!
+                    val wordStart = ts.tokenBeg
+                    consumeToken()
+                    val next = peekFlaggedToken()
+                    // `get` then a line break then `*a() {}` is a field named get: no accessor name
+                    // starts with `*`, so a semicolon goes in at the line break.
+                    if (isClassElementNameEnd(next and CLEAR_TI_MASK) ||
+                        ((next and CLEAR_TI_MASK) == Token.MUL && (next and TI_AFTER_EOL) != 0)
+                    ) {
+                        pushBackName(word, wordStart)
+                    } else {
+                        kind = if (word == "get") ClassElement.GETTER else ClassElement.SETTER
+                    }
+                }
+                val key = classElementName() ?: break@bodyLoop
+                val keyName = staticClassElementName(key)
+                val isPrivate = isPrivateNameNode(key)
+
+                if (peekToken() == Token.LP) {
+                    if (isPrivate) declarePrivateName(key as Name, kind, isStatic)
+                    if (!isStatic && keyName == "constructor") {
+                        if (kind != ClassElement.METHOD || isGenerator) reportError("msg.class.special.ctor")
+                        if (ctor != null) reportError("msg.class.dup.ctor")
+                        val ctorKind = if (derived) FunctionNode.DERIVED_CLASS_CONSTRUCTOR else FunctionNode.BASE_CLASS_CONSTRUCTOR
+                        ctor = function(FunctionNode.FUNCTION_EXPRESSION, true, methodStart, ctorKind)
+                        continue@bodyLoop
+                    }
+                    if (isStatic && keyName == "prototype") reportError("msg.class.static.prototype")
+                    val fn = function(FunctionNode.FUNCTION_EXPRESSION, true, methodStart, isGeneratorMethod = isGenerator)
+                    when (kind) {
+                        ClassElement.GETTER -> {
+                            fn.setFunctionIsGetterMethod()
+                            checkAccessorParams(fn, true)
+                        }
+                        ClassElement.SETTER -> {
+                            fn.setFunctionIsSetterMethod()
+                            checkAccessorParams(fn, false)
+                        }
+                        else -> {
+                            fn.setFunctionIsNormalMethod()
+                            if (isGenerator) fn.isES6Generator = true
+                        }
+                    }
+                    fn.isShorthand = true
+                    fn.isInStrictMode = true
+                    pn.elements.add(ClassElement(kind, isStatic, key, fn))
+                    continue@bodyLoop
+                }
+
+                // A field: neither an accessor nor a generator, and never named constructor, nor
+                // prototype when static (ECMAScript 2022, 15.7.1).
+                if (kind != ClassElement.METHOD || isGenerator) reportError("msg.no.paren.parms")
+                if (keyName == "constructor" || (isStatic && keyName == "prototype")) reportError("msg.class.field.name", keyName)
+                if (isPrivate) declarePrivateName(key as Name, ClassElement.FIELD, isStatic)
+                val initializer = if (matchToken(Token.ASSIGN, true)) classFieldInitializer() else null
+                pn.elements.add(ClassElement(ClassElement.FIELD, isStatic, key, initializer))
+                // A field ends at a semicolon, which a line break or the closing brace can stand in for.
+                val ttFlagged = peekFlaggedToken()
+                when (ttFlagged and CLEAR_TI_MASK) {
+                    Token.SEMI -> consumeToken()
+                    Token.RC -> {}
+                    else -> if ((ttFlagged and TI_AFTER_EOL) == 0) reportError("msg.no.semi.class.field")
+                }
+            }
+
+            mustMatchToken(Token.RC, "msg.no.brace.after.class", true)
+            val end = ts.tokenEnd
+            pn.length = end - pos
+            leavePrivateNameScope(privateScope)
+            pn.privateNames = privateScope.declared.keys.toList()
+
+            val constructor = ctor ?: defaultClassConstructor(pos, derived)
+            constructor.isInStrictMode = true
+            constructor.isShorthand = false
+            // A class constructor's source text is the whole class (ECMAScript 2022, 15.7.15).
+            constructor.setRawSourceBounds(pos, end)
+            pn.className?.let {
+                val ctorName = Name(it.position, it.identifier!!)
+                ctorName.setLineColumnNumber(it.lineno, it.column)
+                constructor.functionName = ctorName
+            }
+            pn.constructor = constructor
+            return pn
+        } finally {
+            inUseStrictDirective = savedStrictMode
+        }
+    }
+
+    /**
+     * The private names one class body declares, with what each is (getter, setter, anything
+     * else, static), and the uses in it of names it may not declare itself, resolved when the
+     * body ends, since a method can use a field declared after it.
+     */
+    private class PrivateNameScope(val parent: PrivateNameScope?) {
+        val declared = LinkedHashMap<String, Int>()
+        val unresolved = ArrayList<Name>()
+    }
+
+    private var privateNameScope: PrivateNameScope? = null
+
+    private fun isPrivateNameNode(node: AstNode?): Boolean = node is Name && node.identifier?.startsWith('#') == true
+
+    /**
+     * Early errors of ECMAScript 2022, 15.7.1: no `#constructor`, and no name declared twice
+     * unless as a getter and a setter that are both static or both not.
+     */
+    private fun declarePrivateName(key: Name, kind: Int, isStatic: Boolean) {
+        val name = key.identifier!!
+        if (name == "#constructor") {
+            reportError("msg.class.private.constructor", key.position, key.length)
+            return
+        }
+        val bits = when (kind) {
+            ClassElement.GETTER -> 1
+            ClassElement.SETTER -> 2
+            else -> 4
+        } or (if (isStatic) 8 else 0)
+        val scope = privateNameScope!!
+        val existing = scope.declared[name]
+        if (existing == null) {
+            scope.declared[name] = bits
+            return
+        }
+        val accessorPair = (existing and 8) == (bits and 8) && ((existing or bits) and 7) == 3
+        if (accessorPair) scope.declared[name] = existing or bits
+        else reportError("msg.class.private.dup", name, key.position, key.length)
+    }
+
+    /** A use of a private name, which some enclosing class body has to declare. */
+    private fun usePrivateName(node: Name) {
+        val scope = privateNameScope
+        if (scope != null) {
+            scope.unresolved.add(node)
+        } else if (compilerEnv.privateNames?.contains(node.identifier) != true) {
+            reportError("msg.private.undeclared", node.identifier, node.position, node.length)
+        }
+    }
+
+    private fun leavePrivateNameScope(scope: PrivateNameScope) {
+        privateNameScope = scope.parent
+        for (ref in scope.unresolved) {
+            if (scope.declared.containsKey(ref.identifier)) continue
+            val parent = scope.parent
+            if (parent != null) {
+                parent.unresolved.add(ref)
+            } else if (compilerEnv.privateNames?.contains(ref.identifier) != true) {
+                reportError("msg.private.undeclared", ref.identifier, ref.position, ref.length)
+            }
+        }
+    }
+
+    /** A private name token just read, as a [Name] whose identifier keeps its `#`. */
+    private fun privateNameNode(): Name {
+        val name = Name(ts.tokenBeg, ts.tokenEnd - ts.tokenBeg, ts.string!!)
+        name.setLineColumnNumber(lineNumber(), columnNumber())
+        return name
+    }
+
+    /** True when [tt] is the contextual word [word] at the start of a class element. */
+    private fun isClassModifier(tt: Int, word: String): Boolean =
+        (tt == Token.NAME || tt == Token.RESERVED) && word == ts.string && !ts.identifierEscaped
+
+    /** True when [tt] ends a class element name, so a modifier word before it was the name. */
+    private fun isClassElementNameEnd(tt: Int): Boolean =
+        tt == Token.LP || tt == Token.ASSIGN || tt == Token.SEMI || tt == Token.RC
+
+    /** Makes the modifier word just read the name of the class element, as in `static() {}` or `get = 1`. */
+    private fun pushBackName(word: String, start: Int) {
+        pendingClassElementName = Name(start, word).also { it.setLineColumnNumber(lineNumber(), columnNumber()) }
+    }
+
+    /** A name [pushBackName] left for [classElementName] to take. */
+    private var pendingClassElementName: Name? = null
+
+    /** The name of a class element: an identifier or reserved word, a string, a number or `[expr]`. */
+    private fun classElementName(): AstNode? {
+        pendingClassElementName?.let {
+            pendingClassElementName = null
+            return it
+        }
+        val tt = peekToken()
+        when (tt) {
+            Token.NAME -> {
+                consumeToken()
+                return createNameNode()
+            }
+            Token.PRIVATE_NAME -> {
+                consumeToken()
+                return privateNameNode()
+            }
+            Token.STRING -> {
+                consumeToken()
+                return createStringLiteral()
+            }
+            Token.NUMBER, Token.BIGINT -> {
+                consumeToken()
+                return createNumericLiteral(tt, true)
+            }
+            Token.LB -> {
+                consumeToken()
+                val pos = ts.tokenBeg
+                val lineno = lineNumber()
+                val column = columnNumber()
+                val expr = allowingIn { assignExpr() }
+                mustMatchToken(Token.RB, "msg.bad.prop", true)
+                val key = ComputedPropertyKey(pos, ts.tokenEnd - pos)
+                key.setLineColumnNumber(lineno, column)
+                key.expression = expr
+                return key
+            }
+            else -> {
+                val word = ts.string
+                if (word != null && (tt == Token.RESERVED || TokenStream.isKeyword(word, compilerEnv.languageVersion, true))) {
+                    // Any reserved word names a class element, e.g. `static if() {}`.
+                    consumeToken()
+                    return createNameNode(false, -1)
+                }
+                consumeToken()
+                reportError("msg.bad.prop")
+                return null
+            }
+        }
+    }
+
+    /** The property name a class element key spells out in the source, or null for a computed one. */
+    private fun staticClassElementName(key: AstNode): String? = when (key) {
+        is Name -> key.identifier
+        is StringLiteral -> key.value
+        else -> null
+    }
+
+    /**
+     * A field initializer is a method of its own, called with the new object or the class as
+     * `this`, whose body returns the initializer's value (ECMAScript 2022, 15.7.10).
+     */
+    private fun classFieldInitializer(): FunctionNode {
+        val pos = ts.tokenEnd
+        val fnNode = classInitializerFunction(pos)
+        fnNode.isClassFieldInitializer = true
+        val savedVars = PerFunctionVariables(fnNode)
+        val saved = enterClassInitializer(false)
+        ++nestingOfFunction
+        try {
+            val body = Block(pos)
+            body.setLineColumnNumber(lineNumber(), columnNumber())
+            val value = assignExpr()
+            val ret = ReturnStatement(value.position, value.length, value)
+            ret.setLineColumnNumber(value.lineno, value.column)
+            body.addStatement(ret)
+            body.length = getNodeEnd(value) - pos
+            fnNode.body = body
+            val end = getNodeEnd(value)
+            fnNode.setRawSourceBounds(pos, end)
+            fnNode.length = end - pos
+        } finally {
+            --nestingOfFunction
+            leaveClassInitializer(saved)
+            savedVars.restore()
+        }
+        fnNode.endLineno = lineNumber()
+        return fnNode
+    }
+
+    /** A static block is a method of its own too, called once with the class as `this` (ECMAScript 2022, 15.7.11). */
+    private fun classStaticBlock(): FunctionNode {
+        val pos = ts.tokenBeg
+        val fnNode = classInitializerFunction(pos)
+        val savedVars = PerFunctionVariables(fnNode)
+        val saved = enterClassInitializer(true)
+        ++nestingOfFunction
+        try {
+            val body = Block(pos)
+            body.setLineColumnNumber(lineNumber(), columnNumber())
+            bodyLoop@ while (true) {
+                val n: AstNode = when (peekToken()) {
+                    Token.ERROR, Token.EOF, Token.RC -> break@bodyLoop
+                    Token.COMMENT -> {
+                        consumeToken()
+                        lastScannedComment()
+                    }
+                    Token.FUNCTION -> {
+                        consumeToken()
+                        function(FunctionNode.FUNCTION_STATEMENT)
+                    }
+                    else -> statementListItem()
+                }
+                body.addStatement(n)
+            }
+            mustMatchToken(Token.RC, "msg.no.brace.after.body", true)
+            val end = ts.tokenEnd
+            body.length = end - pos
+            fnNode.body = body
+            fnNode.setRawSourceBounds(pos, end)
+            fnNode.length = end - pos
+        } finally {
+            --nestingOfFunction
+            leaveClassInitializer(saved)
+            savedVars.restore()
+        }
+        fnNode.endLineno = lineNumber()
+        return fnNode
+    }
+
+    private fun classInitializerFunction(pos: Int): FunctionNode {
+        val fnNode = FunctionNode(pos)
+        fnNode.functionType = FunctionNode.FUNCTION_EXPRESSION
+        fnNode.isMethodDefinition = true
+        fnNode.isShorthand = true
+        fnNode.isInStrictMode = true
+        fnNode.sourceName = sourceURI
+        fnNode.setLineColumnNumber(lineNumber(), columnNumber())
+        return fnNode
+    }
+
+    /** Sets up the parser for a class initializer, and returns what [leaveClassInitializer] puts back. */
+    private fun enterClassInitializer(staticBlock: Boolean): Int {
+        var saved = 0
+        if (insideMethod) saved = saved or 1
+        if (superCallAllowed) saved = saved or 2
+        if (newTargetAllowed) saved = saved or 4
+        if (inClassInitializer) saved = saved or 8
+        if (inStaticBlock) saved = saved or 16
+        insideMethod = true
+        superCallAllowed = false
+        newTargetAllowed = true
+        inClassInitializer = true
+        inStaticBlock = staticBlock
+        return saved
+    }
+
+    private fun leaveClassInitializer(saved: Int) {
+        insideMethod = (saved and 1) != 0
+        superCallAllowed = (saved and 2) != 0
+        newTargetAllowed = (saved and 4) != 0
+        inClassInitializer = (saved and 8) != 0
+        inStaticBlock = (saved and 16) != 0
+    }
+
+    /**
+     * The constructor a class without one gets (ECMAScript 2022, 15.7.14, step 14): an empty
+     * body, which the runtime runs as `constructor(...args) { super(...args); }` for a derived
+     * class without going through the array iterator.
+     */
+    private fun defaultClassConstructor(pos: Int, derived: Boolean): FunctionNode {
+        val fnNode = FunctionNode(pos)
+        fnNode.functionType = FunctionNode.FUNCTION_EXPRESSION
+        fnNode.isMethodDefinition = true
+        fnNode.classConstructorKind = if (derived) FunctionNode.DERIVED_CLASS_CONSTRUCTOR else FunctionNode.BASE_CLASS_CONSTRUCTOR
+        fnNode.isDefaultClassConstructor = true
+        fnNode.sourceName = sourceURI
+        fnNode.setLineColumnNumber(lineNumber(), columnNumber())
+        val body = Block(pos)
+        body.setLineColumnNumber(lineNumber(), columnNumber())
+        fnNode.body = body
+        fnNode.endLineno = lineNumber()
+        return fnNode
+    }
+
     private fun objectLiteral(): ObjectLiteral {
         val pos = ts.tokenBeg
         val lineno = lineNumber()
@@ -3824,7 +4568,7 @@ public class Parser(
                         }
                     } else if (peeked == Token.LP) {
                         entryKind = METHOD_ENTRY
-                    } else if (firstName.type == Token.NAME) {
+                    } else if (firstName.type == Token.NAME && !ts.escapedNames.contains(firstName.position)) {
                         if ("get" == propertyName) {
                             entryKind = GET_ENTRY
                         } else if ("set" == propertyName) {
@@ -3843,7 +4587,9 @@ public class Parser(
                         propertyName = null
                     } else {
                         propertyName = ts.string
-                        // A shorthand method definition.
+                        // A shorthand method definition. Its source text starts at the `get`,
+                        // `set`, `*` or `[` before its name, if there is one.
+                        val sourceStart = if (firstName is GeneratorMethodDefinition || firstName is ComputedPropertyKey) firstName.position else ppos
                         val objectProp =
                             methodDefinition(
                                 ppos,
@@ -3851,6 +4597,7 @@ public class Parser(
                                 entryKind,
                                 methodName is GeneratorMethodDefinition,
                                 true,
+                                sourceStart,
                             )
                         methodName.jsDocNode = jsdocNode
                         elems.add(objectProp)
@@ -3973,8 +4720,12 @@ public class Parser(
                     val lineno = lineNumber()
                     val column = columnNumber()
                     val inner = objliteralProperty()
+                    if (inner == null) {
+                        reportError("msg.bad.prop")
+                        return null
+                    }
 
-                    val def = GeneratorMethodDefinition(pos, ts.tokenEnd - pos, inner!!)
+                    val def = GeneratorMethodDefinition(pos, ts.tokenEnd - pos, inner)
                     def.setLineColumnNumber(lineno, column)
                     pname = def
                 } else {
@@ -4015,6 +4766,7 @@ public class Parser(
             ) {
                 reportError("msg.bad.object.init")
             }
+            rejectEscapedReservedWord(property.position, property.string)
             val nn = Name(property.position, property.string!!)
             val pn = ObjectProperty()
             pn.setKeyAndValue(property, nn)
@@ -4040,8 +4792,9 @@ public class Parser(
         entryKind: Int,
         isGenerator: Boolean,
         isShorthand: Boolean,
+        sourceStart: Int,
     ): ObjectProperty {
-        val fn = function(FunctionNode.FUNCTION_EXPRESSION, true)
+        val fn = function(FunctionNode.FUNCTION_EXPRESSION, true, sourceStart, isGeneratorMethod = isGenerator)
         // The function name was already parsed, so fn should be anonymous.
         val name = fn.functionName
         if (name != null && name.length() != 0) {
@@ -4052,10 +4805,12 @@ public class Parser(
             GET_ENTRY -> {
                 pn.setIsGetterMethod()
                 fn.setFunctionIsGetterMethod()
+                checkAccessorParams(fn, true)
             }
             SET_ENTRY -> {
                 pn.setIsSetterMethod()
                 fn.setFunctionIsSetterMethod()
+                checkAccessorParams(fn, false)
             }
             METHOD_ENTRY -> {
                 pn.setIsNormalMethod()
@@ -4074,7 +4829,38 @@ public class Parser(
         return pn
     }
 
+    /**
+     * A getter takes no parameter and a setter exactly one, which is no rest parameter
+     * (ECMAScript 2015, 14.3.1). Upstream took any parameter list.
+     */
+    private fun checkAccessorParams(fn: FunctionNode, isGetter: Boolean) {
+        if (isGetter) {
+            if (fn.params.isNotEmpty()) reportError("msg.getter.params")
+        } else if (fn.params.size != 1 || fn.hasRestParameter) {
+            reportError("msg.setter.params")
+        }
+    }
+
     private fun createNameNode(): Name = createNameNode(false, Token.NAME)
+
+    /**
+     * Turns away a reserved word spelled with an escape, like `\u0069f`, where an identifier
+     * belongs (ECMAScript 2015, 11.6.2). It scans as a name so that it can still name a property.
+     */
+    private fun rejectEscapedReservedWord(pos: Int, word: String?) {
+        if (ts.escapedReservedWords.contains(pos) ||
+            ("yield" == word && ts.escapedNames.contains(pos) &&
+                (currentScriptOrFn as? FunctionNode)?.isES6Generator == true)
+        ) {
+            reportError("msg.keyword.escaped", word ?: "")
+        }
+    }
+
+    /** [rejectEscapedReservedWord] for a name node not yet placed in the tree, so still absolute. */
+    private fun rejectEscapedReservedWord(name: Name): Name {
+        rejectEscapedReservedWord(name.position, name.identifier)
+        return name
+    }
 
     /**
      * Creates a [Name] node from the token info of the last scanned name. Sometimes a name node
@@ -4683,6 +5469,38 @@ public class Parser(
         return DestructuringArrayResult(empty, iteratorName, lastResultName)
     }
 
+    /**
+     * Gives an anonymous function or class the name of what it is assigned to, unless it has one
+     * (NamedEvaluation, ECMAScript 2015, 12.14.4 and 13.3.3.6). The name is only the function's
+     * name property: unlike a named function expression's, it binds nothing inside the function.
+     */
+    internal fun inferNameIfMissing(left: Any?, right: Node?, prefix: String?) {
+        if (compilerEnv.languageVersion < Context.VERSION_ES6) {
+            return
+        }
+
+        if (left is Name && right != null && right.type == Token.CLASS) {
+            // An anonymous class takes the name too, as its constructor's (ECMAScript 2015, 14.5.16).
+            if (right.getIntProp(Node.CLASS_FLAGS_PROP, 0) and Node.CLASS_HAS_BINDING != 0) return
+            val ctor = currentScriptOrFn!!.getFunctionNode(right.getExistingIntProp(Node.FUNCTION_PROP))
+            if (ctor.functionName == null) ctor.functionName = if (prefix != null) left.withPrefix(prefix) else Name(left.position, left.identifier!!)
+            return
+        }
+        if (left is Name && right != null && right.type == Token.FUNCTION) {
+            if (left.identifier == NativeObject.PROTO_PROPERTY) {
+                // Ignore this odd edge case.
+                return
+            }
+
+            val fnIndex = right.getExistingIntProp(Node.FUNCTION_PROP)
+            val functionNode = currentScriptOrFn!!.getFunctionNode(fnIndex)
+            if (functionNode.type != 0 && functionNode.functionName == null) {
+                functionNode.functionName =
+                    if (prefix != null) left.withPrefix(prefix) else left
+            }
+        }
+    }
+
     private fun processDestructuringDefaults(
         variableType: Int,
         parent: Node,
@@ -4701,6 +5519,10 @@ public class Parser(
             //         ? (($1[0] == undefined) ? 1 : $1[0])
             //         : x
             right = transformer?.transform(n.right!!) ?: n.right!!
+            // A default for a plain name names an anonymous function or class after it
+            // (ECMAScript 2015, 13.3.3.6); a deferred default is named when IRFactory transforms it.
+            val nameNode = Name((left as? AstNode)?.position ?: 0, name)
+            if (transformer != null) inferNameIfMissing(nameNode, right, null)
 
             val condInner =
                 Node(
@@ -4728,7 +5550,7 @@ public class Parser(
 
             // Store it so it can be transformed later.
             if (transformer == null) {
-                currentScriptOrFn!!.putDestructuringRvalues(condInner, right)
+                currentScriptOrFn!!.putDestructuringRvalues(condInner, right, nameNode)
             }
 
             parent.addChildToBack(Node(setOp, createName(Token.BINDNAME, name, null), cond))
@@ -4849,16 +5671,21 @@ public class Parser(
                     Node.newString(id.identifier!!),
                 )
             } else if (id is StringLiteral) {
-                rightElem = Node(
-                    Token.GETPROP,
-                    createName(tempName),
-                    Node.newString(id.value!!),
-                )
-            } else if (id is NumberLiteral) {
+                // An element access, so that a key like "0" finds an index property; upstream's
+                // named access missed it.
                 rightElem = Node(
                     Token.GETELEM,
                     createName(tempName),
-                    createNumber(id.number.toInt().toDouble()),
+                    Node.newString(id.value!!),
+                )
+            } else if (id is NumberLiteral || id is BigIntLiteral) {
+                // The key is the number's string form, so `{ 1.5: a }` reads "1.5" and `{ 1n: a }`
+                // reads "1"; upstream cut the number to an int and had no case for a BigInt.
+                val key = if (id is NumberLiteral) ScriptRuntime.numberToString(id.number, 10) else ScriptRuntime.toString((id as BigIntLiteral).bigInt)
+                rightElem = Node(
+                    Token.GETELEM,
+                    createName(tempName),
+                    Node.newString(key),
                 )
             } else if (id is ComputedPropertyKey) {
                 reportError("msg.bad.computed.property.in.destruct")
@@ -5104,6 +5931,10 @@ public class Parser(
             is Name -> ScriptRuntime.getIndexObject(id.identifier!!)
             is StringLiteral -> ScriptRuntime.getIndexObject(id.value!!)
             is NumberLiteral -> ScriptRuntime.getIndexObject(id.number)
+            // A BigInt names the property its decimal digits spell, as `1n` names "1"
+            // (ECMAScript 2020, 12.2.6.5). Upstream passed it on as a computed key with no
+            // expression and crashed in the code generator.
+            is BigIntLiteral -> ScriptRuntime.getIndexObject(ScriptRuntime.toString(id.bigInt))
             is GeneratorMethodDefinition -> getPropKey(id.methodName)
             else -> null // filled in later
         }

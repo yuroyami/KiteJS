@@ -6,6 +6,14 @@ package io.github.yuroyami.kitejs
 
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_CALLSPECIAL
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_CALL_ON_SUPER
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_CLASS_BEGIN
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_CLASS_CTOR
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_CLASS_ELEMENT
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_CLASS_END
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_NEW_TARGET
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_SUPER_CALL
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_SUPER_CALL_SPREAD
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_SUPER_CTOR
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_CLOSURE_EXPR
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_CLOSURE_STMT
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_DEBUGGER
@@ -467,8 +475,17 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
                 visitExpression(child!!, contextFlags and ECF_TAIL)
             }
             Token.USE_STACK -> stackChange(1)
+            Token.CLASS -> visitClass(node)
+            Token.NEW_TARGET -> {
+                addIcode(Icode_NEW_TARGET)
+                stackChange(1)
+            }
             Token.REF_CALL, Token.CALL, Token.NEW -> {
                 val isOptionalChainingCall = node.getIntProp(Node.OPTIONAL_CHAINING, 0) == 1
+                if (node.getIntProp(Node.SUPER_CALL_PROP, 0) == 1) {
+                    visitSuperCall(node)
+                    return
+                }
                 if (type != Token.REF_CALL && node.getIntProp(Node.NUMBER_OF_SPREAD, 0) > 0) {
                     visitCallWithSpread(node, child!!, type, isOptionalChainingCall)
                     return
@@ -497,7 +514,9 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
                 } else if (node.getIntProp(Node.SUPER_PROPERTY_ACCESS, 0) == 1) {
                     addIndexOp(Icode_CALL_ON_SUPER, argCount)
                 } else {
-                    if (type == Token.CALL && (contextFlags and ECF_TAIL) != 0 && !compilerEnv.generateDebugInfo && !itsInTryFlag) {
+                    // A derived class constructor's frame has to outlive its last call, which is
+                    // where what it returns is checked against its `this` binding.
+                    if (type == Token.CALL && (contextFlags and ECF_TAIL) != 0 && !compilerEnv.generateDebugInfo && !itsInTryFlag && !builder.isDerivedConstructor) {
                         opType = Icode_TAIL_CALL
                     }
                     addIndexOp(opType, argCount)
@@ -1153,6 +1172,83 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
             stackChange(-2)
         }
         if (completeOptionalCallJump != null) resolveForwardGoto(completeOptionalCallJump.afterLabel)
+        if (savedStackDepth + 1 != stackDepth) throw Kit.codeBug()
+    }
+
+    /**
+     * super(...args): the super constructor is read before the arguments are evaluated, then
+     * constructed with the arguments and this function's new.target (ECMAScript 2015, 12.3.5.1).
+     */
+    private fun visitSuperCall(node: Node) {
+        val savedStackDepth = stackDepth
+        addIcode(Icode_SUPER_CTOR)
+        stackChange(1)
+        val firstArg = node.firstChild!!.next
+        if (node.getIntProp(Node.NUMBER_OF_SPREAD, 0) > 0) {
+            visitArgumentArray(firstArg)
+            addIcode(Icode_SUPER_CALL_SPREAD)
+            stackChange(-1)
+        } else {
+            var argCount = 0
+            var arg = firstArg
+            while (arg != null) {
+                visitExpression(arg, 0)
+                ++argCount
+                arg = arg.next
+            }
+            addIndexOp(Icode_SUPER_CALL, argCount)
+            stackChange(-argCount)
+        }
+        if (savedStackDepth + 1 != stackDepth) throw Kit.codeBug()
+    }
+
+    /**
+     * A class: CLASS_BEGIN enters the class scope and leaves the class being built on the stack,
+     * the heritage expression is evaluated in that scope, CLASS_CTOR makes the constructor and
+     * prototype, each element's key is evaluated and CLASS_ELEMENT defines or records it, and
+     * CLASS_END binds the class name, runs the static elements and leaves the constructor.
+     */
+    private fun visitClass(node: Node) {
+        val savedStackDepth = stackDepth
+        val flags = node.getIntProp(Node.CLASS_FLAGS_PROP, 0)
+        val hasBinding = (flags and Node.CLASS_HAS_BINDING) != 0
+        addIndexOp(Icode_CLASS_BEGIN, if (hasBinding) node.getExistingIntProp(Node.FUNCTION_PROP) + 1 else 0)
+        stackChange(1)
+        var element = node.firstChild
+        if ((flags and Node.CLASS_HAS_HERITAGE) != 0) {
+            visitExpression(element!!, 0)
+            element = element.next
+        }
+        // The heritage is evaluated before the body's private names are bound.
+        val privateNames = node.getProp(Node.PRIVATE_NAMES_PROP)
+        if (privateNames != null) {
+            addIndexOp(Icode.Icode_CLASS_PRIVATE_NAMES, literalIds.size)
+            literalIds.add(privateNames)
+        }
+        addIndexOp(Icode_CLASS_CTOR, node.getExistingIntProp(Node.FUNCTION_PROP))
+        addUint8(flags)
+        if ((flags and Node.CLASS_HAS_HERITAGE) != 0) stackChange(-1)
+        while (element != null) {
+            var elementFlags = when (element.type) {
+                Token.GET -> Icode.CLASS_ELEMENT_GETTER
+                Token.SET -> Icode.CLASS_ELEMENT_SETTER
+                Token.FIELD -> Icode.CLASS_ELEMENT_FIELD
+                Token.STATIC_BLOCK -> Icode.CLASS_ELEMENT_STATIC_BLOCK
+                else -> Icode.CLASS_ELEMENT_METHOD
+            }
+            val nodeFlags = element.getIntProp(Node.CLASS_FLAGS_PROP, 0)
+            if ((nodeFlags and Node.CLASS_STATIC) != 0) elementFlags = elementFlags or Icode.CLASS_ELEMENT_STATIC
+            if ((nodeFlags and Node.CLASS_NAMED_INITIALIZER) != 0) elementFlags = elementFlags or Icode.CLASS_ELEMENT_NAMED
+            val fnIndex = element.getIntProp(Node.FUNCTION_PROP, -1)
+            if (fnIndex >= 0) elementFlags = elementFlags or Icode.CLASS_ELEMENT_HAS_FUNCTION
+            val key = element.firstChild
+            if (key != null) visitExpression(key, 0)
+            addIndexOp(Icode_CLASS_ELEMENT, maxOf(fnIndex, 0))
+            addUint8(elementFlags)
+            if (key != null) stackChange(-1)
+            element = element.next
+        }
+        addIcode(Icode_CLASS_END)
         if (savedStackDepth + 1 != stackDepth) throw Kit.codeBug()
     }
 

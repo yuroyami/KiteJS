@@ -40,6 +40,16 @@ class PositionParityTest {
         "123n 0xFFn",
     )
 
+    /**
+     * Tokens the port lexes differently on purpose, by source and token index: a keyword spelled
+     * with an escape is a name (ECMAScript 2015, 11.6.2), and `class` is a keyword of its own now
+     * that the port parses classes (D-95).
+     */
+    private val intended = mapOf(
+        ("\\u0069f \\u0041bc" to 0) to io.github.yuroyami.kitejs.Token.NAME,
+        ("if else class let await yield undefined" to 2) to io.github.yuroyami.kitejs.Token.CLASS,
+    )
+
     @Test
     fun tokenStreamMatchesUpstreamTokenByToken() {
         for (src in sources) {
@@ -58,7 +68,7 @@ class PositionParityTest {
                 val ut = u.getToken()
                 val kt = k.getToken()
                 val at = "source=<$src> token#$index"
-                assertEquals(ut, kt, "token code at $at")
+                assertEquals(intended[src to index] ?: ut, kt, "token code at $at")
                 assertEquals(u.tokenBeg, k.tokenBeg, "tokenBeg at $at")
                 assertEquals(u.tokenEnd, k.tokenEnd, "tokenEnd at $at")
                 assertEquals(u.tokenColumn, k.tokenColumn, "tokenColumn at $at")

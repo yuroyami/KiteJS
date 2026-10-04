@@ -100,6 +100,18 @@ public open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(p
     public var generatorParamInitBlock: Node? = null
 
     /**
+     * [NOT_CLASS_CONSTRUCTOR] for every function but a class constructor, which is
+     * [BASE_CLASS_CONSTRUCTOR], or [DERIVED_CLASS_CONSTRUCTOR] when the class has `extends`.
+     */
+    public var classConstructorKind: Int = NOT_CLASS_CONSTRUCTOR
+
+    /** A class constructor the class did not write, which only hands its arguments on. */
+    public var isDefaultClassConstructor: Boolean = false
+
+    /** The function that computes a class field's initial value, where `arguments` is an error even in eval code. */
+    public var isClassFieldInitializer: Boolean = false
+
+    /**
      * Rhino supports a nonstandard extension letting you write `function a.b.c(arg) {...}`,
      * rewritten at codegen time to `a.b.c = function(arg) {...}`. When the parser sees an
      * expression other than a simple [Name] where the function name belongs, it records that
@@ -132,11 +144,11 @@ public open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(p
         defaultParamsList!!.add(right)
     }
 
-    override fun putDestructuringRvalues(left: Node, right: Node) {
+    override fun putDestructuringRvalues(left: Node, right: Node, name: Name?) {
         if (destructuringRvaluesList == null) {
             destructuringRvaluesList = mutableListOf()
         }
-        destructuringRvaluesList!!.add(arrayOf(left, right))
+        destructuringRvaluesList!!.add(if (name != null) arrayOf(left, right, name) else arrayOf(left, right))
     }
 
     /** The function name as a string, or "" if anonymous. */
@@ -335,6 +347,10 @@ public open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(p
         public const val FUNCTION_EXPRESSION_STATEMENT: Int = 3
 
         public const val ARROW_FUNCTION: Int = 4
+
+        public const val NOT_CLASS_CONSTRUCTOR: Int = 0
+        public const val BASE_CLASS_CONSTRUCTOR: Int = 1
+        public const val DERIVED_CLASS_CONSTRUCTOR: Int = 2
 
         private val NO_PARAMS: List<AstNode> = emptyList()
 
