@@ -224,6 +224,7 @@ internal class QuickJsKiteJs private constructor(
     private fun stopError(): JsEngineError? = when (bridge.stopReason(ptr)) {
         QuickJsBridge.STOP_BUDGET -> JsEngineError("script used more than ${config.instructionBudget} instructions and was stopped")
         QuickJsBridge.STOP_HOOK, QuickJsBridge.STOP_HOOK_THREW -> JsEngineError("script was interrupted")
+        QuickJsBridge.STOP_MEMORY -> JsEngineError("the engine ran out of memory")
         else -> null
     }
 

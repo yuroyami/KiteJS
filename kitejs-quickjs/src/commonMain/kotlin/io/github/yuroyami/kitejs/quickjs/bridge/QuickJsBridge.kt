@@ -75,6 +75,7 @@ internal interface QuickJsBridge {
         const val STOP_BUDGET = 1
         const val STOP_HOOK = 2
         const val STOP_HOOK_THREW = 3
+        const val STOP_MEMORY = 4
 
         const val OPT_CLOCK = 1
         const val OPT_TIME_ZONE = 2

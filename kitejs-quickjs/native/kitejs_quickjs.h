@@ -46,6 +46,7 @@ typedef struct KiteEngine KiteEngine;
 #define KITE_STOP_BUDGET 1
 #define KITE_STOP_HOOK 2
 #define KITE_STOP_HOOK_THREW 3
+#define KITE_STOP_MEMORY 4
 
 /* Options for kite_new. */
 #define KITE_OPT_CLOCK 1      /* Date.now() asks the host */

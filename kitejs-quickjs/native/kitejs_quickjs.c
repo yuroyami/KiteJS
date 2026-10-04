@@ -49,6 +49,8 @@ struct KiteEngine {
     int has_budget;
     int ask_host;
     int32_t stop_reason;
+    /* The runtime's out-of-memory count when the outermost call began. */
+    uint32_t out_of_memory;
 };
 
 #if defined(__wasm__)
@@ -141,10 +143,18 @@ int32_t kite_dup(KiteEngine *e, int32_t h)
 
 /* ---- Callbacks from QuickJS ---------------------------------------------------------------- */
 
+/* Out of memory ends the call even when a script caught it, as it can: it may be caught as null. */
+static int ran_out_of_memory(KiteEngine *e)
+{
+    if (e->stop_reason == KITE_STOP_NONE && JS_KiteOutOfMemoryCount(e->rt) != e->out_of_memory)
+        e->stop_reason = KITE_STOP_MEMORY;
+    return e->stop_reason == KITE_STOP_MEMORY;
+}
+
 static int interrupt_handler(JSRuntime *rt, void *opaque)
 {
     KiteEngine *e = opaque;
-    if (e->stop_reason != KITE_STOP_NONE)
+    if (ran_out_of_memory(e) || e->stop_reason != KITE_STOP_NONE)
         return 1;
     if (e->has_budget) {
         e->budget -= JS_INTERRUPT_COUNTER_INIT;
@@ -302,6 +312,7 @@ void kite_enter(KiteEngine *e)
 {
     JS_UpdateStackTop(e->rt);
     e->stop_reason = KITE_STOP_NONE;
+    e->out_of_memory = JS_KiteOutOfMemoryCount(e->rt);
 }
 
 void kite_set_budget(KiteEngine *e, double budget)
@@ -317,6 +328,7 @@ void kite_ask_host(KiteEngine *e, int32_t ask)
 
 int32_t kite_stop_reason(KiteEngine *e)
 {
+    ran_out_of_memory(e);
     return e->stop_reason;
 }
 

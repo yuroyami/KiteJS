@@ -1,15 +1,16 @@
 --- a/quickjs.c
 +++ b/quickjs.c
-@@ -381,6 +381,8 @@
+@@ -381,6 +381,9 @@
  
      JSInterruptHandler *interrupt_handler;
      void *interrupt_opaque;
 +    JSKiteNowFunc *kite_now;
 +    JSKiteTimezoneOffsetFunc *kite_tz_offset;
++    uint32_t kite_out_of_memory;
  
      JSPromiseHook *promise_hook;
      void *promise_hook_opaque;
-@@ -553,7 +555,9 @@
+@@ -553,7 +556,9 @@
  
  /* must be large enough to have a negligible runtime cost and small
     enough to call the interrupt callback often. */
@@ -19,7 +20,7 @@
  
  struct JSContext {
      JSGCObjectHeader header; /* must come first */
-@@ -2552,6 +2556,29 @@
+@@ -2552,6 +2557,35 @@
      return ret;
  }
  
@@ -46,10 +47,25 @@
 +    rt->kite_tz_offset = tz_offset;
 +}
 +
++/* KiteJS: how many times the runtime has thrown for lack of memory */
++uint32_t JS_KiteOutOfMemoryCount(JSRuntime *rt)
++{
++    return rt->kite_out_of_memory;
++}
++
  static inline uint32_t atom_get_free(const JSAtomStruct *p)
  {
      return (uintptr_t)p >> 1;
-@@ -49127,7 +49154,9 @@
+@@ -8559,6 +8593,8 @@
+ JSValue JS_ThrowOutOfMemory(JSContext *ctx)
+ {
+     JSRuntime *rt = ctx->rt;
++    /* KiteJS: counted, since when the error itself cannot be allocated, null is thrown instead */
++    rt->kite_out_of_memory++;
+     if (!rt->in_out_of_memory) {
+         rt->in_out_of_memory = true;
+         JS_ThrowInternalError(ctx, "out of memory");
+@@ -49127,7 +49163,9 @@
  
  /* OS dependent. d = argv[0] is in ms from 1970. Return the difference
     between UTC time and local time 'd' in minutes */
@@ -60,7 +76,7 @@
  #if defined(_WIN32)
      DWORD r;
      TIME_ZONE_INFORMATION t;
-@@ -57377,7 +57406,7 @@
+@@ -57377,7 +57415,7 @@
      } else {
          d = dval;     /* assuming -8.64e15 <= dval <= -8.64e15 */
          if (is_local) {
@@ -69,7 +85,7 @@
              d += tz * 60000;
          }
      }
-@@ -57423,7 +57452,7 @@
+@@ -57423,7 +57461,7 @@
  
  /* The spec mandates the use of 'double' and it specifies the order
     of the operations */
@@ -78,7 +94,7 @@
      double y, m, dt, ym, mn, day, h, s, milli, time, tv;
      int yi, mi, i;
      int64_t days;
-@@ -57477,7 +57506,7 @@
+@@ -57477,7 +57515,7 @@
      /* adjust for local time and clip */
      if (is_local) {
          int64_t ti = tv < INT64_MIN ? INT64_MIN : tv >= 0x1p63 ? INT64_MAX : (int64_t)tv;
@@ -87,7 +103,7 @@
      }
      d = time_clip(tv);
  out:
-@@ -57537,7 +57566,7 @@
+@@ -57537,7 +57575,7 @@
          return JS_NAN;
  
      if (argc > 0)
@@ -96,7 +112,7 @@
  
      return JS_SetThisTimeValue(ctx, this_val, d);
  }
-@@ -57661,7 +57690,9 @@
+@@ -57661,7 +57699,9 @@
  }
  
  /* OS dependent: return the UTC time in ms since 1970. */
@@ -107,7 +123,7 @@
      return js__gettimeofday_us() / 1000;
  }
  
-@@ -57679,7 +57710,7 @@
+@@ -57679,7 +57719,7 @@
      }
      n = argc;
      if (n == 0) {
@@ -116,7 +132,7 @@
      } else if (n == 1) {
          JSValue v, dv;
          if (JS_VALUE_GET_TAG(argv[0]) == JS_TAG_OBJECT) {
-@@ -57717,7 +57748,7 @@
+@@ -57717,7 +57757,7 @@
              if (i == 0 && fields[0] >= 0 && fields[0] < 100)
                  fields[0] += 1900;
          }
@@ -125,7 +141,7 @@
      }
  has_val:
      rv = js_create_from_ctor(ctx, new_target, JS_CLASS_DATE);
-@@ -57755,7 +57786,7 @@
+@@ -57755,7 +57795,7 @@
          if (i == 0 && fields[0] >= 0 && fields[0] < 100)
              fields[0] += 1900;
      }
@@ -134,7 +150,7 @@
  }
  
  /* Date string parsing */
-@@ -58211,7 +58242,7 @@
+@@ -58211,7 +58251,7 @@
          if (valid) {
              for(i = 0; i < 7; i++)
                  fields1[i] = fields[i];
@@ -143,7 +159,7 @@
              rv = js_float64(d);
          }
      }
-@@ -58223,7 +58254,7 @@
+@@ -58223,7 +58263,7 @@
                             int argc, JSValueConst *argv)
  {
      // now()
@@ -152,7 +168,7 @@
  }
  
  static JSValue js_date_Symbol_toPrimitive(JSContext *ctx, JSValueConst this_val,
-@@ -58270,7 +58301,7 @@
+@@ -58270,7 +58310,7 @@
          return JS_NAN;
      else
          /* assuming -8.64e15 <= v <= -8.64e15 */
@@ -163,7 +179,7 @@
  static JSValue js_date_getTime(JSContext *ctx, JSValueConst this_val,
 --- a/quickjs.h
 +++ b/quickjs.h
-@@ -1251,6 +1251,15 @@
+@@ -1251,6 +1251,16 @@
  JS_EXTERN JSContext *JS_GetPendingJobContext(JSRuntime *rt);
  JS_EXTERN int JS_ExecutePendingJob(JSRuntime *rt, JSContext **pctx);
  
@@ -175,6 +191,7 @@
 +typedef int JSKiteTimezoneOffsetFunc(JSContext *ctx, int64_t time);
 +JS_EXTERN void JS_KiteSetDateHooks(JSRuntime *rt, JSKiteNowFunc *now,
 +                                   JSKiteTimezoneOffsetFunc *tz_offset);
++JS_EXTERN uint32_t JS_KiteOutOfMemoryCount(JSRuntime *rt);
 +
  /* Structure to retrieve (de)serialized SharedArrayBuffer objects. */
  typedef struct JSSABTab {

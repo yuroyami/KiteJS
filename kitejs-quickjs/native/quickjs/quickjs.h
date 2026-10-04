@@ -1259,6 +1259,7 @@ typedef int64_t JSKiteNowFunc(JSContext *ctx);
 typedef int JSKiteTimezoneOffsetFunc(JSContext *ctx, int64_t time);
 JS_EXTERN void JS_KiteSetDateHooks(JSRuntime *rt, JSKiteNowFunc *now,
                                    JSKiteTimezoneOffsetFunc *tz_offset);
+JS_EXTERN uint32_t JS_KiteOutOfMemoryCount(JSRuntime *rt);
 
 /* Structure to retrieve (de)serialized SharedArrayBuffer objects. */
 typedef struct JSSABTab {

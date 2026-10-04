@@ -383,6 +383,7 @@ struct JSRuntime {
     void *interrupt_opaque;
     JSKiteNowFunc *kite_now;
     JSKiteTimezoneOffsetFunc *kite_tz_offset;
+    uint32_t kite_out_of_memory;
 
     JSPromiseHook *promise_hook;
     void *promise_hook_opaque;
@@ -2577,6 +2578,12 @@ void JS_KiteSetDateHooks(JSRuntime *rt, JSKiteNowFunc *now,
 {
     rt->kite_now = now;
     rt->kite_tz_offset = tz_offset;
+}
+
+/* KiteJS: how many times the runtime has thrown for lack of memory */
+uint32_t JS_KiteOutOfMemoryCount(JSRuntime *rt)
+{
+    return rt->kite_out_of_memory;
 }
 
 static inline uint32_t atom_get_free(const JSAtomStruct *p)
@@ -8586,6 +8593,8 @@ static int JS_ThrowTypeErrorReadOnly(JSContext *ctx, int flags, JSAtom atom)
 JSValue JS_ThrowOutOfMemory(JSContext *ctx)
 {
     JSRuntime *rt = ctx->rt;
+    /* KiteJS: counted, since when the error itself cannot be allocated, null is thrown instead */
+    rt->kite_out_of_memory++;
     if (!rt->in_out_of_memory) {
         rt->in_out_of_memory = true;
         JS_ThrowInternalError(ctx, "out of memory");
