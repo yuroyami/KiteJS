@@ -75,6 +75,34 @@ class CancellationTest {
         }
     }
 
+    /** A chain of reactions that queue one another never branches, and still hears the cancel. */
+    @Test
+    fun cancellingTheCallerStopsAnEndlessChainOfReactions() = runBlocking {
+        val js = asyncKiteJs()
+        try {
+            val runner = async(Dispatchers.Default) {
+                js.evaluate("var n = 0; function spin() { n++; Promise.resolve().then(spin) } Promise.resolve().then(spin)")
+            }
+            delay(300)
+            assertTrue(runner.isActive, "the chain finished on its own, so nothing was cancelled")
+
+            runner.cancel()
+            val outcome = runCatching { withTimeout(10_000) { runner.await() } }
+            assertTrue(
+                outcome.exceptionOrNull() is CancellationException,
+                "expected cancellation, got " + outcome.exceptionOrNull(),
+            )
+
+            // The reactions still queued went with the script, so the chain does not resume.
+            val ran = js.evaluate("n").asDouble()
+            js.onEngine { it.runMicrotasks() }
+            assertEquals(ran, js.evaluate("n").asDouble())
+            assertEquals(3.0, js.evaluate("1 + 2").asDouble())
+        } finally {
+            js.close()
+        }
+    }
+
     private suspend fun <T> withContextDefault(block: suspend () -> T): T =
         kotlinx.coroutines.withContext(Dispatchers.Default) { block() }
 }

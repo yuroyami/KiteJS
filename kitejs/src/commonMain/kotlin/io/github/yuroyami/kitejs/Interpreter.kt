@@ -528,6 +528,9 @@ public class Interpreter : Evaluator {
 
         internal fun <T : ScriptOrFn<T>> interpret(ifun: T, idata: InterpreterData<T>, cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             if (!ScriptRuntime.hasTopCall(cx)) throw Kit.codeBug()
+            // A call from native code, such as a forEach callback or a Promise reaction, is charged
+            // like a call from script, before any frame exists to unwind (D-77).
+            cx.addInstructionCount(INVOCATION_COST)
             val frame = initFrame(cx, scope, thisObj, ifun.homeObject, args, null, null, 0, args.size, ifun, idata, null)
             frame.isContinuationsTopFrame = cx.isContinuationsTopCall
             cx.isContinuationsTopCall = false
@@ -1416,7 +1419,7 @@ public class Interpreter : Evaluator {
                 Icode_CALL_SPREAD -> {
                     // The arguments were built into an array, because a spread made their number
                     // a runtime matter. The stack holds the callee and its `this` under it.
-                    if (state.instructionCounting) cx.instructionCount += INVOCATION_COST
+                    if (state.instructionCounting) addInvocationCount(cx, frame)
                     var args = stack[state.stackTop]
                     if (args === DBL_MRK) args = ScriptRuntime.wrapNumber(sDbl[state.stackTop])
                     --state.stackTop
@@ -1443,7 +1446,7 @@ public class Interpreter : Evaluator {
                     return null
                 }
                 Icode_NEW_SPREAD -> {
-                    if (state.instructionCounting) cx.instructionCount += INVOCATION_COST
+                    if (state.instructionCounting) addInvocationCount(cx, frame)
                     var args = stack[state.stackTop]
                     if (args === DBL_MRK) args = ScriptRuntime.wrapNumber(sDbl[state.stackTop])
                     --state.stackTop
@@ -1766,7 +1769,7 @@ public class Interpreter : Evaluator {
             val sDbl = frame.sDbl
             val iCode = frame.idata.itsICode
             val isOptionalChainingCall = op == Icode_CALLSPECIAL_OPTIONAL
-            if (state.instructionCounting) cx.instructionCount += INVOCATION_COST
+            if (state.instructionCounting) addInvocationCount(cx, frame)
             val callType = iCode[frame.pc].toInt() and 0xFF
             val isNew = iCode[frame.pc + 1].toInt() != 0
             val sourceLine = getIndex(iCode, frame.pc + 2)
@@ -1794,7 +1797,7 @@ public class Interpreter : Evaluator {
             val sDbl = frame.sDbl
             var boundArgs: Array<Any?>? = null
             var blen = 0
-            if (state.instructionCounting) cx.instructionCount += INVOCATION_COST
+            if (state.instructionCounting) addInvocationCount(cx, frame)
             state.stackTop -= state.indexReg
             val result = stack[state.stackTop] as ScriptRuntime.LookupResult
             var fun_: Callable? = result.callable
@@ -1904,7 +1907,7 @@ public class Interpreter : Evaluator {
         }
 
         private fun doNew(cx: Context, frame: CallFrame, state: InterpreterState, op: Int): NewState? {
-            if (state.instructionCounting) cx.instructionCount += INVOCATION_COST
+            if (state.instructionCounting) addInvocationCount(cx, frame)
             state.stackTop -= state.indexReg
             var lhs = frame.stack[state.stackTop]
             if (lhs is JSFunction && lhs.constructorCode is InterpreterData<*>) {
@@ -2121,6 +2124,16 @@ public class Interpreter : Evaluator {
                 ++shift
             }
             return args
+        }
+
+        /**
+         * A call costs [INVOCATION_COST] and asks the observer, as a branch does. Upstream only
+         * adds the cost, so code that calls without branching, such as Promise reactions that
+         * each queue the next, ran without the observer ever hearing of it (D-77).
+         */
+        private fun addInvocationCount(cx: Context, frame: CallFrame) {
+            addInstructionCount(cx, frame, INVOCATION_COST)
+            frame.pcPrevBranch = frame.pc
         }
 
         private fun addInstructionCount(cx: Context, frame: CallFrame, extra: Int) {

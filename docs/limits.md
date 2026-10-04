@@ -12,7 +12,13 @@ KiteJs { instructionBudget = 5_000_000 }.use { js ->
 
 The engine counts interpreter instructions. When one call passes the budget it gives up and
 throws `JsEngineError`. Each call gets the budget again, so a long session is not punished for
-what an earlier call did.
+what an earlier call did. A call here is `evaluate`, `runMicrotasks`, or a call into a
+`JsFunction` from Kotlin, and its budget covers the Promise reactions it queues as well: a chain
+of reactions that each queue the next is stopped like a loop is.
+
+When the engine stops a script, the reactions it left queued are dropped with it, so the
+abandoned work does not carry on in the next call. V8 does the same when it terminates a script
+during its own microtask checkpoint.
 
 There is no right number for every case. Measure your own scripts and leave room:
 
@@ -34,8 +40,9 @@ KiteJs { interruptWhen = { deadline.hasPassedNow() } }.use { js ->
 }
 ```
 
-The hook is asked from inside the running script every hundred thousand instructions or so.
-Answer true and the script stops. Setting the hook turns the check on even with no budget.
+The hook is asked from inside the running script every hundred thousand instructions or so,
+Promise reactions included. Answer true and the script stops, dropping the reactions it left
+queued, as the budget does. Setting the hook turns the check on even with no budget.
 
 Use this for a deadline, a stop button, or a cancelled coroutine. `asyncKiteJs` uses it for
 exactly that, and it chains: whatever you set is still asked.

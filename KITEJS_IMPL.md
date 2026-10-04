@@ -431,6 +431,19 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   upstream's "let declaration not directly within block". `Test262ParityTest` lists the 46 files
   that pass only here, one of them outside strict mode only, and `EvalOracleTest` pins both
   halves.
+- D-77: a call is a point where the instruction observer is asked, as a branch is. Upstream
+  only adds `INVOCATION_COST` at a call and asks the observer at branches and thrown
+  exceptions, so code that calls without branching never reached it: a Promise reaction that
+  queues the next one ran forever under any budget and any interrupt hook, and a straight-line
+  `forEach` callback ran to the end of its array. The interpreter now asks at each call site,
+  at each entry from native code (a callback, a reaction), and `Context.processMicrotasks`
+  charges `MICROTASK_COST` and asks before each job, through `Context.addInstructionCount`.
+  When the facade's budget or hook stops a script, `Context.discardMicrotasks` drops the jobs
+  still queued, as V8's `MicrotaskQueue::RunMicrotasks` drops its queue on termination, so the
+  abandoned chain does not resume on the next call. `runMicrotasks` and a host call into a
+  `JsFunction` are each one call to the budget, as `evaluate` is, and the facade's running
+  total is a `Long`. The observer stays off when no threshold is set, so the oracle and parity
+  runs see no change.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

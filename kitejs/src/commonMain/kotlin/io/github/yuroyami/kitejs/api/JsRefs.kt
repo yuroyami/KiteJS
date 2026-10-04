@@ -25,10 +25,13 @@ internal fun liveContext(): Context =
 internal inline fun <T> topCall(cx: Context, scope: Scriptable, crossinline body: () -> T): T {
     if (cx.topCallScope != null) return body()
     var out: Any? = null
-    ScriptRuntime.doTopCall(
-        SerializableCallable { _, _, _, _ -> out = body(); null },
-        cx, scope, null, ScriptRuntime.emptyArgs,
-    )
+    // An outermost call from the host is one call to the instruction budget, as evaluate is.
+    metered(cx) {
+        ScriptRuntime.doTopCall(
+            SerializableCallable { _, _, _, _ -> out = body(); null },
+            cx, scope, null, ScriptRuntime.emptyArgs,
+        )
+    }
     @Suppress("UNCHECKED_CAST")
     return out as T
 }

@@ -353,6 +353,21 @@ public open class Context internal constructor(public val factory: ContextFactor
 
     internal fun observeInstructionCountInternal(instructionCount: Int) = observeInstructionCount(instructionCount)
 
+    /**
+     * Charges [cost] instructions and asks the observer once the count passes the threshold, as
+     * the interpreter does at a branch. Calls and microtasks come through here, because code
+     * without loops spends its time in them: a chain of Promise reactions that each queue the
+     * next never branches, and upstream never asks its observer while one runs (D-77).
+     */
+    internal fun addInstructionCount(cost: Int) {
+        if (instructionThreshold == 0) return
+        instructionCount += cost
+        if (instructionCount > instructionThreshold) {
+            observeInstructionCount(instructionCount)
+            instructionCount = 0
+        }
+    }
+
     // ---- Microtasks ----------------------------------------------------------------------------
 
     /** Queues work to run after the current top-level call finishes. */
@@ -363,9 +378,21 @@ public open class Context internal constructor(public val factory: ContextFactor
     /** Runs the queued work, including anything it queues in turn, until the queue is empty. */
     public open fun processMicrotasks() {
         while (true) {
-            val head = microtasks.removeFirstOrNull() ?: break
+            val head = microtasks.firstOrNull() ?: break
+            // Each job is a call, and asks the observer before it runs, so a stop leaves it queued.
+            addInstructionCount(MICROTASK_COST)
+            microtasks.removeFirst()
             head.run()
         }
+    }
+
+    /**
+     * Drops every queued job. The engine does this when it stops a script for its budget or its
+     * interrupt hook, as V8 drops its queue when execution is terminated during a checkpoint, so
+     * the abandoned work does not run on the next call (D-77).
+     */
+    internal fun discardMicrotasks() {
+        microtasks.clear()
     }
 
     // ---- Compilation ---------------------------------------------------------------------------
@@ -454,6 +481,9 @@ public open class Context internal constructor(public val factory: ContextFactor
     public val isStrictMode: Boolean get() = isTopLevelStrict || (currentActivationCall?.isStrict == true)
 
     public companion object {
+
+        /** What one microtask costs the instruction count, the same as a call (D-77). */
+        internal const val MICROTASK_COST: Int = 100
 
         /** What `Context.implementationVersion` answers. Upstream reads it from a jar manifest. */
         public const val IMPLEMENTATION_VERSION: String = "KiteJS 0.1 (Rhino 1.9.1 port)"

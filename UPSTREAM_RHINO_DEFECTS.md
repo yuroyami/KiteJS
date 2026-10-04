@@ -157,6 +157,18 @@ defined, so asking for either raises a missing-resource error instead of a messa
 - Where: `Messages.properties`.
 - Test: `MessageParityTest` pins that upstream still lacks them.
 
+### The instruction observer never hears of code that only calls (D-77)
+
+`ContextFactory.observeInstructionCount` is asked only at branches and thrown exceptions; a call
+adds `INVOCATION_COST` to the count without checking it. A Promise reaction that queues the next
+one, `function spin() { Promise.resolve().then(spin) }`, therefore runs forever whatever the
+threshold, and so does any other work made of calls without branches, such as a straight-line
+callback handed to `forEach` over a large array. `Context.processMicrotasks` drains the queue
+without a checkpoint either.
+
+- Where: `Interpreter`, the call ops (`doCall`, `doCallSpecial`, `doNew` and the spread forms),
+  `Interpreter.interpret` for calls from native code, and `Context.processMicrotasks`.
+
 ## Maths accuracy
 
 ### log2, acosh, asinh and atanh are formulas on top of log (D-73)

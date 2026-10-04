@@ -41,14 +41,17 @@ public class KiteJsConfig internal constructor() {
 
     /**
      * How many interpreter instructions one call may run before the engine gives up. Zero, the
-     * default, means no limit. This is how you stop a script that never returns.
+     * default, means no limit. This is how you stop a script that never returns. The Promise
+     * reactions a call queues run within the same budget, and when the engine stops a script
+     * the reactions still queued are dropped, so the abandoned work does not run on the next call.
      */
     public var instructionBudget: Int = 0
 
     /**
-     * Asked now and then while a script runs. Answer true, or throw, to stop it. This is how an
-     * outside signal reaches a running script: a deadline, a cancelled coroutine, a stop button.
-     * Setting it turns the instruction observer on even without a budget.
+     * Asked now and then while a script runs, its Promise reactions included. Answer true, or
+     * throw, to stop it. This is how an outside signal reaches a running script: a deadline, a
+     * cancelled coroutine, a stop button. Setting it turns the instruction observer on even without
+     * a budget. As with the budget, a stop drops the reactions still queued.
      */
     public var interruptWhen: (() -> Boolean)? = null
 
@@ -167,12 +170,7 @@ public class KiteJs internal constructor(
      * end of the call, so this is only for work queued from a host callback afterwards.
      */
     public fun runMicrotasks() {
-        checkOpen()
-        try {
-            cx.processMicrotasks()
-        } catch (e: Throwable) {
-            throw translate(e)
-        }
+        guarded { cx.processMicrotasks() }
     }
 
     /** A Kotlin value as the engine sees it, collections and all. */
@@ -194,10 +192,8 @@ public class KiteJs internal constructor(
 
     private inline fun <T> guarded(body: () -> T): T {
         checkOpen()
-        factory.instructionsUsed = 0
-        cx.instructionCount = 0
         try {
-            return body()
+            return metered(cx, body)
         } catch (e: Throwable) {
             throw translate(e)
         }
@@ -246,10 +242,35 @@ public class KiteJs internal constructor(
     }
 }
 
+/**
+ * Runs [body] as one call from the host: the instruction budget starts again, and if the engine
+ * stops the script for its budget or its interrupt hook, the Promise reactions still queued are
+ * dropped along with it (D-77).
+ */
+internal inline fun <T> metered(cx: Context, body: () -> T): T {
+    val factory = cx.factory as? EngineFactory ?: return body()
+    factory.instructionsUsed = 0
+    factory.stopped = false
+    cx.instructionCount = 0
+    try {
+        return body()
+    } catch (e: Throwable) {
+        if (factory.stopped) {
+            factory.stopped = false
+            cx.discardMicrotasks()
+        }
+        throw e
+    }
+}
+
 /** The factory that carries the instruction budget into the running script. */
 internal class EngineFactory(private val config: KiteJsConfig) : ContextFactory() {
 
-    var instructionsUsed: Int = 0
+    /** A Long, so a long run without a budget, watched only by the hook, cannot wrap it. */
+    var instructionsUsed: Long = 0
+
+    /** Set when the budget or the hook stopped the script, which drops its queued reactions. */
+    var stopped: Boolean = false
 
     override fun hasFeature(cx: Context, featureIndex: Int): Boolean = when (featureIndex) {
         Context.FEATURE_LITTLE_ENDIAN -> config.littleEndian
@@ -259,12 +280,22 @@ internal class EngineFactory(private val config: KiteJsConfig) : ContextFactory(
 
     override fun observeInstructionCount(cx: Context, instructionCount: Int) {
         instructionsUsed += instructionCount
-        if (config.instructionBudget in 1..instructionsUsed) {
-            throw JsEngineError(
-                "script used more than ${config.instructionBudget} instructions and was stopped",
-            )
+        val budget = config.instructionBudget
+        if (budget > 0 && instructionsUsed >= budget) {
+            stopped = true
+            throw JsEngineError("script used more than $budget instructions and was stopped")
         }
-        if (config.interruptWhen?.invoke() == true) throw JsEngineError("script was interrupted")
+        val hook = config.interruptWhen ?: return
+        val interrupt = try {
+            hook()
+        } catch (e: Throwable) {
+            stopped = true
+            throw e
+        }
+        if (interrupt) {
+            stopped = true
+            throw JsEngineError("script was interrupted")
+        }
     }
 }
 
