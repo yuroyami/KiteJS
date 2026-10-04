@@ -930,6 +930,9 @@ public abstract class ScriptableObject :
     /** The same as the string form, for a name that is an array index. */
     internal open fun endsLookup(index: Int): Boolean = false
 
+    /** The same as the string form, for a symbol. */
+    internal open fun endsLookup(key: Symbol): Boolean = false
+
     internal fun querySlot(cx: Context, id: Any?): Slot? {
         if (id is Symbol) return map.query(id, 0)
         val s = ScriptRuntime.toStringIdOrIndex(id)
@@ -1349,7 +1352,7 @@ public abstract class ScriptableObject :
         }
 
         public fun putProperty(obj: Scriptable, key: Symbol, value: Any?) {
-            val base = getBase(obj, key) ?: obj
+            val base = getBase(obj, key, true) ?: obj
             ensureSymbolScriptable(base).put(key, obj, value)
         }
 
@@ -1435,6 +1438,8 @@ public abstract class ScriptableObject :
         private fun getBase(start: Scriptable, name: String, forWrite: Boolean): Scriptable? {
             var obj: Scriptable? = start
             do {
+                // A proxy's [[Set]] runs its trap for the whole chain, without asking has first.
+                if (forWrite && obj is NativeProxy) return obj
                 if (obj!!.has(name, start)) break
                 if (obj is ScriptableObject && obj.endsLookup(name)) return if (forWrite) obj else null
                 obj = obj.prototype
@@ -1447,6 +1452,7 @@ public abstract class ScriptableObject :
         private fun getBase(start: Scriptable, index: Int, forWrite: Boolean): Scriptable? {
             var obj: Scriptable? = start
             do {
+                if (forWrite && obj is NativeProxy) return obj
                 if (obj!!.has(index, start)) break
                 if (obj is ScriptableObject && obj.endsLookup(index)) return if (forWrite) obj else null
                 obj = obj.prototype
@@ -1454,10 +1460,14 @@ public abstract class ScriptableObject :
             return obj
         }
 
-        internal fun getBase(start: Scriptable, key: Symbol): Scriptable? {
+        internal fun getBase(start: Scriptable, key: Symbol): Scriptable? = getBase(start, key, false)
+
+        private fun getBase(start: Scriptable, key: Symbol, forWrite: Boolean): Scriptable? {
             var obj: Scriptable? = start
             do {
+                if (forWrite && obj is NativeProxy) return obj
                 if (ensureSymbolScriptable(obj!!).has(key, start)) break
+                if (obj is ScriptableObject && obj.endsLookup(key)) return if (forWrite) obj else null
                 obj = obj.prototype
             } while (obj != null)
             return obj

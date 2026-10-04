@@ -324,6 +324,147 @@ class Test262ParityTest {
             "built-ins/String/prototype/localeCompare/15.5.4.9_CE.js",
             "D-37: there is no collation data, so localeCompare falls back to code unit order",
         )
+
+        // Reflect.get, set, deleteProperty and defineProperty run the target's own internal methods
+        // with the caller's receiver, convert the key first and report a refusal as false (D-89).
+        for (path in listOf(
+            "built-ins/Reflect/defineProperty/return-abrupt-from-property-key.js",
+            "built-ins/Reflect/deleteProperty/return-abrupt-from-result.js",
+            "built-ins/Reflect/get/return-value-from-receiver.js",
+            "built-ins/Reflect/set/call-prototype-property-set.js",
+            "built-ins/Reflect/set/different-property-descriptors.js",
+            "built-ins/Reflect/set/receiver-is-not-object.js",
+            "built-ins/Reflect/set/return-abrupt-from-result.js",
+            "built-ins/Reflect/set/return-false-if-receiver-is-not-writable.js",
+            "built-ins/Reflect/set/return-false-if-target-is-not-writable.js",
+        )) {
+            put(path, "D-89: Reflect follows the target's internal methods with the receiver here")
+        }
+
+        // Proxy traps get the receiver and their false answers count, a trapless proxy forwards with
+        // itself as the receiver, and no `has` or `getPrototypeOf` trap is called that the spec
+        // never reaches (D-89).
+        for (path in listOf(
+            "built-ins/Array/prototype/splice/property-traps-order-with-species.js",
+            "built-ins/JSON/parse/reviver-array-define-prop-err.js",
+            "built-ins/JSON/parse/reviver-object-define-prop-err.js",
+            "built-ins/Proxy/defineProperty/desc-realm.js",
+            "built-ins/Proxy/defineProperty/targetdesc-not-configurable-writable-desc-not-writable.js",
+            "built-ins/Proxy/deleteProperty/boolean-trap-result-boolean-false.js",
+            "built-ins/Proxy/deleteProperty/return-false-not-strict.js",
+            "built-ins/Proxy/deleteProperty/return-false-strict.js",
+            "built-ins/Proxy/deleteProperty/targetdesc-is-configurable-target-is-not-extensible.js",
+            "built-ins/Proxy/deleteProperty/trap-is-null-target-is-proxy.js",
+            "built-ins/Proxy/deleteProperty/trap-is-undefined-strict.js",
+            "built-ins/Proxy/deleteProperty/trap-is-undefined-target-is-proxy.js",
+            "built-ins/Proxy/get/trap-is-undefined-receiver.js",
+            "built-ins/Proxy/has/call-in-prototype.js",
+            "built-ins/Proxy/has/call-with.js",
+            "built-ins/Proxy/has/return-false-target-not-extensible-using-with.js",
+            "built-ins/Proxy/has/return-false-target-prop-exists-using-with.js",
+            "built-ins/Proxy/has/return-false-targetdesc-not-configurable-using-with.js",
+            "built-ins/Proxy/has/return-is-abrupt-with.js",
+            "built-ins/Proxy/has/trap-is-not-callable-using-with.js",
+            "built-ins/Proxy/set/boolean-trap-result-is-false-boolean-return-false.js",
+            "built-ins/Proxy/set/boolean-trap-result-is-false-null-return-false.js",
+            "built-ins/Proxy/set/boolean-trap-result-is-false-number-return-false.js",
+            "built-ins/Proxy/set/boolean-trap-result-is-false-string-return-false.js",
+            "built-ins/Proxy/set/boolean-trap-result-is-false-undefined-return-false.js",
+            "built-ins/Proxy/set/call-parameters-prototype-dunder-proto.js",
+            "built-ins/Proxy/set/call-parameters-prototype.js",
+            "built-ins/Proxy/set/call-parameters.js",
+            "built-ins/Proxy/set/trap-is-missing-receiver-multiple-calls.js",
+            "built-ins/Proxy/set/trap-is-missing-target-is-proxy.js",
+            "built-ins/Proxy/set/trap-is-null-receiver.js",
+            "built-ins/Proxy/set/trap-is-null-target-is-proxy.js",
+            "built-ins/Proxy/set/trap-is-undefined-target-is-proxy.js",
+        )) {
+            put(path, "D-89: proxy traps receive the receiver and are believed when they refuse here")
+        }
+
+        // A typed array's [[Set]] reached through Reflect.set or a prototype chain keeps the element
+        // semantics only when the typed array is the receiver (D-89).
+        for (path in listOf(
+            "built-ins/TypedArrayConstructors/internals/Set/BigInt/key-is-canonical-invalid-index-reflect-set.js",
+            "built-ins/TypedArrayConstructors/internals/Set/BigInt/key-is-not-canonical-index.js",
+            "built-ins/TypedArrayConstructors/internals/Set/BigInt/key-is-not-numeric-index.js",
+            "built-ins/TypedArrayConstructors/internals/Set/BigInt/key-is-symbol.js",
+            "built-ins/TypedArrayConstructors/internals/Set/BigInt/key-is-valid-index-prototype-chain-set.js",
+            "built-ins/TypedArrayConstructors/internals/Set/BigInt/key-is-valid-index-reflect-set.js",
+            "built-ins/TypedArrayConstructors/internals/Set/key-is-canonical-invalid-index-reflect-set.js",
+            "built-ins/TypedArrayConstructors/internals/Set/key-is-not-canonical-index.js",
+            "built-ins/TypedArrayConstructors/internals/Set/key-is-not-numeric-index.js",
+            "built-ins/TypedArrayConstructors/internals/Set/key-is-out-of-bounds-receiver-is-not-object.js",
+            "built-ins/TypedArrayConstructors/internals/Set/key-is-symbol.js",
+            "built-ins/TypedArrayConstructors/internals/Set/key-is-valid-index-prototype-chain-set.js",
+            "built-ins/TypedArrayConstructors/internals/Set/key-is-valid-index-reflect-set.js",
+        )) {
+            put(path, "D-89: a typed array's [[Set]] honours the receiver here")
+        }
+
+        // A `with` object binds a name only when it has the property and its @@unscopables does not
+        // block it, and a binding deleted while that is read is undefined or a ReferenceError (D-89).
+        for (path in listOf(
+            "language/expressions/arrow-function/unscopables-with-in-nested-fn.js",
+            "language/expressions/arrow-function/unscopables-with.js",
+            "language/expressions/function/unscopables-with-in-nested-fn.js",
+            "language/expressions/function/unscopables-with.js",
+            "language/expressions/generators/unscopables-with-in-nested-fn.js",
+            "language/expressions/generators/unscopables-with.js",
+            "language/expressions/object/prop-def-id-eval-error-2.js",
+            "language/expressions/object/prop-def-id-eval-error.js",
+            "language/statements/function/unscopables-with-in-nested-fn.js",
+            "language/statements/function/unscopables-with.js",
+            "language/statements/generators/unscopables-with-in-nested-fn.js",
+            "language/statements/generators/unscopables-with.js",
+            "language/statements/with/binding-blocked-by-unscopables.js",
+            "language/statements/with/get-binding-value-call-with-proxy-env.js",
+            "language/statements/with/get-binding-value-idref-with-proxy-env.js",
+            "language/statements/with/get-mutable-binding-binding-deleted-in-get-unscopables-strict-mode.js",
+            "language/statements/with/get-mutable-binding-binding-deleted-in-get-unscopables.js",
+            "language/statements/with/has-binding-call-with-proxy-env.js",
+            "language/statements/with/has-binding-idref-with-proxy-env.js",
+            "language/statements/with/has-property-err.js",
+            "language/statements/with/set-mutable-binding-binding-deleted-in-get-unscopables.js",
+            "language/statements/with/set-mutable-binding-binding-deleted-with-typed-array-in-proto-chain-strict-mode.js",
+            "language/statements/with/set-mutable-binding-idref-compound-assign-with-proxy-env.js",
+            "language/statements/with/set-mutable-binding-idref-with-proxy-env.js",
+            "language/statements/with/unscopables-get-err.js",
+            "language/statements/with/unscopables-inc-dec.js",
+            "language/statements/with/unscopables-prop-get-err.js",
+        )) {
+            put(path, "D-89: with environments implement HasBinding and @@unscopables here")
+        }
+
+        // Strict code that assigns to a binding the right-hand side deleted is a ReferenceError (D-89).
+        for (path in listOf(
+            "language/expressions/assignment/assignment-operator-calls-putvalue-lref--rval--1.js",
+            "language/expressions/assignment/assignment-operator-calls-putvalue-lref--rval-.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--1.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--10.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--11.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--12.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--13.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--14.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--15.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--16.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--17.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--18.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--19.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--2.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--20.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--21.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--3.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--4.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--5.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--6.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--7.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--8.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--9.js",
+            "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v-.js",
+        )) {
+            put(path, "D-89: a strict write to a binding that disappeared is a ReferenceError here")
+        }
     }
 
     /**
@@ -346,6 +487,14 @@ class Test262ParityTest {
         // A labelled function as the body of a with is an early error here (D-76). In strict code
         // the with is an error already, in both engines.
         put("language/statements/with/labelled-fn-stmt.js", "D-76: a function declaration as a statement body is an early error here")
+        // A trapless proxy's define answers false, and a proxy prototype's set trap sees an
+        // assignment to a primitive. In strict mode the two engines agree (D-89).
+        for (path in listOf(
+            "built-ins/Proxy/defineProperty/targetdesc-undefined-target-is-not-extensible-realm.js",
+            "language/types/reference/put-value-prop-base-primitive.js",
+        )) {
+            put(path, "D-89: proxy traps receive the receiver and are believed when they refuse here")
+        }
     }
 
     /**
@@ -362,6 +511,15 @@ class Test262ParityTest {
             "built-ins/Array/prototype/unshift/set-length-zero-array-length-is-non-writable.js",
         )) {
             put(path, "D-88: an array with a read-only length stops growing here")
+        }
+        // A refused delete through Reflect or a trapless proxy answers false. Upstream throws a
+        // TypeError instead when the calling code is strict; outside strict mode both answer
+        // false (D-89).
+        for (path in listOf(
+            "built-ins/Proxy/deleteProperty/trap-is-missing-target-is-proxy.js",
+            "built-ins/Reflect/deleteProperty/return-boolean.js",
+        )) {
+            put(path, "D-89: a refused delete answers false here")
         }
     }
 

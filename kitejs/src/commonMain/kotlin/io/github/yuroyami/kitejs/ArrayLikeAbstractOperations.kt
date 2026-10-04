@@ -205,6 +205,14 @@ public object ArrayLikeAbstractOperations {
         }
     }
 
+    /** HasProperty for an element, which asks a proxy's `has` trap where a read would not. */
+    internal fun hasElem(target: Scriptable, index: Long): Boolean {
+        if (index < 0 || index > Int.MAX_VALUE) {
+            return ScriptableObject.hasProperty(target, index.toString())
+        }
+        return ScriptableObject.hasProperty(target, index.toInt())
+    }
+
     internal fun getRawElem(target: Scriptable, index: Long): Any? {
         if (index < 0 || index > Int.MAX_VALUE) {
             return ScriptableObject.getProperty(target, index.toString())

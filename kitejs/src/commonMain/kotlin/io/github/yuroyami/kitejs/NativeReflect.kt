@@ -89,15 +89,17 @@ internal class NativeReflect private constructor() : ScriptableObject() {
             }
 
             val ctor = args[0] as Constructable
-            if (args.size < 2) {
-                return ctor.construct(cx, scope, ScriptRuntime.emptyArgs)
-            }
-
             if (args.size > 2 && !AbstractEcmaObjectOperations.isConstructor(cx, args[2])) {
                 throw ScriptRuntime.typeErrorById("msg.not.ctor", ScriptRuntime.typeOf(args[2]))
             }
 
-            val callArgs = ScriptRuntime.getApplyArguments(cx, args[1])
+            // CreateListFromArrayLike demands an object even when no argument will be passed, so a
+            // missing list is a TypeError; upstream constructed with no arguments (D-89).
+            val argumentsList = args.getOrElse(1) { Undefined.instance }
+            if (!ScriptRuntime.isObject(argumentsList)) {
+                throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(argumentsList))
+            }
+            val callArgs = ScriptRuntime.getApplyArguments(cx, argumentsList)
 
             var newTargetPrototype: Any? = null
             if (args.size > 2) {
@@ -139,59 +141,41 @@ internal class NativeReflect private constructor() : ScriptableObject() {
             return newScriptable
         }
 
+        /**
+         * Reflect.defineProperty: the key is converted before the descriptor is read, both may
+         * throw, and only the definition itself answers false. Upstream turned every TypeError the
+         * engine raised into false, a proxy invariant violation or a `null.x` inside a trap
+         * included, and accepted a getter that is not callable (D-89).
+         */
         private fun defineProperty(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any {
-            if (args.size < 3) {
-                throw ScriptRuntime.typeErrorById(
-                    "msg.method.missing.parameter",
-                    "Reflect.defineProperty",
-                    "3",
-                    args.size.toString(),
-                )
-            }
-
             val target = checkTarget(args)
-            val desc = DescriptorInfo(ensureScriptableObject(args[2]))
-
-            val key = args[1]
-
-            return try {
-                if (key is Symbol) {
-                    target.defineOwnProperty(cx, key, desc)
-                } else {
-                    val propertyKey =
-                        ScriptRuntime.toString(ScriptRuntime.toPrimitive(key, ScriptRuntime.StringClass))
-                    target.defineOwnProperty(cx, propertyKey, desc)
-                }
-            } catch (e: EcmaError) {
-                false
-            }
+            val key = ScriptRuntime.toPropertyKey(args.getOrElse(1) { Undefined.instance })
+            val desc = DescriptorInfo(ensureScriptableObject(args.getOrElse(2) { Undefined.instance }))
+            checkPropertyDefinition(desc)
+            return AbstractEcmaObjectOperations.defineOwnPropertyOrFalse(cx, target, key, desc)
         }
 
+        /**
+         * Reflect.deleteProperty: [[Delete]] on the target alone. Upstream searched the prototype
+         * chain for the property and deleted it wherever it found it, so
+         * `Reflect.deleteProperty({}, 'toString')` removed Object.prototype.toString (D-89).
+         */
         private fun deleteProperty(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any {
             val target = checkTarget(args)
-
-            if (args.size > 1) {
-                if (ScriptRuntime.isSymbol(args[1])) {
-                    return deleteProperty(target, args[1] as Symbol)
-                }
-                return deleteProperty(target, ScriptRuntime.toString(args[1]))
-            }
-
-            return false
+            val key = ScriptRuntime.toPropertyKey(args.getOrElse(1) { Undefined.instance })
+            return AbstractEcmaObjectOperations.delete(cx, target, key)
         }
 
+        /**
+         * Reflect.get: ToPropertyKey, then the target's [[Get]] with the receiver as `this` for a
+         * getter. Upstream ignored the receiver, treated a numeric key as an array index through
+         * ToIndex, and answered undefined for an omitted key instead of reading "undefined" (D-89).
+         */
         private fun get(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val target = checkTarget(args)
-
-            if (args.size > 1) {
-                val prop = when {
-                    ScriptRuntime.isSymbol(args[1]) -> getProperty(target, args[1] as Symbol)
-                    args[1] is Number -> getProperty(target, ScriptRuntime.toIndex(args[1]))
-                    else -> getProperty(target, ScriptRuntime.toString(args[1]))
-                }
-                return if (prop === Scriptable.NOT_FOUND) Undefined.SCRIPTABLE_UNDEFINED else prop
-            }
-            return Undefined.SCRIPTABLE_UNDEFINED
+            val key = ScriptRuntime.toPropertyKey(args.getOrElse(1) { Undefined.instance })
+            val receiver = if (args.size > 2) args[2] else target
+            return AbstractEcmaObjectOperations.get(cx, target, key, receiver)
         }
 
         private fun getOwnPropertyDescriptor(
@@ -201,16 +185,8 @@ internal class NativeReflect private constructor() : ScriptableObject() {
             args: Array<Any?>,
         ): Scriptable {
             val target = checkTarget(args)
-
-            if (args.size > 1) {
-                val desc = if (ScriptRuntime.isSymbol(args[1])) {
-                    target.getOwnPropertyDescriptor(cx, args[1])
-                } else {
-                    target.getOwnPropertyDescriptor(cx, ScriptRuntime.toString(args[1]))
-                }
-                return desc?.toObject(scope) ?: Undefined.SCRIPTABLE_UNDEFINED
-            }
-            return Undefined.SCRIPTABLE_UNDEFINED
+            val key = ScriptRuntime.toPropertyKey(args.getOrElse(1) { Undefined.instance })
+            return target.getOwnPropertyDescriptor(cx, key)?.toObject(scope) ?: Undefined.SCRIPTABLE_UNDEFINED
         }
 
         private fun getPrototypeOf(
@@ -222,15 +198,11 @@ internal class NativeReflect private constructor() : ScriptableObject() {
 
         private fun has(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any {
             val target = checkTarget(args)
-
-            if (args.size > 1) {
-                if (ScriptRuntime.isSymbol(args[1])) {
-                    return hasProperty(target, args[1] as Symbol)
-                }
-
-                return hasProperty(target, ScriptRuntime.toString(args[1]))
+            return when (val key = ScriptRuntime.toPropertyKey(args.getOrElse(1) { Undefined.instance })) {
+                is Symbol -> hasProperty(target, key)
+                is Int -> hasProperty(target, key)
+                else -> hasProperty(target, key as String)
             }
-            return false
         }
 
         private fun isExtensible(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any =
@@ -255,36 +227,18 @@ internal class NativeReflect private constructor() : ScriptableObject() {
         private fun preventExtensions(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any =
             checkTarget(args).preventExtensions()
 
+        /**
+         * Reflect.set: the target's [[Set]] with the receiver, answering whether the write was
+         * made. Upstream wrote straight to the receiver and answered true whatever happened, read
+         * a missing value out of range, and with a separate receiver refused a write for a
+         * non-configurable property where only a read-only one should refuse it (D-89).
+         */
         private fun set(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any {
             val target = checkTarget(args)
-            if (args.size < 2) return true
-
-            val receiver = if (args.size > 3) ensureScriptableObject(args[3]) else target
-            if (receiver !== target) {
-                val descriptor = target.getOwnPropertyDescriptor(cx, args[1])
-                if (descriptor != null) {
-                    val setter = descriptor.setter
-                    if (setter != null && setter !== Scriptable.NOT_FOUND) {
-                        (setter as Function).call(cx, scope, receiver, arrayOf(args[2]))
-                        return true
-                    }
-
-                    if (descriptor.isConfigurable(false)) return false
-                }
-            }
-
-            if (ScriptRuntime.isSymbol(args[1])) {
-                receiver.put(args[1] as Symbol, receiver, args[2])
-            } else {
-                val s = ScriptRuntime.toStringIdOrIndex(args[1])
-                if (s.stringId == null) {
-                    receiver.put(s.index, receiver, args[2])
-                } else {
-                    receiver.put(s.stringId, receiver, args[2])
-                }
-            }
-
-            return true
+            val key = ScriptRuntime.toPropertyKey(args.getOrElse(1) { Undefined.instance })
+            val value = args.getOrElse(2) { Undefined.instance }
+            val receiver = if (args.size > 3) args[3] else target
+            return AbstractEcmaObjectOperations.set(cx, target, key, value, receiver)
         }
 
         private fun setPrototypeOf(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any {

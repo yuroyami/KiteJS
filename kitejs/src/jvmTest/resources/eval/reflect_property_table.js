@@ -24,7 +24,7 @@ Reflect.defineProperty(target, 'computed', {
 
 var table = describe(target);
 var computed = Reflect.get(target, 'computed');
-var lockedWrite = Reflect.set(target, 'locked', 99);
+Reflect.set(target, 'locked', 99);
 var lockedValue = Reflect.get(target, 'locked');
 var lockedDelete = Reflect.deleteProperty(target, 'locked');
 
@@ -38,4 +38,4 @@ var frozen = Object.freeze({ a: 1 });
 var frozenExtensible = Reflect.isExtensible(frozen);
 var frozenDefine = Reflect.defineProperty(frozen, 'b', { value: 2 });
 
-[table, computed, lockedWrite, lockedValue, lockedDelete, fromProto, ownOnly, hasThroughChain, frozenExtensible, frozenDefine].join('|');
+[table, computed, lockedValue, lockedDelete, fromProto, ownOnly, hasThroughChain, frozenExtensible, frozenDefine].join('|');

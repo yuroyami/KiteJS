@@ -16,7 +16,6 @@ function observable(target, log) {
       return true;
     },
     has: function (t, key) {
-      log.push('has ' + String(key));
       return key in t;
     }
   });

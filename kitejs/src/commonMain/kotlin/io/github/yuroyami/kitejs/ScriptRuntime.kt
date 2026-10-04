@@ -2170,6 +2170,7 @@ public object ScriptRuntime {
     }
 
     public fun deleteObjectElem(target: Scriptable, elem: Any?, cx: Context): Boolean {
+        if (target is NativeProxy) return target.deleteOrThrow(toPropertyKey(elem))
         if (isSymbol(elem)) {
             val so = ScriptableObject.ensureSymbolScriptable(target)
             val sym = elem as Symbol
@@ -2238,7 +2239,7 @@ public object ScriptRuntime {
         if (parent != null) {
             while (s is NativeWith) {
                 val withObj = s.prototype!!
-                if (ScriptableObject.hasProperty(withObj, id)) return withObj
+                if (withHasBinding(withObj, id)) return withObj
                 s = parent!!
                 parent = parent.parentScope
                 if (parent == null) return bindTop(cx, s, id)
@@ -2262,6 +2263,9 @@ public object ScriptRuntime {
     public fun setName(bound: Scriptable?, value: Any?, cx: Context, scope: Scriptable, id: String): Any? {
         if (bound != null) {
             checkNotConstBinding(bound, id)
+            // SetMutableBinding asks HasProperty before the write (ECMAScript 2015, 8.1.1.2.5);
+            // outside strict code only a proxy can observe that.
+            if (bound is NativeProxy) ScriptableObject.hasProperty(bound, id)
             ScriptableObject.putProperty(bound, id, value)
         } else {
             // Assigning to a name nothing declares creates a global.
@@ -2278,6 +2282,10 @@ public object ScriptRuntime {
     public fun strictSetName(bound: Scriptable?, value: Any?, cx: Context, scope: Scriptable, id: String): Any? {
         if (bound != null) {
             checkNotConstBinding(bound, id)
+            // A binding that disappeared after it was resolved, deleted by the right-hand side or
+            // by an @@unscopables getter, is a ReferenceError in strict code (ECMAScript 2015,
+            // 8.1.1.2.5). Upstream recreated it.
+            if (!ScriptableObject.hasProperty(bound, id)) throw notFoundError(bound, id)
             ScriptableObject.putProperty(bound, id, value)
             return value
         }
@@ -2327,8 +2335,8 @@ public object ScriptRuntime {
         while (true) {
             if (s is NativeWith) {
                 val withObj = s.prototype!!
-                result = ScriptableObject.getProperty(withObj, name)
-                if (result !== Scriptable.NOT_FOUND) {
+                if (withHasBinding(withObj, name)) {
+                    result = withGetBindingValue(cx, withObj, name)
                     thisObj = withObj
                     break
                 }
@@ -2375,8 +2383,8 @@ public object ScriptRuntime {
         while (true) {
             if (s is NativeWith) {
                 val withObj = s.prototype!!
-                result = ScriptableObject.getProperty(withObj, name)
-                if (result !== Scriptable.NOT_FOUND) {
+                if (withHasBinding(withObj, name)) {
+                    result = withGetBindingValue(cx, withObj, name)
                     thisObj = withObj
                     break
                 }
@@ -2414,6 +2422,40 @@ public object ScriptRuntime {
         return ScriptableObject.getProperty(s, name)
     }
 
+    /**
+     * HasBinding of the object environment a `with` statement makes (ECMAScript 2015,
+     * 8.1.1.2.1): the object has the property and its @@unscopables does not block the name.
+     * Upstream read the property instead and took anything but NOT_FOUND as a binding, which a
+     * proxy answering undefined for a missing name defeats, and never looked at @@unscopables,
+     * so `with ([]) { keys }` found Array.prototype.keys (D-89). Catch and block scopes sit behind
+     * a NativeWith too, but their binding objects have no prototype and no @@unscopables, so for
+     * them the check is one missed lookup.
+     */
+    private fun withHasBinding(withObj: Scriptable, name: String): Boolean {
+        if (!ScriptableObject.hasProperty(withObj, name)) return false
+        val unscopables = ScriptableObject.getProperty(withObj, SymbolKey.UNSCOPABLES)
+        if (!isObject(unscopables)) return true
+        val blocked = ScriptableObject.getProperty(unscopables as Scriptable, name)
+        return blocked === Scriptable.NOT_FOUND || !toBoolean(blocked)
+    }
+
+    /**
+     * GetBindingValue of a `with` environment whose HasBinding answered true (ECMAScript 2015,
+     * 8.1.1.2.6). It asks HasProperty again, which only a proxy can observe, so only a proxy is
+     * asked; for any other object a property that is gone reads as NOT_FOUND. A binding deleted
+     * in between, by an @@unscopables getter, is undefined, or a ReferenceError in strict code.
+     */
+    private fun withGetBindingValue(cx: Context, withObj: Scriptable, name: String): Any? {
+        val value = if (withObj is NativeProxy && !ScriptableObject.hasProperty(withObj, name)) {
+            Scriptable.NOT_FOUND
+        } else {
+            ScriptableObject.getProperty(withObj, name)
+        }
+        if (value !== Scriptable.NOT_FOUND) return value
+        if (cx.isStrictMode) throw notFoundError(withObj, name)
+        return Undefined.instance
+    }
+
     /** With dynamic scope on, a lookup that reached the static top may continue into the dynamic one. */
     internal fun checkDynamicScope(possibleDynamicScope: Scriptable, staticTopScope: Scriptable): Scriptable {
         if (possibleDynamicScope === staticTopScope) return possibleDynamicScope
@@ -2439,6 +2481,7 @@ public object ScriptRuntime {
     public fun typeofName(scope: Scriptable, id: String): String {
         val cx = Context.getContext()
         val v = bind(cx, scope, id) ?: return "undefined"
+        if (v is NativeProxy) return typeOf(withGetBindingValue(cx, v, id))
         return typeOf(getObjectProp(v, id, cx))
     }
 
@@ -2653,6 +2696,20 @@ public object ScriptRuntime {
         var value: Any?
         do {
             if (cx.useDynamicScope && scopeChain!!.parentScope == null) scopeChain = checkDynamicScope(cx.topCallScope!!, scopeChain)
+            if (scopeChain is NativeWith) {
+                // A `with` object holds the name only when HasBinding says so (D-89).
+                val withObj = scopeChain.prototype!!
+                if (withHasBinding(withObj, id)) {
+                    value = withGetBindingValue(cx, withObj, id)
+                    if (isConstBinding(withObj, id)) {
+                        if (value !is Number && value !is KBigInt) toNumeric(value)
+                        throw constAssignError(id)
+                    }
+                    return doScriptableIncrDecr(withObj, id, withObj, value, incrDecrMask)
+                }
+                scopeChain = scopeChain.parentScope
+                continue
+            }
             target = scopeChain
             do {
                 value = target!!.get(id, scopeChain!!)

@@ -562,6 +562,49 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   computed property to null, reads a missing `enumerable` or `value` as false or undefined when
   checking a non-configurable property, reads descriptor fields without HasProperty, and lets a
   frozen or non-extensible array keep growing through its dense fast paths.
+- D-89: Reflect and the proxy property traps follow the spec's internal methods with a receiver.
+  `AbstractEcmaObjectOperations` gains [[Get]], [[Set]] (OrdinarySet with the spec's receiver
+  steps, CreateDataProperty on a receiver without the property, and a proxy receiver asked through
+  its own traps), [[Delete]] on the object alone, and a define that answers false instead of
+  throwing. `Reflect.get`, `set`, `has`, `deleteProperty`, `getOwnPropertyDescriptor` and
+  `defineProperty` run ToPropertyKey on the key (so an omitted key is `"undefined"` and `-1` or
+  `0.5` stay names), then call those operations with the caller's receiver; `Reflect.set` answers
+  whether the write was made, refusing on a read-only property, an accessor without a setter or a
+  non-object receiver rather than on a non-configurable one; `Reflect.defineProperty` lets a
+  throwing key, descriptor or trap propagate; `Reflect.construct` requires an object argument
+  list. A proxy's `get` and `set` traps receive the receiver (the object the lookup started from),
+  a trapless proxy runs its target's [[Get]] and [[Set]] with that receiver, a false `set` or
+  `deleteProperty` answer is a TypeError in strict code, `delete` takes the proxy's answer instead
+  of asking `has` afterwards, `ScriptableObject.getBase` stops at a proxy through `endsLookup` (so
+  neither a missed read nor a write consults the proxy's own prototype or `has` trap), and the
+  get and set invariants compare with SameValue. A typed array that is the target of such a set
+  keeps its element semantics when it is the receiver and defers to OrdinarySet otherwise. A
+  trapless proxy's define answers false where its target refuses, instead of letting the target
+  throw. Because a proxy now answers a missed read with undefined rather than NOT_FOUND, the
+  object environment of a `with` statement stops reading names to find them: HasBinding is
+  HasProperty followed by the @@unscopables check (`with ([]) { keys }` no longer finds
+  Array.prototype.keys), GetBindingValue asks a proxy HasProperty again and reads a binding that
+  vanished as undefined or a strict ReferenceError, name calls, `typeof`, `++` and `--` and
+  assignment binding all go through it, and strict SetMutableBinding throws a ReferenceError for
+  a binding the right-hand side deleted. Catch and block scopes also sit behind a NativeWith, but
+  their binding objects have no prototype, so @@unscopables costs them one missed lookup. A
+  compound assignment still resolves the name twice (BINDNAME, then NAME), which only a proxy can
+  tell, through one extra `has` and @@unscopables read; changing that means a new IR shape.
+  `copyWithin` asks HasProperty for each element instead of taking undefined for a hole, and
+  ArraySetLength checks the definition again after converting an object `value`, whose
+  `valueOf` may have made the length read-only, and answers false.
+  Upstream ignores the receiver in `Reflect.get` and `Reflect.set` (writing straight onto it, so
+  an inherited setter is shadowed and a frozen prototype is ignored), answers true for every
+  write, converts a numeric key through ToIndex, reads an omitted key as missing, deletes along
+  the prototype chain, constructs without an argument list, turns every engine TypeError in
+  `Reflect.defineProperty` into false (a proxy invariant violation included) while accepting a
+  getter that is not callable, hands traps the proxy as receiver, never calls a `set`
+  trap when the receiver differs, ignores false trap answers, reads through a trapless proxy with
+  the target as `this`, calls `has` and `getPrototypeOf` traps the spec never reaches, finds
+  `with` bindings by reading them, ignores @@unscopables, recreates a binding deleted before a
+  strict assignment, and deletes a present undefined element in the generic `copyWithin` loop. RegExp's `source` and flag
+  properties stay upstream's own data properties, so `Reflect.get(RegExp.prototype, 'source', re)`
+  still reads `''`; that is a structural difference outside this entry.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

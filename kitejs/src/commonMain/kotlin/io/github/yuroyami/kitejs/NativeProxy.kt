@@ -59,7 +59,7 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
             return booleanTrapResult
         }
 
-        return target.has(name, if (start === this) target else start)
+        return ScriptableObject.hasProperty(target, name)
     }
 
     override fun has(index: Int, start: Scriptable): Boolean {
@@ -80,7 +80,7 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
             return booleanTrapResult
         }
 
-        return target.has(index, if (start === this) target else start)
+        return ScriptableObject.hasProperty(target, index)
     }
 
     override fun has(key: Symbol, start: Scriptable): Boolean {
@@ -100,7 +100,7 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
             return booleanTrapResult
         }
 
-        return ensureSymbolScriptable(target).has(key, if (start === this) target else start)
+        return ScriptableObject.hasProperty(target, key)
     }
 
     override fun getIds(map: CompoundOperationMap, getNonEnumerable: Boolean, getSymbols: Boolean): Array<Any?> {
@@ -174,100 +174,73 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
         return target.startCompoundOp(false).use { target.getIds(it, getNonEnumerable, getSymbols) }
     }
 
-    override fun get(name: String, start: Scriptable): Any? {
+    override fun get(name: String, start: Scriptable): Any? = get(Context.getContext(), name, start)
+
+    override fun get(index: Int, start: Scriptable): Any? = get(Context.getContext(), index, start)
+
+    override fun get(key: Symbol, start: Scriptable): Any? = get(Context.getContext(), key, start)
+
+    /**
+     * [[Get]] (ECMAScript 2015, 9.5.8). The trap is handed the receiver the read started from,
+     * which is the proxy only when the proxy itself was read, and without a trap the target's own
+     * [[Get]] runs with that receiver, through the target's whole prototype chain. Upstream handed
+     * the trap the proxy every time and read the target with the target as `this` (D-89).
+     */
+    internal fun get(cx: Context, key: Any, receiver: Any?): Any? {
         val target = getTargetThrowIfRevoked()
-
-        val trap = getTrap(TRAP_GET)
-        if (trap != null) {
-            val trapResult = callTrap(trap, arrayOf(target, name, this))
-            checkGetInvariants(target.getOwnPropertyDescriptor(Context.getContext(), name), trapResult)
-            return trapResult
-        }
-
-        return target.get(name, if (start === this) target else start)
-    }
-
-    override fun get(index: Int, start: Scriptable): Any? {
-        val target = getTargetThrowIfRevoked()
-
-        val trap = getTrap(TRAP_GET)
-        if (trap != null) {
-            val trapResult = callTrap(trap, arrayOf(target, ScriptRuntime.toString(index), this))
-            checkGetInvariants(target.getOwnPropertyDescriptor(Context.getContext(), index), trapResult)
-            return trapResult
-        }
-
-        return target.get(index, if (start === this) target else start)
-    }
-
-    override fun get(key: Symbol, start: Scriptable): Any? {
-        val target = getTargetThrowIfRevoked()
-
-        val trap = getTrap(TRAP_GET)
-        if (trap != null) {
-            val trapResult = callTrap(trap, arrayOf(target, key, this))
-            checkGetInvariants(target.getOwnPropertyDescriptor(Context.getContext(), key), trapResult)
-            return trapResult
-        }
-
-        return ensureSymbolScriptable(target).get(key, if (start === this) target else start)
+        val trap = getTrap(TRAP_GET) ?: return AbstractEcmaObjectOperations.get(cx, target, key, receiver)
+        val trapResult = callTrap(trap, arrayOf(target, AbstractEcmaObjectOperations.trapKey(key), receiver))
+        checkGetInvariants(target.getOwnPropertyDescriptor(cx, key), trapResult)
+        return trapResult
     }
 
     /** A `get` trap may not contradict a non-configurable property on the target. */
     private fun checkGetInvariants(targetDesc: DescriptorInfo?, trapResult: Any?) {
         if (targetDesc == null || !targetDesc.isConfigurable(false)) return
         if (targetDesc.isDataDescriptor && targetDesc.isWritable(false)) {
-            if (trapResult != targetDesc.value) throw ScriptRuntime.typeError(GET_MUST_MATCH)
+            if (!AbstractEcmaObjectOperations.sameValue(trapResult, targetDesc.value)) throw ScriptRuntime.typeError(GET_MUST_MATCH)
         }
         if (targetDesc.isAccessorDescriptor && Undefined.isUndefined(targetDesc.getter)) {
             if (!Undefined.isUndefined(trapResult)) throw ScriptRuntime.typeError(GET_MUST_MATCH)
         }
     }
 
-    override fun put(name: String, start: Scriptable, value: Any?) {
-        val target = getTargetThrowIfRevoked()
+    override fun put(name: String, start: Scriptable, value: Any?) = putOrThrow(name, start, value)
 
-        val trap = getTrap(TRAP_SET)
-        if (trap != null) {
-            if (!ScriptRuntime.toBoolean(callTrap(trap, arrayOf(target, name, value)))) return
-            checkSetInvariants(target.getOwnPropertyDescriptor(Context.getContext(), name), value)
-            return
+    override fun put(index: Int, start: Scriptable, value: Any?) = putOrThrow(index, start, value)
+
+    override fun put(key: Symbol, start: Scriptable, value: Any?) = putOrThrow(key, start, value)
+
+    /** An assignment: a refused write is a TypeError in strict code and ignored otherwise. */
+    private fun putOrThrow(key: Any, start: Scriptable, value: Any?) {
+        val cx = Context.getContext()
+        if (!set(cx, key, value, start) && cx.isStrictMode) {
+            throw ScriptRuntime.typeError("proxy refused to set the property '${AbstractEcmaObjectOperations.trapKey(key)}'")
         }
-
-        target.put(name, if (start === this) target else start, value)
     }
 
-    override fun put(index: Int, start: Scriptable, value: Any?) {
+    /**
+     * [[Set]] (ECMAScript 2015, 9.5.9), answering whether the write was made. The trap is handed
+     * the receiver as its fourth argument, and without a trap the target's own [[Set]] runs with
+     * that receiver, so a write through a proxy with no traps still asks the proxy for the
+     * receiver's descriptor and defines through it. Upstream called the trap without a receiver,
+     * ignored a false answer even in strict code, and wrote to the target as its own receiver
+     * (D-89).
+     */
+    internal fun set(cx: Context, key: Any, value: Any?, receiver: Any?): Boolean {
         val target = getTargetThrowIfRevoked()
-
-        val trap = getTrap(TRAP_SET)
-        if (trap != null) {
-            if (!ScriptRuntime.toBoolean(callTrap(trap, arrayOf(target, ScriptRuntime.toString(index), value)))) return
-            checkSetInvariants(target.getOwnPropertyDescriptor(Context.getContext(), index), value)
-            return
-        }
-
-        target.put(index, if (start === this) target else start, value)
-    }
-
-    override fun put(key: Symbol, start: Scriptable, value: Any?) {
-        val target = getTargetThrowIfRevoked()
-
-        val trap = getTrap(TRAP_SET)
-        if (trap != null) {
-            if (!ScriptRuntime.toBoolean(callTrap(trap, arrayOf(target, key, value)))) return
-            checkSetInvariants(target.getOwnPropertyDescriptor(Context.getContext(), key), value)
-            return
-        }
-
-        ensureSymbolScriptable(target).put(key, if (start === this) target else start, value)
+        val trap = getTrap(TRAP_SET) ?: return AbstractEcmaObjectOperations.set(cx, target, key, value, receiver)
+        val trapArgs = arrayOf(target, AbstractEcmaObjectOperations.trapKey(key), value, receiver)
+        if (!ScriptRuntime.toBoolean(callTrap(trap, trapArgs))) return false
+        checkSetInvariants(target.getOwnPropertyDescriptor(cx, key), value)
+        return true
     }
 
     /** A `set` trap that claims success may not contradict a non-configurable property. */
     private fun checkSetInvariants(targetDesc: DescriptorInfo?, value: Any?) {
         if (targetDesc == null || !targetDesc.isConfigurable(false)) return
         if (targetDesc.isDataDescriptor && targetDesc.isWritable(false)) {
-            if (value != targetDesc.value) {
+            if (!AbstractEcmaObjectOperations.sameValue(value, targetDesc.value)) {
                 throw ScriptRuntime.typeError("proxy set has to use the same value as the plain call")
             }
         }
@@ -277,49 +250,60 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
     }
 
     override fun delete(name: String) {
-        val target = getTargetThrowIfRevoked()
-
-        val trap = getTrap(TRAP_DELETE_PROPERTY)
-        if (trap != null) {
-            if (!ScriptRuntime.toBoolean(callTrap(trap, arrayOf(target, name)))) return
-            checkDeleteInvariants(target, target.getOwnPropertyDescriptor(Context.getContext(), name))
-            return
-        }
-
-        target.delete(name)
+        deleteOrThrow(name)
     }
 
     override fun delete(index: Int) {
-        val target = getTargetThrowIfRevoked()
-
-        val trap = getTrap(TRAP_DELETE_PROPERTY)
-        if (trap != null) {
-            if (!ScriptRuntime.toBoolean(callTrap(trap, arrayOf(target, ScriptRuntime.toString(index))))) return
-            checkDeleteInvariants(target, target.getOwnPropertyDescriptor(Context.getContext(), index))
-            return
-        }
-
-        target.delete(index)
+        deleteOrThrow(index)
     }
 
     override fun delete(key: Symbol) {
-        val target = getTargetThrowIfRevoked()
-
-        val trap = getTrap(TRAP_DELETE_PROPERTY)
-        if (trap != null) {
-            if (!ScriptRuntime.toBoolean(callTrap(trap, arrayOf(target, key)))) return
-            checkDeleteInvariants(target, target.getOwnPropertyDescriptor(Context.getContext(), key))
-            return
-        }
-
-        ensureSymbolScriptable(target).delete(key)
+        deleteOrThrow(key)
     }
 
-    private fun checkDeleteInvariants(target: ScriptableObject, targetDesc: DescriptorInfo?) {
+    /**
+     * The `delete` operator: [[Delete]], whose false answer is a TypeError in strict code. The
+     * answer is the result, so nothing asks the proxy afterwards whether the property is still
+     * there; upstream did, which called a `has` trap after every delete (D-89).
+     */
+    internal fun deleteOrThrow(key: Any): Boolean {
+        val cx = Context.getContext()
+        val deleted = delete(cx, key)
+        if (!deleted && cx.isStrictMode) {
+            throw ScriptRuntime.typeError("proxy refused to delete the property '${AbstractEcmaObjectOperations.trapKey(key)}'")
+        }
+        return deleted
+    }
+
+    /** [[Delete]] (ECMAScript 2015, 9.5.10), answering whether the property is gone. */
+    internal fun delete(cx: Context, key: Any): Boolean {
+        val target = getTargetThrowIfRevoked()
+        val trap = getTrap(TRAP_DELETE_PROPERTY) ?: return AbstractEcmaObjectOperations.delete(cx, target, key)
+        if (!ScriptRuntime.toBoolean(callTrap(trap, arrayOf(target, AbstractEcmaObjectOperations.trapKey(key))))) return false
+        checkDeleteInvariants(target, key, target.getOwnPropertyDescriptor(cx, key))
+        return true
+    }
+
+    /**
+     * A proxy answers [[HasProperty]], [[Get]] and [[Set]] for its whole chain, so a lookup that
+     * reaches it never goes on to the proxy's own prototype (D-89).
+     */
+    override fun endsLookup(name: String): Boolean = true
+
+    override fun endsLookup(index: Int): Boolean = true
+
+    override fun endsLookup(key: Symbol): Boolean = true
+
+    /**
+     * A `deleteProperty` trap that claims success may not remove a property the target still has
+     * when that property is non-configurable or the target is non-extensible. Upstream's message
+     * printed the literal text `' + name + '` where the key belongs.
+     */
+    private fun checkDeleteInvariants(target: ScriptableObject, key: Any, targetDesc: DescriptorInfo?) {
         if (targetDesc == null) return
         if (targetDesc.isConfigurable(false) || !target.isExtensible) {
             throw ScriptRuntime.typeError(
-                "proxy can't delete an existing own property ' + name + ' on an not configurable or not extensible object",
+                "proxy can't delete an existing own property '${AbstractEcmaObjectOperations.trapKey(key)}' on an not configurable or not extensible object",
             )
         }
     }
@@ -417,7 +401,10 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
             return true
         }
 
-        return target.defineOwnProperty(cx, id, desc)
+        // [[DefineOwnProperty]] answers false for a refused definition, and a trapless proxy
+        // passes that answer on; the target's own define throws instead, which upstream let
+        // through, so a write that should only fail threw (D-89).
+        return AbstractEcmaObjectOperations.defineOwnPropertyOrFalse(cx, target, id!!, desc)
     }
 
     // ---- Extensibility and prototype -----------------------------------------------------------

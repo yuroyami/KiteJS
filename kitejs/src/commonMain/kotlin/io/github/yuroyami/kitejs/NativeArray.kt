@@ -596,6 +596,19 @@ public class NativeArray : ScriptableObject {
             }
             val newLength = checkLength(value)
             info.value = newLength.toDouble()
+            if (checkValid && value is Scriptable) {
+                // Converting an object ran user code, which may have made the length read-only
+                // in the meantime. ArraySetLength converts first (ECMAScript 2015, 9.4.2.4 steps
+                // 3 and 4) and only then lets OrdinaryDefineOwnProperty refuse, which answers
+                // false, so Reflect.defineProperty sees false and Object.defineProperty throws.
+                // Upstream threw from inside the definition, and only its Reflect.defineProperty
+                // catch-all turned that into false (D-89).
+                val cx = Context.getContext()
+                val currentDesc = builtIn.getOwnPropertyDescriptor(cx, "length")
+                if (!AbstractEcmaObjectOperations.isCompatiblePropertyDescriptor(cx, builtIn.isExtensible, info, currentDesc)) {
+                    return false
+                }
+            }
             val writable = info.writable
             builtIn.startCompoundOp(true).use { map ->
                 if (newLength >= builtIn.length) {
@@ -1544,13 +1557,15 @@ public class NativeArray : ScriptableObject {
                     return thisObj
                 }
             }
-            // Otherwise, do the generic thing
+            // Otherwise, do the generic thing: HasProperty, then Get and Set or a delete
+            // (ECMAScript 2015, 22.1.3.3). Upstream read the element and took NOT_FOUND or
+            // undefined for a hole, so a present undefined was deleted and a proxy's `has` trap
+            // was never asked (D-89).
             while (count > 0) {
-                val temp = getRawElem(o, from)
-                if (temp === Scriptable.NOT_FOUND || Undefined.isUndefined(temp)) {
-                    deleteElem(o, to)
+                if (ArrayLikeAbstractOperations.hasElem(o, from)) {
+                    setElem(cx, o, to, getElem(cx, o, from))
                 } else {
-                    setElem(cx, o, to, temp)
+                    deleteElem(o, to)
                 }
                 from += direction
                 to += direction

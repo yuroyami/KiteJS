@@ -144,6 +144,20 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
         return true
     }
 
+    /**
+     * [[Set]] for a canonical numeric key (ECMAScript 2024, 10.4.5.5): written here when this view
+     * is the receiver, ignored when the index is invalid, and otherwise null, which asks for
+     * OrdinarySet onto the receiver. Any other key is null too.
+     */
+    internal fun set(cx: Context, key: Any, value: Any?, receiver: Any?): Boolean? {
+        val num = numericKey(key) ?: return null
+        if (receiver === this) {
+            setElement(num, value)
+            return true
+        }
+        return if (isValidIntegerIndex(num)) null else true
+    }
+
     /** TypedArraySetElement: the value is converted first, then written if the index is valid. */
     private fun setElement(index: Double, value: Any?) {
         val converted = toNumeric(value)

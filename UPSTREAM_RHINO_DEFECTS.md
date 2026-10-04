@@ -269,6 +269,114 @@ length.
 - Where: `NativeArray.put`, `NativeArray.defineOwnProperty`, `js_push` and `js_unshift`.
 - Test: `IntegrityLevelTest.arrays_stop_growing_once_they_may_not` (common).
 
+### Reflect.set writes onto the receiver and always answers true (D-89)
+
+`Reflect.set` puts the value straight onto the receiver with `Scriptable.put` and returns true
+whatever happened, so it answers true for a frozen object, a non-extensible one, an accessor
+without a setter, and an inherited read-only property, which it even shadows with a new own
+property (`Reflect.set(Object.create(Object.freeze({x: 1})), 'x', 2)` creates `x`). Writing to the
+receiver directly also skips an inherited setter, which `Reflect.set(Object.create({set x(v)
+{...}}), 'x', 5)` never calls, and a proxy target's `set` trap, which is not called at all when a
+separate receiver is given. With a separate receiver, a non-configurable but writable property
+refuses the write, where OrdinarySet only refuses a read-only one. A primitive or undefined
+receiver throws a TypeError instead of answering false, `Reflect.set(o, 'x')` with no value throws
+a host `ArrayIndexOutOfBoundsException`, and strict calling code turns a refused write into a
+TypeError.
+
+- Where: `NativeReflect.set`.
+- Test: `EvalOracleTest.reflectRunsTheTargetsInternalMethodsWithTheReceiver`;
+  `ReflectTest` (common).
+
+### Reflect.get ignores its receiver and indexes numeric keys (D-89)
+
+`Reflect.get` never passes its third argument on, so a getter runs with the target as `this`, and
+`Reflect.get(Map.prototype, 'size', map)` throws. A numeric key goes through ToIndex, so
+`Reflect.get(o, -1)` is a RangeError and `Reflect.get(o, 0.5)` reads `o[0]`, while the string `'1'`
+on an array is not treated as an index and reads as missing. A key whose `Symbol.toPrimitive`
+returns a symbol is a TypeError. `Reflect.get`, `Reflect.has`, `Reflect.deleteProperty` and
+`Reflect.getOwnPropertyDescriptor` treat an omitted key as no property at all instead of the string
+`"undefined"`, and `Reflect.has(o, 1)` is false for an object with the property `'1'`.
+
+- Where: `NativeReflect.get`, `has`, `deleteProperty` and `getOwnPropertyDescriptor`.
+- Test: `EvalOracleTest.reflectRunsTheTargetsInternalMethodsWithTheReceiver`;
+  `ReflectTest` (common).
+
+### Reflect.deleteProperty deletes along the prototype chain (D-89)
+
+`Reflect.deleteProperty` uses `ScriptableObject.deleteProperty`, which finds the object in the
+chain that holds the property and deletes it there, so `Reflect.deleteProperty({}, 'toString')`
+removes `Object.prototype.toString`. A proxy's `deleteProperty` trap answering false is reported as
+a success, and the `delete` operator in strict code ignores that false too.
+
+- Where: `NativeReflect.deleteProperty`, `NativeProxy.delete`.
+- Test: `EvalOracleTest.reflectRunsTheTargetsInternalMethodsWithTheReceiver`.
+
+### Reflect.construct and Reflect.defineProperty skip required errors (D-89)
+
+`Reflect.construct(F)` with no argument list, or with `undefined` or `null`, constructs with no
+arguments, where CreateListFromArrayLike requires an object. `Reflect.defineProperty` catches every
+`EcmaError` and answers false, so a TypeError the engine raises, such as a proxy invariant
+violation or `null.x` inside a trap, disappears, and it accepts a descriptor whose `get` is not
+callable.
+
+- Where: `NativeReflect.construct` and `defineProperty`.
+- Test: `EvalOracleTest.reflectRunsTheTargetsInternalMethodsWithTheReceiver`;
+  `ReflectTest` (common).
+
+### Proxy traps get the wrong receiver and false answers are ignored (D-89)
+
+A proxy's `get` trap is always handed the proxy as receiver, even when the read started on an
+object that inherits from it, and its `set` trap gets the proxy too, never the receiver the
+assignment started from; an assignment to an object whose prototype is a proxy with a `set` trap
+never reaches the trap and creates an own property instead. A `set` trap answering false does not
+throw in strict code. A proxy without traps reads its target with the target as `this`, so a
+getter on the target sees the target rather than the proxy. Because `getBase` asks `has` on every
+object in the chain, an assignment that reaches a proxy calls its `has` trap, and a missed read
+goes on to the proxy's own prototype, calling a `getPrototypeOf` trap that the spec never reaches. The `delete` operator asks `has` after deleting to learn the result, which calls the
+`has` trap again. The message for a `deleteProperty` invariant violation prints the literal text
+`' + name + '` in place of the key.
+
+- Where: `NativeProxy.get`, `put`, `delete`, `checkDeleteInvariants`,
+  `ScriptableObject.getBase` and `ScriptRuntime.deleteObjectElem`.
+- Test: `EvalOracleTest.reflectRunsTheTargetsInternalMethodsWithTheReceiver`;
+  `ReflectTest.proxy_traps_receive_the_receiver_and_their_answer_counts` (common).
+
+### with ignores @@unscopables and finds bindings by reading them (D-89)
+
+The object environment of a `with` statement decides whether it holds a name by reading the
+property and comparing with NOT_FOUND, never asking HasProperty or looking at @@unscopables. So
+`with ([]) { keys }` finds `Array.prototype.keys` instead of an outer `keys`, an object whose
+@@unscopables lists `x` still captures reads, writes and `x++`, a proxy's `has` trap is never
+consulted (one answering false still binds the name if its `get` trap answers anything). A strict assignment to a binding that
+the right-hand side deleted recreates the property instead of throwing a ReferenceError
+(`with (scope) { (function () { 'use strict'; x = (delete scope.x, 2) })() }`).
+
+- Where: `ScriptRuntime.nameOrFunction`, `bind`, `typeofName`, `nameIncrDecr` and
+  `strictSetName`.
+- Test: `WithEnvironmentTest` (common); test262 `language/statements/with`.
+
+### copyWithin takes undefined for a hole (D-89)
+
+The generic loop of `Array.prototype.copyWithin` reads each source element and deletes the target
+when the value is NOT_FOUND or undefined, so a present `undefined` is deleted rather than copied
+(`Array.prototype.copyWithin.call({0: undefined, 1: 1, length: 2}, 1, 0)` leaves no `1`), and it
+never asks HasProperty, so a proxy's `has` trap is not called. Dense arrays take a fast path that
+copies correctly.
+
+- Where: `NativeArray.js_copyWithin`.
+- Test: `ReflectTest.copy_within_asks_has_property` (common).
+
+### RegExp.prototype flags and source are data properties (D-89)
+
+`source`, `flags`, `global`, `ignoreCase`, `multiline`, `sticky`, `unicode` and `dotAll` are own
+data properties of every RegExp instance and of `RegExp.prototype`, not accessors on the prototype
+as ECMAScript 2015, 21.2.5 defines them, so `Object.getOwnPropertyNames(/a/)` lists all of them
+where browsers list only `lastIndex`. `Object.getOwnPropertyDescriptor(RegExp.prototype,
+'source')` has a value instead of a `get`, and `Reflect.get(RegExp.prototype, 'source', /xy/)`
+reads `''` where every browser reads `'xy'`. KiteJS keeps upstream's structure for now.
+
+- Where: `NativeRegExp` (the instance ids `Id_source`, `Id_global` and the rest).
+
 ### A getOwnPropertyDescriptor trap answering undefined crashes (D-50)
 
 A Proxy whose `getOwnPropertyDescriptor` trap returns `undefined` for a property the target lacks

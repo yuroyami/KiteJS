@@ -5,6 +5,7 @@
 package io.github.yuroyami.kitejs
 
 import io.github.yuroyami.kitejs.ScriptableObject.DescriptorInfo
+import io.github.yuroyami.kitejs.typedarrays.NativeTypedArrayView
 
 /** The spec's abstract operations on objects: integrity levels, species, grouping and the rest. */
 public object AbstractEcmaObjectOperations {
@@ -89,6 +90,149 @@ public object AbstractEcmaObjectOperations {
             throw ScriptRuntime.typeErrorById("msg.not.ctor", ScriptRuntime.typeOf(species))
         }
         return species
+    }
+
+    // ---- [[Get]], [[Set]] and [[DefineOwnProperty]] as the spec states them ----------------------
+    //
+    // Rhino's get and put look at one object at a time and answer nothing about success, which is
+    // enough for an assignment but not for Reflect, whose methods take a separate receiver and
+    // report whether the target agreed, nor for a proxy forwarding to its target. These follow the
+    // spec's algorithms on top of each object's own descriptor methods, so every exotic object
+    // takes part through the overrides it already has (D-89). A key is what ToPropertyKey gives:
+    // a Symbol, an array index as an Int, or a String.
+
+    /** O.[[Get]](P, Receiver): [key] looked up from [o], with [receiver] as `this` for a getter. */
+    internal fun get(cx: Context, o: Scriptable, key: Any, receiver: Any?): Any? {
+        var obj: Scriptable? = o
+        while (obj != null) {
+            if (obj is NativeProxy) return obj.get(cx, key, receiver)
+            if (obj !is ScriptableObject) {
+                val v = rawGet(obj, key, ScriptRuntime.toObject(cx, ScriptableObject.getTopLevelScope(obj), receiver))
+                if (v !== Scriptable.NOT_FOUND) return v
+            } else {
+                val desc = obj.getOwnPropertyDescriptor(cx, key)
+                if (desc != null) {
+                    if (!desc.isAccessorDescriptor) return desc.value.let { if (it === Scriptable.NOT_FOUND) Undefined.instance else it }
+                    val getter = desc.getter
+                    if (getter !is Callable) return Undefined.instance
+                    return callAccessor(cx, getter, receiver, ScriptRuntime.emptyArgs)
+                }
+                if (key !is Symbol && endsLookup(obj, key)) return Undefined.instance
+            }
+            obj = obj.prototype
+        }
+        return Undefined.instance
+    }
+
+    /**
+     * O.[[Set]](P, V, Receiver), answering whether the write was made. A proxy runs its trap, a
+     * typed array keeps a numeric key to its elements, and everything else is OrdinarySet.
+     */
+    internal fun set(cx: Context, o: Scriptable, key: Any, value: Any?, receiver: Any?): Boolean = when {
+        o is NativeProxy -> o.set(cx, key, value, receiver)
+        o is NativeTypedArrayView && key !is Symbol -> o.set(cx, key, value, receiver) ?: ordinarySet(cx, o, key, value, receiver)
+        o is ScriptableObject -> ordinarySet(cx, o, key, value, receiver)
+        else -> {
+            // An object outside the descriptor protocol takes the write the only way it can.
+            rawPut(o, key, ScriptRuntime.toObject(cx, ScriptableObject.getTopLevelScope(o), receiver), value)
+            true
+        }
+    }
+
+    /** OrdinarySet and OrdinarySetWithOwnDescriptor (ECMAScript 2015, 9.1.9). */
+    internal fun ordinarySet(cx: Context, o: ScriptableObject, key: Any, value: Any?, receiver: Any?): Boolean {
+        val ownDesc = o.getOwnPropertyDescriptor(cx, key)
+        if (ownDesc == null) {
+            val parent = o.prototype
+            if (parent != null) return set(cx, parent, key, value, receiver)
+            return setOnReceiver(cx, key, value, receiver)
+        }
+        if (!ownDesc.isAccessorDescriptor) {
+            if (!ScriptableObject.isTrue(ownDesc.writable)) return false
+            return setOnReceiver(cx, key, value, receiver)
+        }
+        val setter = ownDesc.setter
+        if (setter !is Callable) return false
+        callAccessor(cx, setter, receiver, arrayOf(value))
+        return true
+    }
+
+    /** The data property half of OrdinarySetWithOwnDescriptor: the write lands on [receiver]. */
+    private fun setOnReceiver(cx: Context, key: Any, value: Any?, receiver: Any?): Boolean {
+        if (receiver !is Scriptable || !ScriptRuntime.isObject(receiver)) return false
+        if (receiver !is ScriptableObject) {
+            rawPut(receiver, key, receiver, value)
+            return true
+        }
+        val existing = receiver.getOwnPropertyDescriptor(cx, key)
+            ?: return createDataProperty(cx, receiver, key, value)
+        if (existing.isAccessorDescriptor || !ScriptableObject.isTrue(existing.writable)) return false
+        if (receiver is NativeProxy) {
+            val valueOnly = DescriptorInfo(Scriptable.NOT_FOUND, Scriptable.NOT_FOUND, Scriptable.NOT_FOUND, Scriptable.NOT_FOUND, Scriptable.NOT_FOUND, value)
+            return receiver.defineOwnProperty(cx, key, valueOnly)
+        }
+        // Receiver.[[DefineOwnProperty]](P, {[[Value]]: V}) on a writable data property it owns.
+        // Writing it through the object's own put finds that property first and keeps whatever a
+        // built-in property does on a write, which redefining it would replace.
+        rawPut(receiver, key, receiver, value)
+        return true
+    }
+
+    /** CreateDataProperty: a writable, enumerable, configurable data property, or false. */
+    internal fun createDataProperty(cx: Context, o: ScriptableObject, key: Any, value: Any?): Boolean =
+        defineOwnPropertyOrFalse(cx, o, key, DescriptorInfo(true, true, true, value))
+
+    /**
+     * O.[[DefineOwnProperty]](P, Desc) as a boolean. Rhino throws for a definition it refuses, so
+     * the definition is validated against the current descriptor first, the way
+     * ValidateAndApplyPropertyDescriptor would, and only made when it can succeed. A proxy answers
+     * through its trap, and an exotic object may still refuse with false.
+     */
+    internal fun defineOwnPropertyOrFalse(cx: Context, o: ScriptableObject, key: Any, desc: DescriptorInfo): Boolean {
+        if (o is NativeProxy) return o.defineOwnProperty(cx, key, desc)
+        val current = o.getOwnPropertyDescriptor(cx, key)
+        if (!isCompatiblePropertyDescriptor(cx, o.isExtensible, desc, current)) return false
+        return o.defineOwnProperty(cx, key, desc)
+    }
+
+    /** O.[[Delete]](P) as a boolean: only an own property is looked at. */
+    internal fun delete(cx: Context, o: ScriptableObject, key: Any): Boolean {
+        if (o is NativeProxy) return o.delete(cx, key)
+        val desc = o.getOwnPropertyDescriptor(cx, key) ?: return true
+        if (!ScriptableObject.isTrue(desc.configurable)) return false
+        when (key) {
+            is Symbol -> o.delete(key)
+            is Int -> o.delete(key)
+            else -> o.delete(key as String)
+        }
+        return o.getOwnPropertyDescriptor(cx, key) == null
+    }
+
+    /** Calls a getter or setter with [receiver] as `this`, converted the way `call` converts it. */
+    private fun callAccessor(cx: Context, accessor: Callable, receiver: Any?, args: Array<Any?>): Any? {
+        val scope = (accessor as? Scriptable)?.let { ScriptableObject.getTopLevelScope(it) } ?: ScriptRuntime.getTopCallScope(cx)
+        val thisObj = receiver as? Scriptable ?: ScriptRuntime.getApplyOrCallThis(cx, scope, receiver, 1, accessor)
+        return accessor.call(cx, scope, thisObj, args)
+    }
+
+    private fun endsLookup(o: ScriptableObject, key: Any): Boolean =
+        if (key is Int) o.endsLookup(key) else o.endsLookup(key as String)
+
+    /** The key in the form a proxy trap is handed: a Symbol or a String. */
+    internal fun trapKey(key: Any): Any = if (key is Int) key.toString() else key
+
+    internal fun rawGet(o: Scriptable, key: Any, start: Scriptable): Any? = when (key) {
+        is Symbol -> ScriptableObject.ensureSymbolScriptable(o).get(key, start)
+        is Int -> o.get(key, start)
+        else -> o.get(key as String, start)
+    }
+
+    internal fun rawPut(o: Scriptable, key: Any, start: Scriptable, value: Any?) {
+        when (key) {
+            is Symbol -> ScriptableObject.ensureSymbolScriptable(o).put(key, start, value)
+            is Int -> o.put(key, start, value)
+            else -> o.put(key as String, start, value)
+        }
     }
 
     internal fun put(cx: Context, o: Scriptable, p: String, v: Any?, isThrow: Boolean) {
@@ -237,7 +381,7 @@ public object AbstractEcmaObjectOperations {
         } else if (current.isDataDescriptor && desc.isDataDescriptor) {
             if (current.isConfigurable(false) && current.isWritable(false)) {
                 if (desc.isWritable) return false
-                if (desc.hasValue() && desc.value != current.value) return false
+                if (desc.hasValue() && !sameValue(desc.value, current.value)) return false
                 return true
             }
         } else {
@@ -248,6 +392,17 @@ public object AbstractEcmaObjectOperations {
             }
         }
         return true
+    }
+
+    /** SameValue: NaN is itself, and the two zeroes differ. */
+    internal fun sameValue(x: Any?, y: Any?): Boolean {
+        if (x is Number && y is Number) {
+            val a = x.toDouble()
+            val b = y.toDouble()
+            if (a.isNaN() && b.isNaN()) return true
+            return a == b && (a != 0.0 || a.toRawBits() == b.toRawBits())
+        }
+        return ScriptRuntime.shallowEq(x, y)
     }
 
     /** IsConstructor: does [argument] have a [[Construct]] method. */

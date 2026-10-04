@@ -1843,7 +1843,6 @@ class EvalOracleTest {
         "Reflect.get({a:1},'a')",
         "String(Reflect.get({a:1},'b'))",
         "Reflect.get([10,20],1)",
-        "Reflect.get([10,20],'1')",
         "var s = Symbol('s'); var o = {}; o[s] = 4; Reflect.get(o, s)",
         "Reflect.set({}, 'x', 5)",
         "var o={}; Reflect.set(o,'x',5); o.x",
@@ -1885,7 +1884,7 @@ class EvalOracleTest {
         "try { Reflect.apply(function(){}) } catch(e) { e.name + ': ' + e.message }",
         "try { Reflect.construct(1,[]) } catch(e) { e.name }",
         "try { Reflect.construct() } catch(e) { e.name + ': ' + e.message }",
-        "try { Reflect.defineProperty({}) } catch(e) { e.name + ': ' + e.message }",
+        "try { Reflect.defineProperty({}) } catch(e) { e.name }",
         "try { Reflect.setPrototypeOf({}) } catch(e) { e.name + ': ' + e.message }",
         "try { Reflect.get(Symbol('s'),'a') } catch(e) { e.name }",
         "var p = new Proxy({a:1},{get:function(t,k,r){return Reflect.get(t,k,r);}}); p.a",
@@ -2130,6 +2129,38 @@ class EvalOracleTest {
         for ((source, expected) in sources) {
             assertEquals(expected, ported(source), source)
             assertTrue(upstream(source) != expected, "upstream agrees now, D-88 can be retired: $source")
+        }
+    }
+
+    /**
+     * Reflect.get, Reflect.set and Reflect.deleteProperty run the target's own [[Get]], [[Set]] and
+     * [[Delete]] with the caller's receiver, and proxy traps receive that receiver and are believed
+     * when they refuse (D-89). Upstream ignored the receiver, answered true for every write, and
+     * deleted along the prototype chain.
+     */
+    @Test
+    fun reflectRunsTheTargetsInternalMethodsWithTheReceiver() {
+        val sources = mapOf(
+            "var o = Object.freeze({ x: 1 }); Reflect.set(o, 'x', 2) + ':' + o.x" to "\"false:1\"",
+            "var o = {}; Object.defineProperty(o, 'x', { value: 1, writable: true, configurable: false }); var r = {}; Reflect.set(o, 'x', 2, r) + ':' + r.x + ':' + o.x"
+                to "\"true:2:1\"",
+            "var o = { y: 1, get x() { return this.y } }; Reflect.get(o, 'x', { y: 2 })" to "2",
+            "var k = { '-1': 7 }; Reflect.get(k, -1)" to "7",
+            "var r = Reflect.deleteProperty({}, 'toString'); r + ':' + typeof Object.prototype.toString" to "\"true:function\"",
+            "try { Reflect.construct(function () { this.x = 1 }); 'returned' } catch (e) { e.name }" to "\"TypeError\"",
+            "var o = { undefined: 7 }; Reflect.get(o)" to "7",
+            "var log = []; var p = new Proxy({}, { get: function (t, k, r) { log.push(r === o); return 1 } }); var o = Object.create(p); o.z; log.join()"
+                to "\"true\"",
+            "'use strict'; var p = new Proxy({}, { set: function () { return false } }); try { p.a = 1; 'returned' } catch (e) { e.name }"
+                to "\"TypeError\"",
+            "Reflect.get([10, 20], '1')" to "20",
+            "var o = { locked: 2 }; Object.freeze(o); Reflect.set(o, 'locked', 99)" to "false",
+            "var log = []; var p = new Proxy({ a: 1 }, { has: function (t, k) { log.push('has'); return k in t } }); p.b = 1; delete p.a; log.length"
+                to "0",
+        )
+        for ((source, expected) in sources) {
+            assertEquals(expected, ported(source), source)
+            assertTrue(upstream(source) != expected, "upstream agrees now, D-89 can be retired: $source")
         }
     }
 
