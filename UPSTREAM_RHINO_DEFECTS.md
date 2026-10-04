@@ -98,6 +98,22 @@ files.
   `FunctionSetter`, which ignores a target that is not a function.
 - Test: `EvalOracleTest.aStrictWriteToAnAccessorWithSetUndefinedThrows`.
 
+### A generator function in a plain scope has a null prototype (D-79)
+
+ECMAScript 2015, 14.4.13 and 25.2.3 give a generator function %GeneratorFunction.prototype% as
+its prototype, whose own prototype is `Function.prototype`. Rhino builds that object and its
+constructor only when the scope is a `TopLevel`, so in the scope `initStandardObjects()` returns
+a generator function, however it is written, has a null prototype: `call`, `apply` and `bind`
+are missing, `g instanceof Function` is false, and code that calls a generator through `call`,
+as an iterable helper does, throws `Cannot find function call`. In a `TopLevel` the constructor
+is put on the global as `__GeneratorFunction`, writable, enumerable and configurable, so
+`Object.keys(globalThis)` and a `for`-`in` over the global list a name no script defined.
+
+- Where: `ScriptRuntime.initSafeStandardObjects`, which builds the constructor through
+  `TopLevel.cacheBuiltins` alone, and `BaseFunction.initAsGeneratorFunction`, which puts it on
+  the global.
+- Test: `EvalOracleTest.aGeneratorFunctionInheritsFromTheGeneratorFunctionPrototype`.
+
 ### A getOwnPropertyDescriptor trap answering undefined crashes (D-50)
 
 A Proxy whose `getOwnPropertyDescriptor` trap returns `undefined` for a property the target lacks

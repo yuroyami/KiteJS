@@ -2184,6 +2184,22 @@ class EvalOracleTest {
     }
 
     /**
+     * In a scope that is not a TopLevel, as `initStandardObjects()` makes, a generator function
+     * inherits from %GeneratorFunction.prototype% here, as ECMAScript 2015, 14.4.13 asks.
+     * Upstream builds that prototype for a TopLevel only, so its generator functions have a null
+     * prototype and no `call` (D-79). Neither engine lists a hidden name among the globals.
+     */
+    @Test
+    fun aGeneratorFunctionInheritsFromTheGeneratorFunctionPrototype() {
+        val script = "var g = function* () { yield 1; };" +
+            " [Object.prototype.toString.call(Object.getPrototypeOf(g)), typeof g.call, g instanceof Function].join()"
+        assertEquals("\"[object Null],undefined,false\"", upstream(script))
+        assertEquals("\"[object GeneratorFunction],function,true\"", ported(script))
+        val globals = "Object.keys(this).filter(function (k) { return k.indexOf('Generator') >= 0 }).join()"
+        assertEquals(upstream(globals), ported(globals))
+    }
+
+    /**
      * Assigning to a const is a TypeError here in any mode, which is what ECMAScript 2015,
      * 8.1.1.1.5 asks and what every browser does. Upstream lets the write pass silently outside
      * strict mode, and in strict code run by `eval` (D-71). Both halves are pinned so a change on

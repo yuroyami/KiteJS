@@ -119,13 +119,13 @@ public open class TopLevel : ScriptableObject() {
         public fun getBuiltinCtor(cx: Context, scope: Scriptable, type: Builtins): Function? {
             check(scope.parentScope == null) { "the scope has to be a top-level scope" }
             if (scope is TopLevel) scope.getBuiltinCtor(type)?.let { return it }
-            // GeneratorFunction is not stored under its own name, so the fallback uses the hidden
-            // one.
-            val typeName =
-                if (type == Builtins.GeneratorFunction) BaseFunction.GENERATOR_FUNCTION_CLASS
-                else type.name
-            return ScriptRuntime.getExistingCtor(cx, scope, typeName)
+            // GeneratorFunction is no global, so the fallback finds it parked on the scope.
+            if (type == Builtins.GeneratorFunction) return generatorFunction(scope)
+            return ScriptRuntime.getExistingCtor(cx, scope, type.name)
         }
+
+        private fun generatorFunction(scope: Scriptable): BaseFunction? =
+            ScriptableObject.getTopScopeValue(scope, BaseFunction.GENERATOR_FUNCTION_CLASS) as? BaseFunction
 
         internal fun getNativeErrorCtor(
             cx: Context,
@@ -144,10 +144,8 @@ public open class TopLevel : ScriptableObject() {
         public fun getBuiltinPrototype(scope: Scriptable, type: Builtins): Scriptable? {
             check(scope.parentScope == null) { "the scope has to be a top-level scope" }
             if (scope is TopLevel) scope.getBuiltinPrototype(type)?.let { return it }
-            val typeName =
-                if (type == Builtins.GeneratorFunction) BaseFunction.GENERATOR_FUNCTION_CLASS
-                else type.name
-            return getClassPrototype(scope, typeName)
+            if (type == Builtins.GeneratorFunction) return generatorFunction(scope)?.prototypeProperty as? Scriptable
+            return getClassPrototype(scope, type.name)
         }
     }
 }

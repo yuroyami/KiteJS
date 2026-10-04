@@ -1408,7 +1408,11 @@ public object ScriptRuntime {
             LazilyLoadedCtor(scope, "WeakSet", sealed, Initializable { icx, s, sld -> NativeWeakSet.init(icx, s, sld) })
         }
 
+        // GeneratorFunction is built by the TopLevel cache, and in any other scope here. Upstream
+        // built it for a TopLevel only, so in a plain scope every generator function had a null
+        // prototype and no call, apply or bind (D-79).
         if (scope is TopLevel) scope.cacheBuiltins(scope, sealed)
+        else BaseFunction.initAsGeneratorFunction(scope, sealed)
         return scope
     }
 

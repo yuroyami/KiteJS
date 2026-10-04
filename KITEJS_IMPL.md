@@ -452,6 +452,15 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   nothing. `EvalOracleTest` pins both halves and `AccessorWithoutSetterTest` runs the cases on
   every target; 18 strict-only test262 files now pass here and fail upstream, pinned in
   `Test262ParityTest` (#68).
+- D-79: `GeneratorFunction` is built for every scope `initSafeStandardObjects` sets up, not only
+  for a `TopLevel`, and it is parked on the scope as a value, as %GeneratorPrototype% is, rather
+  than put on the global. Upstream built it in `TopLevel.cacheBuiltins` alone, so in a plain
+  scope, which `initStandardObjects()` and the facade make, every generator function had a null
+  prototype, no `call`, `apply` or `bind`, and was not an `instanceof Function`; in a `TopLevel`
+  it put the constructor on the global as an enumerable `__GeneratorFunction`, which
+  `Object.keys(globalThis)` and a `for`-`in` listed. `GeneratorFunctionPrototypeTest` runs the
+  expression, declaration and method forms on every target, and `EvalOracleTest` pins the
+  difference (#67).
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

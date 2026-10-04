@@ -382,8 +382,10 @@ public open class BaseFunction : ScriptableObject, Function {
             proto.defineProperty("constructor", ctor, READONLY or DONTENUM)
             ctor.setPrototypePropertyAttributes(DONTENUM or READONLY or PERMANENT)
             proto.defineProperty(SymbolKey.TO_STRING_TAG, "GeneratorFunction", READONLY or DONTENUM)
-            putProperty(scope, GENERATOR_FUNCTION_CLASS, ctor)
-            return ctor
+            // Parked on the scope, as %GeneratorPrototype% is, and not a global: upstream put it on
+            // the global as an enumerable __GeneratorFunction, which Object.keys and for-in listed
+            // (D-79).
+            return (scope as? ScriptableObject)?.associateValue(GENERATOR_FUNCTION_CLASS, ctor) ?: ctor
         }
 
         private fun js_hasInstance(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
