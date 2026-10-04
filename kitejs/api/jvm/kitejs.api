@@ -270,6 +270,7 @@ public abstract interface class io/github/yuroyami/kitejs/Constructable {
 
 public class io/github/yuroyami/kitejs/Context : java/lang/AutoCloseable {
 	public static final field Companion Lio/github/yuroyami/kitejs/Context$Companion;
+	public static final field FEATURE_ASM_JS I
 	public static final field FEATURE_DYNAMIC_SCOPE I
 	public static final field FEATURE_E4X I
 	public static final field FEATURE_ENABLE_JAVA_MAP_ACCESS I
@@ -2511,6 +2512,14 @@ public abstract interface class io/github/yuroyami/kitejs/Wrapper {
 	public abstract fun unwrap ()Ljava/lang/Object;
 }
 
+public final class io/github/yuroyami/kitejs/api/AsmReport {
+	public final fun getCompiled ()Z
+	public final fun getLinked ()Z
+	public final fun getName ()Ljava/lang/String;
+	public final fun getReason ()Ljava/lang/String;
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class io/github/yuroyami/kitejs/api/BindScope {
 	public final fun method (Ljava/lang/String;ILkotlin/jvm/functions/Function2;)V
 	public static synthetic fun method$default (Lio/github/yuroyami/kitejs/api/BindScope;Ljava/lang/String;ILkotlin/jvm/functions/Function2;ILjava/lang/Object;)V
@@ -2716,6 +2725,7 @@ public final class io/github/yuroyami/kitejs/api/KiteJs : java/lang/AutoCloseabl
 	public static synthetic fun compile$default (Lio/github/yuroyami/kitejs/api/KiteJs;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsScript;
 	public final fun evaluate-ss6hNDw (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
 	public static synthetic fun evaluate-ss6hNDw$default (Lio/github/yuroyami/kitejs/api/KiteJs;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun getAsmReports ()Ljava/util/List;
 	public final fun getGlobal ()Lio/github/yuroyami/kitejs/api/JsObject;
 	public final fun getVersion ()Ljava/lang/String;
 	public final fun newArray ([Ljava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsArray;
@@ -2728,19 +2738,23 @@ public final class io/github/yuroyami/kitejs/api/KiteJs$Companion {
 }
 
 public final class io/github/yuroyami/kitejs/api/KiteJsConfig {
+	public final fun getAsmJs ()Z
 	public final fun getClock ()Lkotlin/jvm/functions/Function0;
 	public final fun getConsole ()Lio/github/yuroyami/kitejs/NativeConsole$ConsolePrinter;
 	public final fun getInstructionBudget ()I
 	public final fun getInterruptWhen ()Lkotlin/jvm/functions/Function0;
 	public final fun getLanguageVersion ()Lio/github/yuroyami/kitejs/api/LanguageVersion;
+	public final fun getLittleEndian ()Z
 	public final fun getSafeBuiltins ()Z
 	public final fun getSealBuiltins ()Z
 	public final fun getTimeZone ()Lkotlinx/datetime/TimeZone;
+	public final fun setAsmJs (Z)V
 	public final fun setClock (Lkotlin/jvm/functions/Function0;)V
 	public final fun setConsole (Lio/github/yuroyami/kitejs/NativeConsole$ConsolePrinter;)V
 	public final fun setInstructionBudget (I)V
 	public final fun setInterruptWhen (Lkotlin/jvm/functions/Function0;)V
 	public final fun setLanguageVersion (Lio/github/yuroyami/kitejs/api/LanguageVersion;)V
+	public final fun setLittleEndian (Z)V
 	public final fun setSafeBuiltins (Z)V
 	public final fun setSealBuiltins (Z)V
 	public final fun setTimeZone (Lkotlinx/datetime/TimeZone;)V

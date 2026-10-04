@@ -1015,6 +1015,19 @@ final class <#A: kotlin/Any> io.github.yuroyami.kitejs/WeakRef { // io.github.yu
     }
 }
 
+final class io.github.yuroyami.kitejs.api/AsmReport { // io.github.yuroyami.kitejs.api/AsmReport|null[0]
+    final val compiled // io.github.yuroyami.kitejs.api/AsmReport.compiled|{}compiled[0]
+        final fun <get-compiled>(): kotlin/Boolean // io.github.yuroyami.kitejs.api/AsmReport.compiled.<get-compiled>|<get-compiled>(){}[0]
+    final val linked // io.github.yuroyami.kitejs.api/AsmReport.linked|{}linked[0]
+        final fun <get-linked>(): kotlin/Boolean // io.github.yuroyami.kitejs.api/AsmReport.linked.<get-linked>|<get-linked>(){}[0]
+    final val name // io.github.yuroyami.kitejs.api/AsmReport.name|{}name[0]
+        final fun <get-name>(): kotlin/String // io.github.yuroyami.kitejs.api/AsmReport.name.<get-name>|<get-name>(){}[0]
+    final val reason // io.github.yuroyami.kitejs.api/AsmReport.reason|{}reason[0]
+        final fun <get-reason>(): kotlin/String // io.github.yuroyami.kitejs.api/AsmReport.reason.<get-reason>|<get-reason>(){}[0]
+
+    final fun toString(): kotlin/String // io.github.yuroyami.kitejs.api/AsmReport.toString|toString(){}[0]
+}
+
 final class io.github.yuroyami.kitejs.api/ConsoleMessage { // io.github.yuroyami.kitejs.api/ConsoleMessage|null[0]
     constructor <init>(io.github.yuroyami.kitejs/NativeConsole.Level, kotlin/String) // io.github.yuroyami.kitejs.api/ConsoleMessage.<init>|<init>(io.github.yuroyami.kitejs.NativeConsole.Level;kotlin.String){}[0]
 
@@ -1110,6 +1123,8 @@ final class io.github.yuroyami.kitejs.api/JsSyntaxError : io.github.yuroyami.kit
 }
 
 final class io.github.yuroyami.kitejs.api/KiteJs : kotlin/AutoCloseable { // io.github.yuroyami.kitejs.api/KiteJs|null[0]
+    final val asmReports // io.github.yuroyami.kitejs.api/KiteJs.asmReports|{}asmReports[0]
+        final fun <get-asmReports>(): kotlin.collections/List<io.github.yuroyami.kitejs.api/AsmReport> // io.github.yuroyami.kitejs.api/KiteJs.asmReports.<get-asmReports>|<get-asmReports>(){}[0]
     final val global // io.github.yuroyami.kitejs.api/KiteJs.global|{}global[0]
         final fun <get-global>(): io.github.yuroyami.kitejs.api/JsObject // io.github.yuroyami.kitejs.api/KiteJs.global.<get-global>|<get-global>(){}[0]
     final val version // io.github.yuroyami.kitejs.api/KiteJs.version|{}version[0]
@@ -1127,6 +1142,9 @@ final class io.github.yuroyami.kitejs.api/KiteJs : kotlin/AutoCloseable { // io.
 }
 
 final class io.github.yuroyami.kitejs.api/KiteJsConfig { // io.github.yuroyami.kitejs.api/KiteJsConfig|null[0]
+    final var asmJs // io.github.yuroyami.kitejs.api/KiteJsConfig.asmJs|{}asmJs[0]
+        final fun <get-asmJs>(): kotlin/Boolean // io.github.yuroyami.kitejs.api/KiteJsConfig.asmJs.<get-asmJs>|<get-asmJs>(){}[0]
+        final fun <set-asmJs>(kotlin/Boolean) // io.github.yuroyami.kitejs.api/KiteJsConfig.asmJs.<set-asmJs>|<set-asmJs>(kotlin.Boolean){}[0]
     final var clock // io.github.yuroyami.kitejs.api/KiteJsConfig.clock|{}clock[0]
         final fun <get-clock>(): kotlin/Function0<kotlin/Double>? // io.github.yuroyami.kitejs.api/KiteJsConfig.clock.<get-clock>|<get-clock>(){}[0]
         final fun <set-clock>(kotlin/Function0<kotlin/Double>?) // io.github.yuroyami.kitejs.api/KiteJsConfig.clock.<set-clock>|<set-clock>(kotlin.Function0<kotlin.Double>?){}[0]
@@ -1142,6 +1160,9 @@ final class io.github.yuroyami.kitejs.api/KiteJsConfig { // io.github.yuroyami.k
     final var languageVersion // io.github.yuroyami.kitejs.api/KiteJsConfig.languageVersion|{}languageVersion[0]
         final fun <get-languageVersion>(): io.github.yuroyami.kitejs.api/LanguageVersion // io.github.yuroyami.kitejs.api/KiteJsConfig.languageVersion.<get-languageVersion>|<get-languageVersion>(){}[0]
         final fun <set-languageVersion>(io.github.yuroyami.kitejs.api/LanguageVersion) // io.github.yuroyami.kitejs.api/KiteJsConfig.languageVersion.<set-languageVersion>|<set-languageVersion>(io.github.yuroyami.kitejs.api.LanguageVersion){}[0]
+    final var littleEndian // io.github.yuroyami.kitejs.api/KiteJsConfig.littleEndian|{}littleEndian[0]
+        final fun <get-littleEndian>(): kotlin/Boolean // io.github.yuroyami.kitejs.api/KiteJsConfig.littleEndian.<get-littleEndian>|<get-littleEndian>(){}[0]
+        final fun <set-littleEndian>(kotlin/Boolean) // io.github.yuroyami.kitejs.api/KiteJsConfig.littleEndian.<set-littleEndian>|<set-littleEndian>(kotlin.Boolean){}[0]
     final var safeBuiltins // io.github.yuroyami.kitejs.api/KiteJsConfig.safeBuiltins|{}safeBuiltins[0]
         final fun <get-safeBuiltins>(): kotlin/Boolean // io.github.yuroyami.kitejs.api/KiteJsConfig.safeBuiltins.<get-safeBuiltins>|<get-safeBuiltins>(){}[0]
         final fun <set-safeBuiltins>(kotlin/Boolean) // io.github.yuroyami.kitejs.api/KiteJsConfig.safeBuiltins.<set-safeBuiltins>|<set-safeBuiltins>(kotlin.Boolean){}[0]
@@ -3710,6 +3731,8 @@ open class io.github.yuroyami.kitejs/Context : kotlin/AutoCloseable { // io.gith
     }
 
     final object Companion { // io.github.yuroyami.kitejs/Context.Companion|null[0]
+        final const val FEATURE_ASM_JS // io.github.yuroyami.kitejs/Context.Companion.FEATURE_ASM_JS|{}FEATURE_ASM_JS[0]
+            final fun <get-FEATURE_ASM_JS>(): kotlin/Int // io.github.yuroyami.kitejs/Context.Companion.FEATURE_ASM_JS.<get-FEATURE_ASM_JS>|<get-FEATURE_ASM_JS>(){}[0]
         final const val FEATURE_DYNAMIC_SCOPE // io.github.yuroyami.kitejs/Context.Companion.FEATURE_DYNAMIC_SCOPE|{}FEATURE_DYNAMIC_SCOPE[0]
             final fun <get-FEATURE_DYNAMIC_SCOPE>(): kotlin/Int // io.github.yuroyami.kitejs/Context.Companion.FEATURE_DYNAMIC_SCOPE.<get-FEATURE_DYNAMIC_SCOPE>|<get-FEATURE_DYNAMIC_SCOPE>(){}[0]
         final const val FEATURE_E4X // io.github.yuroyami.kitejs/Context.Companion.FEATURE_E4X|{}FEATURE_E4X[0]
