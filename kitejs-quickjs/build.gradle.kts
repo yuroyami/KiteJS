@@ -115,6 +115,126 @@ val buildJni = tasks.register("buildQuickJsJni") {
     outputs.dir(jniOutput)
 }
 
+// ---- Android: a JNI library per ABI, from the NDK's clang -------------------------------------
+
+/** Builds one shared library with a C compiler given as a path, here the NDK's clang. */
+abstract class ClangCompile : DefaultTask() {
+    @get:Inject
+    abstract val exec: ExecOperations
+
+    @get:Input
+    abstract val clang: Property<String>
+
+    @get:Input
+    abstract val flags: ListProperty<String>
+
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val sources: ConfigurableFileCollection
+
+    @get:OutputFile
+    abstract val output: RegularFileProperty
+
+    @TaskAction
+    fun build() {
+        val out = output.get().asFile
+        out.parentFile.mkdirs()
+        exec.exec {
+            commandLine(listOf(clang.get(), "-o", out.absolutePath) + flags.get() + sources.files.map { it.absolutePath })
+        }
+    }
+}
+
+/**
+ * The NDK from the kitejs.ndk property or the environment, or the newest one in the SDK. Only
+ * the Android build reads it, so a build that never packages Android needs no NDK.
+ */
+val ndkClang: Provider<String> = providers.provider {
+    val ndk = listOfNotNull(
+        providers.gradleProperty("kitejs.ndk").orNull,
+        System.getenv("ANDROID_NDK_HOME"),
+        System.getenv("ANDROID_NDK_LATEST_HOME"),
+        System.getenv("ANDROID_NDK_ROOT"),
+    ).firstOrNull { it.isNotBlank() }?.let(::File)
+        ?: listOfNotNull(System.getenv("ANDROID_HOME"), System.getenv("ANDROID_SDK_ROOT"))
+            .map { File(it, "ndk") }
+            .flatMap { it.listFiles()?.toList().orEmpty() }
+            .maxByOrNull { it.name.substringBefore('.').toIntOrNull() ?: 0 }
+        ?: throw GradleException("Building QuickJS for Android needs the NDK: set ANDROID_NDK_HOME or -Pkitejs.ndk=<path>")
+    val os = System.getProperty("os.name").lowercase()
+    val host = when {
+        os.contains("mac") -> "darwin-x86_64"
+        os.contains("win") -> "windows-x86_64"
+        else -> "linux-x86_64"
+    }
+    ndk.resolve("toolchains/llvm/prebuilt/$host/bin/clang" + if (os.contains("win")) ".exe" else "").absolutePath
+}
+
+/** The ABIs the AAR carries, with the clang target for each at the module's minSdk. */
+val androidAbis = listOf(
+    "arm64-v8a" to "aarch64-linux-android21",
+    "armeabi-v7a" to "armv7a-linux-androideabi21",
+    "x86_64" to "x86_64-linux-android21",
+    "x86" to "i686-linux-android21",
+)
+
+val androidJniOutput = layout.buildDirectory.dir("quickjs/android")
+
+val androidJniTasks = androidAbis.map { (abi, triple) ->
+    tasks.register<ClangCompile>("buildQuickJsAndroid" + abi.split('-', '_').joinToString("") { it.replaceFirstChar(Char::uppercase) }) {
+        group = "build"
+        description = "Builds the QuickJS JNI library for Android $abi with the NDK."
+        clang.set(ndkClang)
+        // 16 KB pages, which newer Android devices use and Play requires of native code.
+        flags.set(
+            listOf("--target=$triple", "-shared", "-fPIC", "-fvisibility=hidden", "-g0", "-s", "-Wl,-z,max-page-size=16384") +
+                cFlags + listOf("-I${nativeDir.asFile}", "-lm"),
+        )
+        sources.from(cSources.map { nativeDir.file(it) } + nativeDir.file("jni/kitejs_quickjs_jni.c"))
+        output.set(androidJniOutput.map { it.file("$abi/libkitejs_quickjs.so") })
+    }
+}
+
+/** Every Android library, laid out as a jniLibs folder: one directory per ABI. */
+abstract class AndroidJniLibs : DefaultTask() {
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+}
+
+val buildAndroidJni = tasks.register<AndroidJniLibs>("buildQuickJsAndroid") {
+    group = "build"
+    description = "Builds the QuickJS JNI library for every Android ABI."
+    dependsOn(androidJniTasks)
+    outputDir.set(androidJniOutput)
+}
+
+/**
+ * Android's host tests run on the desktop JVM, where no Android library loads, so they get the
+ * desktop library built for this machine through the property the loader honors.
+ */
+val hostJni: Provider<File> = providers.provider {
+    val os = System.getProperty("os.name").lowercase()
+    val arch = if (System.getProperty("os.arch") in listOf("aarch64", "arm64")) "aarch64" else "x86_64"
+    val (platform, file) = when {
+        os.contains("mac") -> "macos" to "libkitejs_quickjs.dylib"
+        os.contains("win") -> "windows" to "kitejs_quickjs.dll"
+        else -> "linux" to "libkitejs_quickjs.so"
+    }
+    jniOutput.get().file("jni/$platform-$arch/$file").asFile
+}
+
+tasks.withType<Test>().matching { it.name == "testAndroidHostTest" }.configureEach {
+    dependsOn(buildJni)
+    val library = hostJni
+    doFirst { systemProperty("kitejs.quickjs.library", library.get().absolutePath) }
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.jniLibs?.addGeneratedSourceDirectory(buildAndroidJni, AndroidJniLibs::outputDir)
+    }
+}
+
 // ---- JS and Wasm: one WebAssembly module, embedded in the Kotlin code ---------------------------
 
 /** Every function kitejs_quickjs.h declares, which the module exports. */
@@ -268,6 +388,13 @@ kotlin {
 
     @OptIn(ExperimentalAbiValidation::class)
     abiValidation {
+    }
+
+    android {
+        optimization {
+            consumerKeepRules.publish = true
+            consumerKeepRules.file("consumer-rules.pro")
+        }
     }
 
     sourceSets {

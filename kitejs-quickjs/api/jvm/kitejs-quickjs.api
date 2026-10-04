@@ -1,0 +1,18 @@
+public final class io/github/yuroyami/kitejs/quickjs/QuickJs : io/github/yuroyami/kitejs/api/JsEngine {
+	public static final field INSTANCE Lio/github/yuroyami/kitejs/quickjs/QuickJs;
+	public fun getName ()Ljava/lang/String;
+	public fun load (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public synthetic fun newConfig ()Lio/github/yuroyami/kitejs/api/KiteJsConfig;
+	public fun newConfig ()Lio/github/yuroyami/kitejs/quickjs/QuickJsConfig;
+	public synthetic fun open (Lio/github/yuroyami/kitejs/api/KiteJsConfig;)Lio/github/yuroyami/kitejs/api/KiteJs;
+	public fun open (Lio/github/yuroyami/kitejs/quickjs/QuickJsConfig;)Lio/github/yuroyami/kitejs/api/KiteJs;
+}
+
+public final class io/github/yuroyami/kitejs/quickjs/QuickJsConfig : io/github/yuroyami/kitejs/api/KiteJsConfig {
+	public fun <init> ()V
+	public final fun getMaxStackSize ()J
+	public final fun getMemoryLimit ()J
+	public final fun setMaxStackSize (J)V
+	public final fun setMemoryLimit (J)V
+}
+

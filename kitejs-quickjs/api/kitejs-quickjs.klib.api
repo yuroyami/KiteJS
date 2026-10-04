@@ -1,0 +1,27 @@
+// Klib ABI Dump
+// Targets: [iosArm64, iosSimulatorArm64, iosX64, js, linuxArm64, linuxX64, macosArm64, mingwX64, wasmJs]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <io.github.yuroyami:kitejs-quickjs>
+final class io.github.yuroyami.kitejs.quickjs/QuickJsConfig : io.github.yuroyami.kitejs.api/KiteJsConfig { // io.github.yuroyami.kitejs.quickjs/QuickJsConfig|null[0]
+    constructor <init>() // io.github.yuroyami.kitejs.quickjs/QuickJsConfig.<init>|<init>(){}[0]
+
+    final var maxStackSize // io.github.yuroyami.kitejs.quickjs/QuickJsConfig.maxStackSize|{}maxStackSize[0]
+        final fun <get-maxStackSize>(): kotlin/Long // io.github.yuroyami.kitejs.quickjs/QuickJsConfig.maxStackSize.<get-maxStackSize>|<get-maxStackSize>(){}[0]
+        final fun <set-maxStackSize>(kotlin/Long) // io.github.yuroyami.kitejs.quickjs/QuickJsConfig.maxStackSize.<set-maxStackSize>|<set-maxStackSize>(kotlin.Long){}[0]
+    final var memoryLimit // io.github.yuroyami.kitejs.quickjs/QuickJsConfig.memoryLimit|{}memoryLimit[0]
+        final fun <get-memoryLimit>(): kotlin/Long // io.github.yuroyami.kitejs.quickjs/QuickJsConfig.memoryLimit.<get-memoryLimit>|<get-memoryLimit>(){}[0]
+        final fun <set-memoryLimit>(kotlin/Long) // io.github.yuroyami.kitejs.quickjs/QuickJsConfig.memoryLimit.<set-memoryLimit>|<set-memoryLimit>(kotlin.Long){}[0]
+}
+
+final object io.github.yuroyami.kitejs.quickjs/QuickJs : io.github.yuroyami.kitejs.api/JsEngine<io.github.yuroyami.kitejs.quickjs/QuickJsConfig> { // io.github.yuroyami.kitejs.quickjs/QuickJs|null[0]
+    final val name // io.github.yuroyami.kitejs.quickjs/QuickJs.name|{}name[0]
+        final fun <get-name>(): kotlin/String // io.github.yuroyami.kitejs.quickjs/QuickJs.name.<get-name>|<get-name>(){}[0]
+
+    final fun newConfig(): io.github.yuroyami.kitejs.quickjs/QuickJsConfig // io.github.yuroyami.kitejs.quickjs/QuickJs.newConfig|newConfig(){}[0]
+    final fun open(io.github.yuroyami.kitejs.quickjs/QuickJsConfig): io.github.yuroyami.kitejs.api/KiteJs // io.github.yuroyami.kitejs.quickjs/QuickJs.open|open(io.github.yuroyami.kitejs.quickjs.QuickJsConfig){}[0]
+    final suspend fun load() // io.github.yuroyami.kitejs.quickjs/QuickJs.load|load(){}[0]
+}
