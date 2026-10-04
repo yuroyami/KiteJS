@@ -2208,6 +2208,25 @@ class EvalOracleTest {
     }
 
     /**
+     * The descriptor of a global that has not been built yet holds the built-in, as reading the
+     * property would (D-75). Upstream hands out its `LazilyLoadedCtor` placeholder, which throws a
+     * host error as soon as a script touches it. Each scope here is fresh, so nothing has read
+     * the globals before. Both halves are pinned so a change on either side shows.
+     */
+    @Test
+    fun aDescriptorOfALazyGlobalHoldsTheBuiltIn() {
+        for (name in listOf("JSON", "Math", "Map", "Promise", "Reflect", "Uint8Array", "WeakMap")) {
+            val script = "typeof Object.getOwnPropertyDescriptor(this, '$name').value"
+            assertEquals("throws Invalid JavaScript value of type LazilyLoadedCtor", upstream(script), "upstream: $script")
+            assertEquals(if (name in setOf("JSON", "Math", "Reflect")) "\"object\"" else "\"function\"", ported(script), "ported: $script")
+        }
+        val same = "var d = Object.getOwnPropertyDescriptors(this); d.Set.value === Set && d.DataView.value === DataView"
+        assertEquals("true", ported(same))
+        val unscopables = "Object.getOwnPropertyDescriptor(Array.prototype, Symbol.unscopables).value.flat"
+        assertEquals("true", ported(unscopables))
+    }
+
+    /**
      * Array spread when no `Symbol.iterator` is in reach. A real array is still walked by its
      * length, so a hole arrives as undefined and a non-index own property is left out. Each
      * script puts the iterator back so the next one starts clean.

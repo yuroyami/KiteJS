@@ -409,8 +409,19 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   the same name is shadowed. A const directly in a function or script body, a loop or a switch is
   unchanged, which keeps the corpus on upstream's lowering. `Test262ParityTest` lists the
   test262 harness that parses native function source, which declares consts in its loops and
-  now works here, with the two tests that use it, and a third that both engines fail at
-  different points: it now reaches the lazy-constructor descriptor leak of issue 66.
+  now works here, with the two tests that use it.
+- D-75: the descriptor of a property that holds a built-in not yet built, such as
+  `Object.getOwnPropertyDescriptor(globalThis, 'JSON')`, builds it first, as reading the property
+  does, so the descriptor's value is the built-in. Upstream's `LazyLoadSlot` inherits the plain
+  slot's descriptor, which hands out the `LazilyLoadedCtor` placeholder itself, and anything a
+  script does with that value, `typeof` included, throws a host error ("Invalid JavaScript value
+  of type LazilyLoadedCtor"). It hit `Math`, `JSON`, `RegExp`, `Map`, `Set`, `Promise`, `Proxy`,
+  `Reflect`, `BigInt`, `WeakMap`, `WeakSet`, the typed arrays, `ArrayBuffer`, `DataView` and
+  `Array.prototype[Symbol.unscopables]` until something first read them. test262's
+  `built-in-function-object.js` walks every intrinsic's descriptors; both engines still fail it
+  with a Test262Error, upstream at its first intrinsic, where its copy of the harness trips over
+  D-74, and the port only at RegExp's legacy accessors such as `$*`, whose getters print as
+  `function get $*()`, as V8's `$&` does, which is not the NativeFunction syntax.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

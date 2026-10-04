@@ -32,4 +32,11 @@ public class LazyLoadSlot : Slot {
         }
         return v
     }
+
+    /**
+     * Builds the built-in first, as a read would: upstream hands out the placeholder itself as the
+     * descriptor's value, which no script can touch without a host error (D-75).
+     */
+    override fun getPropertyDescriptor(cx: Context, scope: Scriptable): ScriptableObject.DescriptorInfo =
+        ScriptableObject.buildDataDescriptor(getValue(scope), attributes)
 }
