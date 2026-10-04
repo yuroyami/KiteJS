@@ -2498,6 +2498,41 @@ class EvalOracleTest {
     }
 
     /**
+     * The own keys of RegExp.prototype and Date.prototype name their symbol methods by the
+     * symbols, as ECMAScript 2015, 9.1.12 asks, so each listed key has a descriptor. Upstream
+     * lists the description of each symbol as a string, which names no property, and leaves the
+     * symbols out (D-90). Where the two already agree, on a prototype whose symbol keys sit in its
+     * slot map, they still do.
+     */
+    @Test
+    fun theOwnKeysOfAPrototypeNameItsSymbolMethodsBySymbols() {
+        val script = "function names(o) { return Object.getOwnPropertySymbols(o).map(String).sort().join(); }" +
+            " function kinds(o) { return Reflect.ownKeys(o).filter(function (k) { return String(k).indexOf('Symbol(') === 0; })" +
+            ".map(function (k) { return typeof k; }).join(); }" +
+            " [names(RegExp.prototype), names(Date.prototype), kinds(RegExp.prototype), kinds(Date.prototype)].join('|')"
+        assertEquals("\"||string,string,string,string,string|string\"", upstream(script))
+        assertEquals(
+            "\"Symbol(Symbol.match),Symbol(Symbol.matchAll),Symbol(Symbol.replace),Symbol(Symbol.search),Symbol(Symbol.split)" +
+                "|Symbol(Symbol.toPrimitive)|symbol,symbol,symbol,symbol,symbol|symbol\"",
+            ported(script),
+        )
+        val agreeing = "[Object.getOwnPropertySymbols(Array.prototype).map(String).sort().join(), typeof Reflect.ownKeys(Map.prototype)" +
+            ".filter(function (k) { return typeof k === 'symbol'; })[0]].join('|')"
+        assertEquals(upstream(agreeing), ported(agreeing))
+        // Freezing walks the same list and asks for each key's descriptor, which upstream lacks.
+        val freeze = "Object.freeze(Date.prototype); Object.isFrozen(Date.prototype)"
+        // A non-extensible prototype refuses a change to a symbol method upstream, which looks for it
+        // among the properties added later, and finds none.
+        val redefine = "Object.preventExtensions(RegExp.prototype);" +
+            " Object.defineProperty(RegExp.prototype, Symbol.split, { writable: false });" +
+            " Object.getOwnPropertyDescriptor(RegExp.prototype, Symbol.split).writable"
+        assertEquals("throws TypeError: Cannot add properties to this object because extensible is false.", upstream(redefine))
+        assertEquals("false", ported(redefine))
+        assertFailsWith<NullPointerException> { upstream(freeze) }
+        assertEquals("true", ported(freeze))
+    }
+
+    /**
      * Array spread when no `Symbol.iterator` is in reach. A real array is still walked by its
      * length, so a hole arrives as undefined and a non-index own property is left out. Each
      * script puts the iterator back so the next one starts clean.

@@ -605,6 +605,16 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   strict assignment, and deletes a present undefined element in the generic `copyWithin` loop. RegExp's `source` and flag
   properties stay upstream's own data properties, so `Reflect.get(RegExp.prototype, 'source', re)`
   still reads `''`; that is a structural difference outside this entry.
+- D-90: `IdScriptableObject.PrototypeValues.getNames` lists a prototype id named by a symbol as
+  that symbol. Upstream added the symbol's `toString()`, so `Reflect.ownKeys` of
+  `RegExp.prototype` and `Date.prototype` listed strings such as `"Symbol(Symbol.match)"` that
+  name no property, `Object.getOwnPropertySymbols` left the symbol methods out, a descriptor read
+  of a listed key answered undefined, and `Object.freeze` reached the string and crashed the host
+  with a `NullPointerException`. `IdScriptableObject.defineOwnProperty` redefines such an id in
+  place, as it does a named one; upstream sent a symbol key to the slot map, which does not hold
+  it, so a non-extensible prototype refused the change as a new property and an extensible one
+  got a second copy over the id. `OwnSymbolKeysTest` checks every key of the built-ins on every
+  target, and `EvalOracleTest` pins the difference (#76).
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

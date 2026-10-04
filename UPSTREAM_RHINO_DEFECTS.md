@@ -377,6 +377,28 @@ reads `''` where every browser reads `'xy'`. KiteJS keeps upstream's structure f
 
 - Where: `NativeRegExp` (the instance ids `Id_source`, `Id_global` and the rest).
 
+### The own keys of RegExp.prototype and Date.prototype are strings, not symbols (D-90)
+
+ECMAScript 2015, 9.1.12 lists the keys of an object's properties, so a property named by a symbol
+is listed as that symbol. For the symbol methods of `RegExp.prototype` (`Symbol.match`,
+`Symbol.matchAll`, `Symbol.replace`, `Symbol.search`, `Symbol.split`) and
+`Date.prototype[Symbol.toPrimitive]`, Rhino lists the string `"Symbol(Symbol.match)"` and so on:
+`Reflect.ownKeys` answers keys that name no property, so a descriptor read of each answers
+undefined, `Object.getOwnPropertySymbols` leaves the methods out, and `Object.freeze` of either
+prototype ends in a `NullPointerException`. A prototype whose symbol keys sit in its slot map,
+such as `Array.prototype`, is right.
+
+A definition of one of those methods misses it too: `IdScriptableObject.defineOwnProperty`
+redefines a prototype id in place only for a string key, and sends a symbol to the slot map, which
+does not hold it. Once `Object.preventExtensions` ran, `Object.defineProperty(RegExp.prototype,
+Symbol.split, { writable: false })` throws "Cannot add properties to this object because extensible
+is false", and before it ran the definition adds a second property over the method.
+
+- Where: `IdScriptableObject.PrototypeValues.getNames`, which adds `name.toString()` for a key
+  that is a `Symbol`, and `IdScriptableObject.defineOwnProperty`, which looks up a prototype id
+  for a `CharSequence` key only.
+- Test: `EvalOracleTest.theOwnKeysOfAPrototypeNameItsSymbolMethodsBySymbols`.
+
 ### A getOwnPropertyDescriptor trap answering undefined crashes (D-50)
 
 A Proxy whose `getOwnPropertyDescriptor` trap returns `undefined` for a property the target lacks

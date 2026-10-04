@@ -159,8 +159,9 @@ public abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
                             if (names == null) names = arrayOfNulls(maxId)
                             names[count++] = name
                         } else if (getSymbols && name is Symbol) {
+                            // The key is the symbol, as a slot map lists it, not its description.
                             if (names == null) names = arrayOfNulls(maxId)
-                            names[count++] = name.toString()
+                            names[count++] = name
                         }
                     }
                 }
@@ -611,6 +612,36 @@ public abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
                             applyDescriptorToAttributeBitset(attr, desc.enumerable, desc.writable, desc.configurable),
                         )
                         if (super.has(name, this)) super.delete(name)
+                        return true
+                    }
+                }
+            }
+        } else if (ScriptRuntime.isSymbol(id)) {
+            // A method named by a symbol, such as RegExp.prototype[Symbol.split], is a prototype id
+            // as a named one is, so it is redefined in place. Upstream sent it to the slot map,
+            // which does not hold it: a non-extensible prototype refused the change as a new
+            // property, and an extensible one got a second copy over the id (D-90).
+            val key = if (id is NativeSymbol) id.key else id as Symbol
+            prototypeValues?.let { pv ->
+                val pid = pv.findId(key)
+                if (pid != 0) {
+                    if (desc.isAccessorDescriptor) {
+                        pv.delete(pid)
+                    } else {
+                        checkPropertyDefinition(desc)
+                        val slot = queryOrFakeSlot(cx, id)
+                        checkPropertyChangeForSlot(key, slot, desc)
+                        val attr = pv.getAttributes(pid)
+                        val value = desc.value
+                        if (value !== Scriptable.NOT_FOUND && (attr and READONLY) == 0) {
+                            val currentValue = pv.get(pid)
+                            if (!sameValue(value, currentValue)) pv.set(pid, this, value)
+                        }
+                        pv.setAttributes(
+                            pid,
+                            applyDescriptorToAttributeBitset(attr, desc.enumerable, desc.writable, desc.configurable),
+                        )
+                        if (super.has(key, this)) super.delete(key)
                         return true
                     }
                 }
