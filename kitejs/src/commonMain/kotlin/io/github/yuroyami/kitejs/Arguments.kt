@@ -92,9 +92,13 @@ internal open class Arguments(private val activation: NativeCall, cx: Context) :
         return value
     }
 
-    /** Whether slot [index] is the same variable as a named parameter. */
+    /**
+     * Whether slot [index] is the same variable as a named parameter. Only the arguments of a
+     * sloppy function are mapped, whoever reads them; upstream asked whether the reading code was
+     * strict (D-80).
+     */
     private fun sharedWithActivation(index: Int): Boolean {
-        if (Context.getContext().isStrictMode) return false
+        if (activation.isStrict) return false
         val f = activation.function
         if (f == null || f.hasDefaultParameters()) return false
         val definedCount = f.paramCount

@@ -2200,6 +2200,33 @@ class EvalOracleTest {
     }
 
     /**
+     * Strict mode at run time is the mode of the code that runs, as ECMAScript 2015, 10.2.1 asks:
+     * a strict function throws on a failed write when sloppy code calls it, a sloppy one does not
+     * throw when strict code calls it, and an indirect `eval` from strict code runs sloppy code.
+     * Upstream asks the current activation, which only a function that needs one pushes, so the
+     * answer follows the caller (D-80).
+     */
+    @Test
+    fun strictModeIsTheModeOfTheCodeThatRuns() {
+        val frozen = "var o = Object.freeze({ z: 1 });"
+        val answers = linkedMapOf(
+            "$frozen function call(fn) { try { fn(); return 'quiet' } catch (e) { return e.name } }" +
+                " (function () { 'use strict'; return call(function () { o.z = 2 }) })()" to ("\"quiet\"" to "\"TypeError\""),
+            "$frozen function sloppy() { o.z = 2; return 'quiet' }" +
+                " (function () { 'use strict'; try { return sloppy() } catch (e) { return e.name } })()" to ("\"TypeError\"" to "\"quiet\""),
+            "(function () { 'use strict'; try { return (0, eval)('var o = Object.freeze({ z: 1 }); o.z = 2; \\'quiet\\'') } catch (e) { return e.name } })()" to
+                ("\"TypeError\"" to "\"quiet\""),
+            "eval(\"'use strict'; var o = Object.freeze({ z: 1 }); try { o.z = 2; 'quiet' } catch (e) { e.name }\")" to ("\"quiet\"" to "\"TypeError\""),
+        )
+        for ((script, expected) in answers) {
+            assertEquals(expected.first, upstream(script), "upstream: $script")
+            assertEquals(expected.second, ported(script), "ported: $script")
+        }
+        val same = "$frozen (function () { 'use strict'; var f = function () { o.z = 2 }; try { f(); return 'quiet' } catch (e) { return e.name } })()"
+        assertEquals(upstream(same), ported(same))
+    }
+
+    /**
      * Assigning to a const is a TypeError here in any mode, which is what ECMAScript 2015,
      * 8.1.1.1.5 asks and what every browser does. Upstream lets the write pass silently outside
      * strict mode, and in strict code run by `eval` (D-71). Both halves are pinned so a change on

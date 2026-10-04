@@ -461,6 +461,16 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   `Object.keys(globalThis)` and a `for`-`in` listed. `GeneratorFunctionPrototypeTest` runs the
   expression, declaration and method forms on every target, and `EvalOracleTest` pins the
   difference (#67).
+- D-80: `Context.isStrictMode` answers the mode of the code that runs: the interpreter's current
+  frame, whose descriptor says whether its code is strict, and the top call only when no frame
+  runs. Upstream asked the current activation, which only a function that needs one pushes, so a
+  strict callback called by sloppy code wrote to a frozen object quietly, and a sloppy function
+  called from strict code threw. The `Function` constructor marks the frame that calls it as
+  sloppy until it returns, in place of clearing the activation. Two readers of the same answer
+  meant something else and now ask for it: an `arguments` object is mapped when its own function
+  is sloppy, whoever reads it, and an indirect `eval` compiles its code sloppy unless the code
+  says otherwise, where upstream made it strict whenever its caller was. `StrictModeFollowsTheCodeTest`
+  runs each failed write in both directions, and `EvalOracleTest` pins the difference (#69).
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

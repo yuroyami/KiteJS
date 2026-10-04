@@ -2577,8 +2577,16 @@ public object ScriptRuntime {
         return newObject(fun_, cx, scope, args)
     }
 
-    /** Direct `eval`: compiles the string in the caller's scope. */
-    public fun evalSpecial(cx: Context, scope: Scriptable, thisArg: Any?, args: Array<Any?>, filenameIn: String?, lineNumberIn: Int): Any? {
+    /** Direct `eval`: compiles the string in the caller's scope, as strict code when the caller is strict. */
+    public fun evalSpecial(cx: Context, scope: Scriptable, thisArg: Any?, args: Array<Any?>, filenameIn: String?, lineNumberIn: Int): Any? =
+        performEval(cx, scope, thisArg, args, filenameIn, lineNumberIn, cx.isStrictMode)
+
+    /**
+     * Compiles and runs eval code, which is strict when [strictCaller] is or when it starts with
+     * its own directive. An indirect `eval` passes false, as no caller makes global code strict;
+     * upstream compiled it strict whenever the code calling it was (D-80).
+     */
+    internal fun performEval(cx: Context, scope: Scriptable, thisArg: Any?, args: Array<Any?>, filenameIn: String?, lineNumberIn: Int, strictCaller: Boolean): Any? {
         if (args.isEmpty()) return Undefined.instance
         val x = args[0]
         if (x !is CharSequence) {
@@ -2600,7 +2608,7 @@ public object ScriptRuntime {
         val evaluator = Context.createInterpreter()
         val homeObject = if (scope is NativeCall) scope.homeObject else null
         val script = cx.compileString(x.toString(), evaluator, reporter, sourceName, 1, null) { compilerEnvs ->
-            compilerEnvs.strictMode = cx.isStrictMode
+            compilerEnvs.strictMode = strictCaller
             val isInsideMethod = scope is NativeCall && scope.homeObject != null
             compilerEnvs.allowSuper = isInsideMethod
             compilerEnvs.inEval = true

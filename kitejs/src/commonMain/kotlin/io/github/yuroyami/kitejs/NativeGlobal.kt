@@ -345,7 +345,7 @@ public object NativeGlobal {
 
     private fun js_eval(cx: Context, scope: Scriptable, args: Array<Any?>): Any? {
         val global = ScriptableObject.getTopLevelScope(scope)
-        return ScriptRuntime.evalSpecial(cx, global, global, args, "eval code", 1)
+        return ScriptRuntime.performEval(cx, global, global, args, "eval code", 1, strictCaller = false)
     }
 
     private fun encode(str: String, fullUri: Boolean): String {

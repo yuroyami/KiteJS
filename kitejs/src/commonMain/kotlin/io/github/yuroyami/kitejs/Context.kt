@@ -477,8 +477,21 @@ public open class Context internal constructor(public val factory: ContextFactor
     /** True unless the script pinned a language version older than 1.3. */
     internal val isVersionECMA1: Boolean get() = version == VERSION_DEFAULT || version >= VERSION_1_3
 
-    /** Whether the code running right now is in strict mode. */
-    public val isStrictMode: Boolean get() = isTopLevelStrict || (currentActivationCall?.isStrict == true)
+    /**
+     * Whether the code running right now is in strict mode: the code of the interpreter's current
+     * frame, as strictness belongs to the code and not to its caller, and without a frame the top
+     * call. Upstream asked the current activation, which only a function that needs one pushes, so
+     * a strict function called from sloppy code ran as sloppy, and a sloppy one called from strict
+     * code ran as strict (D-80).
+     */
+    public val isStrictMode: Boolean
+        get() {
+            val frame = lastInterpreterFrame ?: return isTopLevelStrict || (currentActivationCall?.isStrict == true)
+            return frame !== sloppyFrame && (frame as Interpreter.CallFrame).isStrict
+        }
+
+    /** The frame that the `Function` constructor runs for, which reads as sloppy while it is current, as the code it makes is (D-80). */
+    internal var sloppyFrame: Any? = null
 
     public companion object {
 

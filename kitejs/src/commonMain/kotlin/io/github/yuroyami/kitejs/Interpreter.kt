@@ -176,6 +176,8 @@ public class Interpreter : Evaluator {
         val varSource: CallFrame
         val emptyStackTop: Int
         val useActivation: Boolean
+        /** Whether this frame runs strict code, which is what [Context.isStrictMode] answers while it runs (D-80). */
+        val isStrict: Boolean
         var isContinuationsTopFrame = false
         val thisObj: Scriptable?
         var result: Any? = Undefined.instance
@@ -191,6 +193,7 @@ public class Interpreter : Evaluator {
         constructor(cx: Context, thisObj: Scriptable?, fnOrScript: ScriptOrFn<*>, code: InterpreterData<*>, parentFrame: CallFrame?, previousInterpreterFrame: CallFrame?) {
             idata = code
             useActivation = fnOrScript.descriptor!!.requiresActivationFrame
+            isStrict = fnOrScript.descriptor!!.isStrict
             emptyStackTop = idata.itsMaxVars + idata.itsMaxLocals - 1
             val maxFrameArray = idata.itsMaxFrameArray
             if (maxFrameArray != emptyStackTop + idata.itsMaxStack + 1) throw Kit.codeBug()
@@ -230,6 +233,7 @@ public class Interpreter : Evaluator {
             varSource = original.varSource
             emptyStackTop = original.emptyStackTop
             useActivation = original.useActivation
+            isStrict = original.isStrict
             isContinuationsTopFrame = original.isContinuationsTopFrame
             thisObj = original.thisObj
             result = original.result
@@ -264,6 +268,7 @@ public class Interpreter : Evaluator {
             varSource = original.varSource
             emptyStackTop = original.emptyStackTop
             useActivation = original.useActivation
+            isStrict = original.isStrict
             isContinuationsTopFrame = original.isContinuationsTopFrame
             thisObj = original.thisObj
             result = original.result

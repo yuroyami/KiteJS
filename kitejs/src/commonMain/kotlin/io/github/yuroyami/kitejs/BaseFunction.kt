@@ -453,16 +453,23 @@ public open class BaseFunction : ScriptableObject, Function {
         private fun js_gen_constructor(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable =
             withoutStrictMode(cx) { jsConstructor(cx, scope, args, true) }
 
-        /** The Function constructor compiles sloppy code even when called from strict code. */
+        /**
+         * The Function constructor makes sloppy code even when called from strict code. The frame
+         * that calls it reads as sloppy until it returns, and code it calls on the way, such as a
+         * `toString` of an argument, still runs as its own code says (D-80).
+         */
         private inline fun withoutStrictMode(cx: Context, block: () -> Scriptable): Scriptable {
             if (!cx.isStrictMode) return block()
             val activation = cx.currentActivationCall
             val strictMode = cx.isTopLevelStrict
+            val sloppyFrame = cx.sloppyFrame
             try {
                 cx.currentActivationCall = null
                 cx.isTopLevelStrict = false
+                cx.sloppyFrame = cx.lastInterpreterFrame
                 return block()
             } finally {
+                cx.sloppyFrame = sloppyFrame
                 cx.isTopLevelStrict = strictMode
                 cx.currentActivationCall = activation
             }

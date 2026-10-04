@@ -114,6 +114,25 @@ is put on the global as `__GeneratorFunction`, writable, enumerable and configur
   the global.
 - Test: `EvalOracleTest.aGeneratorFunctionInheritsFromTheGeneratorFunctionPrototype`.
 
+### Strict mode at run time follows the caller, not the code that runs (D-80)
+
+ECMAScript 2015, 10.2.1 makes strictness a property of code: a failed write in strict code throws
+a TypeError, and the same write in sloppy code does nothing, whoever called the code. Rhino asks
+the current activation, which the interpreter pushes only for a function that needs one, and the
+top call. So a strict callback without an activation runs as its caller does: called by a sloppy
+function, its write to a frozen object, to an accessor without a setter, to a non-extensible
+object, or its `delete` of a permanent property, passes quietly, and a sloppy function called by
+strict code throws on the same writes. The same answer decides two other things it should not: an
+`arguments` object is mapped or not by the mode of the code reading it rather than of its own
+function, and an indirect `eval` called from strict code compiles strict code, where the spec
+makes indirect eval code strict only by its own directive. Strict eval code from sloppy code runs
+as sloppy.
+
+- Where: `Context.isStrictMode`, which reads `currentActivationCall` and `isTopLevelStrict`;
+  `Arguments.sharedWithActivation`, which asks the context; and `NativeGlobal.js_eval`, which
+  compiles through `evalSpecial` with the caller's mode.
+- Test: `EvalOracleTest.strictModeIsTheModeOfTheCodeThatRuns`.
+
 ### A getOwnPropertyDescriptor trap answering undefined crashes (D-50)
 
 A Proxy whose `getOwnPropertyDescriptor` trap returns `undefined` for a property the target lacks
