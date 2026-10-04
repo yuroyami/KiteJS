@@ -70,6 +70,19 @@ arrays, `ArrayBuffer`, `DataView` and `Array.prototype[Symbol.unscopables]`.
   without initializing it the way `getValue` does.
 - Test: `EvalOracleTest.aDescriptorOfALazyGlobalHoldsTheBuiltIn`.
 
+### A function declaration as the body of a loop or an if is accepted (D-76)
+
+`while (0) function f() {}`, `for (;0;) l: function f() {}`, `for (var x of []) l: function f() {}`
+and `if (1) l: function f() {}` are early SyntaxErrors (ECMAScript 2015, 13.7.1.1 and 13.6.1),
+and so are `l: function* g() {}`, `if (1) function* g() {}` and, in strict code,
+`if (1) function f() {}` and `l: function f() {}`. Annex B.3.2 and B.3.4 allow only a plain
+function, labelled or as the body of an `if`, in sloppy code. Rhino accepts all of them; V8
+rejects all of them. 46 test262 files fail for this.
+
+- Where: `Parser`, the bodies of `ifStatement`, `whileLoop`, `doLoop`, `forLoop` and
+  `withStatement`, and the labelled statement in `nameOrLabel`.
+- Test: `EvalOracleTest.aFunctionDeclarationIsNotTheBodyOfALoop`.
+
 ### A getOwnPropertyDescriptor trap answering undefined crashes (D-50)
 
 A Proxy whose `getOwnPropertyDescriptor` trap returns `undefined` for a property the target lacks
@@ -154,14 +167,3 @@ FreeBSD's routines, which V8 uses, are exact for powers of two and do not overfl
 
 - Where: `NativeMath`.
 - Test: `EvalOracleTest.mathIsFdlibmAsV8HasIt`; `built-ins/Math/log2/log2-basicTests.js`.
-
-## Shared with KiteJS, not fixed yet
-
-### A function declaration as the body of a loop or a labelled if is accepted
-
-`while (0) function f() {}`, `for (;0;) l: function f() {}`, `for (var x of []) l: function f() {}`
-and `if (1) l: function f() {}` are early SyntaxErrors (ECMAScript 2015, 13.7.1.1, 13.6.1 and
-B.3.4, which allows only a plain function declaration as the body of an `if`). Neither engine
-reports them; V8 rejects all four.
-
-- Where: `Parser`, the statement parsing of loop and `if` bodies.

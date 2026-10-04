@@ -93,15 +93,57 @@ class Test262ParityTest {
             put(path, "D-72: each iteration of a let or const loop head binds afresh here")
         }
 
-        // A labelled function as the body of a loop is an early error, which neither engine
-        // reports for a var or let head. Upstream passes these only because it rejects a const
-        // head outright, before it reaches the body; the port takes the head (D-72).
+        // A function declaration, labelled or not, as the body of a loop, a with or an if is an
+        // early SyntaxError here, and a labelled generator or one in strict code too. Upstream
+        // accepts them all (D-76).
         for (path in listOf(
-            "language/statements/for/labelled-fn-stmt-const.js",
-            "language/statements/for-in/labelled-fn-stmt-const.js",
-            "language/statements/for-of/labelled-fn-stmt-const.js",
+            "language/block-scope/syntax/function-declarations/in-statement-position-do-statement-while-expression.js",
+            "language/block-scope/syntax/function-declarations/in-statement-position-for-statement.js",
+            "language/block-scope/syntax/function-declarations/in-statement-position-if-expression-statement-else-statement.js",
+            "language/block-scope/syntax/function-declarations/in-statement-position-if-expression-statement.js",
+            "language/block-scope/syntax/function-declarations/in-statement-position-while-expression-statement.js",
+            "language/statements/do-while/decl-fun.js",
+            "language/statements/do-while/decl-gen.js",
+            "language/statements/do-while/labelled-fn-stmt.js",
+            "language/statements/for-in/decl-fun.js",
+            "language/statements/for-in/decl-gen.js",
+            "language/statements/for-in/labelled-fn-stmt-let.js",
+            "language/statements/for-in/labelled-fn-stmt-lhs.js",
+            "language/statements/for-in/labelled-fn-stmt-var.js",
+            "language/statements/for-of/decl-fun.js",
+            "language/statements/for-of/decl-gen.js",
+            "language/statements/for-of/labelled-fn-stmt-let.js",
+            "language/statements/for-of/labelled-fn-stmt-lhs.js",
+            "language/statements/for-of/labelled-fn-stmt-var.js",
+            "language/statements/for/decl-fun.js",
+            "language/statements/for/decl-gen.js",
+            "language/statements/for/labelled-fn-stmt-expr.js",
+            "language/statements/for/labelled-fn-stmt-let.js",
+            "language/statements/for/labelled-fn-stmt-var.js",
+            "language/statements/if/if-decl-else-decl-strict.js",
+            "language/statements/if/if-decl-else-stmt-strict.js",
+            "language/statements/if/if-decl-no-else-strict.js",
+            "language/statements/if/if-fun-else-fun-strict.js",
+            "language/statements/if/if-fun-else-stmt-strict.js",
+            "language/statements/if/if-fun-no-else-strict.js",
+            "language/statements/if/if-gen-else-gen.js",
+            "language/statements/if/if-gen-else-stmt.js",
+            "language/statements/if/if-gen-no-else.js",
+            "language/statements/if/if-stmt-else-decl-strict.js",
+            "language/statements/if/if-stmt-else-fun-strict.js",
+            "language/statements/if/if-stmt-else-gen.js",
+            "language/statements/if/labelled-fn-stmt-first.js",
+            "language/statements/if/labelled-fn-stmt-lone.js",
+            "language/statements/if/labelled-fn-stmt-second.js",
+            "language/statements/labeled/decl-fun-strict.js",
+            "language/statements/labeled/decl-gen.js",
+            "language/statements/while/decl-fun.js",
+            "language/statements/while/decl-gen.js",
+            "language/statements/while/labelled-fn-stmt.js",
+            "language/statements/with/decl-fun.js",
+            "language/statements/with/decl-gen.js",
         )) {
-            put(path, "D-72: upstream rejects the const head, the port parses it and accepts the body")
+            put(path, "D-76: a function declaration as a statement body is an early error here")
         }
 
         // A const in a block is bound afresh each time here, so the harness that parses native
@@ -157,6 +199,9 @@ class Test262ParityTest {
         )) {
             put(path, "D-71: a write to a const throws here and is ignored upstream")
         }
+        // A labelled function as the body of a with is an early error here (D-76). In strict code
+        // the with is an error already, in both engines.
+        put("language/statements/with/labelled-fn-stmt.js", "D-76: a function declaration as a statement body is an early error here")
     }
 
     /**

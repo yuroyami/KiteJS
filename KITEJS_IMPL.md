@@ -378,8 +378,7 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   icodes of the port's own, `INITCONST` by name and `INITCONSTVAR` by frame slot, since
   `SETCONST` only ever binds a const once. A write to it in the body is a TypeError (D-71). A
   const in a for-in or for-of head with an initializer is a SyntaxError. `Test262ParityTest`
-  lists the five files that pass only here, and the three `labelled-fn-stmt-const.js` files
-  upstream passes only because it rejects the head before it reaches the body.
+  lists the five files that pass only here.
 - D-73: `Math`'s transcendental functions, the `**` operator and asm.js's maths library are
   `FdLibm`, a port of Sun's fdlibm 5.3 to common Kotlin, rather than `kotlin.math`, which hands
   them to the platform: the JVM's `Math` (intrinsics that may be a unit off in the last place),
@@ -422,6 +421,16 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   with a Test262Error, upstream at its first intrinsic, where its copy of the harness trips over
   D-74, and the port only at RegExp's legacy accessors such as `$*`, whose getters print as
   `function get $*()`, as V8's `$&` does, which is not the NativeFunction syntax.
+- D-76: a function declaration is not a statement, so as the body of a `while`, `do`, `for`,
+  `for-in`, `for-of`, `with` or `if`, labelled or not, it is an early SyntaxError (ECMAScript
+  2015, 13.6.1 and 13.7.1.1), and a labelled function is one too in strict code or when it is a
+  generator (13.13.1). Annex B.3.2 and B.3.4 keep what browsers keep: in sloppy code a plain
+  function may be labelled and may be the body of an `if`. Upstream accepts every one of these,
+  as SpiderMonkey's old function statements did, and so does the port below `VERSION_ES6`. The
+  message, "function declaration not directly within block", is the port's own key, modelled on
+  upstream's "let declaration not directly within block". `Test262ParityTest` lists the 46 files
+  that pass only here, one of them outside strict mode only, and `EvalOracleTest` pins both
+  halves.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

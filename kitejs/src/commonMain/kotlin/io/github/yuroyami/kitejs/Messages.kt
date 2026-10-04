@@ -363,5 +363,7 @@ internal object Messages {
         // resource error at these two points, which is a bug, not behaviour worth copying.
         "msg.missing.argument" to "Missing argument",
         "msg.typed.array.abstract.ctor" to "Abstract class TypedArray not directly constructable",
+        // The port's own: upstream accepts a function declaration as the body of a loop (D-76).
+        "msg.func.decl.not.in.block" to "function declaration not directly within block",
     )
 }

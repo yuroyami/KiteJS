@@ -1336,6 +1336,7 @@ public class Parser(
         val pn = IfStatement(pos)
         val data = condition()
         val ifTrue = getNextStatementAfterInlineComments(pn)
+        checkControlBody(ifTrue, isIfBody = true)
         var ifFalse: AstNode? = null
         if (matchToken(Token.ELSE, true)) {
             if (peekToken() == Token.COMMENT) {
@@ -1344,6 +1345,7 @@ public class Parser(
             }
             elsePos = ts.tokenBeg - pos
             ifFalse = statement()
+            checkControlBody(ifFalse, isIfBody = true)
         }
         val end = getNodeEnd(ifFalse ?: ifTrue)
         pn.length = end - pos
@@ -1465,6 +1467,7 @@ public class Parser(
             pn.condition = data.condition
             pn.setParens(data.lp - pos, data.rp - pos)
             val body = getNextStatementAfterInlineComments(pn)
+            checkControlBody(body, isIfBody = false)
             pn.length = getNodeEnd(body) - pos
             restoreRelativeLoopPosition(pn)
             pn.body = body
@@ -1484,6 +1487,7 @@ public class Parser(
         enterLoop(pn)
         try {
             val body = getNextStatementAfterInlineComments(pn)
+            checkControlBody(body, isIfBody = false)
             mustMatchToken(Token.WHILE, "msg.no.while.do", true)
             pn.whilePosition = ts.tokenBeg - pos
             val data = condition()
@@ -1525,6 +1529,25 @@ public class Parser(
             }
         }
         return body
+    }
+
+    /**
+     * The body of a loop, a `with` or an `if` is a statement, and a function declaration is not
+     * one, labelled or not (ECMAScript 2015, 13.6.1 and 13.7.1.1). Annex B.3.4 lets the body of
+     * an `if` in sloppy code be a plain function declaration, which is what browsers keep.
+     * Upstream accepts all of these; older language versions still do (D-76).
+     */
+    private fun checkControlBody(body: AstNode, isIfBody: Boolean) {
+        if (compilerEnv.languageVersion < Context.VERSION_ES6) return
+        val function = when {
+            body is FunctionNode -> {
+                if (isIfBody && !inUseStrictDirective && !body.isGenerator) return
+                body
+            }
+            body is LabeledStatement && body.statement is FunctionNode -> body
+            else -> return
+        }
+        addError("msg.func.decl.not.in.block", function.position, function.length)
     }
 
     private fun forLoop(): Loop {
@@ -1647,6 +1670,7 @@ public class Parser(
             enterLoop(pn)
             try {
                 val body = getNextStatementAfterInlineComments(pn)
+                checkControlBody(body, isIfBody = false)
                 pn.length = getNodeEnd(body) - forPos
                 restoreRelativeLoopPosition(pn)
                 pn.body = body
@@ -1988,6 +2012,7 @@ public class Parser(
         try {
             hasUndefinedBeenRedefined = true
             val body = getNextStatementAfterInlineComments(pn)
+            checkControlBody(body, isIfBody = false)
 
             pn.length = getNodeEnd(body) - pos
             pn.jsDocNode = withComment
@@ -2216,6 +2241,13 @@ public class Parser(
             for (lb in bundle.labels) {
                 labelSet!!.remove(lb.name)
             }
+        }
+
+        // A labelled function is Annex B.3.2's, for sloppy code, and never a generator (D-76).
+        if (stmt is FunctionNode && compilerEnv.languageVersion >= Context.VERSION_ES6 &&
+            (inUseStrictDirective || stmt.isGenerator)
+        ) {
+            addError("msg.func.decl.not.in.block", stmt.position, stmt.length)
         }
 
         // When stmt already has a parent its position is relative. See bug #710225.

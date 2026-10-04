@@ -21,7 +21,7 @@ class MessageParityTest {
      * of them raises a missing-resource error rather than returning text, so there is nothing to
      * compare against and the port writes its own wording (D-49).
      */
-    private val addedByThePort = setOf("msg.missing.argument", "msg.typed.array.abstract.ctor")
+    private val addedByThePort = setOf("msg.missing.argument", "msg.typed.array.abstract.ctor", "msg.func.decl.not.in.block")
 
     private fun portedKeys(): List<String> {
         val field = Messages::class.java.getDeclaredField("en")

@@ -2227,6 +2227,36 @@ class EvalOracleTest {
     }
 
     /**
+     * A function declaration as the body of a loop, a `with` or an `if`, or labelled there, is an
+     * early SyntaxError here, as ECMAScript 2015, 13.6.1 and 13.7.1.1 ask and V8 reports. Upstream
+     * accepts them all (D-76). Both halves are pinned so a change on either side shows.
+     */
+    @Test
+    fun aFunctionDeclarationIsNotTheBodyOfALoop() {
+        for (source in listOf(
+            "while (0) function f() {}",
+            "for (var k in {}) function f() {}",
+            "with ({}) function f() {}",
+            "while (0) l: function f() {}",
+            "if (1) l: function f() {}",
+            "if (1) function* g() {}",
+            "l: function* g() {}",
+            "\"use strict\"; if (1) function f() {}",
+            "\"use strict\"; l: function f() {}",
+        )) {
+            val script = "try { eval('$source'); 'accepted' } catch (e) { e.name }"
+            assertEquals("\"accepted\"", upstream(script), "upstream: $source")
+            assertEquals("\"SyntaxError\"", ported(script), "ported: $source")
+        }
+        val message = "try { eval('while (0) function f() {}') } catch (e) { e.message }"
+        assertEquals("\"function declaration not directly within block\"", ported(message))
+        for (source in listOf("if (1) function f() {} else function g() {}", "l: function f() {}", "while (0) { function f() {} }")) {
+            val script = "try { eval('$source'); 'accepted' } catch (e) { e.name }"
+            assertEquals(upstream(script), ported(script), source)
+        }
+    }
+
+    /**
      * Array spread when no `Symbol.iterator` is in reach. A real array is still walked by its
      * length, so a hole arrives as undefined and a non-index own property is left out. Each
      * script puts the iterator back so the next one starts clean.
