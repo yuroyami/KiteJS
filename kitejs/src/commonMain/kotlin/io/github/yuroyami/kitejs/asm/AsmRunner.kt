@@ -113,7 +113,7 @@ internal class AsmRunner(private val instance: AsmInstance) {
             AsmOp.I2D_S -> dv[dp++] = iv[--ip].toDouble()
             AsmOp.I2D_U -> dv[dp++] = (iv[--ip].toLong() and 0xFFFFFFFFL).toDouble()
             AsmOp.D2I -> iv[ip++] = ScriptRuntime.toInt32(dv[--dp])
-            AsmOp.D_FROUND -> dv[dp - 1] = dv[dp - 1].toFloat().toDouble()
+            AsmOp.D_FROUND -> dv[dp - 1] = froundOf(dv[dp - 1])
 
             AsmOp.H_LOAD_I16 -> iv[ip - 1] = loadI16(bytes, iv[ip - 1])
             AsmOp.H_LOAD_U16 -> iv[ip - 1] = loadI16(bytes, iv[ip - 1]) and 0xFFFF

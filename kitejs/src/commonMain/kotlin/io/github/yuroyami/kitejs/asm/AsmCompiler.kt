@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.asm
 
+import io.github.yuroyami.kitejs.NativeMath
 import io.github.yuroyami.kitejs.Token
 import io.github.yuroyami.kitejs.ast.ArrayLiteral
 import io.github.yuroyami.kitejs.ast.AstRoot
@@ -449,8 +450,11 @@ internal fun intLiteralOf(node: AstNode): Long? {
     return value.toLong()
 }
 
-/** Rounds to the nearest value a 32 bit float can hold, which is what `Math.fround` answers. */
-internal fun froundOf(value: Double): Double = value.toFloat().toDouble()
+/**
+ * Rounds to the nearest value a 32 bit float can hold, which is what `Math.fround` answers. Not
+ * through `toFloat()`, which does nothing on Kotlin/JS, where a Float is a double (D-59).
+ */
+internal fun froundOf(value: Double): Double = NativeMath.froundToDouble(value)
 
 /** The value when it is a whole number a 32 bit slot can hold either way, and null otherwise. */
 internal fun wholeInRange(value: Double): Long? {
