@@ -169,6 +169,22 @@ public open class LambdaConstructor : LambdaFunction {
         prototypeScriptable.defineProperty(name, f, attributes)
     }
 
+    /** [defineKnownBuiltInPrototypeMethod] for a method named by a symbol. */
+    public fun defineKnownBuiltInPrototypeMethod(
+        tag: Any,
+        scope: Scriptable,
+        name: SymbolKey,
+        length: Int,
+        prototype: Any?,
+        target: SerializableCallable,
+        attributes: Int,
+        propertyAttributes: Int,
+    ) {
+        val f = KnownBuiltInFunction(tag, scope, "[" + name.name + "]", length, prototype, target)
+        f.setStandardPropertyAttributes(propertyAttributes)
+        prototypeScriptable.defineProperty(name, f, attributes)
+    }
+
     // ---- Prototype properties -------------------------------------------------------------------
 
     public fun definePrototypeProperty(name: String, value: Any?, attributes: Int) {

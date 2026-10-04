@@ -2214,6 +2214,37 @@ class EvalOracleTest {
     }
 
     /**
+     * `instanceof` asks the target's `Symbol.hasInstance` with the left side as its argument, a
+     * primitive one included, throws for a method that cannot be called, and a bound function asks
+     * `instanceof` of its target (D-92). Upstream asks only a plain object, with the target as the
+     * argument, and its `Function.prototype[Symbol.hasInstance]` crashes the host with a
+     * ClassCastException for a bound built-in. Every expected value is what V8 answers.
+     */
+    @Test
+    fun instanceofAsksSymbolHasInstance() {
+        val custom = "function F() {} Object.defineProperty(F, Symbol.hasInstance, { value: function (v) { return v === 1 } });"
+        val sources = mapOf(
+            "$custom [1 instanceof F, ({}) instanceof F, 1 instanceof F.bind()].join(' ')" to "\"true false true\"",
+            "var o = {}; o[Symbol.hasInstance] = function (v) { return this === o && v.a === 1 }; String(({ a: 1 }) instanceof o)" to "\"true\"",
+            "String(2 instanceof { [Symbol.hasInstance]: function (v) { return v === 2 } })" to "\"true\"",
+            "try { String(1 instanceof { [Symbol.hasInstance]: 1 }) } catch (e) { e.name }" to "\"TypeError\"",
+            "function G() {} Object.defineProperty(G, Symbol.hasInstance, { value: 1 }); try { String(({}) instanceof G) } catch (e) { e.name }" to "\"TypeError\"",
+            "var o = Object.defineProperty(function () {}, Symbol.hasInstance, { get: function () { throw new RangeError('h') } }); try { String(({}) instanceof o) } catch (e) { e.name }"
+                to "\"RangeError\"",
+            "function H() {} var h = H.bind(); var o = new H(); Object.defineProperty(H, Symbol.hasInstance, { value: function () { return false } }); String(o instanceof h)"
+                to "\"false\"",
+            "$custom String(Function.prototype[Symbol.hasInstance].call(F.bind(), 1))" to "\"true\"",
+        )
+        for ((source, expected) in sources) {
+            assertEquals(expected, ported(source), source)
+            assertTrue(upstream(source) != expected, "upstream agrees now, D-92 can be retired: $source")
+        }
+        val bound = "String(Function.prototype[Symbol.hasInstance].call(Array.bind(), []))"
+        assertEquals("\"true\"", ported(bound))
+        assertFailsWith<ClassCastException>("upstream reads a bound built-in now, D-92 can be retired") { upstream(bound) }
+    }
+
+    /**
      * A comparator that answers NaN means equal (D-85), so a stable sort keeps such elements in
      * order. Upstream makes NaN greater, and forty elements are enough for its TimSort to move them.
      */

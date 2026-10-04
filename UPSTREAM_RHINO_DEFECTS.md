@@ -536,6 +536,44 @@ another realm's `other.eval` run in the global scope of the eval function's own 
 - Test: `EvalOracleTest.constructProxiesEnumerationAndJsonFollowTheInternalMethods`;
   `ConstructAndProxyInternalsTest` (common).
 
+### instanceof ignores Symbol.hasInstance on a function, and on a primitive left side (D-92)
+
+ECMAScript 2015, 12.9.4: `V instanceof target` gets the target's `@@hasInstance` and, when it is
+not undefined, answers ToBoolean of calling it with the target as `this` and V as the argument.
+Rhino only asks for it on a plain object, and gets it wrong there too:
+
+- `function F() {} Object.defineProperty(F, Symbol.hasInstance, { value: function (v) { return v === 1 } }); [1 instanceof F, ({}) instanceof F]`
+  answers `false,false`; V8 answers `true,false`. A function's own method is never read, nor is
+  a getter for it, so a throwing getter does not throw.
+- A primitive left side answers false before the method is looked up:
+  `2 instanceof { [Symbol.hasInstance]: function (v) { return v === 2 } }` answers `false`.
+- On a plain object the method is called with the target itself as its argument in place of the
+  left side: `var o = {}; o[Symbol.hasInstance] = function (v) { return v.a === 1 }; ({a: 1}) instanceof o`
+  answers `false`.
+- A method that is not callable is passed over instead of throwing a TypeError:
+  `1 instanceof { [Symbol.hasInstance]: 1 }` answers `false`.
+- A bound function reads its target's `prototype` instead of asking `instanceof` of the target, so
+  the target's own method is skipped: with `F` as above, `1 instanceof F.bind()` answers `false`.
+
+- Where: `ScriptRuntime.instanceOf`, which answers false for a primitive and otherwise calls
+  `Scriptable.hasInstance`; `BaseFunction.hasInstance`, which walks the chain;
+  `ScriptableObject.hasInstance`, which passes `this` as the argument; `BoundFunction.hasInstance`.
+- Test: `EvalOracleTest.instanceofAsksSymbolHasInstance`; `InstanceofTest` (common).
+
+### Function.prototype[Symbol.hasInstance] crashes on a bound built-in (D-92)
+
+`Function.prototype[Symbol.hasInstance].call(Array.bind(), [])` ends in a host
+`ClassCastException` (`LambdaConstructor cannot be cast to JSFunction`), and so does a function
+bound twice, whose target is a `BoundFunction`. OrdinaryHasInstance (ECMAScript 2015, 7.3.19)
+answers `instanceof` of the bound target, so V8 answers `true`. For a bound script function it
+reads the target's `prototype` rather than asking the target, so with `F` defining its own
+`Symbol.hasInstance` as above, `Function.prototype[Symbol.hasInstance].call(F.bind(), 1)` answers
+`false` where V8 answers `true`.
+
+- Where: `BaseFunction.js_hasInstance`, which casts `BoundFunction.getTargetFunction()` to
+  `JSFunction`.
+- Test: `EvalOracleTest.instanceofAsksSymbolHasInstance`; `InstanceofTest` (common).
+
 ### A getOwnPropertyDescriptor trap answering undefined crashes (D-50)
 
 A Proxy whose `getOwnPropertyDescriptor` trap returns `undefined` for a property the target lacks

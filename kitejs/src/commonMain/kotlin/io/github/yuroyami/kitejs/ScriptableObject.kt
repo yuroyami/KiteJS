@@ -370,18 +370,16 @@ public abstract class ScriptableObject :
 
     override fun getDefaultValue(hint: KClass<*>?): Any? = getDefaultValue(this, hint)
 
+    /**
+     * What `instanceof` asks once this object has no `Symbol.hasInstance`, which
+     * [ScriptRuntime.instanceOf] has already looked for: OrdinaryHasInstance for something that can
+     * be called, and a TypeError for anything else. Upstream looked the method up again here and
+     * called it with this object as its argument in place of [instance], and walked [instance]'s
+     * chain for this object itself rather than for its `prototype` (D-92).
+     */
     override fun hasInstance(instance: Scriptable): Boolean {
-        // The default for a plain object is to walk the prototype chain. Function objects and the
-        // non-script ones override this.
-        val cx = Context.getContext()
-        val hasInstance = ScriptRuntime.getObjectElem(this, SymbolKey.HAS_INSTANCE, cx)
-        if (hasInstance is Function) {
-            return ScriptRuntime.toBoolean(
-                hasInstance.call(cx, hasInstance.declarationScope!!, this, arrayOf(this)),
-            )
-        }
         if (this !is Callable) throw ScriptRuntime.typeErrorById("msg.instanceof.bad.target")
-        return ScriptRuntime.jsDelegatesTo(instance, this)
+        return ScriptRuntime.ordinaryHasInstance(Context.getContext(), this, instance)
     }
 
     /** True for an object that has to pretend it is `undefined`, which only `NativeWith` does. */

@@ -48,11 +48,6 @@ public class BoundFunction(
         )
     }
 
-    override fun hasInstance(instance: Scriptable): Boolean {
-        if (targetFunction is Function) return targetFunction.hasInstance(instance)
-        throw ScriptRuntime.typeErrorById("msg.not.ctor")
-    }
-
     override val functionName: String
         get() = if (targetFunction is BaseFunction) "bound " + targetFunction.functionName else ""
 

@@ -1892,10 +1892,54 @@ public object ScriptRuntime {
         }
     }
 
+    /**
+     * InstanceofOperator (ES 13.10.2): the target's `Symbol.hasInstance` decides, called with the
+     * target as `this` and [a] as its argument, and only a target without one has to be callable
+     * and is asked OrdinaryHasInstance. Upstream asked a function its prototype chain whatever it
+     * defined, answered false for a primitive before looking, passed an object's method the
+     * target itself in place of [a], and passed over a `Symbol.hasInstance` that was not callable
+     * (D-92).
+     */
     public fun instanceOf(a: Any?, b: Any?, cx: Context): Boolean {
-        if (b !is Scriptable) throw typeErrorById("msg.instanceof.not.object")
-        if (a !is Scriptable) return false
-        return b.hasInstance(a)
+        if (b !is Scriptable || isSymbol(b)) throw typeErrorById("msg.instanceof.not.object")
+        // GetMethod. A host object that holds no symbols has no Symbol.hasInstance to find.
+        val handler = if (b is SymbolScriptable) ScriptableObject.getProperty(b, SymbolKey.HAS_INSTANCE) else Scriptable.NOT_FOUND
+        if (handler is Callable) {
+            // Function.prototype[Symbol.hasInstance] is OrdinaryHasInstance, so it is not called.
+            if (BaseFunction.isOrdinaryHasInstance(handler)) return ordinaryHasInstance(cx, b, a)
+            val scope = (handler as? Function)?.declarationScope ?: ScriptableObject.getTopLevelScope(b)
+            return toBoolean(handler.call(cx, scope, b, arrayOf(a)))
+        }
+        if (handler != null && handler !== Scriptable.NOT_FOUND && !Undefined.isUndefined(handler)) {
+            throw notFunctionError(handler)
+        }
+        // The object's own [hasInstance] stands in for OrdinaryHasInstance, which is what a function
+        // answers, so a host object keeps its say; the default throws for a target that cannot be
+        // called.
+        if (a is Scriptable && !isSymbol(a)) return b.hasInstance(a)
+        if (b !is Callable) {
+            // The legacy StopIteration cannot be called and answers by its class, which no
+            // primitive has, so `e instanceof StopIteration` stays false for a thrown string.
+            if (b is NativeIterator.StopIteration) return false
+            throw typeErrorById("msg.instanceof.bad.target")
+        }
+        return ordinaryHasInstance(cx, b, a)
+    }
+
+    /**
+     * OrdinaryHasInstance (ES 7.3.21): false for a [c] that cannot be called, `instanceof` of the
+     * target for a bound function, false for an [o] that is not an object, and otherwise whether
+     * [c]'s `prototype`, which has to be an object, is in [o]'s prototype chain.
+     */
+    internal fun ordinaryHasInstance(cx: Context, c: Any?, o: Any?): Boolean {
+        if (c !is Callable) return false
+        if (c is BoundFunction) return instanceOf(o, c.targetFunction, cx)
+        if (o !is Scriptable || isSymbol(o)) return false
+        val proto = if (c is Scriptable) ScriptableObject.getProperty(c, "prototype") else Scriptable.NOT_FOUND
+        if (proto !is Scriptable || !isObject(proto)) {
+            throw typeErrorById("msg.instanceof.bad.prototype", (c as? BaseFunction)?.functionName ?: "unknown")
+        }
+        return jsDelegatesTo(o, proto)
     }
 
     public fun `in`(a: Any?, b: Any?, cx: Context): Boolean {

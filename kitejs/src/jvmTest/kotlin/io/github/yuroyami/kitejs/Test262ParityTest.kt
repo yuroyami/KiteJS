@@ -719,6 +719,18 @@ class Test262ParityTest {
         )) {
             put(path, "D-91: a property call of eval is an indirect eval here")
         }
+
+        // instanceof asks the target's Symbol.hasInstance, primitive left side and all, and throws
+        // for one that cannot be called (D-92).
+        for (path in listOf(
+            "language/expressions/instanceof/S11.8.6_A6_T2.js",
+            "language/expressions/instanceof/symbol-hasinstance-get-err.js",
+            "language/expressions/instanceof/symbol-hasinstance-invocation.js",
+            "language/expressions/instanceof/symbol-hasinstance-not-callable.js",
+            "language/expressions/instanceof/symbol-hasinstance-to-boolean.js",
+        )) {
+            put(path, "D-92: instanceof is InstanceofOperator here")
+        }
     }
 
     /**

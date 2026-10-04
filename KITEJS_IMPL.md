@@ -663,6 +663,21 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   puts integer keys from 2^31 in creation order, lets Object.prototype take a new prototype,
   re-defaults a built-in function's null prototype, parses `-0` as `0`, reads `toJSON` twice,
   serialises a proxy for an array as an object, and makes `this.eval` a direct eval.
+- D-92: `instanceof` is InstanceofOperator. `ScriptRuntime.instanceOf` looks up the target's
+  `Symbol.hasInstance`, calls it with the target as `this` and the left side, primitive or not, as
+  its argument, and answers ToBoolean of the result; a value that is neither undefined, null nor
+  callable is a TypeError, and only a target without one must be callable and is asked
+  OrdinaryHasInstance (`ScriptRuntime.ordinaryHasInstance`), which for a bound function is
+  `instanceof` of its target. `Function.prototype[Symbol.hasInstance]` is a `KnownBuiltInFunction`
+  so finding it goes straight to OrdinaryHasInstance without a call. `Scriptable.hasInstance` stays
+  the hook a host object answers through once no method was found, and `ScriptableObject`'s
+  default is now OrdinaryHasInstance for something callable and a TypeError otherwise; the legacy
+  `StopIteration` still answers false for a primitive. Upstream asked a function its prototype
+  chain whatever it defined, answered false for a primitive left side before looking, called an
+  object's method with the target itself as the argument, passed over a method that could not be
+  called, read a bound function's target `prototype` instead of asking the target, and crashed
+  with a host ClassCastException in `Function.prototype[Symbol.hasInstance]` for a bound function
+  whose target was not a script function (#75).
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

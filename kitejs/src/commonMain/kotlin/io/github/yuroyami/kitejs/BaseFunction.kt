@@ -105,14 +105,13 @@ public open class BaseFunction : ScriptableObject, Function {
         get() = if (avoidObjectDetection()) "undefined" else "function"
 
     /**
-     * The `instanceof` operator for function objects: true when this function's `prototype`
-     * property is somewhere in [instance]'s prototype chain.
+     * OrdinaryHasInstance for this function, which `instanceof` falls back to when there is no
+     * `Symbol.hasInstance` to ask: true when this function's `prototype` is somewhere in
+     * [instance]'s prototype chain, and for a bound function whatever `instanceof` says of its
+     * target (D-92).
      */
-    override fun hasInstance(instance: Scriptable): Boolean {
-        val protoProp = getProperty(this, PROTOTYPE_PROPERTY_NAME)
-        if (protoProp is Scriptable) return ScriptRuntime.jsDelegatesTo(instance, protoProp)
-        throw ScriptRuntime.typeErrorById("msg.instanceof.bad.prototype", functionName)
-    }
+    override fun hasInstance(instance: Scriptable): Boolean =
+        ScriptRuntime.ordinaryHasInstance(Context.getContext(), this, instance)
 
     /** Makes [value] a non-enumerable, non-deletable, read-only `prototype` on this function. */
     public fun setImmunePrototypeProperty(value: Any?) {
@@ -280,6 +279,7 @@ public open class BaseFunction : ScriptableObject, Function {
 
         private val APPLY_TAG: Any = "APPLY_TAG"
         private val CALL_TAG: Any = "CALL_TAG"
+        private val HAS_INSTANCE_TAG: Any = "HAS_INSTANCE_TAG"
 
         // ---- The built-in property accessors -------------------------------------------------
 
@@ -361,6 +361,9 @@ public open class BaseFunction : ScriptableObject, Function {
 
         internal fun isApply(f: KnownBuiltInFunction): Boolean = f.tag === APPLY_TAG
 
+        /** Whether [f] is some realm's `Function.prototype[Symbol.hasInstance]`. */
+        internal fun isOrdinaryHasInstance(f: Any?): Boolean = f is KnownBuiltInFunction && f.tag === HAS_INSTANCE_TAG
+
         internal fun isApplyOrCall(f: KnownBuiltInFunction): Boolean {
             val tag = f.tag
             return tag === APPLY_TAG || tag === CALL_TAG
@@ -381,8 +384,11 @@ public open class BaseFunction : ScriptableObject, Function {
             ctor.defineKnownBuiltInPrototypeMethod(CALL_TAG, scope, "call", 1, null, ::js_call, DONTENUM, DONTENUM or READONLY)
             ctor.definePrototypeMethod(scope, "toSource", 1, ::js_toSource)
             ctor.definePrototypeMethod(scope, "toString", 0, ::js_toString)
-            ctor.definePrototypeMethod(
-                scope, SymbolKey.HAS_INSTANCE, 1, null, ::js_hasInstance, DONTENUM or READONLY or PERMANENT, DONTENUM or READONLY,
+            // Tagged so `instanceof` can go straight to OrdinaryHasInstance when this is the method
+            // it finds, which is what it would do anyway.
+            ctor.defineKnownBuiltInPrototypeMethod(
+                HAS_INSTANCE_TAG, scope, SymbolKey.HAS_INSTANCE, 1, null, ::js_hasInstance,
+                DONTENUM or READONLY or PERMANENT, DONTENUM or READONLY,
             )
             // Function.prototype attributes, ECMA 15.3.3.1.
             ctor.setPrototypePropertyAttributes(DONTENUM or READONLY or PERMANENT)
@@ -413,21 +419,14 @@ public open class BaseFunction : ScriptableObject, Function {
             return (scope as? ScriptableObject)?.associateValue(GENERATOR_FUNCTION_CLASS, ctor) ?: ctor
         }
 
-        private fun js_hasInstance(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            if (thisObj !is Callable) return false
-            val protoProp =
-                if (thisObj is BoundFunction) (thisObj.targetFunction as JSFunction).prototypeProperty
-                else getProperty(thisObj, PROTOTYPE_PROPERTY_NAME)
-            if (ScriptRuntime.isObject(protoProp)) {
-                val obj = args.getOrNull(0)
-                if (obj is Scriptable) return ScriptRuntime.jsDelegatesTo(obj, protoProp as Scriptable)
-                return false
-            }
-            throw ScriptRuntime.typeErrorById(
-                "msg.instanceof.bad.prototype",
-                if (thisObj is BaseFunction) thisObj.functionName else "unknown",
-            )
-        }
+        /**
+         * `Function.prototype[Symbol.hasInstance]`, which is OrdinaryHasInstance. Upstream cast a
+         * bound function's target to JSFunction, so a bound built-in crashed with a host
+         * ClassCastException, and it read the bound target's `prototype` where the spec asks
+         * `instanceof` of the target, so the target's own `Symbol.hasInstance` was skipped (D-92).
+         */
+        private fun js_hasInstance(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
+            ScriptRuntime.ordinaryHasInstance(cx, thisObj, args.getOrElse(0) { Undefined.instance })
 
         private fun js_bind(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             if (thisObj !is Callable) throw ScriptRuntime.notFunctionError(thisObj)
