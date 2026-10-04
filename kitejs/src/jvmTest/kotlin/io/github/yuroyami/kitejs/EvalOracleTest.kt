@@ -2263,6 +2263,44 @@ class EvalOracleTest {
         }
     }
 
+    /** Each source replaces a global, so each gets standard objects of its own on both sides. */
+    private fun freshScopes() {
+        uscope = ucx.initStandardObjects()
+        kscope = Context.getContext().initStandardObjects()
+    }
+
+    /**
+     * What the engine makes on its own comes from the realm's intrinsics, in a scope of any class,
+     * the one `initStandardObjects()` makes included, never from a global a script replaced
+     * (D-94). Upstream keeps intrinsics for a `TopLevel` only and makes a plain object when given
+     * no scope, and its `Map.groupBy`, `Error.captureStackTrace` and `Promise.any` build through
+     * the global and crash the host with a ClassCastException once it is replaced. Every expected
+     * value is what V8 answers.
+     */
+    @Test
+    fun replacedGlobalsDoNotReachWhatTheEngineMakes() {
+        val sources = mapOf(
+            "var SP = String.prototype, gp = Object.getPrototypeOf; String = function () {}; (gp('a') === SP) + ' ' + typeof ''.trim" to "\"true function\"",
+            "var OP = Object.prototype, gp = Object.getPrototypeOf; Object = function () {}; String(gp({}) === OP)" to "\"true\"",
+            "var TE = TypeError; TypeError = function () {}; try { null.x; } catch (e) { (e instanceof TE) + ' ' + typeof e.message; }" to "\"true string\"",
+            "Array = function () {}; typeof [].join" to "\"function\"",
+        )
+        for ((source, expected) in sources) {
+            freshScopes()
+            assertEquals(expected, ported(source), source)
+            assertTrue(upstream(source) != expected, "upstream agrees now, D-94 can be retired: $source")
+        }
+        val crashes = mapOf(
+            "var MP = Map.prototype, gp = Object.getPrototypeOf; var M = Map; Map = function () {}; String(gp(M.groupBy([1], function () { return 'k' })) === MP)" to "\"true\"",
+            "var cst = Error.captureStackTrace; Error = function () {}; var o = {}; cst(o); typeof o.stack" to "\"string\"",
+        )
+        for ((source, expected) in crashes) {
+            freshScopes()
+            assertEquals(expected, ported(source), source)
+            assertFailsWith<ClassCastException>("upstream builds the intrinsic now, D-94 can be retired: $source") { upstream(source) }
+        }
+    }
+
     /**
      * A comparator that answers NaN means equal (D-85), so a stable sort keeps such elements in
      * order. Upstream makes NaN greater, and forty elements are enough for its TimSort to move them.

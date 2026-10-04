@@ -1345,12 +1345,10 @@ public object ScriptRuntime {
         initSafeStandardObjects(cx, scope, sealed)
 
     public fun initSafeStandardObjects(cx: Context, scopeIn: ScriptableObject?, sealed: Boolean): ScriptableObject {
-        var scope = scopeIn
-        if (scope == null) {
-            scope = NativeObject()
-        } else if (scope is TopLevel) {
-            scope.clearCache()
-        }
+        // A TopLevel when none is given, as the doc of Context.initStandardObjects says; upstream
+        // made a plain object (D-94).
+        val scope = scopeIn ?: TopLevel()
+        TopLevel.clearIntrinsics(scope)
         scope.put("global", scope, scope)
         scope.associateValue(LIBRARY_SCOPE_KEY, scope)
         // ClassCache and ConcurrentFactory are LiveConnect and threading support, neither ported.
@@ -1424,11 +1422,11 @@ public object ScriptRuntime {
             LazilyLoadedCtor(scope, "WeakSet", sealed, Initializable { icx, s, sld -> NativeWeakSet.init(icx, s, sld) })
         }
 
-        // GeneratorFunction is built by the TopLevel cache, and in any other scope here. Upstream
-        // built it for a TopLevel only, so in a plain scope every generator function had a null
-        // prototype and no call, apply or bind (D-79).
-        if (scope is TopLevel) scope.cacheBuiltins(scope, sealed)
-        else BaseFunction.initAsGeneratorFunction(scope, sealed)
+        // The intrinsics are cached for every global object, a TopLevel or not, and GeneratorFunction
+        // is built along with them. Upstream did both for a TopLevel only, so in a plain scope
+        // every generator function had a null prototype and no call, apply or bind (D-79), and a
+        // replaced global changed what the engine made (D-94).
+        TopLevel.cacheIntrinsics(scope, sealed)
         return scope
     }
 

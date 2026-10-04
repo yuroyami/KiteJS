@@ -68,7 +68,7 @@ public class NativeMap : ScriptableObject() {
             )
             constructor.setPrototypePropertyAttributes(DONTENUM or READONLY or PERMANENT)
 
-            constructor.defineConstructorMethod(scope, "groupBy", 2, SerializableCallable { icx, s, thisObj, args -> jsGroupBy(icx, s, thisObj, args) })
+            constructor.defineConstructorMethod(scope, "groupBy", 2, SerializableCallable { icx, s, _, args -> jsGroupBy(icx, s, constructor, args) })
 
             constructor.definePrototypeMethod(scope, "set", 2, SerializableCallable { _, _, thisObj, args -> realThis(thisObj, "set").js_set(key(args), if (args.size > 1) args[1] else Undefined.instance) })
             constructor.definePrototypeMethod(scope, "delete", 1, SerializableCallable { _, _, thisObj, args -> realThis(thisObj, "delete").js_delete(key(args)) })
@@ -111,7 +111,12 @@ public class NativeMap : ScriptableObject() {
             return nm
         }
 
-        private fun jsGroupBy(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
+        /**
+         * `Map.groupBy` makes a Map of its own realm, so it builds one with [map], the constructor
+         * it belongs to. Upstream built it with whatever the global `Map` held and cast the result,
+         * which crashed the host with a ClassCastException once a script replaced it (D-94).
+         */
+        private fun jsGroupBy(cx: Context, scope: Scriptable, map: LambdaConstructor, args: Array<Any?>): Any? {
             val items = if (args.isEmpty()) Undefined.instance else args[0]
             val callback = if (args.size < 2) Undefined.instance else args[1]
 
@@ -120,11 +125,11 @@ public class NativeMap : ScriptableObject() {
                 AbstractEcmaObjectOperations.KEY_COERCION.COLLECTION,
             )
 
-            val map = cx.newObject(scope, "Map") as NativeMap
+            val result = map.construct(cx, ScriptableObject.getTopLevelScope(map), ScriptRuntime.emptyArgs) as NativeMap
             for ((k, v) in groups) {
-                map.entries.put(k, cx.newArray(scope, v.toTypedArray()))
+                result.entries.put(k, cx.newArray(scope, v.toTypedArray()))
             }
-            return map
+            return result
         }
 
         /**

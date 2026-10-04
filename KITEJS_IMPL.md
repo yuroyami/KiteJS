@@ -689,6 +689,21 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   `[Symbol.iterator]` of length 1, made `prototype` an ordinary enumerable property, and gave
   %GeneratorPrototype% no `constructor`. The iterator helpers of ES2025 (`Iterator.prototype.map`
   and the rest) are not part of this: the global `Iterator` is still Rhino's legacy one (#74).
+- D-94: Every global object keeps its realm's intrinsics. `TopLevel.Intrinsics` holds the original
+  constructors and error constructors, taken from the globals once the standard objects are in,
+  in a field of a `TopLevel` and as an associated value of any other global object, and a scope
+  that has none uses those of the global it inherits from, as a scope made per request on top of
+  a shared one does. `ScriptRuntime.initSafeStandardObjects` makes a `TopLevel` when it is given
+  no scope, as `Context.initStandardObjects` documents, so the global the `KiteJs` facade and
+  `initStandardObjects()` make is one, and `Object.prototype.toString.call(this)` there answers
+  `[object global]`, as Node does. `Map.groupBy` builds its Map with the constructor it belongs to,
+  and `Promise.any` and `Error.captureStackTrace` build their errors with `newNativeError`.
+  Upstream cached the intrinsics for a `TopLevel` only and made a plain `NativeObject` when given
+  no scope, so in the global most embedders get a replaced `String`, `Object`, `Array` or
+  `TypeError` changed the prototype of every primitive, literal and engine error that followed,
+  and `Map.groupBy`, `Promise.any` and `Error.captureStackTrace` built through the global binding
+  and crashed the host with a ClassCastException once a script replaced it, `TopLevel` or not
+  (#77).
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

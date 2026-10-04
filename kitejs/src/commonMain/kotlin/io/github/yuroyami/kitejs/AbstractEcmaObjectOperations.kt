@@ -536,7 +536,7 @@ public object AbstractEcmaObjectOperations {
 
     /** The built-in constructor [type] of the realm whose global is [realm], or whatever its global of that name holds. */
     private fun builtinCtor(realm: Scriptable, type: TopLevel.Builtins): Any? {
-        (realm as? TopLevel)?.getBuiltinCtor(type)?.let { return it }
+        TopLevel.cachedBuiltinCtor(realm, type)?.let { return it }
         if (type == TopLevel.Builtins.GeneratorFunction) return ScriptableObject.getTopScopeValue(realm, BaseFunction.GENERATOR_FUNCTION_CLASS)
         return ScriptableObject.getProperty(realm, type.name)
     }

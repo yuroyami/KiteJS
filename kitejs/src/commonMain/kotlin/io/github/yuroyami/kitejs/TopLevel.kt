@@ -11,8 +11,9 @@ package io.github.yuroyami.kitejs
  * constructors are writable and deletable, so a script can replace them. Caching them here keeps
  * internal work pointing at the real ones.
  *
- * `Context.initStandardObjects` fills this cache when the scope is a `TopLevel`. A scope that
- * inherits its globals from a prototype instead has to call [cacheBuiltins] itself.
+ * `Context.initStandardObjects` fills this cache, in a field for a `TopLevel` and as an associated
+ * value for any other global object, and makes a `TopLevel` when it is given no scope. A scope
+ * that inherits its globals from a prototype uses the cache of the global it inherits from (D-94).
  */
 public open class TopLevel : ScriptableObject() {
 
@@ -63,8 +64,8 @@ public open class TopLevel : ScriptableObject() {
         JavaException,
     }
 
-    private var ctors: MutableMap<Builtins, BaseFunction>? = null
-    private var errors: MutableMap<NativeErrors, BaseFunction>? = null
+    /** This scope's own [Intrinsics], kept in a field rather than as an associated value. */
+    private val intrinsics = Intrinsics()
 
     override val className: String
         get() = "global"
@@ -74,43 +75,99 @@ public open class TopLevel : ScriptableObject() {
      * uses. `ScriptRuntime.initStandardObjects` calls this when the scope is a `TopLevel`.
      */
     public fun cacheBuiltins(scope: Scriptable, sealed: Boolean) {
-        val c = mutableMapOf<Builtins, BaseFunction>()
-        for (builtin in Builtins.entries) {
-            val value = getProperty(this, builtin.name)
-            if (value is BaseFunction) {
-                c[builtin] = value
-            } else if (builtin == Builtins.GeneratorFunction) {
-                // GeneratorFunction is a real constructor that never gets registered in the global
-                // scope, so it has to be built here.
-                c[builtin] = BaseFunction.initAsGeneratorFunction(scope, sealed) as BaseFunction
-            }
-        }
-        ctors = c
-
-        val e = mutableMapOf<NativeErrors, BaseFunction>()
-        for (error in NativeErrors.entries) {
-            val value = getProperty(this, error.name)
-            if (value is BaseFunction) e[error] = value
-        }
-        errors = e
+        intrinsics.fill(this, scope, sealed)
     }
 
     /** Drops the cache, which the standard objects being rebuilt requires. */
     internal fun clearCache() {
-        ctors = null
-        errors = null
+        intrinsics.clear()
     }
 
     /** The cached constructor, or null when [cacheBuiltins] has not run. */
-    public fun getBuiltinCtor(type: Builtins): BaseFunction? = ctors?.get(type)
+    public fun getBuiltinCtor(type: Builtins): BaseFunction? = intrinsics.ctors?.get(type)
 
-    internal fun getNativeErrorCtor(type: NativeErrors): BaseFunction? = errors?.get(type)
+    internal fun getNativeErrorCtor(type: NativeErrors): BaseFunction? = intrinsics.errors?.get(type)
 
     /** The cached prototype, or null when [cacheBuiltins] has not run. */
     public fun getBuiltinPrototype(type: Builtins): Scriptable? =
         getBuiltinCtor(type)?.prototypeProperty as? Scriptable
 
+    /**
+     * A realm's original constructors, taken from its globals once its standard objects are in,
+     * so a script that replaces a global does not change what the engine makes. A `TopLevel`
+     * keeps its own in a field; any other global object keeps one as an associated value (D-94).
+     */
+    internal class Intrinsics {
+        var ctors: Map<Builtins, BaseFunction>? = null
+            private set
+        var errors: Map<NativeErrors, BaseFunction>? = null
+            private set
+
+        fun fill(global: Scriptable, scope: Scriptable, sealed: Boolean) {
+            val c = mutableMapOf<Builtins, BaseFunction>()
+            for (builtin in Builtins.entries) {
+                val value = getProperty(global, builtin.name)
+                if (value is BaseFunction) {
+                    c[builtin] = value
+                } else if (builtin == Builtins.GeneratorFunction) {
+                    // GeneratorFunction is a real constructor that never gets registered in the
+                    // global scope, so it has to be built here.
+                    c[builtin] = BaseFunction.initAsGeneratorFunction(scope, sealed) as BaseFunction
+                }
+            }
+            ctors = c
+            val e = mutableMapOf<NativeErrors, BaseFunction>()
+            for (error in NativeErrors.entries) {
+                val value = getProperty(global, error.name)
+                if (value is BaseFunction) e[error] = value
+            }
+            errors = e
+        }
+
+        fun clear() {
+            ctors = null
+            errors = null
+        }
+    }
+
     public companion object {
+
+        private const val INTRINSICS_KEY = "TopLevel.Intrinsics"
+
+        /**
+         * Takes [global]'s intrinsics from its globals, whatever class backs it. Upstream kept
+         * them for a `TopLevel` only, so in any other global, the one `initStandardObjects()`
+         * makes included, a replaced `String`, `Object` or `TypeError` changed the prototype of
+         * every string, literal and engine error that followed (D-94).
+         */
+        internal fun cacheIntrinsics(global: ScriptableObject, sealed: Boolean) {
+            if (global is TopLevel) return global.cacheBuiltins(global, sealed)
+            val holder = global.associateValue(INTRINSICS_KEY, Intrinsics()) as Intrinsics
+            holder.fill(global, global, sealed)
+        }
+
+        /** Drops [global]'s intrinsics, which rebuilding its standard objects requires. */
+        internal fun clearIntrinsics(global: ScriptableObject) {
+            if (global is TopLevel) global.clearCache()
+            else (global.getAssociatedValue(INTRINSICS_KEY) as? Intrinsics)?.clear()
+        }
+
+        /**
+         * The intrinsics [scope] keeps, or else those of the global it inherits from, as a scope
+         * made per request on top of a shared one does. Null when none has them.
+         */
+        private fun intrinsicsOf(scope: Scriptable): Intrinsics? {
+            var s: Scriptable? = scope
+            while (s != null && s !is NativeProxy) {
+                val found = if (s is TopLevel) s.intrinsics else (s as? ScriptableObject)?.getAssociatedValue(INTRINSICS_KEY) as? Intrinsics
+                if (found?.ctors != null) return found
+                s = s.prototype
+            }
+            return null
+        }
+
+        /** The cached constructor for [type] of [scope]'s realm, or null when it has none. */
+        internal fun cachedBuiltinCtor(scope: Scriptable, type: Builtins): BaseFunction? = intrinsicsOf(scope)?.ctors?.get(type)
 
         /**
          * The built-in constructor for [type]. Falls back to an ordinary property lookup when the
@@ -118,7 +175,7 @@ public open class TopLevel : ScriptableObject() {
          */
         public fun getBuiltinCtor(cx: Context, scope: Scriptable, type: Builtins): Function? {
             check(scope.parentScope == null) { "the scope has to be a top-level scope" }
-            if (scope is TopLevel) scope.getBuiltinCtor(type)?.let { return it }
+            cachedBuiltinCtor(scope, type)?.let { return it }
             // GeneratorFunction is no global, so the fallback finds it parked on the scope.
             if (type == Builtins.GeneratorFunction) return generatorFunction(scope)
             return ScriptRuntime.getExistingCtor(cx, scope, type.name)
@@ -133,7 +190,7 @@ public open class TopLevel : ScriptableObject() {
             type: NativeErrors,
         ): Function? {
             check(scope.parentScope == null) { "the scope has to be a top-level scope" }
-            if (scope is TopLevel) scope.getNativeErrorCtor(type)?.let { return it }
+            intrinsicsOf(scope)?.errors?.get(type)?.let { return it }
             return ScriptRuntime.getExistingCtor(cx, scope, type.name)
         }
 
@@ -143,7 +200,7 @@ public open class TopLevel : ScriptableObject() {
          */
         public fun getBuiltinPrototype(scope: Scriptable, type: Builtins): Scriptable? {
             check(scope.parentScope == null) { "the scope has to be a top-level scope" }
-            if (scope is TopLevel) scope.getBuiltinPrototype(type)?.let { return it }
+            (cachedBuiltinCtor(scope, type)?.prototypeProperty as? Scriptable)?.let { return it }
             if (type == Builtins.GeneratorFunction) return generatorFunction(scope)?.prototypeProperty as? Scriptable
             return getClassPrototype(scope, type.name)
         }

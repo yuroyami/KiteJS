@@ -287,7 +287,8 @@ internal class NativeError : IdScriptableObject() {
             if (args.size > 1) {
                 func = ScriptRuntime.toObjectOrNull(cx, args[1], scope) as Function?
             }
-            val err = cx.newObject(thisObj, "Error") as NativeError
+            // %Error%, never the global binding, which a script may have replaced (D-94).
+            val err = ScriptRuntime.newNativeError(cx, thisObj, TopLevel.NativeErrors.Error, null) as NativeError
             err.setStackProvider(EvaluatorException("[object Object]"))
             if (func != null) {
                 val funcName = func.get("name", func)

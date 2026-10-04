@@ -339,7 +339,7 @@ public class NativePromise : ScriptableObject() {
                         // Nothing at all was supplied, so the AggregateError is thrown, not
                         // delivered through the promise.
                         val newArray = topCx.newArray(topScope, errors.toTypedArray())
-                        val error = topCx.newObject(topScope, "AggregateError", arrayOf<Any?>(newArray)) as NativeError
+                        val error = ScriptRuntime.newNativeError(topCx, topScope, TopLevel.NativeErrors.AggregateError, arrayOf<Any?>(newArray))
                         throw JavaScriptException(error, null, 0)
                     }
                     return capability.promise
@@ -362,7 +362,8 @@ public class NativePromise : ScriptableObject() {
 
         fun finalRejection(cx: Context, scope: Scriptable) {
             val newArray = cx.newArray(scope, errors.toTypedArray())
-            val error = cx.newObject(scope, "AggregateError", arrayOf<Any?>(newArray)) as NativeError
+            // %AggregateError%, never the global binding, which a script may have replaced (D-94).
+            val error = ScriptRuntime.newNativeError(cx, scope, TopLevel.NativeErrors.AggregateError, arrayOf<Any?>(newArray))
             capability.reject.call(cx, scope, Undefined.SCRIPTABLE_UNDEFINED, arrayOf<Any?>(error))
         }
 

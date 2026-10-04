@@ -595,6 +595,37 @@ ECMAScript 2015, 25.2.3.2 makes it read-only and hidden, and %GeneratorPrototype
 - Test: `EvalOracleTest.theIteratorPrototypesInheritIteratorPrototype`; `IteratorPrototypeTest`
   (common).
 
+### Replacing a global constructor changes what the engine makes (D-94)
+
+An object literal is made from %Object.prototype% (ECMAScript 2015, 12.2.6.7), an array literal
+from %ArrayPrototype% (9.4.2.2), a primitive's wrapper by ToObject from the intrinsic prototype
+(7.1.13), and an error the engine throws from its intrinsic kind. Rhino keeps the original
+constructors for that only in a `TopLevel`, and `Context.initStandardObjects()` makes a plain
+`NativeObject` for its global, so there every one of them reads the global binding a script may
+have replaced:
+
+- `var SP = String.prototype; String = function () {}; (Object.getPrototypeOf('a') === SP) + ' ' + typeof ''.trim`
+  answers `false undefined`; V8 answers `true function`.
+- After `Object = function () {}`, `Object.getPrototypeOf({}) === Object.prototype` as saved before
+  is `false`, and after `Array = function () {}`, `[].join` is undefined.
+- After `TypeError = function () {}`, the error `null.x` throws is not an instance of the saved
+  `TypeError` and has no `message`.
+
+Three built-ins build through the global binding even in a `TopLevel`, and cast what it gives
+them, so a replaced global crashes the host with a `ClassCastException`:
+
+- `var M = Map; Map = function () {}; M.groupBy([1], function () { return 'k' })` casts to
+  `NativeMap`.
+- `var cst = Error.captureStackTrace; Error = function () {}; cst({})` casts to `NativeError`.
+- `AggregateError = function () {}; Promise.any([])` casts to `NativeError` in its rejection.
+
+- Where: `ScriptRuntime.initSafeStandardObjects`, which makes a `NativeObject` for a null scope
+  and caches the intrinsics only when the scope is a `TopLevel`; `NativeMap.jsGroupBy`,
+  `NativeError.js_captureStackTrace` and `NativePromise`'s `Promise.any`, which call
+  `cx.newObject(scope, name)`.
+- Test: `EvalOracleTest.replacedGlobalsDoNotReachWhatTheEngineMakes`; `RealmIntrinsicsTest`
+  (common).
+
 ### A getOwnPropertyDescriptor trap answering undefined crashes (D-50)
 
 A Proxy whose `getOwnPropertyDescriptor` trap returns `undefined` for a property the target lacks
