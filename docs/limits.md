@@ -70,9 +70,15 @@ Weak collections are the one place memory behaves differently by target:
 
 | Target | `WeakMap` and `WeakSet` |
 |---|---|
-| JVM, Android, iOS, macOS, Linux, Windows | Entries are released when the key is collected |
+| JVM, Android, iOS, macOS, Linux, Windows | An entry is released when its key is collected, even when the value refers back to the key |
 | JavaScript | Same, on any runtime with `WeakRef`, which is every current one |
-| WebAssembly | Entries are held until the map is dropped |
+| WebAssembly | An entry is released with its key, but a dropped map stays reachable from its live keys |
+
+Entries are stored on their keys rather than in the map, which is why a value that points back
+at its key, such as `cache.set(node, { node })`, does not keep the key alive. Upstream Rhino keeps
+such entries for as long as the map lives. The other side of that layout is that a map you drop
+while its keys live on leaves its entry on each key until the key is next used as a `WeakMap` or
+`WeakSet` key, or is collected itself.
 
 No script can tell the difference, because a `WeakMap` has no iteration and no size. The cost on
 WebAssembly is memory, not behaviour. `WeakRef.isWeakSupported` answers false there if your host

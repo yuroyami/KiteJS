@@ -4,12 +4,12 @@
 
 package io.github.yuroyami.kitejs
 
-/** `WeakSet`: the same weak keys as [NativeWeakMap], with nothing stored against them. */
+/** `WeakSet`: the same weak keys as [NativeWeakMap], kept the same way, with nothing stored against them. */
 public class NativeWeakSet : ScriptableObject() {
 
     private var instanceOfWeakSet = false
 
-    private val entries = WeakKeyMap<Boolean>()
+    private val entries = WeakEntries(this)
 
     override val className: String
         get() = CLASS_NAME
@@ -29,7 +29,7 @@ public class NativeWeakSet : ScriptableObject() {
 
     private fun js_has(key: Any?): Any {
         if (!isValidValue(key)) return false
-        return entries.containsKey(key!!)
+        return entries.get(key!!) != null
     }
 
     public companion object {

@@ -480,6 +480,21 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   promise and without calling its `then`, and any other thenable has `then` read once and called
   from a microtask with fresh resolving functions, so nested promises and thenables are adopted
   and only one settlement counts. `onSettled` and the coroutine `await` sit on it.
+- D-82: `WeakMap` and `WeakSet` keep their entries on the keys, not in the collection. Each
+  key that the engine made (any `ScriptableObject`, or a symbol from `Symbol()`) carries a
+  `WeakKeyTable` of the collections it is in, each held weakly, with what that collection holds
+  for it. This is the inverted representation the WeakMap note in the spec (ECMAScript 2015,
+  23.3) describes for a collector without ephemerons, the one Mozilla's ephemeron write-up
+  attributes to Edge and the one the SES weak-map shim uses. Nothing in a collection leads to a
+  key, so a value that refers back to its key, or entries whose values lead to each other's keys,
+  go when nothing else holds the keys. Upstream keeps a `java.util.WeakHashMap`, whose values are
+  strong and so pin any key they lead to for as long as the map lives. The costs: an entry of a
+  collection that was collected first stays on a live key until that key is next looked up, which
+  sweeps it out; a value that refers to its own collection keeps that collection alive while the
+  key lives; and built-in symbols and host objects such as a `Delegator`, which have nowhere to
+  keep a table, use a `WeakKeyMap` of the collection's own. On WebAssembly, where nothing is weak,
+  an entry now goes with its key and a dropped collection stays reachable from its live keys,
+  where before every entry stayed until the collection was dropped.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

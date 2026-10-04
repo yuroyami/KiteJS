@@ -229,6 +229,22 @@ without a checkpoint either.
 - Where: `Interpreter`, the call ops (`doCall`, `doCallSpecial`, `doNew` and the spread forms),
   `Interpreter.interpret` for calls from native code, and `Context.processMicrotasks`.
 
+### A WeakMap value that refers to its key keeps the entry forever (D-82)
+
+`NativeWeakMap` and `NativeWeakSet` keep a `java.util.WeakHashMap`, which holds its keys weakly
+and its values strongly. A value that leads back to its own key, `map.set(k, { owner: k })`, is
+reachable from the map and keeps the key, so the entry is never collected while the map lives.
+The same goes for two entries whose values lead to each other's keys. This is the commonest way
+a `WeakMap` is used, as a side table of metadata about an object, so a long-lived cache keyed by
+objects grows without bound. The note on WeakMap in the spec (ECMAScript 2015, 23.3) says the
+collections are meant not to keep an object that would otherwise be unreachable, and V8,
+SpiderMonkey and JavaScriptCore, whose collectors have ephemerons, all let such entries go.
+
+- Where: `NativeWeakMap` and `NativeWeakSet`, the `WeakHashMap` field. The JVM has no ephemeron,
+  so the fix is the inverted representation: store each collection's value on the key, in a
+  table keyed weakly by the collection, so only the key leads to its values.
+- Test: `WeakMapGcTest.upstreamKeepsAKeyItsValueLeadsTo`.
+
 ## Maths accuracy
 
 ### log2, acosh, asinh and atanh are formulas on top of log (D-73)

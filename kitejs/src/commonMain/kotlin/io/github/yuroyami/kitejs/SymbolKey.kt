@@ -30,6 +30,9 @@ public class SymbolKey(private val nameOrNull: String?, override val kind: Symbo
 
     override fun hashCode(): Int = super.hashCode()
 
+    /** What this symbol holds for the weak collections it is a key in, kept so it dies with it. */
+    internal var weakTable: WeakKeyTable? = null
+
     override fun toString(): String = if (nameOrNull == null) "Symbol()" else "Symbol($nameOrNull)"
 
     public companion object {

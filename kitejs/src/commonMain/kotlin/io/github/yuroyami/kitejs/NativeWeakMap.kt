@@ -7,13 +7,13 @@ package io.github.yuroyami.kitejs
 /**
  * `WeakMap`: a map that does not keep its keys alive. Only objects and unregistered symbols can be
  * keys, and there is no way to ask it what it holds, which is what makes the weakness unobservable
- * from script.
+ * from script. The values live with their keys rather than here; see [WeakEntries].
  */
 public class NativeWeakMap : ScriptableObject() {
 
     private var instanceOfWeakMap = false
 
-    private val entries = WeakKeyMap<Any>()
+    private val entries = WeakEntries(this)
 
     override val className: String
         get() = CLASS_NAME
@@ -32,7 +32,7 @@ public class NativeWeakMap : ScriptableObject() {
 
     private fun js_has(key: Any?): Any {
         if (!isValidKey(key)) return false
-        return entries.containsKey(key!!)
+        return entries.get(key!!) != null
     }
 
     private fun js_set(key: Any?, v: Any?): Any {
