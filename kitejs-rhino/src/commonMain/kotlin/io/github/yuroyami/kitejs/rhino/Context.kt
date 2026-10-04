@@ -1,0 +1,703 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+package io.github.yuroyami.kitejs.rhino
+
+import io.github.yuroyami.kitejs.rhino.ast.AstRoot
+import io.github.yuroyami.kitejs.rhino.ast.ScriptNode
+
+/**
+ * The state one run of the engine carries: the language version, the error reporter, the feature
+ * flags, and the call stack bookkeeping the interpreter needs.
+ *
+ * Upstream keeps the current context in a `ThreadLocal`, one per thread. This port is single-thread
+ * confined (D-3), so there is exactly one slot. Enter a context before running anything and exit it
+ * afterwards, or use [ContextFactory.call], which does both.
+ *
+ * Gone from upstream: class shutters, wrap factories, security controllers, class loaders, the
+ * debugger hooks and the E4X and LiveConnect surfaces. None of them have a meaning off the JVM.
+ */
+public open class Context internal constructor(public val factory: ContextFactory) : AutoCloseable {
+
+    public constructor() : this(ContextFactory.getGlobal())
+
+    public var isSealed: Boolean = false
+        private set
+    private var sealKey: Any? = null
+
+    internal var topCallScope: Scriptable? = null
+    internal var isContinuationsTopCall: Boolean = false
+    internal var currentActivationCall: NativeCall? = null
+    internal var typeErrorThrower: BaseFunction? = null
+    internal var iterating: MutableSet<Scriptable>? = null
+    internal var interpreterSecurityDomain: Any? = null
+
+    /**
+     * The registry behind `Symbol.for`, one per context. ECMAScript 2024, 20.4.2.2 shares it
+     * across the realms of one agent, and a thread is one agent here, so two engines never write
+     * the same map (D-40).
+     */
+    internal val symbolRegistry: MutableMap<String, SymbolKey> = HashMap()
+
+    private var version: Int = VERSION_ES6
+
+    private var errorReporterField: ErrorReporter? = null
+    internal var regExpProxy: RegExpProxy? = null
+    private var generatingDebug: Boolean = false
+    private var generatingDebugChanged: Boolean = false
+    private var generatingSource: Boolean = true
+    internal var useDynamicScope: Boolean = false
+    private var interpretedMode: Boolean = true
+    /** How deep the interpreter's call frames may go before it gives up. */
+    public var maximumInterpreterStackDepth: Int = Int.MAX_VALUE
+        set(value) {
+            if (isSealed) onSealedMutation()
+            check(interpretedMode) { "Cannot set maximumInterpreterStackDepth outside interpreted mode" }
+            require(value >= 1) { "Cannot set maximumInterpreterStackDepth to less than 1" }
+            field = value
+        }
+    private var enterCount: Int = 0
+    private var threadLocalMap: MutableMap<Any, Any?>? = null
+
+    /**
+     * The zone `Date` reads for local time. Defaults to the system's, and a test or an embedder
+     * can set it to anything. This is the only place the engine asks the platform about time
+     * zones; every other date calculation is its own arithmetic.
+     */
+    public var timeZone: kotlinx.datetime.TimeZone = kotlinx.datetime.TimeZone.currentSystemDefault()
+        set(value) {
+            field = value
+            rawTimeZoneOffsetMs = null
+        }
+
+    /** The zone's standard offset, worked out once per zone rather than per date calculation. */
+    internal var rawTimeZoneOffsetMs: Int? = null
+
+    /**
+     * Where `Date.now()` and `new Date()` get the time, as epoch milliseconds. Defaults to the
+     * system clock; a test pins it so results do not depend on when the test runs.
+     */
+    public var clock: () -> Double = { kotlin.time.Clock.System.now().toEpochMilliseconds().toDouble() }
+
+    private val microtasks = ArrayDeque<Runnable>()
+
+    /**
+     * Where rejected promises with nothing to catch them are collected. Nothing is collected until
+     * [trackUnhandledPromiseRejections] turns it on, because what to do about them is the
+     * embedder's decision.
+     */
+    public val unhandledPromiseTracker: UnhandledRejectionTracker = UnhandledRejectionTracker()
+
+    public fun trackUnhandledPromiseRejections(track: Boolean) {
+        unhandledPromiseTracker.enable(track)
+    }
+
+    internal var activationNames: MutableSet<String>? = null
+
+    /** The interpreter's current frame, when one is running. */
+    internal var lastInterpreterFrame: Any? = null
+    internal var instructionCount: Int = 0
+    internal var instructionThreshold: Int = 0
+
+    /** One entry per `"use asm"` function this context has parsed, compiled or not. */
+    internal val asmDiagnostics: MutableList<io.github.yuroyami.kitejs.rhino.asm.AsmDiagnostic> = ArrayList()
+
+    /** Scratch space the interpreter reuses rather than allocating. */
+    internal var scratchUint32: Long = 0
+    internal var scratchScriptable: Scriptable? = null
+    internal var generateObserverCount: Boolean = false
+
+    /** Set when the script being run has a top-level "use strict". */
+    internal var isTopLevelStrict: Boolean = false
+
+    /** A unit of deferred work, run by [processMicrotasks]. */
+    public fun interface Runnable {
+        public fun run()
+    }
+
+    override fun close() {
+        if (enterCount < 1) throw Kit.codeBug()
+        if (--enterCount == 0) {
+            check(currentContext === this) { "currentContext: $currentContext, this: $this" }
+            releaseContext(this)
+        }
+    }
+
+    /** Freezes every setting. With a non-null [sealKey] the same key unseals it again. */
+    public fun seal(sealKey: Any?) {
+        if (isSealed) onSealedMutation()
+        isSealed = true
+        this.sealKey = sealKey
+    }
+
+    public fun unseal(sealKey: Any) {
+        require(this.sealKey === sealKey)
+        check(isSealed)
+        isSealed = false
+        this.sealKey = null
+    }
+
+    /**
+     * The language version this context evaluates at. Changing it affects what gets compiled from
+     * then on. New code should use [VERSION_ES6] or [VERSION_ECMASCRIPT].
+     */
+    public open var languageVersion: Int
+        get() = version
+        set(value) {
+            if (isSealed) onSealedMutation()
+            checkLanguageVersion(value)
+            version = value
+        }
+
+    /** The version of this engine. */
+    public val implementationVersion: String
+        get() = IMPLEMENTATION_VERSION
+
+    /** Where warnings and errors go. Defaults to a reporter that throws on error. */
+    public var errorReporter: ErrorReporter
+        get() = errorReporterField ?: DefaultErrorReporter.instance
+        set(value) {
+            if (isSealed) onSealedMutation()
+            errorReporterField = value
+        }
+
+    /** Sets the reporter and returns the old one, the way upstream's setter does. */
+    public fun setErrorReporter(reporter: ErrorReporter): ErrorReporter {
+        val old = errorReporter
+        errorReporter = reporter
+        return old
+    }
+
+    // ---- The standard objects ----------------------------------------------------------------
+
+    /** Makes a global scope with every standard object in it. */
+    public fun initStandardObjects(): ScriptableObject = initStandardObjects(null, false)
+
+    public fun initStandardObjects(scope: ScriptableObject?): Scriptable = initStandardObjects(scope, false)
+
+    /** Fills [scope], or a new `TopLevel` when null, with the standard objects. */
+    public open fun initStandardObjects(scope: ScriptableObject?, sealed: Boolean): ScriptableObject =
+        ScriptRuntime.initStandardObjects(this, scope, sealed)
+
+    public fun initSafeStandardObjects(): ScriptableObject = initSafeStandardObjects(null, false)
+
+    public fun initSafeStandardObjects(scope: ScriptableObject?): Scriptable = initSafeStandardObjects(scope, false)
+
+    public open fun initSafeStandardObjects(scope: ScriptableObject?, sealed: Boolean): ScriptableObject =
+        ScriptRuntime.initSafeStandardObjects(this, scope, sealed)
+
+    // ---- Running code ------------------------------------------------------------------------
+
+    /** Compiles and runs [source] against [scope], and returns what its last expression gave. */
+    public fun evaluateString(scope: Scriptable, source: String, sourceName: String?, lineno: Int, securityDomain: Any? = null): Any? {
+        val script = compileString(source, sourceName, lineno, securityDomain)
+        return script.exec(this, scope, scope)
+    }
+
+    /** Whether [source] is a complete statement, or needs more lines before it could parse. */
+    public fun stringIsCompilableUnit(source: String): Boolean {
+        var errorseen = false
+        val compilerEnv = CompilerEnvirons()
+        compilerEnv.initFromContext(this)
+        compilerEnv.generatingSource = false
+        val p = Parser(compilerEnv, DefaultErrorReporter.instance)
+        try {
+            p.parse(source, null, 1)
+        } catch (ee: EvaluatorException) {
+            errorseen = true
+        }
+        return !(errorseen && p.eof())
+    }
+
+    public fun compileString(source: String, sourceName: String?, lineno: Int, securityDomain: Any? = null): Script {
+        val line = if (lineno < 0) 0 else lineno
+        return compileString(source, null, null, sourceName, line, securityDomain, null)
+    }
+
+    internal fun compileString(
+        source: String,
+        compiler: Evaluator?,
+        compilationErrorReporter: ErrorReporter?,
+        sourceName: String?,
+        lineno: Int,
+        securityDomain: Any?,
+        compilerEnvironsProcessor: ((CompilerEnvirons) -> Unit)?,
+    ): Script = compileImpl(
+        null, source, sourceName, lineno, securityDomain, false, compiler, compilationErrorReporter, compilerEnvironsProcessor,
+    ) as Script
+
+    /** Compiles [source], which has to hold exactly one function, into a function object. */
+    public fun compileFunction(scope: Scriptable, source: String, sourceName: String?, lineno: Int, securityDomain: Any? = null): Function =
+        compileFunction(scope, source, null, null, sourceName, lineno, securityDomain)
+
+    internal fun compileFunction(
+        scope: Scriptable,
+        source: String,
+        compiler: Evaluator?,
+        compilationErrorReporter: ErrorReporter?,
+        sourceName: String?,
+        lineno: Int,
+        securityDomain: Any?,
+    ): Function = compileImpl(
+        scope, source, sourceName, lineno, securityDomain, true, compiler, compilationErrorReporter, null,
+    ) as Function
+
+    public fun decompileScript(script: Script, indent: Int): String? = (script as JSScript).descriptor.rawSource
+
+    public fun decompileFunction(fun_: Function, indent: Int): String {
+        if (fun_ is BaseFunction) return fun_.decompile(indent, emptySet())
+        return "function " + fun_.className + "() {\n\t[native code]\n}\n"
+    }
+
+    public fun decompileFunctionBody(fun_: Function, indent: Int): String {
+        if (fun_ is BaseFunction) return fun_.decompile(indent, setOf(DecompilerFlag.ONLY_BODY))
+        return "[native code]\n"
+    }
+
+    // ---- Making objects ------------------------------------------------------------------------
+
+    public open fun newObject(scope: Scriptable): Scriptable {
+        val result = NativeObject()
+        ScriptRuntime.setBuiltinProtoAndParent(result, scope, TopLevel.Builtins.Object)
+        return result
+    }
+
+    public open fun newObject(scope: Scriptable, constructorName: String): Scriptable =
+        newObject(scope, constructorName, ScriptRuntime.emptyArgs)
+
+    public open fun newObject(scope: Scriptable, constructorName: String, args: Array<Any?>): Scriptable =
+        ScriptRuntime.newObject(this, scope, constructorName, args)
+
+    public open fun newArray(scope: Scriptable, length: Int): Scriptable {
+        val result = NativeArray(length.toLong())
+        ScriptRuntime.setBuiltinProtoAndParent(result, scope, TopLevel.Builtins.Array)
+        return result
+    }
+
+    public open fun newArray(scope: Scriptable, elements: Array<Any?>): Scriptable {
+        val result = NativeArray(elements)
+        ScriptRuntime.setBuiltinProtoAndParent(result, scope, TopLevel.Builtins.Array)
+        return result
+    }
+
+    /** The elements of an array-like object, with holes read as `undefined`. */
+    public fun getElements(obj: Scriptable): Array<Any?> = ScriptRuntime.getArrayElements(obj)
+
+    // ---- Settings ------------------------------------------------------------------------------
+
+    public val isGeneratingDebug: Boolean get() = generatingDebug
+
+    public fun setGeneratingDebug(generatingDebug: Boolean) {
+        if (isSealed) onSealedMutation()
+        generatingDebugChanged = true
+        this.generatingDebug = generatingDebug
+    }
+
+    public val isGeneratingDebugChanged: Boolean get() = generatingDebugChanged
+
+    public val isGeneratingSource: Boolean get() = generatingSource
+
+    public fun setGeneratingSource(generatingSource: Boolean) {
+        if (isSealed) onSealedMutation()
+        this.generatingSource = generatingSource
+    }
+
+    /** Always true: there is no bytecode compiler in this port (D-15). */
+    public val isInterpretedMode: Boolean get() = interpretedMode
+
+    public fun setInterpretedMode(interpretedMode: Boolean) {
+        if (isSealed) onSealedMutation()
+        this.interpretedMode = interpretedMode
+    }
+
+    /** A value an embedder parks on the context under [key]. */
+    public fun getThreadLocal(key: Any): Any? = threadLocalMap?.get(key)
+
+    public fun putThreadLocal(key: Any, value: Any?) {
+        if (isSealed) onSealedMutation()
+        val m = threadLocalMap ?: HashMap<Any, Any?>().also { threadLocalMap = it }
+        m[key] = value
+    }
+
+    public fun removeThreadLocal(key: Any) {
+        if (isSealed) onSealedMutation()
+        threadLocalMap?.remove(key)
+    }
+
+    /** Whether an optional engine behaviour is on. The [factory] decides. */
+    public open fun hasFeature(featureIndex: Int): Boolean = factory.hasFeature(this, featureIndex)
+
+    public val instructionObserverThreshold: Int get() = instructionThreshold
+
+    /**
+     * How many instructions the interpreter runs between calls to
+     * [ContextFactory.observeInstructionCount]. Zero turns the observer off.
+     */
+    public fun setInstructionObserverThreshold(threshold: Int) {
+        if (isSealed) onSealedMutation()
+        require(threshold >= 0)
+        instructionThreshold = threshold
+        setGenerateObserverCount(threshold > 0)
+    }
+
+    public open fun setGenerateObserverCount(generateObserverCount: Boolean) {
+        this.generateObserverCount = generateObserverCount
+    }
+
+    public open val isGenerateObserverCount: Boolean get() = generateObserverCount
+
+    protected open fun observeInstructionCount(instructionCount: Int) {
+        factory.observeInstructionCount(this, instructionCount)
+    }
+
+    internal fun observeInstructionCountInternal(instructionCount: Int) = observeInstructionCount(instructionCount)
+
+    /**
+     * Charges [cost] instructions and asks the observer once the count passes the threshold, as
+     * the interpreter does at a branch. Calls and microtasks come through here, because code
+     * without loops spends its time in them: a chain of Promise reactions that each queue the
+     * next never branches, and upstream never asks its observer while one runs (D-77).
+     */
+    internal fun addInstructionCount(cost: Int) {
+        if (instructionThreshold == 0) return
+        instructionCount += cost
+        if (instructionCount > instructionThreshold) {
+            observeInstructionCount(instructionCount)
+            instructionCount = 0
+        }
+    }
+
+    // ---- Microtasks ----------------------------------------------------------------------------
+
+    /** Queues work to run after the current top-level call finishes. */
+    public open fun enqueueMicrotask(task: Runnable) {
+        microtasks.addLast(task)
+    }
+
+    /** Runs the queued work, including anything it queues in turn, until the queue is empty. */
+    public open fun processMicrotasks() {
+        while (true) {
+            val head = microtasks.firstOrNull() ?: break
+            // Each job is a call, and asks the observer before it runs, so a stop leaves it queued.
+            addInstructionCount(MICROTASK_COST)
+            microtasks.removeFirst()
+            head.run()
+        }
+    }
+
+    /**
+     * Drops every queued job. The engine does this when it stops a script for its budget or its
+     * interrupt hook, as V8 drops its queue when execution is terminated during a checkpoint, so
+     * the abandoned work does not run on the next call (D-77).
+     */
+    internal fun discardMicrotasks() {
+        microtasks.clear()
+    }
+
+    // ---- Compilation ---------------------------------------------------------------------------
+
+    protected open fun compileImpl(
+        scope: Scriptable?,
+        sourceString: String,
+        sourceName: String?,
+        lineno: Int,
+        securityDomain: Any?,
+        returnFunction: Boolean,
+        compiler: Evaluator?,
+        compilationErrorReporter: ErrorReporter?,
+        compilerEnvironProcessor: ((CompilerEnvirons) -> Unit)?,
+    ): Any {
+        val name = sourceName ?: "unnamed script"
+        // A scope is given exactly when a function is wanted.
+        if (!((scope == null) xor returnFunction)) throw Kit.codeBug()
+
+        val compilerEnv = CompilerEnvirons()
+        compilerEnv.initFromContext(this)
+        val reporter = compilationErrorReporter ?: compilerEnv.errorReporter
+        compilerEnvironProcessor?.invoke(compilerEnv)
+
+        val tree = parse(sourceString, name, lineno, compilerEnv, reporter, returnFunction)
+        val evaluator = compiler ?: createInterpreter()
+        val bytecode = evaluator.compile(compilerEnv, tree, sourceString, returnFunction)
+
+        return if (returnFunction) evaluator.createFunctionObject(this, scope!!, bytecode, securityDomain)
+        else evaluator.createScriptObject(bytecode, securityDomain)
+    }
+
+    private fun parse(
+        sourceString: String,
+        sourceName: String,
+        lineno: Int,
+        compilerEnv: CompilerEnvirons,
+        compilationErrorReporter: ErrorReporter,
+        returnFunction: Boolean,
+    ): ScriptNode {
+        val p = Parser(compilerEnv, compilationErrorReporter)
+        if (returnFunction) p.calledByCompileFunction = true
+        val ast: AstRoot = p.parse(sourceString, sourceName, lineno)
+        if (returnFunction) {
+            val first = ast.firstChild
+            require(first != null && first.type == Token.FUNCTION) {
+                "compileFunction only accepts source with single JS function: $sourceString"
+            }
+        }
+        // Before the tree is lowered, because lowering reads the source tree apart: an asm.js
+        // module needs to know whether a number was written 0 or 0.0, and the lowered form
+        // keeps only the value.
+        // Looking for the directive in the text first: a script without it has no module, and
+        // walking its whole tree to find that out would cost every script something.
+        if (hasFeature(FEATURE_ASM_JS) && sourceString.contains(io.github.yuroyami.kitejs.rhino.asm.AsmCompiler.DIRECTIVE)) {
+            io.github.yuroyami.kitejs.rhino.asm.AsmCompiler.compileAll(ast, asmDiagnostics)
+        }
+        val irf = IRFactory(compilerEnv, sourceName, sourceString, compilationErrorReporter)
+        val tree = irf.transformTree(ast)!!
+        if (compilerEnv.generatingSource) {
+            tree.rawSource = sourceString
+            tree.setRawSourceBounds(0, sourceString.length)
+        }
+        return tree
+    }
+
+    // ---- Activation names and strict mode ------------------------------------------------------
+
+    public fun addActivationName(name: String) {
+        if (isSealed) onSealedMutation()
+        val s = activationNames ?: HashSet<String>().also { activationNames = it }
+        s.add(name)
+    }
+
+    public fun isActivationNeeded(name: String): Boolean = activationNames?.contains(name) == true
+
+    public fun removeActivationName(name: String) {
+        if (isSealed) onSealedMutation()
+        activationNames?.remove(name)
+    }
+
+    /** True unless the script pinned a language version older than 1.3. */
+    internal val isVersionECMA1: Boolean get() = version == VERSION_DEFAULT || version >= VERSION_1_3
+
+    /**
+     * Whether the code running right now is in strict mode: the code of the interpreter's current
+     * frame, as strictness belongs to the code and not to its caller, and without a frame the top
+     * call. Upstream asked the current activation, which only a function that needs one pushes, so
+     * a strict function called from sloppy code ran as sloppy, and a sloppy one called from strict
+     * code ran as strict (D-80).
+     */
+    public val isStrictMode: Boolean
+        get() {
+            val frame = lastInterpreterFrame ?: return isTopLevelStrict || (currentActivationCall?.isStrict == true)
+            return frame !== sloppyFrame && (frame as Interpreter.CallFrame).isStrict
+        }
+
+    /** The frame that the `Function` constructor runs for, which reads as sloppy while it is current, as the code it makes is (D-80). */
+    internal var sloppyFrame: Any? = null
+
+    public companion object {
+
+        /** What one microtask costs the instruction count, the same as a call (D-77). */
+        internal const val MICROTASK_COST: Int = 100
+
+        /** What `Context.implementationVersion` answers. Upstream reads it from a jar manifest. */
+        public const val IMPLEMENTATION_VERSION: String = "KiteJS 0.1 (Rhino 1.9.1 port)"
+
+        /** The version number a script asked for was not one of the known ones. */
+        public const val VERSION_UNKNOWN: Int = -1
+        public const val VERSION_DEFAULT: Int = 0
+        public const val VERSION_1_0: Int = 100
+        public const val VERSION_1_1: Int = 110
+        public const val VERSION_1_2: Int = 120
+        public const val VERSION_1_3: Int = 130
+        public const val VERSION_1_4: Int = 140
+        public const val VERSION_1_5: Int = 150
+        public const val VERSION_1_6: Int = 160
+        public const val VERSION_1_7: Int = 170
+        public const val VERSION_1_8: Int = 180
+
+        /** The default: everything up to ES6 that this engine implements. */
+        public const val VERSION_ES6: Int = 200
+
+        /** Like [VERSION_ES6] with the remaining legacy leniencies switched off. */
+        public const val VERSION_ECMASCRIPT: Int = 250
+
+        // The feature flags. See ContextFactory.hasFeature for what each one defaults to.
+        public const val FEATURE_NON_ECMA_GET_YEAR: Int = 1
+        public const val FEATURE_MEMBER_EXPR_AS_FUNCTION_NAME: Int = 2
+        public const val FEATURE_RESERVED_KEYWORD_AS_IDENTIFIER: Int = 3
+        public const val FEATURE_TO_STRING_AS_SOURCE: Int = 4
+        public const val FEATURE_PARENT_PROTO_PROPERTIES: Int = 5
+        public const val FEATURE_E4X: Int = 6
+        public const val FEATURE_DYNAMIC_SCOPE: Int = 7
+        public const val FEATURE_STRICT_VARS: Int = 8
+        public const val FEATURE_STRICT_EVAL: Int = 9
+        public const val FEATURE_LOCATION_INFORMATION_IN_ERROR: Int = 10
+        public const val FEATURE_STRICT_MODE: Int = 11
+        public const val FEATURE_WARNING_AS_ERROR: Int = 12
+        public const val FEATURE_ENHANCED_JAVA_ACCESS: Int = 13
+        public const val FEATURE_V8_EXTENSIONS: Int = 14
+        public const val FEATURE_OLD_UNDEF_NULL_THIS: Int = 15
+        public const val FEATURE_ENUMERATE_IDS_FIRST: Int = 16
+        public const val FEATURE_THREAD_SAFE_OBJECTS: Int = 17
+        public const val FEATURE_INTEGER_WITHOUT_DECIMAL_PLACE: Int = 18
+        public const val FEATURE_LITTLE_ENDIAN: Int = 19
+        public const val FEATURE_ENABLE_XML_SECURE_PARSING: Int = 20
+        public const val FEATURE_ENABLE_JAVA_MAP_ACCESS: Int = 21
+        public const val FEATURE_INTL_402: Int = 22
+
+        /**
+         * Whether a function marked `"use asm"` is compiled to typed code. On by default. Turning
+         * it off makes such a function run like any other, which is the same answer, only slower.
+         */
+        public const val FEATURE_ASM_JS: Int = 23
+
+        public const val languageVersionProperty: String = "language version"
+        public const val errorReporterProperty: String = "error reporter"
+
+        /**
+         * The entered context of the calling thread, if any. An engine belongs to one thread, and
+         * each thread has its own slot, as upstream does. See [CurrentContextSlot].
+         */
+        internal var currentContext: Context?
+            get() = CurrentContextSlot.value
+            set(value) {
+                CurrentContextSlot.value = value
+            }
+
+        public fun getCurrentContext(): Context? = currentContext
+
+        /** Enters a context from the global factory, or returns the one already entered. */
+        public fun enter(): Context = enter(null, ContextFactory.getGlobal())
+
+        internal fun enter(cx: Context?, factory: ContextFactory): Context {
+            val old = currentContext
+            val c: Context
+            if (old != null) {
+                c = old
+            } else {
+                if (cx == null) {
+                    c = factory.makeContext()
+                    check(c.enterCount == 0) { "factory.makeContext() returned Context instance already associated with some thread" }
+                    factory.onContextCreated(c)
+                    if (factory.isSealed && !c.isSealed) c.seal(null)
+                } else {
+                    check(cx.enterCount == 0) { "can not use Context instance already associated with some thread" }
+                    c = cx
+                }
+                currentContext = c
+            }
+            ++c.enterCount
+            return c
+        }
+
+        /** Leaves the current context. Each [enter] needs one [exit]. */
+        public fun exit() {
+            val cx = currentContext ?: throw IllegalStateException("Calling Context.exit without previous Context.enter")
+            if (cx.enterCount < 1) throw Kit.codeBug()
+            if (--cx.enterCount == 0) releaseContext(cx)
+        }
+
+        private fun releaseContext(cx: Context) {
+            currentContext = null
+            cx.factory.onContextReleased(cx)
+        }
+
+        /** Calls [callable] with a context entered, entering one from [factory] if needed. */
+        public fun call(factory: ContextFactory?, callable: Callable, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
+            call(factory ?: ContextFactory.getGlobal()) { cx -> callable.call(cx, scope, thisObj, args) }
+
+        internal fun <T> call(factory: ContextFactory, action: ContextAction<T>): T =
+            enter(null, factory).use { cx -> action.run(cx) }
+
+        internal fun onSealedMutation(): Nothing = throw IllegalStateException()
+
+        public fun isValidLanguageVersion(version: Int): Boolean = when (version) {
+            VERSION_DEFAULT, VERSION_1_0, VERSION_1_1, VERSION_1_2, VERSION_1_3, VERSION_1_4,
+            VERSION_1_5, VERSION_1_6, VERSION_1_7, VERSION_1_8, VERSION_ES6, VERSION_ECMASCRIPT -> true
+            else -> false
+        }
+
+        public fun checkLanguageVersion(version: Int) {
+            if (isValidLanguageVersion(version)) return
+            throw IllegalArgumentException("Bad language version: $version")
+        }
+
+        // ---- Reporting ---------------------------------------------------------------------
+
+        public fun reportWarning(message: String, sourceName: String?, lineno: Int, lineSource: String?, lineOffset: Int) {
+            val cx = getContext()
+            if (cx.hasFeature(FEATURE_WARNING_AS_ERROR)) reportError(message, sourceName, lineno, lineSource, lineOffset)
+            else cx.errorReporter.warning(message, sourceName, lineno, lineSource, lineOffset)
+        }
+
+        public fun reportWarning(message: String) {
+            val linep = IntArray(1)
+            val filename = getSourcePositionFromStack(linep)
+            reportWarning(message, filename, linep[0], null, 0)
+        }
+
+        /** Reports an error through the entered context's reporter, or throws when there is none. */
+        public fun reportError(message: String, sourceName: String?, lineno: Int, lineSource: String?, lineOffset: Int) {
+            val cx = currentContext
+            if (cx != null) cx.errorReporter.error(message, sourceName, lineno, lineSource, lineOffset)
+            else throw EvaluatorException(message, sourceName, lineno, lineSource, lineOffset)
+        }
+
+        public fun reportError(message: String) {
+            val linep = IntArray(1)
+            val filename = getSourcePositionFromStack(linep)
+            reportError(message, filename, linep[0], null, 0)
+        }
+
+        public fun reportRuntimeError(message: String, sourceName: String?, lineno: Int, lineSource: String?, lineOffset: Int): EvaluatorException {
+            val cx = currentContext
+            if (cx != null) return cx.errorReporter.runtimeError(message, sourceName, lineno, lineSource, lineOffset)
+            throw EvaluatorException(message, sourceName, lineno, lineSource, lineOffset)
+        }
+
+        public fun reportRuntimeError(message: String): EvaluatorException {
+            val linep = IntArray(1)
+            val filename = getSourcePositionFromStack(linep)
+            return reportRuntimeError(message, filename, linep[0], null, 0)
+        }
+
+        internal fun reportRuntimeErrorById(messageId: String, vararg args: Any?): EvaluatorException =
+            reportRuntimeError(ScriptRuntime.getMessageById(messageId, *args))
+
+        /** The value of `undefined`. */
+        public val undefinedValue: Any get() = Undefined.instance
+
+        public fun toBoolean(value: Any?): Boolean = ScriptRuntime.toBoolean(value)
+
+        public fun toNumber(value: Any?): Double = ScriptRuntime.toNumber(value)
+
+        public fun toString(value: Any?): String = ScriptRuntime.toString(value)
+
+        public fun toObject(value: Any?, scope: Scriptable): Scriptable = ScriptRuntime.toObject(scope, value)
+
+        /** Rethrows [e] as something script can catch: a [RhinoException] as is, anything else wrapped. */
+        public fun throwAsScriptRuntimeEx(e: Throwable): RuntimeException {
+            if (e is RhinoException) throw e
+            throw WrappedException(e)
+        }
+
+        /** The entered context, or a failure if nothing entered one. */
+        public fun getContext(): Context =
+            currentContext ?: throw RuntimeException("No Context associated with current Thread")
+
+        /** The one evaluator this port has. */
+        internal fun createInterpreter(): Evaluator = Interpreter()
+
+        /**
+         * The source name and line the interpreter is currently at. The line goes into `linep[0]`.
+         * Upstream falls back to walking the Java stack; there is no such fallback here (D-18).
+         */
+        internal fun getSourcePositionFromStack(linep: IntArray): String? {
+            val cx = currentContext ?: return null
+            if (cx.lastInterpreterFrame != null) return createInterpreter().getSourcePositionFromStack(cx, linep)
+            return null
+        }
+
+        /** Whether the code running right now is in strict mode. False when there is no context. */
+        public val isCurrentContextStrict: Boolean get() = currentContext?.isStrictMode ?: false
+    }
+}

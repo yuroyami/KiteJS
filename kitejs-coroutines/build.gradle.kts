@@ -1,115 +1,34 @@
-import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
-import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 
 plugins {
-    alias(libs.plugins.kotlin.multiplatform)
-    alias(libs.plugins.android.kmp.library)
+    id("kitejs.multiplatform")
     alias(libs.plugins.vanniktech.publish)
     alias(libs.plugins.dokka)
 }
 
 /*
- * :kitejs-coroutines puts the engine behind suspending functions. The engine itself is
- * single-threaded, as JavaScript is, so this module gives each engine a thread of its own and
- * hops every call onto it. Nothing here changes what the engine does; it only decides
- * when and where the engine runs.
+ * :kitejs-coroutines puts an engine behind suspending functions. An engine is single-threaded,
+ * as JavaScript is, so this module gives each engine a thread of its own and hops every call
+ * onto it. Nothing here changes what the engine does; it only decides when and where the engine
+ * runs, and it works with any engine kitejs-api describes.
  *
- * It is a separate artifact so :kitejs keeps its one runtime dependency. An embedder that does not
- * use coroutines pays nothing.
+ * It is a separate artifact so the engines keep their own dependencies small. An embedder that
+ * does not use coroutines pays nothing.
  */
 kotlin {
     explicitApi()
-
-    jvmToolchain(21)
-
-    // EngineThread is an expect class, which the compiler still calls beta. Each platform makes
-    // the engine's thread in its own way.
-    compilerOptions {
-        freeCompilerArgs.add("-Xexpect-actual-classes")
-    }
 
     @OptIn(ExperimentalAbiValidation::class)
     abiValidation {
     }
 
-    android {
-        namespace = "io.github.yuroyami.kitejs.coroutines"
-        compileSdk = 36
-        minSdk = 21
-
-        // Without this the Android target compiles but never runs a test, so the whole
-        // common suite goes unchecked on the one target most likely to ship it.
-        withHostTestBuilder {}
-    }
-
-    listOf(
-        iosSimulatorArm64(),
-        iosArm64(),
-        iosX64(),
-        macosArm64(),
-    ).forEach { target ->
-        target.binaries.framework {
-            baseName = "KiteJSCoroutines"
-            isStatic = false
-        }
-    }
-
-    linuxX64()
-    linuxArm64()
-    mingwX64()
-
-    @OptIn(ExperimentalKotlinGradlePluginApi::class)
-    js {
-        browser {
-            // Karma serves the project directory over HTTP. A '#' anywhere in the absolute path
-            // truncates that URL at the fragment marker, and every file 404s. If jsBrowserTest
-            // fails locally with "404: /absolute/<some prefix>", that is why: move the checkout
-            // to a path without a '#'.
-            testTask {
-                useKarma { useChromeHeadless() }
-            }
-        }
-        nodejs {
-            testTask {
-                useMocha { timeout = "300s" }
-            }
-        }
-        binaries.library()
-    }
-
-    @OptIn(ExperimentalWasmDsl::class, ExperimentalKotlinGradlePluginApi::class)
-    wasmJs {
-        browser {
-            // Same Karma path caveat as the js target above.
-            testTask {
-                useKarma { useChromeHeadless() }
-            }
-        }
-        nodejs {
-            testTask {
-                useMocha { timeout = "300s" }
-            }
-        }
-        binaries.library()
-    }
-
-    jvm {
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_11)
-            freeCompilerArgs.add("-Xjdk-release=11")
-        }
-    }
-
     sourceSets {
         commonMain.dependencies {
-            api(projects.kitejs)
+            api(projects.kitejsRhino)
             api(libs.kotlinx.coroutines.core)
         }
 
         commonTest.dependencies {
-            implementation(kotlin("test"))
             implementation(libs.kotlinx.coroutines.test)
         }
     }

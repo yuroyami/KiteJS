@@ -2,9 +2,8 @@ plugins {
     // Declared here with apply false so the publish plugin's shared build service
     // is loaded by one classloader for the whole build. Without this, applying it
     // to sibling modules makes publishAndReleaseToMavenCentral fail.
+    // The Kotlin and Android plugins come from buildSrc, which every module shares.
     alias(libs.plugins.vanniktech.publish).apply(false)
-    alias(libs.plugins.kotlin.multiplatform).apply(false)
-    alias(libs.plugins.android.kmp.library).apply(false)
     // Applied (not deferred) at the root so `dokkaGenerate` aggregates every
     // library module into one API site at build/dokka/html (deployed to /api/).
     alias(libs.plugins.dokka)
@@ -17,7 +16,7 @@ allprojects {
 }
 
 dependencies {
-    dokka(project(":kitejs"))
+    dokka(project(":kitejs-rhino"))
     dokka(project(":kitejs-coroutines"))
 }
 

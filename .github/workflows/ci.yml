@@ -22,10 +22,10 @@ jobs:
       - name: Build and test (JVM, Android, JS and Wasm on Node and in Chrome, Linux, ABI check)
         run: >
           ./gradlew
-          :kitejs:jvmTest :kitejs:testAndroidHostTest
-          :kitejs:jsNodeTest :kitejs:jsBrowserTest
-          :kitejs:wasmJsNodeTest :kitejs:wasmJsBrowserTest
-          :kitejs:linuxX64Test
+          :kitejs-rhino:jvmTest :kitejs-rhino:testAndroidHostTest
+          :kitejs-rhino:jsNodeTest :kitejs-rhino:jsBrowserTest
+          :kitejs-rhino:wasmJsNodeTest :kitejs-rhino:wasmJsBrowserTest
+          :kitejs-rhino:linuxX64Test
           :kitejs-coroutines:jvmTest :kitejs-coroutines:testAndroidHostTest
           :kitejs-coroutines:jsNodeTest :kitejs-coroutines:jsBrowserTest
           :kitejs-coroutines:wasmJsNodeTest :kitejs-coroutines:wasmJsBrowserTest
@@ -44,7 +44,7 @@ jobs:
       - name: Apple targets (macOS and the iOS simulator)
         run: >
           ./gradlew
-          :kitejs:macosArm64Test :kitejs:iosSimulatorArm64Test
+          :kitejs-rhino:macosArm64Test :kitejs-rhino:iosSimulatorArm64Test
           :kitejs-coroutines:macosArm64Test :kitejs-coroutines:iosSimulatorArm64Test
 
   windows:
@@ -57,4 +57,4 @@ jobs:
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
       - name: Windows target
-        run: ./gradlew :kitejs:mingwX64Test :kitejs-coroutines:mingwX64Test
+        run: ./gradlew :kitejs-rhino:mingwX64Test :kitejs-coroutines:mingwX64Test

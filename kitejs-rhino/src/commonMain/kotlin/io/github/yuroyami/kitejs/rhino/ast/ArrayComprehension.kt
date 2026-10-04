@@ -1,0 +1,86 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+package io.github.yuroyami.kitejs.rhino.ast
+
+import io.github.yuroyami.kitejs.rhino.Token
+
+/**
+ * An array comprehension such as `[expr for (x in y) if (cond)]`. Node type is
+ * [Token.ARRAYCOMP]. It introduces a scope, so it extends [Scope].
+ */
+public class ArrayComprehension(pos: Int = -1, len: Int = 1) : Scope(pos, len) {
+
+    /** The result expression. Setting it reparents the node. */
+    public var result: AstNode? = null
+        set(value) {
+            val newResult = value!!
+            field = newResult
+            newResult.parent = this
+        }
+
+    private val loopList: MutableList<ArrayComprehensionLoop> = mutableListOf()
+
+    /** The filter expression, or null when there is no `if` clause. */
+    public var filter: AstNode? = null
+        set(value) {
+            field = value
+            value?.parent = this
+        }
+
+    /** Position of the `if` keyword, relative to this node. -1 if there is no filter. */
+    public var ifPosition: Int = -1
+
+    /** Position of the left paren of the filter condition. -1 if there is no filter. */
+    public var filterLp: Int = -1
+
+    /** Position of the right paren of the filter condition. -1 if there is no filter. */
+    public var filterRp: Int = -1
+
+    init {
+        typeField = Token.ARRAYCOMP
+    }
+
+    public val loops: List<ArrayComprehensionLoop>
+        get() = loopList
+
+    public fun setLoops(loops: List<ArrayComprehensionLoop>) {
+        loopList.clear()
+        for (acl in loops) {
+            addLoop(acl)
+        }
+    }
+
+    public fun addLoop(acl: ArrayComprehensionLoop) {
+        loopList.add(acl)
+        acl.parent = this
+    }
+
+    override fun toSource(depth: Int): String {
+        val sb = StringBuilder(250)
+        sb.append("[")
+        sb.append(result!!.toSource(0))
+        for (loop in loopList) {
+            sb.append(loop.toSource(0))
+        }
+        filter?.let {
+            sb.append(" if (")
+            sb.append(it.toSource(0))
+            sb.append(")")
+        }
+        sb.append("]")
+        return sb.toString()
+    }
+
+    override fun visit(visitor: NodeVisitor) {
+        if (!visitor.visit(this)) {
+            return
+        }
+        result!!.visit(visitor)
+        for (loop in loopList) {
+            loop.visit(visitor)
+        }
+        filter?.visit(visitor)
+    }
+}
