@@ -408,7 +408,17 @@ public open class BaseFunction : ScriptableObject, Function {
             val functionProto = getProperty(function, PROTOTYPE_PROPERTY_NAME) as Scriptable
             proto.prototype = functionProto
             val top = getTopLevelScope(scope)
-            putProperty(proto, PROTOTYPE_PROPERTY_NAME, getTopScopeValue(top, ES6Generator.GENERATOR_TAG))
+            // %GeneratorFunction.prototype% and %GeneratorPrototype% name each other, read-only,
+            // hidden and configurable (ES 25.2.3.2, 25.3.1.1). Upstream put an ordinary
+            // `prototype`, which Object.keys listed, and gave %GeneratorPrototype% no
+            // `constructor`, so it inherited Object's (D-93).
+            val generatorPrototype = getTopScopeValue(top, ES6Generator.GENERATOR_TAG)
+            proto.defineProperty(PROTOTYPE_PROPERTY_NAME, generatorPrototype, READONLY or DONTENUM)
+            (generatorPrototype as? ScriptableObject)?.let {
+                it.defineProperty("constructor", proto, READONLY or DONTENUM)
+                // ES6Generator.init leaves the sealing to here, once the link is in.
+                if (sealed) it.sealObject()
+            }
             val ctor = LambdaConstructor(scope, GENERATOR_FUNCTION_CLASS, 1, proto, ::js_gen_constructorCall, ::js_gen_constructor)
             proto.defineProperty("constructor", ctor, READONLY or DONTENUM)
             ctor.setPrototypePropertyAttributes(DONTENUM or READONLY or PERMANENT)

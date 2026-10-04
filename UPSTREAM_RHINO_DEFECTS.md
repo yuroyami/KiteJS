@@ -574,6 +574,27 @@ reads the target's `prototype` rather than asking the target, so with `F` defini
   `JSFunction`.
 - Test: `EvalOracleTest.instanceofAsksSymbolHasInstance`; `InstanceofTest` (common).
 
+### The iterator prototypes inherit Object.prototype, with no %IteratorPrototype% (D-93)
+
+ECMAScript 2015, 25.1.2 defines %IteratorPrototype%, an ordinary object whose one property is
+`[Symbol.iterator]`, a function of length 0 that returns its `this`; %ArrayIteratorPrototype%,
+%MapIteratorPrototype%, %SetIteratorPrototype%, %StringIteratorPrototype%,
+%RegExpStringIteratorPrototype% and %GeneratorPrototype% all inherit it. In Rhino each of them
+inherits Object.prototype and holds a `[Symbol.iterator]` of its own, of length 1 for the first
+five, so `Object.getPrototypeOf(Object.getPrototypeOf([][Symbol.iterator]())) === Object.prototype`
+is `true` and a method added for every iterator has no one object to go on. V8 answers `false`.
+
+The generator prototypes are half linked as well: %GeneratorFunction.prototype%'s `prototype` is
+an ordinary writable, enumerable property, so `Object.keys` of it lists `prototype`, where
+ECMAScript 2015, 25.2.3.2 makes it read-only and hidden, and %GeneratorPrototype% has no
+`constructor` (25.3.1.1), so it inherits Object's.
+
+- Where: `ES6Iterator.init` and `ES6Generator.init`, which set `getObjectPrototype(scope)` as the
+  prototype and define `SymbolKey.ITERATOR` on each; `BaseFunction.initAsGeneratorFunction`, which
+  uses `putProperty` for `prototype`.
+- Test: `EvalOracleTest.theIteratorPrototypesInheritIteratorPrototype`; `IteratorPrototypeTest`
+  (common).
+
 ### A getOwnPropertyDescriptor trap answering undefined crashes (D-50)
 
 A Proxy whose `getOwnPropertyDescriptor` trap returns `undefined` for a property the target lacks

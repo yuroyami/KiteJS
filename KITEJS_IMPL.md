@@ -678,6 +678,17 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   called, read a bound function's target `prototype` instead of asking the target, and crashed
   with a host ClassCastException in `Function.prototype[Symbol.hasInstance]` for a bound function
   whose target was not a script function (#75).
+- D-93: The array, map, set, string, regexp string and generator iterator prototypes inherit one
+  %IteratorPrototype% per realm, which `ES6Iterator.iteratorPrototype` makes the first time one of
+  them asks and parks on the top scope. It is an ordinary object whose one property is
+  `[Symbol.iterator]`, of length 0, answering its `this`, and the prototypes no longer hold a copy
+  each. %GeneratorFunction.prototype%'s `prototype` is read-only and hidden, and %GeneratorPrototype%
+  has a `constructor` pointing back at it, so `ES6Generator.init` leaves the sealing of
+  %GeneratorPrototype% to `BaseFunction.initAsGeneratorFunction`, which adds that link. Upstream
+  gave every iterator prototype Object.prototype as its prototype and its own
+  `[Symbol.iterator]` of length 1, made `prototype` an ordinary enumerable property, and gave
+  %GeneratorPrototype% no `constructor`. The iterator helpers of ES2025 (`Iterator.prototype.map`
+  and the rest) are not part of this: the global `Iterator` is still Rhino's legacy one (#74).
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

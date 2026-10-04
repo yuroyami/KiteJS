@@ -270,19 +270,15 @@ public class ES6Generator : ScriptableObject {
         internal fun init(scope: ScriptableObject, sealed: Boolean): ES6Generator {
             val prototype = ES6Generator()
             prototype.parentScope = scope
-            prototype.prototype = getObjectPrototype(scope)
+            // %GeneratorPrototype% inherits %IteratorPrototype% and its [Symbol.iterator] (D-93).
+            prototype.prototype = ES6Iterator.iteratorPrototype(scope, sealed)
 
             defineProperty(prototype, "next", LambdaFunction(scope, "next", 1, SerializableCallable { cx, s, thisObj, args -> js_next(cx, s, thisObj, args) }), DONTENUM)
             defineProperty(prototype, "return", LambdaFunction(scope, "return", 1, SerializableCallable { cx, s, thisObj, args -> js_return(cx, s, thisObj, args) }), DONTENUM)
             defineProperty(prototype, "throw", LambdaFunction(scope, "throw", 1, SerializableCallable { cx, s, thisObj, args -> js_throw(cx, s, thisObj, args) }), DONTENUM)
-            prototype.defineProperty(
-                SymbolKey.ITERATOR,
-                LambdaFunction(scope, "[Symbol.iterator]", 0, SerializableCallable { _, _, thisObj, _ -> thisObj }),
-                DONTENUM,
-            )
             prototype.defineProperty(SymbolKey.TO_STRING_TAG, "Generator", DONTENUM or READONLY)
-
-            if (sealed) prototype.sealObject()
+            // Not sealed yet: BaseFunction.initAsGeneratorFunction adds the `constructor` that
+            // points back at %GeneratorFunction.prototype%, and seals it then.
 
             // Generator instances find this prototype through the scope, since there is no
             // constructor to read it from.

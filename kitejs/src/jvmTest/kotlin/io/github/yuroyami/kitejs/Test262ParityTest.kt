@@ -731,6 +731,19 @@ class Test262ParityTest {
         )) {
             put(path, "D-92: instanceof is InstanceofOperator here")
         }
+
+        // The iterator prototypes inherit one %IteratorPrototype%, and the generator prototypes
+        // name each other (D-93).
+        for (path in listOf(
+            "built-ins/GeneratorFunction/prototype/prototype.js",
+            "built-ins/GeneratorPrototype/constructor.js",
+            "built-ins/Iterator/prototype/Symbol.iterator/is-function.js",
+            "built-ins/Iterator/prototype/Symbol.iterator/length.js",
+            "built-ins/Iterator/prototype/Symbol.iterator/name.js",
+            "built-ins/Iterator/prototype/Symbol.iterator/prop-desc.js",
+        )) {
+            put(path, "D-93: the iterator prototypes inherit %IteratorPrototype% here")
+        }
     }
 
     /**

@@ -2245,6 +2245,25 @@ class EvalOracleTest {
     }
 
     /**
+     * The iterator prototypes inherit one %IteratorPrototype%, which alone holds a
+     * `[Symbol.iterator]` of length 0 (D-93). Upstream gives each its own copy, of length 1, and
+     * Object.prototype as its prototype. Every expected value is what V8 answers.
+     */
+    @Test
+    fun theIteratorPrototypesInheritIteratorPrototype() {
+        val sources = mapOf(
+            "String(Object.getPrototypeOf(Object.getPrototypeOf([][Symbol.iterator]())) === Object.prototype)" to "\"false\"",
+            "String(Object.prototype.hasOwnProperty.call(Object.getPrototypeOf([][Symbol.iterator]()), Symbol.iterator))" to "\"false\"",
+            "String(Object.getPrototypeOf(Object.getPrototypeOf(Object.getPrototypeOf((function* () {})()))) === Object.prototype)" to "\"false\"",
+            "String(Object.getPrototypeOf([][Symbol.iterator]())[Symbol.iterator].length)" to "\"0\"",
+        )
+        for ((source, expected) in sources) {
+            assertEquals(expected, ported(source), source)
+            assertTrue(upstream(source) != expected, "upstream agrees now, D-93 can be retired: $source")
+        }
+    }
+
+    /**
      * A comparator that answers NaN means equal (D-85), so a stable sort keeps such elements in
      * order. Upstream makes NaN greater, and forty elements are enough for its TimSort to move them.
      */

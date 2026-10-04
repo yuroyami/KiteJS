@@ -47,19 +47,38 @@ public abstract class ES6Iterator : ScriptableObject {
         public const val VALUE_PROPERTY: String = "value"
         public const val RETURN_METHOD: String = "return"
 
-        /** Installs [prototype] as the shared prototype for iterators tagged [tag]. */
-        internal fun init(scope: ScriptableObject?, sealed: Boolean, prototype: ScriptableObject, tag: String) {
-            if (scope != null) {
-                prototype.parentScope = scope
-                prototype.prototype = getObjectPrototype(scope)
-            }
-            val next = LambdaFunction(scope!!, NEXT_METHOD, 0, SerializableCallable { cx, s, thisObj, args -> js_next(cx, s, thisObj, args) })
+        /** The key %IteratorPrototype% is parked under on the top scope. */
+        private const val ITERATOR_PROTOTYPE_TAG = "IteratorPrototype"
+
+        /**
+         * Installs [prototype] as the shared prototype for iterators tagged [tag]. It inherits
+         * %IteratorPrototype%, which holds `[Symbol.iterator]`; upstream gave each iterator
+         * prototype a copy of its own and Object.prototype as its prototype (D-93).
+         */
+        internal fun init(scope: ScriptableObject, sealed: Boolean, prototype: ScriptableObject, tag: String) {
+            prototype.parentScope = scope
+            prototype.prototype = iteratorPrototype(scope, sealed)
+            val next = LambdaFunction(scope, NEXT_METHOD, 0, SerializableCallable { cx, s, thisObj, args -> js_next(cx, s, thisObj, args) })
             defineProperty(prototype, NEXT_METHOD, next, DONTENUM)
-            val iterator = LambdaFunction(scope, "[Symbol.iterator]", 1, SerializableCallable { cx, s, thisObj, args -> js_iterator(cx, s, thisObj, args) })
-            prototype.defineProperty(SymbolKey.ITERATOR, iterator, DONTENUM)
             prototype.defineProperty(SymbolKey.TO_STRING_TAG, prototype.className, DONTENUM or READONLY)
             if (sealed) prototype.sealObject()
             scope.associateValue(tag, prototype)
+        }
+
+        /**
+         * %IteratorPrototype% (ES 25.1.2) of [scope]'s realm: an ordinary object whose one property
+         * is `[Symbol.iterator]`, which answers its `this`, and which the array, string, map, set,
+         * regexp string and generator iterator prototypes all inherit. The first of them makes it.
+         */
+        internal fun iteratorPrototype(scope: ScriptableObject, sealed: Boolean): ScriptableObject {
+            (scope.getAssociatedValue(ITERATOR_PROTOTYPE_TAG) as? ScriptableObject)?.let { return it }
+            val proto = NativeObject()
+            proto.parentScope = scope
+            proto.prototype = getObjectPrototype(scope)
+            val iterator = LambdaFunction(scope, "[Symbol.iterator]", 0, SerializableCallable { _, _, thisObj, _ -> thisObj })
+            proto.defineProperty(SymbolKey.ITERATOR, iterator, DONTENUM)
+            if (sealed) proto.sealObject()
+            return scope.associateValue(ITERATOR_PROTOTYPE_TAG, proto) as ScriptableObject
         }
 
         private fun realThis(thisObj: Scriptable?): ES6Iterator =
@@ -67,9 +86,6 @@ public abstract class ES6Iterator : ScriptableObject {
 
         private fun js_next(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
             realThis(thisObj).next(cx, scope)
-
-        private fun js_iterator(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
-            thisObj
 
         internal fun makeIteratorResult(cx: Context, scope: Scriptable, done: Boolean): Scriptable =
             makeIteratorResult(cx, scope, done, Undefined.instance)
