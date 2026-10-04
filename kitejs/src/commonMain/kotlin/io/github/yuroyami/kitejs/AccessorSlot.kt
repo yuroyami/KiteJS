@@ -67,13 +67,13 @@ public class AccessorSlot : Slot {
 
     override fun setValue(value: Any?, owner: Scriptable, start: Scriptable, isThrow: Boolean): Boolean {
         val s = setter
-        if (s == null) {
-            if (getter != null) {
-                throwNoSetterException(start, value)
-                return true
-            }
-        } else {
-            return s.setValue(value, owner, start)
+        // A descriptor's `set: undefined` keeps a setter whose target is not a function, which is
+        // no setter at all (ES2015 9.1.9.1): a strict write throws, as it does when `set` is left
+        // out. Upstream ran the empty setter and dropped the write without a word (D-78).
+        if (s != null && (s !is FunctionSetter || s.target is Function)) return s.setValue(value, owner, start)
+        if (s != null || getter != null) {
+            throwNoSetterException(start, value)
+            return true
         }
         return super.setValue(value, owner, start, isThrow)
     }

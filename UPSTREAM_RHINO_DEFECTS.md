@@ -83,6 +83,21 @@ rejects all of them. 46 test262 files fail for this.
   `withStatement`, and the labelled statement in `nameOrLabel`.
 - Test: `EvalOracleTest.aFunctionDeclarationIsNotTheBodyOfALoop`.
 
+### A strict write to an accessor with set: undefined is dropped (D-78)
+
+`Object.defineProperty(o, 'z', { get: f, set: undefined })` gives an accessor with no setter,
+the same as leaving `set` out (ECMAScript 2015, 6.2.4.5), so a write to `o.z` in strict code is a
+TypeError (9.1.9.1 and 6.2.3.2), on `o` and on any object that inherits `z`. Rhino keeps the
+explicit `undefined` as a setter, runs it as nothing and returns, so the strict write is dropped
+without an error; with `set` left out it throws. Web IDL bindings define read-only attributes
+with `set: undefined`. 18 strict-only test262 files fail for this, among them
+`language/expressions/assignment/11.13.1-2-s.js` and the `lgcl-*-assignment-operator-no-set`
+files.
+
+- Where: `AccessorSlot.setValue`, which asks only whether a setter object is there, and its
+  `FunctionSetter`, which ignores a target that is not a function.
+- Test: `EvalOracleTest.aStrictWriteToAnAccessorWithSetUndefinedThrows`.
+
 ### A getOwnPropertyDescriptor trap answering undefined crashes (D-50)
 
 A Proxy whose `getOwnPropertyDescriptor` trap returns `undefined` for a property the target lacks

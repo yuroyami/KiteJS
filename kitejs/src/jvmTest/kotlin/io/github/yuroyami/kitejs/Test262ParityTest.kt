@@ -146,6 +146,20 @@ class Test262ParityTest {
             put(path, "D-76: a function declaration as a statement body is an early error here")
         }
 
+        // An accessor defined with `set: undefined` has no setter, so a strict write to it throws
+        // here. Upstream calls the empty setter and drops the write, so these strict-only files
+        // fail there (D-78).
+        for (path in buildList {
+            add("language/expressions/assignment/11.13.1-2-s.js")
+            for (n in 34..44) add("language/expressions/compound-assignment/11.13.2-$n-s.js")
+            for (op in listOf("and", "nullish", "or")) {
+                add("language/expressions/logical-assignment/lgcl-$op-assignment-operator-no-set.js")
+                add("language/expressions/logical-assignment/lgcl-$op-assignment-operator-no-set-put.js")
+            }
+        }) {
+            put(path, "D-78: a strict write to an accessor with set: undefined throws here")
+        }
+
         // A const in a block is bound afresh each time here, so the harness that parses native
         // function source, which declares consts in its loops, now works, and the tests that use
         // it pass. Upstream keeps the first pass's value and its copy of the harness fails (D-74).

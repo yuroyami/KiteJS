@@ -444,6 +444,14 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   `JsFunction` are each one call to the budget, as `evaluate` is, and the facade's running
   total is a `Long`. The observer stays off when no threshold is set, so the oracle and parity
   runs see no change.
+- D-78: an accessor slot whose setter is a `FunctionSetter` of something that is not a function
+  has no setter. `Object.defineProperty` keeps `set: undefined` as such a setter, and upstream's
+  `AccessorSlot.setValue` ran it, which did nothing, so a strict write was dropped where ECMAScript
+  2015, 9.1.9.1 throws a TypeError, as it does when `set` is left out. `setValue` now treats it as
+  no setter: the strict write throws through `throwNoSetterException` and a sloppy one changes
+  nothing. `EvalOracleTest` pins both halves and `AccessorWithoutSetterTest` runs the cases on
+  every target; 18 strict-only test262 files now pass here and fail upstream, pinned in
+  `Test262ParityTest` (#68).
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

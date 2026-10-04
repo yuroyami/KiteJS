@@ -2163,6 +2163,27 @@ class EvalOracleTest {
     }
 
     /**
+     * A strict write to an accessor whose descriptor says `set: undefined` is a TypeError here, as
+     * it is when `set` is left out: ECMAScript 2015, 9.1.9.1 sees no setter either way. Upstream
+     * runs the empty setter and drops the write (D-78). Both halves are pinned, on the object and
+     * through its prototype, and where the two already agree they still do.
+     */
+    @Test
+    fun aStrictWriteToAnAccessorWithSetUndefinedThrows() {
+        val define = "var o = Object.defineProperty({}, 'z', { get: function () { return 1; }, set: undefined });"
+        for (target in listOf("o", "Object.create(o)")) {
+            val script = "$define var t = $target; (function () { 'use strict'; try { t.z = 2 } catch (e) { return e.name } return 'written' })()"
+            assertEquals("\"written\"", upstream(script), "upstream: $script")
+            assertEquals("\"TypeError\"", ported(script), "ported: $script")
+        }
+        val omitted = "var o = Object.defineProperty({}, 'z', { get: function () { return 1; } });" +
+            " (function () { 'use strict'; try { o.z = 2 } catch (e) { return String(e) } })()"
+        assertEquals(upstream(omitted), ported(omitted))
+        val sloppy = "$define o.z = 2; String(o.z) + Object.keys(Object.getOwnPropertyDescriptor(o, 'z'))"
+        assertEquals(upstream(sloppy), ported(sloppy))
+    }
+
+    /**
      * Assigning to a const is a TypeError here in any mode, which is what ECMAScript 2015,
      * 8.1.1.1.5 asks and what every browser does. Upstream lets the write pass silently outside
      * strict mode, and in strict code run by `eval` (D-71). Both halves are pinned so a change on
