@@ -23,14 +23,18 @@ private fun PropertyFlags.attributes(): Int {
     return a
 }
 
-private fun JsObject.asScriptableObject(): ScriptableObject =
-    target as? ScriptableObject ?: throw JsEngineError("this object cannot take host bindings")
+/** The object to bind onto, once its engine is known to be open and on this thread. */
+private fun JsObject.asScriptableObject(): ScriptableObject {
+    contextFor(target)
+    return target as? ScriptableObject ?: throw JsEngineError("this object cannot take host bindings")
+}
 
 // ---- Values ---------------------------------------------------------------------------------
 
 /** Puts a value on the object. */
 public fun JsObject.property(name: String, value: Any?, flags: PropertyFlags = PropertyFlags()) {
-    asScriptableObject().defineProperty(name, Converters.toEngine(value, liveContext(), target), flags.attributes())
+    val holder = asScriptableObject()
+    holder.defineProperty(name, Converters.toEngine(value, contextFor(target), target), flags.attributes())
 }
 
 /** Puts a value that a script can read but not change. */
@@ -42,8 +46,9 @@ public fun JsObject.constant(name: String, value: Any?) {
 
 /** A property computed on every read. */
 public fun JsObject.getter(name: String, flags: PropertyFlags = PropertyFlags(), read: () -> Any?) {
+    val holder = asScriptableObject()
     val scope = target
-    asScriptableObject().defineProperty(
+    holder.defineProperty(
         name,
         { Converters.toEngine(read(), liveContext(), scope) },
         null,
@@ -53,7 +58,8 @@ public fun JsObject.getter(name: String, flags: PropertyFlags = PropertyFlags(),
 
 /** A property that only accepts writes. */
 public fun JsObject.setter(name: String, flags: PropertyFlags = PropertyFlags(), write: (JsValue) -> Unit) {
-    asScriptableObject().defineProperty(name, null, { v -> write(JsValue(v)) }, flags.attributes())
+    val holder = asScriptableObject()
+    holder.defineProperty(name, null, { v -> write(JsValue(v)) }, flags.attributes())
 }
 
 /** A property with both halves. */
@@ -63,8 +69,9 @@ public fun JsObject.accessor(
     read: () -> Any?,
     write: (JsValue) -> Unit,
 ) {
+    val holder = asScriptableObject()
     val scope = target
-    asScriptableObject().defineProperty(
+    holder.defineProperty(
         name,
         { Converters.toEngine(read(), liveContext(), scope) },
         { v -> write(JsValue(v)) },
@@ -81,6 +88,7 @@ public fun JsObject.function(
     flags: PropertyFlags = PropertyFlags(enumerable = false),
     body: (List<JsValue>) -> Any?,
 ): JsFunction {
+    val holder = asScriptableObject()
     val scope = scopeOf(target)
     val fn = LambdaFunction(
         scope,
@@ -88,7 +96,7 @@ public fun JsObject.function(
         arity,
         SerializableCallable { cx, s, _, args -> Converters.toEngine(body(args.map { JsValue(it) }), cx, s) },
     )
-    asScriptableObject().defineProperty(name, fn, flags.attributes())
+    holder.defineProperty(name, fn, flags.attributes())
     return JsFunction(fn)
 }
 
@@ -99,6 +107,7 @@ public fun JsObject.method(
     flags: PropertyFlags = PropertyFlags(enumerable = false),
     body: (self: JsValue, args: List<JsValue>) -> Any?,
 ): JsFunction {
+    val holder = asScriptableObject()
     val scope = scopeOf(target)
     val fn = LambdaFunction(
         scope,
@@ -108,7 +117,7 @@ public fun JsObject.method(
             Converters.toEngine(body(JsValue(thisObj), args.map { JsValue(it) }), cx, s)
         },
     )
-    asScriptableObject().defineProperty(name, fn, flags.attributes())
+    holder.defineProperty(name, fn, flags.attributes())
     return JsFunction(fn)
 }
 
@@ -119,6 +128,7 @@ public fun JsObject.constructor(
     flags: PropertyFlags = PropertyFlags(enumerable = false),
     build: (JsObject, List<JsValue>) -> Unit,
 ): JsFunction {
+    val holder = asScriptableObject()
     val scope = scopeOf(target)
     val ctor = LambdaConstructor(
         scope,
@@ -130,7 +140,7 @@ public fun JsObject.constructor(
             obj
         },
     )
-    asScriptableObject().defineProperty(name, ctor, flags.attributes())
+    holder.defineProperty(name, ctor, flags.attributes())
     return JsFunction(ctor)
 }
 
@@ -138,7 +148,7 @@ public fun JsObject.constructor(
 
 /** A nested object, built by [build]. Returns it so you can keep a handle. */
 public fun JsObject.obj(name: String, build: JsObject.() -> Unit = {}): JsObject {
-    val child = JsObject(liveContext().newObject(scopeOf(target)))
+    val child = JsObject(contextFor(target).newObject(scopeOf(target)))
     child.build()
     property(name, child)
     return child

@@ -33,6 +33,11 @@ import kotlin.coroutines.coroutineContext
  * The engine underneath is single-threaded, as JavaScript is, and the thread that opened it holds
  * it. Every call here hops onto that thread, one at a time, so two callers never overlap.
  *
+ * The values that come back are the engine's own. A number, a string, a boolean, a BigInt, null
+ * or undefined is a copy and can be read anywhere. An object, an array or a function still belongs
+ * to the engine, so read it inside [onEngine]; touched from another thread it throws
+ * `JsEngineError` rather than running script there.
+ *
  * ```
  * val js = asyncKiteJs()
  * js.use { println(js.evaluate("1 + 1").asDouble()) }
@@ -112,6 +117,9 @@ public class AsyncKiteJs internal constructor(
     /**
      * Binds a host function that suspends. The script sees a normal function returning a promise;
      * [body] runs on [scope] and settles it.
+     *
+     * [body] runs off the engine's thread, so its arguments follow the rule above: scalars can be
+     * read as they are, and an object or a function argument is read inside [onEngine].
      */
     public suspend fun suspendFunction(
         target: JsObject,

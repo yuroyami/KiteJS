@@ -69,13 +69,13 @@ public value class JsValue internal constructor(internal val raw: Any?) {
 
     public fun asBoolean(): Boolean = ScriptRuntime.toBoolean(raw)
 
-    public fun asDouble(): Double = ScriptRuntime.toNumber(raw)
+    public fun asDouble(): Double = ScriptRuntime.toNumber(checked())
 
-    public fun asInt(): Int = ScriptRuntime.toInt32(raw)
+    public fun asInt(): Int = ScriptRuntime.toInt32(checked())
 
-    public fun asLong(): Long = ScriptRuntime.toInt32(raw).toLong()
+    public fun asLong(): Long = ScriptRuntime.toInt32(checked()).toLong()
 
-    public fun asString(): String = ScriptRuntime.toString(raw)
+    public fun asString(): String = ScriptRuntime.toString(checked())
 
     /** Throws unless this really is a BigInt. There is no coercion from a number, as in a script. */
     public fun asBigInt(): KBigInt = raw as? KBigInt ?: throw wrongType("a BigInt")
@@ -98,9 +98,23 @@ public value class JsValue internal constructor(internal val raw: Any?) {
      * A plain Kotlin value, all the way down: `Map` for an object, `List` for an array, `Double`,
      * `String`, `Boolean`, or null. A function stays a [JsFunction], since it has no Kotlin twin.
      */
-    public fun toKotlin(): Any? = Converters.toKotlin(raw, HashSet())
+    public fun toKotlin(): Any? = Converters.toKotlin(checked(), HashSet())
 
-    override fun toString(): String = if (isUndefined) "undefined" else ScriptRuntime.toString(raw)
+    /** What `String(value)` gives. An object whose engine cannot be used here prints its class. */
+    override fun toString(): String = when {
+        isUndefined -> "undefined"
+        raw is Scriptable && !usableHere(raw) -> inertText(raw)
+        else -> ScriptRuntime.toString(raw)
+    }
+
+    /**
+     * The value, once it is safe to coerce here. A scalar is a copy and is safe anywhere; coercing
+     * an object can run its script, so its engine has to be open and on this thread.
+     */
+    private fun checked(): Any? {
+        if (raw is Scriptable) contextFor(raw)
+        return raw
+    }
 
     private fun wrongType(wanted: String): JsError =
         jsTypeError("expected $wanted, got ${typeOf}")

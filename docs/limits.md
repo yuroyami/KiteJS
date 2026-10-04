@@ -103,6 +103,15 @@ other's global scope. A program that runs several documents gives each document 
 val worker = thread { KiteJs().use { js -> js.evaluate(script) } }
 ```
 
+Only that thread can use or close the engine. From another thread, `evaluate`, `close` and the
+rest throw `JsEngineError` and leave the engine as it was.
+
+The objects, arrays and functions an engine hands out belong to it in the same way. They work
+while the engine is open and on its thread, they throw `JsEngineError` once it is closed or from
+another thread, before any script can run, and they cannot be handed to a different engine.
+Numbers, strings, booleans, BigInts, null and undefined are copies and work anywhere. A handle's
+`toString()` never throws: where its engine cannot be used it prints the object's class.
+
 JavaScript and WebAssembly run one thread, so there one engine is open at a time.
 
 Use `asyncKiteJs` when you want the calls serialised for you on a thread of its own.

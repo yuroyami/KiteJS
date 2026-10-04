@@ -131,6 +131,11 @@ public class KiteJs internal constructor(
 
     private var closed = false
 
+    init {
+        // Every handle finds its engine here, through the global scope its object lives in.
+        scopeObject.associateValue(EngineKey, this)
+    }
+
     /** The global object. Bind host functions and values onto it. */
     public val global: JsObject = JsObject(scopeObject)
 
@@ -174,24 +179,44 @@ public class KiteJs internal constructor(
     }
 
     /** A Kotlin value as the engine sees it, collections and all. */
-    public fun valueOf(value: Any?): JsValue = JsValue(Converters.toEngine(value, cx, scopeObject))
+    public fun valueOf(value: Any?): JsValue = JsValue(Converters.toEngine(value, usableContext(), scopeObject))
 
     /** A fresh empty object, the same as `{}` in a script. */
-    public fun newObject(): JsObject = JsObject(cx.newObject(scopeObject))
+    public fun newObject(): JsObject = JsObject(usableContext().newObject(scopeObject))
 
     /** A fresh array holding [elements]. */
-    public fun newArray(vararg elements: Any?): JsArray =
-        JsValue(cx.newArray(scopeObject, Converters.toEngineAll(elements, cx, scopeObject))).asArray()
+    public fun newArray(vararg elements: Any?): JsArray {
+        val cx = usableContext()
+        return JsValue(cx.newArray(scopeObject, Converters.toEngineAll(elements, cx, scopeObject))).asArray()
+    }
 
-    /** Releases the engine. Using it afterwards throws. */
+    /**
+     * Releases the engine. Using it afterwards throws, and so does every handle it gave out.
+     * Only the thread that opened it can release it; from another thread this throws and leaves
+     * the engine open, so it cannot release whatever engine that thread holds instead.
+     */
     override fun close() {
         if (closed) return
+        if (Context.getCurrentContext() !== cx) throw wrongThread()
         closed = true
         Context.exit()
     }
 
-    private inline fun <T> guarded(body: () -> T): T {
+    /** True when this engine is open and this is its thread, so its handles can be used here. */
+    internal val isUsableHere: Boolean get() = !closed && Context.getCurrentContext() === cx
+
+    /** The engine's context, once it is known to be open and on this thread. */
+    internal fun usableContext(): Context {
         checkOpen()
+        if (Context.getCurrentContext() !== cx) throw wrongThread()
+        return cx
+    }
+
+    private fun wrongThread(): JsEngineError =
+        JsEngineError("this engine belongs to the thread that opened it; use it and close it there")
+
+    private inline fun <T> guarded(body: () -> T): T {
+        usableContext()
         try {
             return metered(cx, body)
         } catch (e: Throwable) {

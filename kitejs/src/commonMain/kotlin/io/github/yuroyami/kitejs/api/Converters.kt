@@ -75,7 +75,8 @@ public object Converters {
             obj
         }
         is Set<*> -> cx.newArray(scope, value.map { toEngine(it, cx, scope) }.toTypedArray())
-        else -> toEngine(value)
+        // An object from another engine cannot move into this one.
+        else -> adopt(toEngine(value), scope)
     }
 
     internal fun toEngineAll(args: Array<out Any?>, cx: Context, scope: Scriptable): Array<Any?> =

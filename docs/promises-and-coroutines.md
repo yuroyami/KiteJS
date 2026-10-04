@@ -56,11 +56,16 @@ js.onEngine { engine ->
 }
 ```
 
+What comes back from the engine is the engine's own. A number, a string, a boolean, a BigInt,
+null or undefined is a copy you can read anywhere. An object, an array or a function still
+belongs to the engine, so read it inside `onEngine`; from another thread it throws
+`JsEngineError` instead of running script there.
+
 ## Awaiting a promise
 
 ```kotlin
 val user = js.evaluateAwaiting("fetchUser(7)")
-println(user.asObject()["name"].asString())
+println(js.onEngine { user.asObject()["name"].asString() })
 ```
 
 `evaluateAwaiting` runs the script and, if the answer is a promise, waits for it to settle.
@@ -100,7 +105,9 @@ js.suspendFunction(js.onEngine { it.global }, "fetch", 1, scope) { args ->
 val length = js.evaluateAwaiting("fetch('/a').then(function (body) { return body.length })")
 ```
 
-If the body throws, the promise rejects with that message.
+If the body throws, the promise rejects with that message. The body runs on `scope`, off the
+engine's thread, so read an object or a function argument inside `onEngine`; scalars can be read
+as they are.
 
 ## Cancellation
 
