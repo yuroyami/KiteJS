@@ -14,7 +14,6 @@ import io.github.yuroyami.kitejs.ScriptableObject
 import io.github.yuroyami.kitejs.SerializableCallable
 import io.github.yuroyami.kitejs.SerializableConstructable
 import io.github.yuroyami.kitejs.SymbolKey
-import io.github.yuroyami.kitejs.TopLevel
 import io.github.yuroyami.kitejs.Undefined
 
 /**
@@ -114,34 +113,59 @@ public class NativeArrayBuffer : ScriptableObject {
 
         private fun js_isView(args: Array<Any?>): Boolean = isArg(args, 0) && args[0] is NativeArrayBufferView
 
+        /**
+         * ArrayBuffer.prototype.slice (ECMAScript 2024, 25.1.6.7). The length is read once, before
+         * the arguments are converted, and both buffers are checked again once the species
+         * constructor has run, because a conversion or the constructor may have detached either of
+         * them (issue 24, D-87).
+         */
         private fun js_slice(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): NativeArrayBuffer {
             val self = getSelf(thisObj)
             if (self.isDetached) throw ScriptRuntime.typeErrorById("msg.arraybuf.detached")
+            val len = self.length.toDouble()
 
-            val start = if (isArg(args, 0)) ScriptRuntime.toNumber(args[0]) else 0.0
-            val end = if (isArg(args, 1)) ScriptRuntime.toNumber(args[1]) else self.length.toDouble()
-            val len0 = self.length
-            val endI = ScriptRuntime.toInt32(maxOf(0.0, minOf(len0.toDouble(), if (end < 0) len0 + end else end)))
-            val startI = ScriptRuntime.toInt32(minOf(endI.toDouble(), maxOf(0.0, if (start < 0) len0 + start else start)))
-            val len = endI - startI
+            val relativeStart = ScriptRuntime.toIntegerOrInfinity(args.getOrElse(0) { Undefined.instance })
+            val first = if (relativeStart < 0) maxOf(len + relativeStart, 0.0) else minOf(relativeStart, len)
+            val endArg = args.getOrElse(1) { Undefined.instance }
+            val relativeEnd = if (Undefined.isUndefined(endArg)) len else ScriptRuntime.toIntegerOrInfinity(endArg)
+            val final = if (relativeEnd < 0) maxOf(len + relativeEnd, 0.0) else minOf(relativeEnd, len)
+            val newLen = maxOf(final - first, 0.0).toInt()
 
-            val buf = constructNew(cx, scope, thisObj!!, len)
+            val ctor = AbstractEcmaObjectOperations.speciesConstructor(
+                cx,
+                self,
+                Intrinsics.constructor(cx, scope, CLASS_NAME),
+            )
+            val buf = ctor.construct(cx, scope, arrayOf<Any?>(newLen))
+            if (buf !is NativeArrayBuffer) throw ScriptRuntime.typeErrorById("msg.species.invalid.ctor")
+            if (buf.isDetached) throw ScriptRuntime.typeErrorById("msg.arraybuf.detached")
             if (buf === self) throw ScriptRuntime.typeErrorById("msg.arraybuf.same")
+            if (buf.length < newLen) throw ScriptRuntime.typeErrorById("msg.arraybuf.smaller.len", newLen, buf.length)
 
-            val actualLength = buf.length
-            if (actualLength < len) throw ScriptRuntime.typeErrorById("msg.arraybuf.smaller.len", len, actualLength)
-
-            self.buffer!!.copyInto(buf.buffer!!, 0, startI, startI + len)
+            // The species constructor is user code and may have detached the source.
+            val from = self.buffer ?: throw ScriptRuntime.typeErrorById("msg.arraybuf.detached")
+            val start = first.toInt()
+            if (start < from.size) {
+                val count = minOf(newLen, from.size - start)
+                from.copyInto(buf.buffer!!, 0, start, start + count)
+            }
             return buf
         }
 
-        /** `transfer` and `transferToFixedLength` do the same thing here: copy, then detach. */
+        /**
+         * `transfer` and `transferToFixedLength`, which are the same here because no buffer is
+         * resizable: ArrayBufferCopyAndDetach (ECMAScript 2024, 25.1.3.3). The new length is
+         * converted before the source is checked, and the copy is always a plain ArrayBuffer of
+         * the realm that defined the method, so species is never read (issue 25, D-87).
+         */
         private fun js_transfer(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Scriptable {
             val self = getSelf(thisObj)
+            val lengthArg = args.getOrElse(0) { Undefined.instance }
+            val newByteLength = if (Undefined.isUndefined(lengthArg)) self.length else ScriptRuntime.toIndex(lengthArg)
             if (self.isDetached) throw ScriptRuntime.typeErrorById("msg.arraybuf.detached")
 
-            val newByteLength = validateNewByteLength(args, self.length)
-            val newBuffer = constructNew(cx, scope, thisObj!!, newByteLength)
+            val newBuffer = Intrinsics.constructor(cx, scope, CLASS_NAME)
+                .construct(cx, scope, arrayOf<Any?>(newByteLength)) as NativeArrayBuffer
 
             val copyLength = minOf(newByteLength, self.length)
             if (copyLength > 0) self.buffer!!.copyInto(newBuffer.buffer!!, 0, 0, copyLength)
@@ -150,27 +174,7 @@ public class NativeArrayBuffer : ScriptableObject {
             return newBuffer
         }
 
-        /** Builds the result through the species constructor, as every one of these methods does. */
-        private fun constructNew(cx: Context, scope: Scriptable, thisObj: Scriptable, byteLength: Int): NativeArrayBuffer {
-            val ctor = AbstractEcmaObjectOperations.speciesConstructor(
-                cx,
-                thisObj,
-                TopLevel.getBuiltinCtor(cx, ScriptableObject.getTopLevelScope(scope), TopLevel.Builtins.ArrayBuffer)!!,
-            )
-            val newBuf = ctor.construct(cx, scope, arrayOf<Any?>(byteLength))
-            if (newBuf !is NativeArrayBuffer) throw ScriptRuntime.typeErrorById("msg.species.invalid.ctor")
-            return newBuf
-        }
-
         internal fun isArg(args: Array<Any?>, i: Int): Boolean = args.size > i && Undefined.instance != args[i]
-
-        private fun validateNewByteLength(args: Array<Any?>, defaultLength: Int): Int {
-            var newLength = if (isArg(args, 0)) ScriptRuntime.toNumber(args[0]) else defaultLength.toDouble()
-            if (newLength.isNaN()) newLength = 0.0
-            if (newLength < 0 || newLength.isInfinite()) throw ScriptRuntime.rangeError("Invalid array buffer length")
-            if (newLength >= Int.MAX_VALUE.toDouble()) throw ScriptRuntime.rangeError("Array buffer length too large")
-            return newLength.toInt()
-        }
     }
 }
 

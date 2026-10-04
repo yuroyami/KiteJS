@@ -2081,6 +2081,29 @@ class EvalOracleTest {
     }
 
     /**
+     * `slice` checks its source again after the conversions and the species constructor, and
+     * `transfer` copies into a plain ArrayBuffer without reading species (D-87). Upstream checks
+     * only on entry, so a conversion that detaches the source escapes as a host
+     * NullPointerException, and it transfers through species, so a species answering the source
+     * hands back the buffer it has just detached.
+     */
+    @Test
+    fun arrayBufferSliceRechecksAndTransferSkipsSpecies() {
+        val slice = "var a = new ArrayBuffer(2); try { a.slice({ valueOf: function () { a.transfer(); return 0 } }); 'returned' } catch (e) { e.name }"
+        assertEquals("\"TypeError\"", ported(slice))
+        assertFailsWith<NullPointerException>("upstream re-checks the source now, D-87 can be retired") { upstream(slice) }
+        val sources = mapOf(
+            "var a = new ArrayBuffer(2); a.constructor = {}; a.constructor[Symbol.species] = function () { return a };" +
+                " var b = a.transfer(); a.detached + ':' + b.detached" to "\"true:false\"",
+            "var a = new ArrayBuffer(2); try { a.transfer(-0.5); 'ok:' + a.detached } catch (e) { e.name }" to "\"ok:true\"",
+        )
+        for ((source, expected) in sources) {
+            assertEquals(expected, ported(source), source)
+            assertTrue(upstream(source) != expected, "upstream agrees now, D-87 can be retired: $source")
+        }
+    }
+
+    /**
      * A comparator that answers NaN means equal (D-85), so a stable sort keeps such elements in
      * order. Upstream makes NaN greater, and forty elements are enough for its TimSort to move them.
      */

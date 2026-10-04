@@ -189,6 +189,24 @@ itself, so an element it inherits from its prototype is skipped.
 - Where: `NativeTypedArrayView.js_set` (the prototype method) and `setRange`.
 - Test: `EvalOracleTest.typedArraySetTakesAnyArrayLike`.
 
+### ArrayBuffer slice crashes on a detached source, and transfer goes through species (D-87)
+
+`slice` checks that the buffer is attached only on entry, so a `valueOf` on `start` or `end`, a
+`constructor` or species getter, or the species constructor itself, any of which may detach it,
+leaves the copy dereferencing a null array, and a host `NullPointerException` escapes the script's
+`try`. `transfer` and `transferToFixedLength` build their copy through the species constructor,
+where ArrayBufferCopyAndDetach allocates a plain `%ArrayBuffer%`: a species answering the source
+makes `transfer` return the very buffer it has just detached, a `constructor` getter that throws
+blocks a transfer that should succeed, and a species constructor that calls `transfer` recurses
+until a host `StackOverflowError`. The detached check also comes before the new length is
+converted instead of after, a small negative length such as `-0.5` is a RangeError where ToIndex
+makes it 0, and the default constructor of both comes from `TopLevel.getBuiltinCtor`, which in any
+scope that is not a `TopLevel` is whatever the global `ArrayBuffer` holds.
+
+- Where: `NativeArrayBuffer.js_slice`, `js_transfer`, `js_transferToFixedLength` and
+  `validateNewByteLength`.
+- Test: `EvalOracleTest.arrayBufferSliceRechecksAndTransferSkipsSpecies`.
+
 ### A getOwnPropertyDescriptor trap answering undefined crashes (D-50)
 
 A Proxy whose `getOwnPropertyDescriptor` trap returns `undefined` for a property the target lacks

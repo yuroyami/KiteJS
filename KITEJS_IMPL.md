@@ -518,6 +518,18 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   1, 2 and 3, and an element the source inherits is copied. ToIntegerOrInfinity answers +0 for NaN
   and -0. Upstream indexes the missing argument, so `set()` escapes as a host
   ArrayIndexOutOfBoundsException, demands an object, and reads only own elements.
+- D-87: `ArrayBuffer.prototype.slice` reads the length once, before its arguments are converted,
+  and once the species constructor has run it checks that the result is attached, is not the
+  source and is long enough, and then that the source is still attached, copying only the bytes
+  the source still holds. `transfer` and `transferToFixedLength` are ArrayBufferCopyAndDetach: the
+  new length goes through ToIndex before the detached check, and the copy is a plain ArrayBuffer
+  of the method's own realm, so species is never read. Both default to the realm's own
+  ArrayBuffer constructor rather than the global. Upstream checks the source only on entry, so a
+  conversion or species constructor that detaches it escapes as a host NullPointerException, and
+  it transfers through species, so a species answering the source returns the buffer it has just
+  detached, a throwing `constructor` getter blocks the transfer, and a species constructor that
+  calls `transfer` recurses until the host stack overflows. It also rejects `transfer(-0.5)`,
+  which ToIndex makes 0, and checks for detachment before converting the length.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
