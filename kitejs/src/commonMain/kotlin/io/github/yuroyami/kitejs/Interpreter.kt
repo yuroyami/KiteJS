@@ -21,6 +21,7 @@ import io.github.yuroyami.kitejs.Icode.Companion.Icode_ENTERDQ
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_GENERATOR
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_GENERATOR_END
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_GENERATOR_RETURN
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_GENERATOR_RETURN_RESULT
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_GETVAR1
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_GOSUB
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_IFEQ_POP
@@ -103,6 +104,7 @@ import io.github.yuroyami.kitejs.Icode.Companion.Icode_VALUE_AND_THIS
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_VALUE_AND_THIS_OPTIONAL
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_VAR_INC_DEC
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_YIELD_STAR
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_AWAIT
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_ZERO
 import io.github.yuroyami.kitejs.Icode.Companion.MIN_ICODE
 import io.github.yuroyami.kitejs.ast.FunctionNode
@@ -398,7 +400,20 @@ public class Interpreter : Evaluator {
     /** The state a suspended generator resumes with. */
     internal class GeneratorState(val operation: Int, val value: Any?) {
         var returnedException: RuntimeException? = null
+
+        /** Set when an async body returns, with what it returned, which no exception carries. */
+        var completed = false
+        var completionValue: Any? = null
     }
+
+    /**
+     * What a finally block entered by GOSUB keeps in its local: where to go back to, and the
+     * result that was pending when it started, which a `return` inside it that a `break` then
+     * abandons must not overwrite. Each finally holds its own, as V8 gives each try-finally a
+     * result register of its own (D-97). A throw entering the block leaves the throwable there
+     * instead.
+     */
+    private class FinallyReturn(val pc: Int, val result: Any?, val resultDbl: Double)
 
     /** What one instruction tells the loop to do next. Null from the dispatch means "carry on". */
     private sealed class NewState {
@@ -475,7 +490,8 @@ public class Interpreter : Evaluator {
         /** How many bytes an instruction takes, including its operands. */
         private fun bytecodeSpan(bytecode: Int): Int {
             when (bytecode) {
-                Token.THROW, Token.YIELD, Icode_YIELD_STAR, Icode_GENERATOR, Icode_GENERATOR_END, Icode_GENERATOR_RETURN -> return 1 + 2
+                Token.THROW, Token.YIELD, Icode_YIELD_STAR, Icode_AWAIT, Icode_GENERATOR, Icode_GENERATOR_END, Icode_GENERATOR_RETURN,
+                Icode_GENERATOR_RETURN_RESULT -> return 1 + 2
                 Icode_GOSUB, Token.GOTO, Token.IFEQ, Token.IFNE, Icode_IFEQ_POP, Icode_IF_NULL_UNDEF, Icode_IF_NOT_NULL_UNDEF, Icode_LEAVEDQ -> return 1 + 2
                 Icode_CALLSPECIAL, Icode_CALLSPECIAL_OPTIONAL -> return 1 + 1 + 1 + 2
                 Token.CATCH_SCOPE -> return 1 + 1
@@ -585,6 +601,23 @@ public class Interpreter : Evaluator {
                 val result = interpretLoop(cx, activeFrame, generatorState)
                 generatorState.returnedException?.let { throw it }
                 return result
+            } finally {
+                activeFrame.syncStateToFrame(frame)
+            }
+        }
+
+        /**
+         * Runs an async body from where it is suspended, with [operation] and [value] as an
+         * awaited promise settled. Returns an [AsyncFunctionDriver.AwaitRequest] when the body
+         * reaches an `await`, or what the body returned; a throw comes out as one (D-97).
+         */
+        internal fun resumeAsync(cx: Context, operation: Int, savedState: Any?, value: Any?): Any? {
+            val frame = savedState as CallFrame
+            val activeFrame = frame.shallowCloneFrozen(cx.lastInterpreterFrame as CallFrame?)
+            try {
+                val generatorState = GeneratorState(operation, value)
+                val result = interpretLoop(cx, activeFrame, generatorState)
+                return if (generatorState.completed) generatorState.completionValue else result
             } finally {
                 activeFrame.syncStateToFrame(frame)
             }
@@ -768,7 +801,7 @@ public class Interpreter : Evaluator {
                 }
                 Token.YIELD, Icode_YIELD_STAR -> {
                     if (!frame.frozen) {
-                        return NewState.YieldResult(freezeGenerator(cx, frame, state, state.generatorState!!, op == Icode_YIELD_STAR))
+                        return NewState.YieldResult(freezeGenerator(cx, frame, state, state.generatorState!!, op))
                     }
                     val obj = thawGenerator(frame, state, state.generatorState!!, op)
                     if (obj !== Scriptable.NOT_FOUND) {
@@ -779,15 +812,29 @@ public class Interpreter : Evaluator {
                 }
                 Icode_GENERATOR_END -> {
                     frame.frozen = true
+                    if (frame.fnOrScript.descriptor!!.isAsync) {
+                        state.generatorState!!.completed = true
+                        state.generatorState!!.completionValue = Undefined.instance
+                        return NewState.BreakLoop
+                    }
                     val sourceLine = getIndex(frame.idata.itsICode, frame.pc)
                     state.generatorState!!.returnedException =
                         JavaScriptException(NativeIterator.getStopIterationObject(frame.scope!!), frame.fnOrScript.descriptor!!.sourceName, sourceLine)
                     return NewState.BreakLoop
                 }
-                Icode_GENERATOR_RETURN -> {
+                Icode_GENERATOR_RETURN, Icode_GENERATOR_RETURN_RESULT -> {
                     frame.frozen = true
-                    frame.result = stack[state.stackTop]
-                    frame.resultDbl = sDbl[state.stackTop--]
+                    // GENERATOR_RETURN_RESULT ends with the value its return stored before the
+                    // finally blocks ran.
+                    if (op == Icode_GENERATOR_RETURN) {
+                        frame.result = stack[state.stackTop]
+                        frame.resultDbl = sDbl[state.stackTop--]
+                    }
+                    if (frame.fnOrScript.descriptor!!.isAsync) {
+                        state.generatorState!!.completed = true
+                        state.generatorState!!.completionValue = if (frame.result === DBL_MRK) ScriptRuntime.wrapNumber(frame.resultDbl) else frame.result
+                        return NewState.BreakLoop
+                    }
                     val si = NativeIterator.StopIteration(if (frame.result === DBL_MRK) frame.resultDbl else frame.result)
                     val sourceLine = getIndex(frame.idata.itsICode, frame.pc)
                     state.generatorState!!.returnedException = JavaScriptException(si, frame.fnOrScript.descriptor!!.sourceName, sourceLine)
@@ -895,10 +942,11 @@ public class Interpreter : Evaluator {
                 }
                 Icode_STARTSUB -> {
                     if (state.stackTop == frame.emptyStackTop + 1) {
-                        // Entered from GOSUB: keep the return address in the finally's local.
+                        // Entered from GOSUB: keep the return address in the finally's local,
+                        // with the result pending then.
                         state.indexReg += frame.idata.itsMaxVars
-                        stack[state.indexReg] = stack[state.stackTop]
-                        sDbl[state.indexReg] = sDbl[state.stackTop]
+                        stack[state.indexReg] = FinallyReturn(sDbl[state.stackTop].toInt(), frame.result, frame.resultDbl)
+                        stack[state.stackTop] = null
                         --state.stackTop
                     } else if (state.stackTop != frame.emptyStackTop) {
                         throw Kit.codeBug()
@@ -909,12 +957,14 @@ public class Interpreter : Evaluator {
                     if (state.instructionCounting) addInstructionCount(cx, frame, 0)
                     state.indexReg += frame.idata.itsMaxVars
                     val value = stack[state.indexReg]
-                    if (value !== DBL_MRK) {
+                    if (value !is FinallyReturn) {
                         // A pending throwable rather than a return address: keep unwinding.
                         state.throwable = value
                         return NewState.BreakWithoutExtension
                     }
-                    frame.pc = sDbl[state.indexReg].toInt()
+                    frame.result = value.result
+                    frame.resultDbl = value.resultDbl
+                    frame.pc = value.pc
                     if (state.instructionCounting) frame.pcPrevBranch = frame.pc
                     return null
                 }
@@ -1404,6 +1454,16 @@ public class Interpreter : Evaluator {
          * leaves the whole interpreter running interpreted (D-42).
          */
         private fun executeCold(cx: Context, frame: CallFrame, state: InterpreterState, op: Int): NewState? {
+            if (op == Icode_AWAIT) {
+                // Suspends like a yield, which an async function never has, so it lives here.
+                if (!frame.frozen) return NewState.YieldResult(freezeGenerator(cx, frame, state, state.generatorState!!, op))
+                val obj = thawGenerator(frame, state, state.generatorState!!, op)
+                if (obj !== Scriptable.NOT_FOUND) {
+                    state.throwable = obj
+                    return NewState.BreakWithoutExtension
+                }
+                return null
+            }
             val stack = frame.stack
             val sDbl = frame.sDbl
             when (op) {
@@ -2085,6 +2145,22 @@ public class Interpreter : Evaluator {
             val generatorFrame = captureFrameForGenerator(frame)
             generatorFrame.frozen = true
             val fn = generatorFrame.fnOrScript as JSFunction
+            if (fn.descriptor.isAsyncFunction) {
+                // The call returns the promise once the body has run to its first await.
+                val driver = AsyncFunctionDriver(generatorFrame, ScriptableObject.getTopLevelScope(frame.scope!!), fn.descriptor.isStrict, cx)
+                frame.result = driver.promise
+                // The body enters its activation again as it starts, so the call's own one steps
+                // aside until then, or the activation would become its own parent and the caller's
+                // be lost.
+                val activation = if (fn.descriptor.requiresActivationFrame) cx.currentActivationCall else null
+                if (activation != null) ScriptRuntime.exitActivationFunction(cx)
+                try {
+                    driver.start(cx)
+                } finally {
+                    if (activation != null) ScriptRuntime.enterActivationFunction(cx, activation)
+                }
+                return
+            }
             frame.result = if (cx.languageVersion >= Context.VERSION_ES6) {
                 ES6Generator(frame.scope!!, fn, generatorFrame)
             } else {
@@ -2099,17 +2175,22 @@ public class Interpreter : Evaluator {
             return result
         }
 
-        private fun freezeGenerator(cx: Context, frame: CallFrame, state: InterpreterState, generatorState: GeneratorState, yieldStar: Boolean): Any? {
+        private fun freezeGenerator(cx: Context, frame: CallFrame, state: InterpreterState, generatorState: GeneratorState, op: Int): Any? {
             if (generatorState.operation == NativeGenerator.GENERATOR_CLOSE) throw ScriptRuntime.typeErrorById("msg.yield.closing")
             frame.frozen = true
-            frame.result = frame.stack[state.stackTop]
-            frame.resultDbl = frame.sDbl[state.stackTop]
+            // The yielded value leaves through the return value, not frame.result, which may
+            // hold what a return stored before a finally block that yields (D-97).
+            val yielded = frame.stack[state.stackTop]
             frame.savedStackTop = state.stackTop
             // Back up so the resume lands on the yield again.
             frame.pc--
             ScriptRuntime.exitActivationFunction(cx)
-            val result = if (frame.result !== DBL_MRK) frame.result else ScriptRuntime.wrapNumber(frame.resultDbl)
-            return if (yieldStar) ES6Generator.YieldStarResult(result) else result
+            val result = if (yielded !== DBL_MRK) yielded else ScriptRuntime.wrapNumber(frame.sDbl[state.stackTop])
+            return when (op) {
+                Icode_YIELD_STAR -> ES6Generator.YieldStarResult(result)
+                Icode_AWAIT -> AsyncFunctionDriver.AwaitRequest(result)
+                else -> result
+            }
         }
 
         private fun thawGenerator(frame: CallFrame, state: InterpreterState, generatorState: GeneratorState, op: Int): Any? {
@@ -2121,7 +2202,7 @@ public class Interpreter : Evaluator {
             }
             if (generatorState.operation == NativeGenerator.GENERATOR_CLOSE) return generatorState.value
             if (generatorState.operation != NativeGenerator.GENERATOR_SEND) throw Kit.codeBug()
-            if (op == Token.YIELD || op == Icode_YIELD_STAR) frame.stack[state.stackTop] = generatorState.value
+            if (op == Token.YIELD || op == Icode_YIELD_STAR || op == Icode_AWAIT) frame.stack[state.stackTop] = generatorState.value
             return Scriptable.NOT_FOUND
         }
 

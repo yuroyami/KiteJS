@@ -86,10 +86,11 @@ class IcodeParityTest {
             // A const a for head declares, bound afresh on every pass, by name and by frame slot
             // (D-72). Upstream's parser rejects that syntax too.
             // A class definition, `new.target` and the `super` call of a derived constructor
-            // (D-95), which upstream has no syntax for.
+            // (D-95), which upstream has no syntax for. The `await` of an async function, and the
+            // generator return whose value was stored before its finally blocks ran (D-97).
             listOf(
-                "Icode_CALL_SPREAD", "Icode_CLASS_BEGIN", "Icode_CLASS_CTOR", "Icode_CLASS_ELEMENT",
-                "Icode_CLASS_END", "Icode_CLASS_PRIVATE_NAMES", "Icode_INITCONST", "Icode_INITCONSTVAR",
+                "Icode_AWAIT", "Icode_CALL_SPREAD", "Icode_CLASS_BEGIN", "Icode_CLASS_CTOR", "Icode_CLASS_ELEMENT",
+                "Icode_CLASS_END", "Icode_CLASS_PRIVATE_NAMES", "Icode_GENERATOR_RETURN_RESULT", "Icode_INITCONST", "Icode_INITCONSTVAR",
                 "Icode_NEW_SPREAD", "Icode_NEW_TARGET", "Icode_SUPER_CALL", "Icode_SUPER_CALL_SPREAD",
                 "Icode_SUPER_CTOR",
             ),

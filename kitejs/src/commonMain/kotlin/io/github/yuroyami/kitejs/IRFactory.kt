@@ -9,6 +9,7 @@ import io.github.yuroyami.kitejs.ast.ArrayComprehension
 import io.github.yuroyami.kitejs.ast.ArrayComprehensionLoop
 import io.github.yuroyami.kitejs.ast.ArrayLiteral
 import io.github.yuroyami.kitejs.ast.Assignment
+import io.github.yuroyami.kitejs.ast.AwaitExpression
 import io.github.yuroyami.kitejs.ast.AstNode
 import io.github.yuroyami.kitejs.ast.AstRoot
 import io.github.yuroyami.kitejs.ast.BigIntLiteral
@@ -173,6 +174,10 @@ public class IRFactory(
             Token.WHILE -> return transformWhileLoop(node as WhileLoop)
             Token.WITH -> return transformWith(node as WithStatement)
             Token.YIELD, Token.YIELD_STAR -> return transformYield(node as Yield)
+            Token.AWAIT -> {
+                val await = node as AwaitExpression
+                return Node(Token.AWAIT, transform(await.operand!!), node.lineno, node.column)
+            }
         }
 
         return when (node) {
@@ -582,7 +587,10 @@ public class IRFactory(
                             body.lineno,
                             body.column,
                         )
-                        if (fn.isGenerator) {
+                        // A generator binds its parameters before it is made, and an async function
+                        // in its body, where a throw rejects the promise it returns
+                        // (ECMAScript 2017, 14.7.11, EvaluateAsyncFunctionBody).
+                        if (fn.isGenerator && !fn.isAsyncFunction) {
                             val block = paramInitBlock ?: Node(Token.BLOCK).also {
                                 paramInitBlock = it
                             }
@@ -593,7 +601,7 @@ public class IRFactory(
                     }
                     i -= 2
                 }
-                if (fn.isGenerator && paramInitBlock != null) {
+                if (fn.isGenerator && !fn.isAsyncFunction && paramInitBlock != null) {
                     fn.generatorParamInitBlock = paramInitBlock
                 }
             }

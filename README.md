@@ -25,9 +25,10 @@ KiteJs { instructionBudget = 5_000_000 }.use { js ->
 ## What it does
 
 Runs ES5.1 and most of ES2015 and later: `let` and `const`, arrow functions, template literals,
-destructuring, `Symbol`, `Map`, `Set`, `WeakMap`, `WeakSet`, generators, `Promise`, `Proxy`,
-`Reflect`, `BigInt`, typed arrays, optional chaining, and the full regular expression syntax
-including named groups and lookbehind. It does not run classes, modules or `async`/`await`.
+destructuring, classes with private and static members, `Symbol`, `Map`, `Set`, `WeakMap`,
+`WeakSet`, generators, `Promise`, async functions and `await`, `Proxy`, `Reflect`, `BigInt`, typed
+arrays, optional chaining, and the full regular expression syntax including named groups and
+lookbehind. It does not run modules, async generators or `for await`.
 
 The engine is common Kotlin. There is no platform engine underneath, no native library to ship,
 and no code generation at runtime. The parser, the regular expression engine, the date

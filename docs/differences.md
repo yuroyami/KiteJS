@@ -11,8 +11,8 @@ These are syntax errors. A script using any of them will not even parse.
 | Not supported | Write instead |
 |---|---|
 | `import` and `export` | Nothing. Concatenate the sources, or bind a loader function yourself |
-| `async function`, `await` | `Promise` with `.then`, or a host function that suspends |
-| `for await (... of ...)` | Iterate the promises and await each one |
+| `for await (... of ...)` | A plain `for` loop that awaits each promise in an async function |
+| `async function*`, `async *m() {}` | An async function that returns an array, or a generator of promises |
 | `var [a, ...rest] = list` | `var a = list[0], rest = list.slice(1)` |
 | `var { a, ...rest } = obj` | `var a = obj.a, rest = Object.assign({}, obj); delete rest.a` |
 | `var { [key]: v } = obj` | `var v = obj[key]` |

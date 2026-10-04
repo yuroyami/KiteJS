@@ -157,8 +157,14 @@ internal abstract class Icode {
         // Last icode
         // Binds a class body's private names, in a scope of their own, before its constructor is made.
         const val Icode_CLASS_PRIVATE_NAMES = Icode_SUPER_CALL_SPREAD - 1
+        // Suspends an async function on the value at the top of the stack, which it resumes with
+        // the settled value (ECMAScript 2017, 6.2.3.1 Await).
+        const val Icode_AWAIT = Icode_CLASS_PRIVATE_NAMES - 1
+        // Ends a generator with the value a `return` inside a try with a finally stored before
+        // the finally blocks ran.
+        const val Icode_GENERATOR_RETURN_RESULT = Icode_AWAIT - 1
 
-        const val MIN_ICODE = Icode_CLASS_PRIVATE_NAMES
+        const val MIN_ICODE = Icode_GENERATOR_RETURN_RESULT
 
         // The operand byte of CLASS_ELEMENT: the kind of element in the low bits, then flags.
         const val CLASS_ELEMENT_METHOD = 0
@@ -286,6 +292,8 @@ internal abstract class Icode {
             Icode_SUPER_CALL -> "SUPER_CALL"
             Icode_SUPER_CALL_SPREAD -> "SUPER_CALL_SPREAD"
             Icode_CLASS_PRIVATE_NAMES -> "CLASS_PRIVATE_NAMES"
+            Icode_AWAIT -> "AWAIT"
+            Icode_GENERATOR_RETURN_RESULT -> "GENERATOR_RETURN_RESULT"
                 // An icode with no name.
                 else -> throw IllegalStateException(bytecode.toString())
             }

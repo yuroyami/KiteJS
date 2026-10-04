@@ -93,6 +93,23 @@ public open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(p
             }
         }
 
+    /**
+     * An async function, arrow or method (ECMAScript 2017, 14.7). It runs on the generator
+     * machinery, each `await` a suspension its driver resumes, so it is a generator to the code
+     * generator, and an async generator when [isES6Generator] is set too.
+     */
+    public var isAsync: Boolean = false
+        set(value) {
+            field = value
+            if (value) {
+                isGenerator = true
+                requiresActivation = true
+            }
+        }
+
+    /** An async function that is no generator: the call answers a promise of what it returns. */
+    public val isAsyncFunction: Boolean get() = isAsync && !isES6Generator
+
     private var generatorResumePoints: MutableList<Node>? = null
     private var liveLocalsMap: MutableMap<Node, IntArray>? = null
 
@@ -266,6 +283,7 @@ public open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(p
         val isArrow = functionType == ARROW_FUNCTION
         if (!isMethod) {
             sb.append(makeIndent(depth))
+            if (isAsync) sb.append("async ")
             if (!isArrow) {
                 sb.append("function")
             }

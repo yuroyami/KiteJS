@@ -794,6 +794,89 @@ any of that asks the object for `__iterator__`, the iterator protocol of JavaScr
 - Test: `EvalOracleTest.forInFollowsEnumerateObjectProperties`; `ForInEnumerationTest` (common);
   `language/statements/for-in/12.6.4-2.js` and `order-enumerable-shadowed.js`.
 
+### A generator's return value is computed after its finally blocks (D-97)
+
+`return expr` inside a `try` with a `finally` evaluates `expr` before the finally blocks run
+(ECMAScript 2015, 13.10.1 and 13.15.8). In a generator Rhino moves the whole return after them,
+and after the scopes of the blocks it leaves, so
+`function* g() { try { return f() } finally { log('fin') } }` logs `fin` before calling `f`, and
+`function* h() { { let x = 3; try { return x } finally {} } }` throws a ReferenceError for `x`,
+from inside the `try`, which runs the finally block a second time on the way out.
+
+- Where: `NodeTransformer.transformCompilationUnitR`, whose `RETURN` case keeps a generator's
+  return node whole; `Interpreter`'s yield, which reuses the frame result slot a stored return
+  value would need.
+- Test: `SyntaxConformanceTest.generator_return_through_finally` (common).
+
+### A return abandoned inside a finally replaces the one pending (D-97)
+
+While a finally block runs, the completion that entered it waits, and if the block ends normally
+that completion goes on (ECMAScript 2015, 13.15.8). Rhino keeps a pending return value in the
+one result slot of the frame, which any `return` inside the finally block writes too, so when
+that inner return is abandoned by a `break`, a `continue` or a throw the block catches, the outer
+return hands back the inner value:
+`function f() { try { return 42 } finally { do try { return 43 } finally { break } while (0) } }`
+answers 43 where V8 answers 42. The same slot is a script's completion value, so
+`eval('6; try { 7; } finally { 8; }')` answers 8 rather than 7.
+
+- Where: `Interpreter`'s `Icode_STARTSUB` and `Icode_RETSUB`, which keep only the return address
+  of a finally block entered by `Icode_GOSUB`.
+- Test: `SyntaxConformanceTest.abandoned_return_in_finally` (common).
+
+### Duplicate parameters are accepted where the list is not plain (D-97)
+
+A parameter list with a default, a pattern or a rest parameter, and the list of a method or an
+arrow function, may not bind a name twice, in sloppy code too (ECMAScript 2015, 14.1.2, 14.2.1
+and 14.3.1). Rhino takes `function f(x = 0, x) {}`, `function f(x, [x]) {}`,
+`function f(x, ...x) {}`, `({ m(a, a) {} })` and `(a, a) => 1`, and checks plain lists in strict
+code only.
+
+- Where: `Parser.parseFunctionParams` and `Parser.arrowFunctionParams`.
+- Test: `SyntaxConformanceTest.duplicate_parameters` (common).
+
+### A "use strict" body does not reach back to the parameters (D-97)
+
+A function whose body starts with "use strict" is strict code from its name on, so its name and
+parameters may not be `eval`, `arguments` or a reserved word of strict code, nor a parameter
+appear twice (ECMAScript 2015, 12.1.1 and 14.1.2). Rhino applies those rules only when the code
+around the function is strict already, so it takes `function f(a, a) { 'use strict' }`,
+`function f(eval) { 'use strict' }`, `function eval() { 'use strict' }` and
+`function static() { 'use strict' }`.
+
+- Where: `Parser.parseFunctionBody`, where the directive is found.
+- Test: `SyntaxConformanceTest.use_strict_reaches_back_to_the_parameters` (common).
+
+### A block takes two functions of one name whatever they are (D-97)
+
+Two function declarations of one block may share a name only when both are plain functions in
+sloppy code (ECMAScript 2015, 13.2.1.1, and Annex B.3.3.4 for the exception). Rhino takes
+`{ function* f() {} function f() {} }` and, in strict code, `{ function f() {} function f() {} }`.
+
+- Where: `Parser.defineSymbol`.
+- Test: `SyntaxConformanceTest.block_function_redeclarations` (common).
+
+### A let declaration needs no semicolon (D-97)
+
+A `let` declaration ends the way any statement does, with a semicolon or where automatic
+semicolon insertion puts one (ECMAScript 2015, 11.9), so `let x 0` is a SyntaxError. Rhino
+returns from the `let` statement before the check unless a semicolon follows, and runs
+`let x 0` as two statements.
+
+- Where: `Parser.statementHelper`, in its `LET` case.
+- Test: `SyntaxConformanceTest.let_declarations_end_like_statements` (common).
+
+### Parenthesized assignment targets are taken the wrong way round (D-97)
+
+In an assignment pattern a name or property in parentheses is a target like any other, and a
+property takes a default, while a literal in parentheses is no pattern at all (ECMAScript 2015,
+12.14.1 and 12.14.5.1). Rhino rejects `[(a)] = [1]`, `({ a: (b) } = {})` and `[o.x = 5] = []`,
+and takes `({}) = 1` and `([]) = 1` as the patterns inside the parentheses.
+
+- Where: `Parser.assignExpr`, which unwraps parentheses before marking a pattern;
+  `Parser.destructuringArray`, `Parser.destructuringObject` and
+  `Parser.processDestructuringDefaults`, which accept a name or a nested pattern only.
+- Test: `SyntaxConformanceTest.assignment_targets` (common).
+
 ### A getOwnPropertyDescriptor trap answering undefined crashes (D-50)
 
 A Proxy whose `getOwnPropertyDescriptor` trap returns `undefined` for a property the target lacks

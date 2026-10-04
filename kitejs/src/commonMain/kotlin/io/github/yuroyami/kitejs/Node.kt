@@ -374,7 +374,8 @@ public open class Node : Iterable<Node> {
     public fun labelId(): Int {
         if (typeField != Token.TARGET &&
             typeField != Token.YIELD &&
-            typeField != Token.YIELD_STAR
+            typeField != Token.YIELD_STAR &&
+            typeField != Token.AWAIT
         ) {
             Kit.codeBug()
         }
@@ -384,7 +385,8 @@ public open class Node : Iterable<Node> {
     public fun labelId(labelId: Int) {
         if (typeField != Token.TARGET &&
             typeField != Token.YIELD &&
-            typeField != Token.YIELD_STAR
+            typeField != Token.YIELD_STAR &&
+            typeField != Token.AWAIT
         ) {
             Kit.codeBug()
         }
@@ -593,6 +595,7 @@ public open class Node : Iterable<Node> {
         Token.SET_REF_OP,
         Token.YIELD,
         Token.YIELD_STAR,
+        Token.AWAIT,
         -> true
 
         else -> false
@@ -613,7 +616,8 @@ public open class Node : Iterable<Node> {
     private fun resetTargetsRecursive() {
         if (typeField == Token.TARGET ||
             typeField == Token.YIELD ||
-            typeField == Token.YIELD_STAR
+            typeField == Token.YIELD_STAR ||
+            typeField == Token.AWAIT
         ) {
             labelId(-1)
         }
@@ -835,7 +839,13 @@ public open class Node : Iterable<Node> {
 
         /** On a class: the private names its body declares, as an array of strings. */
         internal const val PRIVATE_NAMES_PROP: Int = 36
-        public const val LAST_PROP: Int = PRIVATE_NAMES_PROP
+
+        /**
+         * On the name `async` before `(` on the same line, or on the parameter of `async x =>`:
+         * where the `async` starts, for an async arrow function to start there (D-97).
+         */
+        internal const val ASYNC_ARROW_PROP: Int = 37
+        public const val LAST_PROP: Int = ASYNC_ARROW_PROP
 
         internal const val CLASS_HAS_HERITAGE: Int = 1
         internal const val CLASS_HAS_BINDING: Int = 2
@@ -934,6 +944,7 @@ public open class Node : Iterable<Node> {
             CLASS_FLAGS_PROP -> "class_flags"
             SUPER_CALL_PROP -> "super_call"
             PRIVATE_NAMES_PROP -> "private_names"
+            ASYNC_ARROW_PROP -> "async_arrow"
             else -> throw Kit.codeBug()
         }
 

@@ -809,10 +809,12 @@ public object ScriptRuntime {
         cx: Context?,
         scope: Scriptable,
         es6GeneratorFunction: Boolean = false,
+        asyncFunction: Boolean = false,
     ) {
         fn.parentScope = scope
         fn.prototype =
-            if (es6GeneratorFunction) ScriptableObject.getGeneratorFunctionPrototype(scope)
+            if (asyncFunction) TopLevel.getBuiltinPrototype(ScriptableObject.getTopLevelScope(scope), TopLevel.Builtins.AsyncFunction)
+            else if (es6GeneratorFunction) ScriptableObject.getGeneratorFunctionPrototype(scope)
             else ScriptableObject.getFunctionPrototype(scope)
         if (cx != null && cx.languageVersion >= Context.VERSION_ES6) {
             fn.setStandardPropertyAttributes(ScriptableObject.READONLY or ScriptableObject.DONTENUM)

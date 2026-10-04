@@ -36,6 +36,9 @@ public object CodeGenUtils {
         if (fn.functionName != null) builder.name = fn.name
         if (fn.isInStrictMode) builder.isStrict = true
         if (fn.isES6Generator) builder.isES6Generator = true
+        if (fn.isAsync) builder.isAsync = true
+        // An async function is no constructor and has no `prototype` (ECMAScript 2017, 14.7.10).
+        if (fn.isAsyncFunction) builder.hasPrototype = false
         if (fn.isShorthand) builder.isShorthand = true
         if (fn.isClassFieldInitializer) builder.isClassFieldInitializer = true
         if (fn.classConstructorKind != FunctionNode.NOT_CLASS_CONSTRUCTOR) {

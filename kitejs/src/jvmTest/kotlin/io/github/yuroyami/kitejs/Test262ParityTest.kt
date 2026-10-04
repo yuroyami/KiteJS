@@ -33,20 +33,24 @@ class Test262ParityTest {
 
     /** Upstream's list, copied. A test needing any of these is not run by either engine. */
     private val unsupportedFeatures = setOf(
-        "Atomics", "IsHTMLDDA", "async-functions", "async-iteration", "decorators", "default-arg",
+        "Atomics", "IsHTMLDDA", "async-iteration", "decorators", "default-arg",
         "object-rest", "regexp-dotall", "regexp-unicode-property-escapes",
         "resizable-arraybuffer", "SharedArrayBuffer", "tail-call-optimization", "Temporal",
         "upsert", "u180e",
     )
 
     /**
-     * Folders upstream's properties file skips whole because upstream has no class syntax, which
-     * the port runs anyway (D-95). Upstream fails to parse every file in them, so they only add
-     * to the port's own outcomes and to the cannot-parse list.
+     * Folders upstream's properties file skips whole because upstream has no class syntax (D-95)
+     * and no async functions (D-97), which the port runs anyway. Upstream fails to parse every
+     * file in them, so they only add to the port's own outcomes and to the cannot-parse list.
      */
     private val portOnlyFolders = listOf(
+        "built-ins/AsyncFunction",
+        "language/expressions/async-function",
+        "language/expressions/await",
         "language/expressions/class",
         "language/expressions/new.target",
+        "language/statements/async-function",
         "language/statements/class",
     )
 
@@ -945,6 +949,91 @@ class Test262ParityTest {
         )) {
             put(path, "D-96: for-in follows EnumerateObjectProperties here")
         }
+        // Async functions, which upstream cannot parse inside a test that otherwise runs (D-97).
+        for (path in listOf(
+            "built-ins/AsyncFunction/is-a-constructor.js",
+            "built-ins/Function/prototype/toString/async-function-expression.js",
+        ) + listOf(
+            "a-following-parameter-is-named-arguments", "a-preceding-parameter-is-named-arguments",
+            "fn-body-cntns-arguments-func-decl", "fn-body-cntns-arguments-lex-bind",
+            "fn-body-cntns-arguments-var-bind", "no-pre-existing-arguments-bindings-are-present",
+        ).flatMap { listOf("language/eval-code/direct/async-func-expr-nameless-$it-declare-arguments.js", "language/eval-code/direct/async-func-expr-nameless-$it-declare-arguments-and-assign.js") }) {
+            put(path, "D-97: async functions run here")
+        }
+        // `for (async of` is an early error, which upstream takes as a loop over a name (D-97).
+        put("language/statements/for-of/head-lhs-async-invalid.js", "D-97: `for (async of` is an early error here")
+        // An async test now runs to the end of its microtasks on both engines, and a resolve
+        // function whose `then` getter throws rejects its promise only here (D-81).
+        for (path in listOf(
+            "built-ins/Promise/all/resolve-poisoned-then.js",
+            "built-ins/Promise/allSettled/resolve-poisoned-then.js",
+            "built-ins/Promise/prototype/then/resolve-pending-fulfilled-poisoned-then.js",
+            "built-ins/Promise/prototype/then/resolve-pending-rejected-poisoned-then.js",
+            "built-ins/Promise/prototype/then/resolve-settled-fulfilled-poisoned-then.js",
+            "built-ins/Promise/prototype/then/resolve-settled-rejected-poisoned-then.js",
+            "built-ins/Promise/race/resolve-poisoned-then.js",
+            "built-ins/Promise/resolve-poisoned-then-deferred.js",
+            "built-ins/Promise/resolve-poisoned-then-immed.js",
+            "built-ins/Promise/resolve/arg-poisoned-then.js",
+            "built-ins/Promise/resolve/resolve-poisoned-then.js",
+        )) {
+            put(path, "D-81: a resolution whose then getter throws rejects the promise here")
+        }
+        // A "use strict" body makes its own function's name and parameters strict too, which
+        // upstream checks only in code that was strict already (D-97).
+        for (path in listOf(
+            "built-ins/Function/15.3.2.1-10-6gs.js",
+            "built-ins/Function/15.3.2.1-11-1-s.js",
+            "built-ins/Function/15.3.2.1-11-3-s.js",
+            "built-ins/Function/15.3.2.1-11-5-s.js",
+            "language/expressions/function/name-arguments-strict-body.js",
+            "language/expressions/function/param-duplicated-strict-body-1.js",
+            "language/expressions/function/param-duplicated-strict-body-2.js",
+            "language/expressions/function/param-duplicated-strict-body-3.js",
+            "language/expressions/function/param-eval-strict-body.js",
+            "language/expressions/object/setter-param-arguments-strict-inside.js",
+            "language/expressions/object/setter-param-eval-strict-inside.js",
+            "language/statements/function/13.1-22-s.js",
+            "language/statements/function/name-arguments-strict-body.js",
+            "language/statements/function/name-eval-strict-body.js",
+            "language/statements/function/param-arguments-strict-body.js",
+            "language/statements/function/param-duplicated-strict-body-1.js",
+            "language/statements/function/param-duplicated-strict-body-2.js",
+            "language/statements/function/param-duplicated-strict-body-3.js",
+            "language/statements/function/param-eval-strict-body.js",
+        )) {
+            put(path, "D-97: a use strict body reaches back to the name and parameters here")
+        }
+        // A block takes two functions of one name only when both are plain ones in sloppy code;
+        // upstream takes any two (D-97).
+        for (scope in listOf("block-scope", "statements/switch")) {
+            for (pair in listOf("function-name-redeclaration-attempt-with-function", "function-name-redeclaration-attempt-with-generator", "generator-name-redeclaration-attempt-with-function", "generator-name-redeclaration-attempt-with-generator")) {
+                put("language/$scope/syntax/redeclaration/$pair.js", "D-97: a block takes two functions of one name only when both are plain sloppy ones here")
+            }
+        }
+        // Duplicate names in an arrow's destructured parameters are an early error in any mode (D-97).
+        for (path in listOf("array-1", "array-2", "object-1", "object-2", "object-3", "object-6")) {
+            put("language/expressions/arrow-function/syntax/early-errors/arrowparameters-cover-no-duplicates-binding-$path.js", "D-97: duplicate parameters are an early error where the list is not plain here")
+        }
+        // A parenthesized object literal is no assignment target (D-97).
+        for (path in listOf(
+            "language/expressions/assignmenttargettype/direct-arrowfunction-1.js",
+            "language/expressions/assignmenttargettype/parenthesized-primaryexpression-objectliteral.js",
+        )) {
+            put(path, "D-97: a parenthesized literal is no assignment target here")
+        }
+        // Async generators are a SyntaxError here until async iteration lands (#91), and upstream
+        // cannot parse them either; the two fail differently.
+        for (path in listOf(
+            "a-following-parameter-is-named-arguments", "a-preceding-parameter-is-named-arguments",
+            "fn-body-cntns-arguments-func-decl", "fn-body-cntns-arguments-lex-bind",
+            "fn-body-cntns-arguments-var-bind", "no-pre-existing-arguments-bindings-are-present",
+        ).flatMap { listOf("language/eval-code/direct/async-gen-func-expr-$it-declare-arguments.js", "language/eval-code/direct/async-gen-func-expr-$it-declare-arguments-and-assign.js") }) {
+            put(path, "#91: async generators are not supported yet here, and upstream cannot parse them")
+        }
+        // An async function in a switch case is not block-scoped here yet (#85), and upstream
+        // cannot parse it; the two fail differently.
+        put("language/statements/switch/scope-lex-async-function.js", "#85: functions in a switch case are not block-scoped yet here")
     }
 
     /**
@@ -974,6 +1063,22 @@ class Test262ParityTest {
             "language/types/reference/put-value-prop-base-primitive.js",
         )) {
             put(path, "D-89: proxy traps receive the receiver and are believed when they refuse here")
+        }
+        // Duplicate parameters are an early error where the list is not plain, in any mode; in
+        // strict code they are one on both engines (D-97).
+        for (path in listOf(
+            "language/expressions/arrow-function/dflt-params-duplicates.js",
+            "language/expressions/arrow-function/params-duplicate.js",
+            "language/expressions/arrow-function/syntax/early-errors/arrowparameters-cover-no-duplicates.js",
+            "language/expressions/function/dflt-params-duplicates.js",
+            "language/expressions/generators/dflt-params-duplicates.js",
+            "language/expressions/object/method-definition/early-errors-object-method-duplicate-parameters.js",
+            "language/expressions/object/method-definition/gen-meth-dflt-params-duplicates.js",
+            "language/expressions/object/method-definition/meth-dflt-params-duplicates.js",
+            "language/statements/function/dflt-params-duplicates.js",
+            "language/statements/generators/dflt-params-duplicates.js",
+        )) {
+            put(path, "D-97: duplicate parameters are an early error where the list is not plain here")
         }
     }
 
@@ -1052,8 +1157,9 @@ class Test262ParityTest {
             val source = file.readText()
             val meta = Test262FrontMatter.parse(source)
             if (meta.features.any { it in unsupportedFeatures }) { skipped++; continue }
-            // Neither engine has modules, and async needs a host event loop the runner has not got.
-            if (meta.hasFlag("module") || meta.hasFlag("async")) { skipped++; continue }
+            // Neither engine has modules. An async test runs to the end of its microtasks and
+            // reports through $DONE on both (D-97).
+            if (meta.hasFlag("module")) { skipped++; continue }
 
             val modes = buildList {
                 if (!meta.hasFlag("onlyStrict")) add(false)
@@ -1192,6 +1298,17 @@ class Test262ParityTest {
             cx.languageVersion = UContext.VERSION_ES6
             cx.isInterpretedMode = true
             val scope = cx.initSafeStandardObjects(org.mozilla.javascript.TopLevel(), false)
+            val printed = StringBuilder()
+            val print = org.mozilla.javascript.LambdaFunction(
+                scope,
+                "print",
+                1,
+                org.mozilla.javascript.SerializableCallable { _, _, _, args ->
+                    printed.append(args.joinToString(" ") { org.mozilla.javascript.Context.toString(it) }).append('\n')
+                    org.mozilla.javascript.Undefined.instance
+                },
+            )
+            scope.defineProperty("print", print, org.mozilla.javascript.ScriptableObject.DONTENUM)
             for (name in meta.harnessFiles()) {
                 upstreamHarness.getOrPut(name) {
                     cx.compileString(harnessSource(name), "harness/$name", 1, null)
@@ -1205,7 +1322,10 @@ class Test262ParityTest {
                 val script = cx.compileString(text, path, if (strict) 0 else 1, null)
                 failedEarly = false
                 script.exec(cx, scope, scope)
-                if (meta.isNegative) unexpectedPass(meta) else PASS
+                cx.processMicrotasks()
+                if (meta.isNegative) unexpectedPass(meta)
+                else if (meta.hasFlag("async")) Test262Execution.asyncOutcome(printed.toString())
+                else PASS
             } catch (e: org.mozilla.javascript.RhinoException) {
                 judge(meta, errorNameUpstream(e), failedEarly)
             }

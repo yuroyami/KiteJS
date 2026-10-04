@@ -133,29 +133,47 @@ public class NativePromise : ScriptableObject() {
         private fun doResolve(cx: Context, scope: Scriptable, promise: NativePromise, resolution: Any?): Any {
             if (alreadyResolved) return Undefined.instance
             alreadyResolved = true
-
-            if (resolution === promise) {
-                val err = ScriptRuntime.newNativeError(
-                    cx, scope, TopLevel.NativeErrors.TypeError, arrayOf<Any?>("No promise self-resolution"),
-                )
-                return promise.rejectPromise(cx, scope, err)
-            }
-
-            if (!ScriptRuntime.isObject(resolution)) return promise.fulfillPromise(cx, scope, resolution)
-
-            // A `then` getter that throws rejects the promise. Upstream lets the error escape the
-            // resolve function with the promise already marked resolved, so it stays pending (D-81).
-            val thenObj = try {
-                getProperty(ensureScriptable(resolution), "then")
-            } catch (re: RhinoException) {
-                return promise.rejectPromise(cx, scope, getErrorObject(cx, scope, re))
-            }
-            if (thenObj !is Callable) return promise.fulfillPromise(cx, scope, resolution)
-
-            // A thenable is adopted through a microtask, never synchronously.
-            cx.enqueueMicrotask(Context.Runnable { promise.callThenable(cx, scope, resolution, thenObj) })
-            return Undefined.instance
+            return promise.resolve(cx, scope, resolution)
         }
+    }
+
+    /** What a promise's resolve function does once it counts: fulfill, reject, or adopt a thenable. */
+    private fun resolve(cx: Context, scope: Scriptable, resolution: Any?): Any {
+        if (resolution === this) {
+            val err = ScriptRuntime.newNativeError(
+                cx, scope, TopLevel.NativeErrors.TypeError, arrayOf<Any?>("No promise self-resolution"),
+            )
+            return rejectPromise(cx, scope, err)
+        }
+
+        if (!ScriptRuntime.isObject(resolution)) return fulfillPromise(cx, scope, resolution)
+
+        // A `then` getter that throws rejects the promise. Upstream lets the error escape the
+        // resolve function with the promise already marked resolved, so it stays pending (D-81).
+        val thenObj = try {
+            getProperty(ensureScriptable(resolution), "then")
+        } catch (re: RhinoException) {
+            return rejectPromise(cx, scope, getErrorObject(cx, scope, re))
+        }
+        if (thenObj !is Callable) return fulfillPromise(cx, scope, resolution)
+
+        // A thenable is adopted through a microtask, never synchronously.
+        cx.enqueueMicrotask(Context.Runnable { callThenable(cx, scope, resolution, thenObj) })
+        return Undefined.instance
+    }
+
+    /**
+     * Settles a promise the engine made itself, such as the one an async function returns, the
+     * way its resolve function would, once. Its resolving functions are never handed to script,
+     * so nothing else can settle it first.
+     */
+    internal fun resolveFromEngine(cx: Context, scope: Scriptable, resolution: Any?) {
+        if (state == State.PENDING) resolve(cx, scope, resolution)
+    }
+
+    /** Rejects a promise the engine made itself, the way its reject function would. */
+    internal fun rejectFromEngine(cx: Context, scope: Scriptable, reason: Any?) {
+        if (state == State.PENDING) rejectPromise(cx, scope, reason)
     }
 
     /**
@@ -496,6 +514,39 @@ public class NativePromise : ScriptableObject() {
             )
             return true
         }
+
+        /**
+         * A pending promise of [scope]'s realm, the one `NewPromiseCapability(%Promise%)` makes,
+         * which nothing a script did can observe.
+         */
+        internal fun newIntrinsic(cx: Context, scope: Scriptable): NativePromise {
+            val top = getTopLevelScope(scope)
+            val promise = NativePromise()
+            promise.parentScope = top
+            promise.prototype = TopLevel.getBuiltinPrototype(top, TopLevel.Builtins.Promise)
+            return promise
+        }
+
+        /**
+         * The spec's Await (ECMAScript 2017, 6.2.3.1): `PromiseResolve(%Promise%, value)`, then
+         * [onFulfilled] or [onRejected] from the microtask queue once that promise settles, with
+         * no promise of their own to settle. Throws what PromiseResolve throws, as when reading
+         * the `constructor` of a promise does, which the caller throws at the `await`.
+         */
+        internal fun await(cx: Context, scope: Scriptable, value: Any?, onFulfilled: Callable, onRejected: Callable) {
+            val top = getTopLevelScope(scope)
+            val ctor = TopLevel.getBuiltinCtor(cx, top, TopLevel.Builtins.Promise)
+            val promise = resolveInternal(cx, top, ctor, value) as NativePromise
+            promise.addReactions(
+                cx,
+                top,
+                Reaction(null, ReactionType.FULFILL, onFulfilled),
+                Reaction(null, ReactionType.REJECT, onRejected),
+            )
+        }
+
+        /** The value a promise rejects with for an engine exception, as [getErrorObject] makes it. */
+        internal fun errorValue(cx: Context, scope: Scriptable, re: RhinoException): Any? = getErrorObject(cx, scope, re)
 
         private fun js_resolve(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             if (!ScriptRuntime.isObject(thisObj)) {

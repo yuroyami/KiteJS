@@ -30,7 +30,9 @@ data class Test262FrontMatter(
     fun harnessFiles(): List<String> {
         // A "raw" test gets nothing, not even assert.js.
         if (hasFlag("raw")) return emptyList()
-        return listOf("assert.js", "sta.js") + includes
+        // An async test reports through $DONE, which doneprintHandle.js prints (INTERPRETING.md).
+        val done = if (hasFlag("async")) listOf("doneprintHandle.js") else emptyList()
+        return listOf("assert.js", "sta.js") + done + includes
     }
 
     companion object {

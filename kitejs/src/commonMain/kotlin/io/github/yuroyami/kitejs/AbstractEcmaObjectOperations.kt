@@ -538,6 +538,7 @@ public object AbstractEcmaObjectOperations {
     private fun builtinCtor(realm: Scriptable, type: TopLevel.Builtins): Any? {
         TopLevel.cachedBuiltinCtor(realm, type)?.let { return it }
         if (type == TopLevel.Builtins.GeneratorFunction) return ScriptableObject.getTopScopeValue(realm, BaseFunction.GENERATOR_FUNCTION_CLASS)
+        if (type == TopLevel.Builtins.AsyncFunction) return ScriptableObject.getTopScopeValue(realm, BaseFunction.ASYNC_FUNCTION_CLASS)
         return ScriptableObject.getProperty(realm, type.name)
     }
 

@@ -40,6 +40,12 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
     public val isTopLevel: Boolean get() = (flags and IS_TOP_LEVEL_FLAG) != 0
     public val isFunction: Boolean get() = functionType != 0
     public val isES6Generator: Boolean get() = (flags and IS_ES6_GENERATOR_FLAG) != 0
+
+    /** An async function or async generator (ECMAScript 2017, 14.7; ECMAScript 2018, 14.5). */
+    public val isAsync: Boolean get() = (flags and IS_ASYNC_FLAG) != 0
+
+    /** An async function that is no generator, whose call returns a promise. */
+    public val isAsyncFunction: Boolean get() = (flags and (IS_ASYNC_FLAG or IS_ES6_GENERATOR_FLAG)) == IS_ASYNC_FLAG
     public val isShorthand: Boolean get() = (flags and IS_SHORTHAND_FLAG) != 0
     public val hasPrototype: Boolean get() = (flags and HAS_PROTOTYPE_FLAG) != 0
     public val hasLexicalThis: Boolean get() = (flags and HAS_LEXICAL_THIS_FLAG) != 0
@@ -101,6 +107,7 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
         public var isScript: Boolean = false
         public var isTopLevel: Boolean = false
         public var isES6Generator: Boolean = false
+        public var isAsync: Boolean = false
         public var isShorthand: Boolean = false
         public var hasPrototype: Boolean = false
         public var hasLexicalThis: Boolean = false
@@ -155,6 +162,7 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
             f = f or (if (isScript) IS_SCRIPT_FLAG else 0)
             f = f or (if (isTopLevel) IS_TOP_LEVEL_FLAG else 0)
             f = f or (if (isES6Generator) IS_ES6_GENERATOR_FLAG else 0)
+            f = f or (if (isAsync) IS_ASYNC_FLAG else 0)
             f = f or (if (isShorthand) IS_SHORTHAND_FLAG else 0)
             f = f or (if (hasPrototype) HAS_PROTOTYPE_FLAG else 0)
             f = f or (if (hasLexicalThis) HAS_LEXICAL_THIS_FLAG else 0)
@@ -212,5 +220,6 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
         const val IS_DERIVED_CONSTRUCTOR_FLAG = 1 shl 14
         const val IS_DEFAULT_CONSTRUCTOR_FLAG = 1 shl 15
         const val IS_CLASS_FIELD_INITIALIZER_FLAG = 1 shl 16
+        const val IS_ASYNC_FLAG = 1 shl 17
     }
 }

@@ -245,7 +245,6 @@ class IcodeOracleTest {
             "delete a[b]; a[b]++; a.b--; ++a[b]",
             "function f() { return; } function g() { }",
             "var x; let y = 1; const z = 2; { let y = 3 }",
-            "async function f() { await x }",
             "var o = { __proto__: p }",
             "if (a) { function f() {} }",
             "var f = function () { return arguments }; f.arguments",
@@ -277,12 +276,14 @@ class IcodeOracleTest {
         assertEquals(emptyList(), failures, "icode differs from upstream")
     }
 
-    /** Syntax the port added, which upstream still rejects: class definitions (D-95). */
+    /** Syntax the port added, which upstream still rejects: class definitions (D-95) and async functions (D-97). */
     @Test
     fun syntaxOnlyThePortHasCompiles() {
         val sources = listOf(
             "class C { constructor() {} }",
             "class D extends C { #x = 1; static { this.y = new.target } m() { return super.m() + this.#x } }",
+            "async function f() { await x }",
+            "var g = async (a, ...b) => await a; var o = { async m() { return await this } }",
         )
         for (source in sources) {
             assertTrue(runCatching { upstreamIcode(source) }.isFailure, "upstream now compiles $source")

@@ -158,8 +158,9 @@ internal class TokenStream(
                 "while" -> Token.WHILE
                 "with" -> Token.WITH
                 "yield" -> Token.YIELD
-                // 11.6.2.2 Future Reserved Words
-                "await" -> Token.RESERVED
+                // 11.6.2.2 Future Reserved Words. `await` is not one in a script: it is a name
+                // the parser takes as the operator in an async function or a class static block
+                // (ECMAScript 2017, 12.1.1), where ES6's table had it reserved everywhere (D-97).
                 "enum" -> Token.RESERVED
                 // 11.6.2.2 NOTE Strict Future Reserved Words
                 "implements" -> if (isStrict) Token.RESERVED else 0
@@ -1742,6 +1743,39 @@ internal class TokenStream(
         private set
     var tokenEnd: Int = 0
         private set
+
+    /**
+     * Whether the keyword `function` comes next from [from], the end of the token just scanned,
+     * on the same line, as it does after the `async` of an async function (ECMAScript 2017,
+     * 14.7). Reads the source directly, past spaces and comments without a line break, and moves
+     * nothing: the parser has one token of lookahead, and `async` alone is an ordinary name. The
+     * caller says where the token ends because [tokenEnd] does not: after a name it sits one
+     * character further on, past the character that ended the name, a line break included.
+     */
+    internal fun functionFollowsOnSameLine(from: Int): Boolean {
+        var i = from
+        while (i < sourceEnd) {
+            val c = sourceString[i].code
+            if (ScriptRuntime.isJSLineTerminator(c)) return false
+            if (isJSSpace(c) || isJSFormatChar(c)) {
+                i++
+            } else if (c == '/'.code && i + 1 < sourceEnd && sourceString[i + 1] == '*') {
+                val close = sourceString.indexOf("*/", i + 2)
+                if (close < 0) return false
+                for (j in i + 2 until close) {
+                    if (ScriptRuntime.isJSLineTerminator(sourceString[j].code)) return false
+                }
+                i = close + 2
+            } else {
+                break
+            }
+        }
+        if (!sourceString.startsWith("function", i)) return false
+        val after = i + "function".length
+        if (after >= sourceEnd) return true
+        val c = sourceString[after].code
+        return !(c == '$'.code || c == '_'.code || c == '\\'.code || Characters.isUnicodeIdentifierPart(c))
+    }
 
     private var lastLineEnd = 0
     private var tokenStartLastLineEnd = 0

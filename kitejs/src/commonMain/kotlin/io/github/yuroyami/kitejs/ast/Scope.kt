@@ -36,6 +36,13 @@ public open class Scope(pos: Int = -1, len: Int = 1) : Jump() {
      */
     internal var functionNamesWithin: MutableSet<String>? = null
 
+    /**
+     * Those of [functionNamesWithin] that are generators or async functions, which no other
+     * function of the block may share a name with, where Annex B.3.3.4 lets two plain functions
+     * of a block in sloppy code do so.
+     */
+    internal var nonPlainFunctionNamesWithin: MutableSet<String>? = null
+
     private var childScopeList: MutableList<Scope>? = null
 
     init {

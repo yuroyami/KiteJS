@@ -9,6 +9,7 @@ import io.github.yuroyami.kitejs.ast.ArrayComprehension
 import io.github.yuroyami.kitejs.ast.ArrayComprehensionLoop
 import io.github.yuroyami.kitejs.ast.ArrayLiteral
 import io.github.yuroyami.kitejs.ast.Assignment
+import io.github.yuroyami.kitejs.ast.AwaitExpression
 import io.github.yuroyami.kitejs.ast.AstNode
 import io.github.yuroyami.kitejs.ast.AstRoot
 import io.github.yuroyami.kitejs.ast.BigIntLiteral
@@ -140,6 +141,24 @@ public class Parser(
 
     /** Set in a class static block outside any function in it, where `return` is an early error. */
     private var inStaticBlock = false
+
+    /**
+     * What `await` is here (ECMAScript 2017, 12.1.1 and 14.7): a name ([AWAIT_NAME]), the operator
+     * of an async function body ([AWAIT_OPERATOR]), or a reserved word that no await expression
+     * may use, in an async function's parameters ([AWAIT_IN_PARAMS]) and in a class static
+     * block ([AWAIT_IN_STATIC_BLOCK]). A function or a non-async arrow body sets its own (D-97).
+     */
+    private var awaitContext = AWAIT_NAME
+
+    /**
+     * Where the last `await` spelled as an identifier began, outside the bodies of the functions
+     * parsed since: an async arrow function checks that none came in its parameters, which it only
+     * knows to be parameters once it reaches its `=>` (ECMAScript 2017, 14.7.1).
+     */
+    private var lastAwaitNamePos = -1
+
+    /** Whether the argument list just parsed ended with a comma, which no rest parameter may take. */
+    private var argumentsTrailingComma = false
     internal var currentScope: Scope? = null
     private var endFlags = 0
     private var inForInit = false // bound temporarily during forStatement()
@@ -583,6 +602,15 @@ public class Parser(
                     } catch (e: ParserException) {
                         break
                     }
+                } else if (tt == Token.NAME && asyncFunctionFollows()) {
+                    inDirectivePrologue = false
+                    n = try {
+                        asyncFunction(
+                            if (calledByCompileFunction) FunctionNode.FUNCTION_EXPRESSION else FunctionNode.FUNCTION_STATEMENT,
+                        )
+                    } catch (e: ParserException) {
+                        break
+                    }
                 } else if (tt == Token.COMMENT) {
                     n = lastScannedComment()
                     consumeToken()
@@ -627,8 +655,10 @@ public class Parser(
     private fun parseFunctionBody(type: Int, fnNode: FunctionNode): AstNode {
         var isExpressionClosure = false
         if (!matchToken(Token.LC, true)) {
-            if (compilerEnv.languageVersion < Context.VERSION_1_8 &&
-                type != FunctionNode.ARROW_FUNCTION
+            // An expression closure is JavaScript 1.8's, which SpiderMonkey never took for a
+            // generator or an async function either (D-97).
+            if (type != FunctionNode.ARROW_FUNCTION &&
+                (compilerEnv.languageVersion < Context.VERSION_1_8 || fnNode.isAsync || fnNode.isES6Generator)
             ) {
                 reportError("msg.no.brace.body")
             } else {
@@ -663,7 +693,11 @@ public class Parser(
             } else {
                 bodyLoop@ while (true) {
                     val n: AstNode
-                    when (peekToken()) {
+                    val next = peekToken()
+                    if (next == Token.NAME && asyncFunctionFollows()) {
+                        inDirectivePrologue = false
+                        n = asyncFunction(FunctionNode.FUNCTION_STATEMENT)
+                    } else when (next) {
                         Token.ERROR, Token.EOF, Token.RC -> break@bodyLoop
                         Token.COMMENT -> {
                             consumeToken()
@@ -687,6 +721,7 @@ public class Parser(
                                     ) {
                                         reportError("msg.use.strict.non.simple")
                                     }
+                                    checkNamesOfStrictFunction(fnNode)
                                     inUseStrictDirective = true
                                     fnNode.isInStrictMode = true
                                     if (!savedStrictMode) {
@@ -726,6 +761,8 @@ public class Parser(
             var destructuringDefault: MutableMap<String, AstNode>? = null
 
             val paramNames = HashSet<String>()
+            // Every name the list binds, patterns included, for the duplicate check at the end.
+            val boundParamNames = ArrayList<String>()
             do {
                 val tt = peekToken()
                 if (tt == Token.RP) {
@@ -763,6 +800,7 @@ public class Parser(
                         val lhs = expr.left!! // [x = 1]
                         val rhs = expr.right!! // [2]
                         markDestructuring(lhs)
+                        boundNames(lhs, boundParamNames)
                         fnNode.addParam(lhs)
                         val pname = currentScriptOrFn!!.getNextTempName()
                         defineSymbol(Token.LP, pname, false)
@@ -773,6 +811,7 @@ public class Parser(
                         destructuringDefault[pname] = rhs
                     } else {
                         markDestructuring(expr)
+                        boundNames(expr, boundParamNames)
                         fnNode.addParam(expr)
                         // Destructuring assignment for parameters: add a dummy parameter name and
                         // a statement in the body that initializes the real variables from it.
@@ -810,6 +849,7 @@ public class Parser(
                             val pattern = destructuringPrimaryExpr()
                             if (peekToken() == Token.ASSIGN) reportError("msg.rest.default")
                             markDestructuring(pattern)
+                            boundNames(pattern, boundParamNames)
                             fnNode.addParam(pattern)
                             val pname = currentScriptOrFn!!.getNextTempName()
                             defineSymbol(Token.LP, pname, false)
@@ -838,6 +878,7 @@ public class Parser(
                         getAndResetJsDoc()?.let { paramNameNode.jsDocNode = it }
                         fnNode.addParam(paramNameNode)
                         val paramName = ts.string!!
+                        boundParamNames.add(paramName)
                         defineSymbol(Token.LP, paramName)
                         if (this.inUseStrictDirective) {
                             if ("eval" == paramName || "arguments" == paramName) {
@@ -862,6 +903,13 @@ public class Parser(
                     }
                 }
             } while (matchToken(Token.COMMA, true))
+
+            // A list with a default, a pattern or a rest parameter, and the list of a method, may
+            // not bind a name twice, in sloppy code too (ECMAScript 2015, 14.1.2 and 14.3.1).
+            // Upstream checked plain lists in strict code only.
+            if (fnNode.isMethodDefinition || fnNode.defaultParams != null || fnNode.hasRestParameter || destructuring != null) {
+                firstDuplicate(boundParamNames)?.let { addError("msg.dup.param.strict", it) }
+            }
 
             if (destructuring != null) {
                 val destructuringNode = Node(Token.COMMA)
@@ -902,13 +950,19 @@ public class Parser(
         sourceStart: Int = -1,
         classConstructorKind: Int = FunctionNode.NOT_CLASS_CONSTRUCTOR,
         isGeneratorMethod: Boolean = false,
+        isAsync: Boolean = false,
+        asyncStart: Int = -1,
     ): FunctionNode {
         var isGenerator = false
         var syntheticType = type
         val inIfClause = ifClauseFunction
         ifClauseFunction = false
+        // An `await` in a function, its name included, is no business of an async arrow head
+        // around it.
+        val savedLastAwaitNamePos = lastAwaitNamePos
         val baseLineno = lineNumber() // line number where the source starts
-        val functionSourceStart = ts.tokenBeg // start of the "function" keyword
+        // The start of the "function" keyword, or of the `async` before it.
+        val functionSourceStart = if (asyncStart >= 0) asyncStart else ts.tokenBeg
         val functionTextStart = if (sourceStart >= 0) sourceStart else functionSourceStart
         val functionStartColumn = columnNumber()
         var name: Name? = null
@@ -960,17 +1014,26 @@ public class Parser(
             name.length() > 0
         ) {
             // Function statements define a symbol in the enclosing scope.
-            defineSymbol(Token.FUNCTION, name.identifier!!, false, inIfClause)
+            defineSymbol(Token.FUNCTION, name.identifier!!, false, inIfClause, plainFunction = !isGenerator && !isAsync)
+        }
+
+        // An async function expression's own name is bound inside it, where `await` is reserved
+        // (ECMAScript 2017, 14.7: BindingIdentifier[+Await]).
+        if (isAsync && type == FunctionNode.FUNCTION_EXPRESSION && "await" == name?.identifier) {
+            reportError("msg.reserved.id", "await")
         }
 
         val fnNode = FunctionNode(functionSourceStart, name)
         fnNode.isMethodDefinition = isMethodDefiniton
         fnNode.functionType = type
         fnNode.classConstructorKind = classConstructorKind
+        if (isAsync) fnNode.isAsync = true
         // A generator method is known to be one before its body, which may not use `yield` as a
         // name either.
         if (isGenerator || isGeneratorMethod) {
             fnNode.isES6Generator = true
+            // Async generators are ECMAScript 2018 and follow on their own (D-97).
+            if (isAsync) reportError("msg.async.generator.unsupported")
         }
         if (lpPos != -1) fnNode.lp = lpPos - functionSourceStart
 
@@ -982,13 +1045,16 @@ public class Parser(
         val savedNewTargetAllowed = newTargetAllowed
         val savedInClassInitializer = inClassInitializer
         val savedInStaticBlock = inStaticBlock
+        val savedAwaitContext = awaitContext
         insideMethod = isMethodDefiniton
         superCallAllowed = classConstructorKind == FunctionNode.DERIVED_CLASS_CONSTRUCTOR
         newTargetAllowed = true
         inClassInitializer = false
         inStaticBlock = false
         try {
+            awaitContext = if (isAsync) AWAIT_IN_PARAMS else AWAIT_NAME
             parseFunctionParams(fnNode)
+            awaitContext = if (isAsync) AWAIT_OPERATOR else AWAIT_NAME
             val body = parseFunctionBody(type, fnNode)
             fnNode.body = body
             val end = functionSourceStart + body.position + body.length
@@ -1011,6 +1077,8 @@ public class Parser(
             newTargetAllowed = savedNewTargetAllowed
             inClassInitializer = savedInClassInitializer
             inStaticBlock = savedInStaticBlock
+            awaitContext = savedAwaitContext
+            lastAwaitNamePos = savedLastAwaitNamePos
         }
 
         if (memberExprNode != null) {
@@ -1031,13 +1099,39 @@ public class Parser(
         return fnNode
     }
 
-    private fun arrowFunction(params: AstNode?, startLine: Int, startColumn: Int): AstNode {
+    /**
+     * An async function declaration or expression of [type], from its `async`, which
+     * [asyncFunctionFollows] has seen is next (ECMAScript 2017, 14.7).
+     */
+    private fun asyncFunction(type: Int): FunctionNode {
+        consumeToken()
+        val asyncStart = ts.tokenBeg
+        mustMatchToken(Token.FUNCTION, "msg.syntax", true)
+        return function(type, false, isAsync = true, asyncStart = asyncStart)
+    }
+
+    /**
+     * The arrow function whose parameters, parsed as an expression, are [params]. With an
+     * [asyncStart], where its `async` begins, it is an async arrow function and [params] is the
+     * `x` of `async x` or the call `async(...)` whose arguments become its parameters (ECMAScript
+     * 2017, 14.7).
+     */
+    private fun arrowFunction(params: AstNode?, startLine: Int, startColumn: Int, asyncStart: Int = -1): AstNode {
         val baseLineno = lineNumber() // line number where the source starts
-        val functionSourceStart = params?.position ?: -1
+        val isAsync = asyncStart >= 0
+        val functionSourceStart = if (isAsync) asyncStart else params?.position ?: -1
 
         val fnNode = FunctionNode(functionSourceStart)
         fnNode.functionType = FunctionNode.ARROW_FUNCTION
         fnNode.jsDocNode = getAndResetJsDoc()
+        if (isAsync) fnNode.isAsync = true
+
+        // No arrow function takes an await expression in its parameters, and an async one no
+        // `await` at all, as an identifier there would be one in its own body (ECMAScript 2017,
+        // 14.2.1 and 14.7.1).
+        if (params != null && containsAwaitExpression(params) || isAsync && lastAwaitNamePos > asyncStart) {
+            reportError("msg.await.params")
+        }
 
         // Would prefer to defer createDestructuringAssignment to codegen, but the symbol
         // definitions have to happen now, before the body is parsed.
@@ -1050,9 +1144,15 @@ public class Parser(
         // and so do super(), new.target and the restrictions of a class initializer. Only a
         // return is the arrow function's own again.
         val savedInStaticBlock = inStaticBlock
+        val savedAwaitContext = awaitContext
+        val savedLastAwaitNamePos = lastAwaitNamePos
         inStaticBlock = false
         try {
-            if (params is ParenthesizedExpression) {
+            // An async arrow function binds no `await` among its parameters.
+            if (isAsync) awaitContext = AWAIT_IN_PARAMS
+            if (isAsync && params is FunctionCall) {
+                asyncArrowParams(fnNode, params, destructuring, destructuringDefault, paramNames)
+            } else if (params is ParenthesizedExpression) {
                 fnNode.setParens(0, params.length)
                 if (params.getIntProp(Node.TRAILING_COMMA, 0) == 1) {
                     fnNode.putIntProp(Node.TRAILING_COMMA, 1)
@@ -1082,6 +1182,9 @@ public class Parser(
                 fnNode.putProp(Node.DESTRUCTURING_PARAMS, destructuringNode)
             }
 
+            // The body of a plain arrow function takes `await` as a name even inside an async
+            // function; only its parameters are the enclosing function's (ECMAScript 2017, 14.2).
+            awaitContext = if (isAsync) AWAIT_OPERATOR else AWAIT_NAME
             val body = parseFunctionBody(FunctionNode.ARROW_FUNCTION, fnNode)
             fnNode.body = body
             val end = functionSourceStart + body.position + body.length
@@ -1090,9 +1193,11 @@ public class Parser(
         } finally {
             savedVars.restore()
             inStaticBlock = savedInStaticBlock
+            awaitContext = savedAwaitContext
+            lastAwaitNamePos = savedLastAwaitNamePos
         }
 
-        if (fnNode.isGenerator) {
+        if (fnNode.isGenerator && !fnNode.isAsync) {
             reportError("msg.arrowfunction.generator")
             return makeErrorNode()
         }
@@ -1105,6 +1210,45 @@ public class Parser(
         return fnNode
     }
 
+    /**
+     * The parameters of `async(...) =>`, from the arguments of the call they were parsed as. A
+     * spread argument is the rest parameter, which comes last, with no comma after it.
+     */
+    private fun asyncArrowParams(
+        fnNode: FunctionNode,
+        call: FunctionCall,
+        destructuring: MutableMap<String, Node>,
+        destructuringDefault: MutableMap<String, AstNode>,
+        paramNames: MutableSet<String>,
+    ) {
+        fnNode.setParens(call.lp, call.rp)
+        if (call.getIntProp(Node.TRAILING_COMMA, 0) == 1) fnNode.putIntProp(Node.TRAILING_COMMA, 1)
+        val args = call.arguments
+        for ((i, arg) in args.withIndex()) {
+            if (arg is Spread) {
+                if (i != args.size - 1 || fnNode.getIntProp(Node.TRAILING_COMMA, 0) == 1) {
+                    reportError("msg.parm.after.rest", arg.position, arg.length)
+                }
+                val rest = arg.expression!!
+                if (rest is Assignment) reportError("msg.rest.default")
+                fnNode.hasRestParameter = true
+                arrowFunctionParams(fnNode, rest, destructuring, destructuringDefault, paramNames)
+            } else {
+                arrowFunctionParams(fnNode, arg, destructuring, destructuringDefault, paramNames)
+            }
+        }
+    }
+
+    /** Whether [node] holds an await expression outside any function nested in it. */
+    private fun containsAwaitExpression(node: AstNode): Boolean {
+        var found = false
+        node.visit { n ->
+            if (n is AwaitExpression) found = true
+            !found && n !is FunctionNode
+        }
+        return found
+    }
+
     private fun arrowFunctionParams(
         fnNode: FunctionNode,
         params: AstNode?,
@@ -1114,6 +1258,7 @@ public class Parser(
     ) {
         if (params is ArrayLiteral || params is ObjectLiteral) {
             markDestructuring(params)
+            arrowPatternNames(params, paramNames)
             fnNode.addParam(params)
             val pname = currentScriptOrFn!!.getNextTempName()
             defineSymbol(Token.LP, pname, false)
@@ -1144,6 +1289,10 @@ public class Parser(
                 }
                 if (paramNames.contains(paramName)) addError("msg.dup.param.strict", paramName)
                 paramNames.add(paramName)
+            } else if (!paramNames.add(paramName)) {
+                // An arrow function's parameters are unique in sloppy code too (ECMAScript 2015,
+                // 14.2.1). Upstream checked them in strict code only.
+                addError("msg.dup.param.strict", paramName)
             }
         } else if (params is Assignment) {
             if (compilerEnv.languageVersion >= Context.VERSION_ES6) {
@@ -1163,6 +1312,7 @@ public class Parser(
                     )
                 } else if (lhs is ArrayLiteral || lhs is ObjectLiteral) {
                     markDestructuring(lhs)
+                    arrowPatternNames(lhs, paramNames)
                     fnNode.addParam(lhs)
                     val pname = currentScriptOrFn!!.getNextTempName()
                     defineSymbol(Token.LP, pname, false)
@@ -1338,9 +1488,9 @@ public class Parser(
 
             Token.LET -> {
                 pn = letStatement()
-                if (!(pn is VariableDeclaration && peekToken() == Token.SEMI)) {
-                    return pn
-                }
+                // A let declaration ends the way any statement does, so `let x 0` is an error
+                // (ECMAScript 2015, 11.9). Upstream skipped the check unless a semicolon followed.
+                if (pn !is VariableDeclaration) return pn
             }
 
             // Since ECMAScript 2015 a yield is an expression like any other, so a statement can
@@ -1389,6 +1539,12 @@ public class Parser(
             Token.DEFAULT -> pn = defaultXmlNamespace()
 
             Token.NAME -> {
+                if (asyncFunctionFollows()) {
+                    // A declaration, which no single-statement context takes, Annex B's `if`
+                    // clause and label included (ECMAScript 2017, 13.1).
+                    if (!inStatementListItem) reportError("msg.async.decl.not.in.block")
+                    return asyncFunction(FunctionNode.FUNCTION_EXPRESSION_STATEMENT)
+                }
                 pn = nameOrLabel()
                 if (pn !is ExpressionStatement) {
                     return pn // LabeledStatement
@@ -2180,6 +2336,10 @@ public class Parser(
         // initializer is no generator (ECMAScript 2022, 15.7.1).
         if (tt == Token.RETURN && inStaticBlock) reportError("msg.bad.return")
         if (tt == Token.YIELD && inClassInitializer) reportError("msg.bad.yield")
+        // An async function is no generator, so it cannot yield (ECMAScript 2017, 14.7).
+        if (tt == Token.YIELD && insideFunctionBody() && (currentScriptOrFn as FunctionNode).isAsyncFunction) {
+            reportError("msg.async.yield")
+        }
         consumeToken()
         val lineno = lineNumber()
         val column = columnNumber()
@@ -2365,6 +2525,8 @@ public class Parser(
         // Look for more labels.
         var stmt: AstNode? = null
         while (peekToken() == Token.NAME) {
+            // An async function declaration is no labelled statement; statementHelper says so.
+            if (asyncFunctionFollows()) break
             currentFlaggedToken = currentFlaggedToken or TI_CHECK_LABEL
             expr = expr(false)
             if (expr.type != Token.LABEL) {
@@ -2569,8 +2731,15 @@ public class Parser(
     /**
      * [ifClause] marks a function declared as the clause of an `if`, which Annex B.3.4 treats as
      * if it sat in a block of its own: it is lexical in no block the parser has open.
+     * [plainFunction] is false for a generator or async function declaration.
      */
-    internal fun defineSymbol(declType: Int, name: String?, ignoreNotInBlock: Boolean, ifClause: Boolean = false) {
+    internal fun defineSymbol(
+        declType: Int,
+        name: String?,
+        ignoreNotInBlock: Boolean,
+        ifClause: Boolean = false,
+        plainFunction: Boolean = true,
+    ) {
         if (name == null) {
             if (compilerEnv.ideMode) { // stay robust in IDE mode
                 return
@@ -2578,6 +2747,10 @@ public class Parser(
             codeBug()
         } else if ("undefined" == name) {
             hasUndefinedBeenRedefined = true
+        } else if ("await" == name && awaitContext != AWAIT_NAME) {
+            // A binding named `await` in an async function or a static block (ECMAScript 2017,
+            // 12.1.1), whichever pattern or declaration it comes from.
+            reportError("msg.reserved.id", name)
         }
         val scope = currentScope!!
         val definingScope = scope.getDefiningScope(name!!)
@@ -2640,7 +2813,18 @@ public class Parser(
                 if (declType == Token.VAR) noteVarNameInBlocks(name)
                 val fromBlock = declType == Token.FUNCTION && inBlock
                 if (fromBlock && !ifClause) {
+                    // Two functions of one block may share a name only when both are plain and
+                    // the code is sloppy (ECMAScript 2015, 13.2.1.1 and Annex B.3.3.4).
+                    if (scope.functionNamesWithin?.contains(name) == true &&
+                        (inUseStrictDirective || !plainFunction || scope.nonPlainFunctionNamesWithin?.contains(name) == true)
+                    ) {
+                        addError("msg.fn.redecl", name)
+                        return
+                    }
                     (scope.functionNamesWithin ?: HashSet<String>().also { scope.functionNamesWithin = it }).add(name)
+                    if (!plainFunction) {
+                        (scope.nonPlainFunctionNamesWithin ?: HashSet<String>().also { scope.nonPlainFunctionNamesWithin = it }).add(name)
+                    }
                 }
                 if (symbol != null) {
                     if (symDeclType == Token.VAR) {
@@ -2746,6 +2930,11 @@ public class Parser(
             // Pull out the JSDoc info and reset it before recursing.
             val jsdocNode = getAndResetJsDoc()
 
+            // A literal in parentheses is no pattern, so `({}) = 1` assigns to nothing
+            // (ECMAScript 2015, 12.14.1). Upstream took it as the pattern inside.
+            if (pn is ParenthesizedExpression && removeParens(pn) is DestructuringForm) {
+                reportError("msg.bad.assign.left")
+            }
             markDestructuring(pn)
             val opPos = ts.tokenBeg
             if (isNotValidSimpleAssignmentTarget(pn)) {
@@ -2765,7 +2954,7 @@ public class Parser(
             }
         } else if (!hasEOL && tt == Token.ARROW) {
             consumeToken()
-            pn = arrowFunction(pn, startLine, startColumn)
+            pn = arrowFunction(pn, startLine, startColumn, asyncArrowStart(pn))
         } else if (pn.getIntProp(Node.OBJECT_LITERAL_DESTRUCTURING, 0) == 1 &&
             !inDestructuringAssignment
         ) {
@@ -2986,6 +3175,10 @@ public class Parser(
                         )
                         return makeErrorNode()
                     }
+                    if (pn is AwaitExpression) {
+                        reportError("msg.no.unary.expr.on.left.exp", "await")
+                        return makeErrorNode()
+                    }
                     consumeToken()
                     pn = InfixExpression(tt, pn, expExpr(), opPos)
                 }
@@ -3003,6 +3196,12 @@ public class Parser(
         }
         val line: Int
         val column: Int
+
+        if (tt == Token.NAME && "await" == ts.string && awaitContext != AWAIT_NAME &&
+            awaitContext != AWAIT_IN_STATIC_BLOCK
+        ) {
+            return awaitExpression()
+        }
 
         when (tt) {
             Token.VOID, Token.NOT, Token.BITNOT, Token.TYPEOF -> {
@@ -3077,6 +3276,24 @@ public class Parser(
         }
     }
 
+    /**
+     * `await` and its operand, a UnaryExpression, in an async function (ECMAScript 2017, 14.7). In
+     * the function's parameters the expression is an early error.
+     */
+    private fun awaitExpression(): AstNode {
+        consumeToken()
+        val pos = ts.tokenBeg
+        val line = lineNumber()
+        val column = columnNumber()
+        if (ts.escapedNames.contains(pos)) reportError("msg.keyword.escaped", "await")
+        if (awaitContext == AWAIT_IN_PARAMS) reportError("msg.await.params")
+        val operand = unaryExpr()
+        val node = AwaitExpression(pos, getNodeEnd(operand) - pos, operand)
+        node.setLineColumnNumber(line, column)
+        setRequiresActivation()
+        return node
+    }
+
     /** The default branch of [unaryExpr], split out so the XML case can fall through to it. */
     private fun unaryExprTail(): AstNode {
         val pn = memberExpr(true)
@@ -3103,6 +3320,7 @@ public class Parser(
     }
 
     private fun argumentList(): MutableList<AstNode>? {
+        argumentsTrailingComma = false
         if (matchToken(Token.RP, true)) return null
 
         val result = mutableListOf<AstNode>()
@@ -3112,6 +3330,7 @@ public class Parser(
             do {
                 if (peekToken() == Token.RP) {
                     // Handles f1(a,) without breaking f1(a,b
+                    argumentsTrailingComma = true
                     break
                 }
                 // An argument is an AssignmentExpression, so `f(yield 1)` needs no parentheses
@@ -3282,6 +3501,9 @@ public class Parser(
         if (args != null && args.size > ARGC_LIMIT) reportError("msg.too.many.function.args")
         f.setArguments(args)
         f.rp = ts.tokenBeg - pos
+        if (argumentsTrailingComma && pn.getIntProp(Node.ASYNC_ARROW_PROP, -1) >= 0) {
+            f.putIntProp(Node.TRAILING_COMMA, 1)
+        }
         f.length = ts.tokenEnd - pos
         if (isOptionalChain) {
             f.markIsOptionalCall()
@@ -3753,6 +3975,7 @@ public class Parser(
         val nameLineno = lineNumber()
         val nameColumn = columnNumber()
         rejectEscapedReservedWord(namePos, nameString)
+        val nameEscaped = ts.escapedNames.contains(namePos)
         if (0 != (ttFlagged and TI_CHECK_LABEL) && peekToken() == Token.COLON) {
             // Do not consume the colon: it is the unwind indicator that returns to
             // statementHelper.
@@ -3760,6 +3983,20 @@ public class Parser(
             label.name = nameString
             label.setLineColumnNumber(lineNumber(), columnNumber())
             return label
+        }
+        // An unescaped `async` with no line break after it starts an async function expression,
+        // the head of an async arrow function, or a call of something named async, which a `=>`
+        // after it turns into an async arrow head (ECMAScript 2017, 12.3 and 14.7).
+        var asyncArrowHead = false
+        if ("async" == nameString && !nameEscaped && compilerEnv.languageVersion >= Context.VERSION_ES6) {
+            when (peekTokenOrEOL()) {
+                Token.FUNCTION -> {
+                    consumeToken()
+                    return function(FunctionNode.FUNCTION_EXPRESSION, false, isAsync = true, asyncStart = namePos)
+                }
+                Token.NAME -> return asyncArrowParameter(namePos)
+                Token.LP -> asyncArrowHead = true
+            }
         }
         // Not a label. Peeking the next token to check for a colon has clobbered ts.tokenBeg and
         // ts.tokenEnd, so the name bounds go into instance vars that createNameNode reads.
@@ -3769,10 +4006,38 @@ public class Parser(
         // (ECMAScript 2022, 15.7.1, ContainsArguments).
         if (inClassInitializer && "arguments" == nameString) reportError("msg.class.init.arguments")
 
-        if (compilerEnv.xmlAvailable) {
-            return propertyName(-1, 0)
+        val pn = if (compilerEnv.xmlAvailable) propertyName(-1, 0) else createNameNode(true, Token.NAME)
+        if (asyncArrowHead) pn.putIntProp(Node.ASYNC_ARROW_PROP, namePos)
+        return pn
+    }
+
+    /**
+     * The `x` of `async x => ...`, the one parameter of an async arrow function, marked with the
+     * position of its `async` for [assignExpr] to build the function from. No line break may come
+     * before the `=>` (ECMAScript 2017, 14.7).
+     */
+    private fun asyncArrowParameter(asyncStart: Int): AstNode {
+        consumeToken()
+        val param = rejectEscapedReservedWord(createNameNode(true, Token.NAME))
+        if (peekTokenOrEOL() != Token.ARROW) {
+            reportError("msg.syntax")
+            return makeErrorNode()
         }
-        return createNameNode(true, Token.NAME)
+        param.putIntProp(Node.ASYNC_ARROW_PROP, asyncStart)
+        return param
+    }
+
+    /**
+     * Where the `async` of an async arrow head begins, if [pn], just followed by `=>`, is one:
+     * `async x` or a plain call `async(...)` with no line break after the `async`. Otherwise -1.
+     */
+    private fun asyncArrowStart(pn: AstNode): Int {
+        if (pn is Name) return pn.getIntProp(Node.ASYNC_ARROW_PROP, -1)
+        if (pn is FunctionCall && pn !is NewExpression && !pn.isOptionalCall) {
+            val target = pn.target
+            if (target is Name) return target.getIntProp(Node.ASYNC_ARROW_PROP, -1)
+        }
+        return -1
     }
 
     /** May return an [ArrayLiteral] or an [ArrayComprehension]. */
@@ -4131,11 +4396,29 @@ public class Parser(
                 val methodStart = pendingClassElementName?.position ?: ts.tokenBeg
                 var kind = ClassElement.METHOD
                 var isGenerator = false
+                var isAsync = false
                 tt = peekToken()
-                if (tt == Token.MUL) {
+                if (pendingClassElementName == null && isClassModifier(tt, "async") &&
+                    compilerEnv.languageVersion >= Context.VERSION_ES6
+                ) {
+                    val wordStart = ts.tokenBeg
+                    consumeToken()
+                    val next = peekFlaggedToken()
+                    // `async` before a line break, or before what ends a name, names the element
+                    // (ECMAScript 2017, 14.6: no LineTerminator after the `async` of a method).
+                    if (isClassElementNameEnd(next and CLEAR_TI_MASK) || (next and TI_AFTER_EOL) != 0) {
+                        pushBackName("async", wordStart)
+                    } else {
+                        isAsync = true
+                    }
+                    tt = peekToken()
+                }
+                if (pendingClassElementName != null) {
+                    // The element is named by the word just read.
+                } else if (tt == Token.MUL) {
                     consumeToken()
                     isGenerator = true
-                } else if (isClassModifier(tt, "get") || isClassModifier(tt, "set")) {
+                } else if (!isAsync && (isClassModifier(tt, "get") || isClassModifier(tt, "set"))) {
                     val word = ts.string!!
                     val wordStart = ts.tokenBeg
                     consumeToken()
@@ -4157,14 +4440,14 @@ public class Parser(
                 if (peekToken() == Token.LP) {
                     if (isPrivate) declarePrivateName(key as Name, kind, isStatic)
                     if (!isStatic && keyName == "constructor") {
-                        if (kind != ClassElement.METHOD || isGenerator) reportError("msg.class.special.ctor")
+                        if (kind != ClassElement.METHOD || isGenerator || isAsync) reportError("msg.class.special.ctor")
                         if (ctor != null) reportError("msg.class.dup.ctor")
                         val ctorKind = if (derived) FunctionNode.DERIVED_CLASS_CONSTRUCTOR else FunctionNode.BASE_CLASS_CONSTRUCTOR
                         ctor = function(FunctionNode.FUNCTION_EXPRESSION, true, methodStart, ctorKind)
                         continue@bodyLoop
                     }
                     if (isStatic && keyName == "prototype") reportError("msg.class.static.prototype")
-                    val fn = function(FunctionNode.FUNCTION_EXPRESSION, true, methodStart, isGeneratorMethod = isGenerator)
+                    val fn = function(FunctionNode.FUNCTION_EXPRESSION, true, methodStart, isGeneratorMethod = isGenerator, isAsync = isAsync)
                     when (kind) {
                         ClassElement.GETTER -> {
                             fn.setFunctionIsGetterMethod()
@@ -4187,7 +4470,7 @@ public class Parser(
 
                 // A field: neither an accessor nor a generator, and never named constructor, nor
                 // prototype when static (ECMAScript 2022, 15.7.1).
-                if (kind != ClassElement.METHOD || isGenerator) reportError("msg.no.paren.parms")
+                if (kind != ClassElement.METHOD || isGenerator || isAsync) reportError("msg.no.paren.parms")
                 if (keyName == "constructor" || (isStatic && keyName == "prototype")) reportError("msg.class.field.name", keyName)
                 if (isPrivate) declarePrivateName(key as Name, ClassElement.FIELD, isStatic)
                 val initializer = if (matchToken(Token.ASSIGN, true)) classFieldInitializer() else null
@@ -4420,6 +4703,7 @@ public class Parser(
                         consumeToken()
                         function(FunctionNode.FUNCTION_STATEMENT)
                     }
+                    Token.NAME -> if (asyncFunctionFollows()) asyncFunction(FunctionNode.FUNCTION_STATEMENT) else statementListItem()
                     else -> statementListItem()
                 }
                 body.addStatement(n)
@@ -4458,11 +4742,15 @@ public class Parser(
         if (newTargetAllowed) saved = saved or 4
         if (inClassInitializer) saved = saved or 8
         if (inStaticBlock) saved = saved or 16
+        saved = saved or (awaitContext shl 5)
         insideMethod = true
         superCallAllowed = false
         newTargetAllowed = true
         inClassInitializer = true
         inStaticBlock = staticBlock
+        // A field initializer takes `await` as a name, as V8 does, and a static block reserves
+        // it (ECMAScript 2022, 15.7.1).
+        awaitContext = if (staticBlock) AWAIT_IN_STATIC_BLOCK else AWAIT_NAME
         return saved
     }
 
@@ -4472,6 +4760,7 @@ public class Parser(
         newTargetAllowed = (saved and 4) != 0
         inClassInitializer = (saved and 8) != 0
         inStaticBlock = (saved and 16) != 0
+        awaitContext = saved shr 5
     }
 
     /**
@@ -4511,6 +4800,7 @@ public class Parser(
         commaLoop@ while (true) {
             var propertyName: String? = null
             var entryKind = PROP_ENTRY
+            var isAsyncMethod = false
             var tt = peekToken()
             val jsdocNode = getAndResetJsDoc()
             if (tt == Token.COMMENT) {
@@ -4573,9 +4863,17 @@ public class Parser(
                             entryKind = GET_ENTRY
                         } else if ("set" == propertyName) {
                             entryKind = SET_ENTRY
+                        } else if ("async" == propertyName &&
+                            compilerEnv.languageVersion >= Context.VERSION_ES6 &&
+                            peekTokenOrEOL() != Token.EOL
+                        ) {
+                            // An async method, with no line break after its `async`
+                            // (ECMAScript 2017, 14.6).
+                            isAsyncMethod = true
+                            entryKind = METHOD_ENTRY
                         }
                     }
-                    if (entryKind == GET_ENTRY || entryKind == SET_ENTRY) {
+                    if (entryKind == GET_ENTRY || entryKind == SET_ENTRY || isAsyncMethod) {
                         pname = objliteralProperty()
                         if (pname == null) {
                             reportError("msg.bad.prop")
@@ -4598,6 +4896,7 @@ public class Parser(
                                 methodName is GeneratorMethodDefinition,
                                 true,
                                 sourceStart,
+                                isAsyncMethod,
                             )
                         methodName.jsDocNode = jsdocNode
                         elems.add(objectProp)
@@ -4793,8 +5092,9 @@ public class Parser(
         isGenerator: Boolean,
         isShorthand: Boolean,
         sourceStart: Int,
+        isAsync: Boolean = false,
     ): ObjectProperty {
-        val fn = function(FunctionNode.FUNCTION_EXPRESSION, true, sourceStart, isGeneratorMethod = isGenerator)
+        val fn = function(FunctionNode.FUNCTION_EXPRESSION, true, sourceStart, isGeneratorMethod = isGenerator, isAsync = isAsync)
         // The function name was already parsed, so fn should be anonymous.
         val name = fn.functionName
         if (name != null && name.length() != 0) {
@@ -4854,7 +5154,23 @@ public class Parser(
         ) {
             reportError("msg.keyword.escaped", word ?: "")
         }
+        // No identifier may be spelled `await` where it is the operator or reserved.
+        if ("await" == word) {
+            if (awaitContext != AWAIT_NAME) {
+                reportError(if (ts.escapedNames.contains(pos)) "msg.keyword.escaped" else "msg.reserved.id", word)
+            }
+            lastAwaitNamePos = pos
+        }
     }
+
+    /**
+     * Whether the name just peeked is the `async` of an async function declaration or expression:
+     * not spelled with an escape, with `function` after it on the same line (ECMAScript 2017,
+     * 14.7). Anywhere else `async` is a name.
+     */
+    private fun asyncFunctionFollows(): Boolean =
+        compilerEnv.languageVersion >= Context.VERSION_ES6 &&
+            "async" == ts.string && !ts.identifierEscaped && ts.functionFollowsOnSameLine(ts.tokenBeg + "async".length)
 
     /** [rejectEscapedReservedWord] for a name node not yet placed in the tree, so still absolute. */
     private fun rejectEscapedReservedWord(name: Name): Name {
@@ -5349,7 +5665,8 @@ public class Parser(
         var iteratorName: String? = null
         var lastResultName: String? = null
 
-        for (n in array.elements) {
+        for (element in array.elements) {
+            val n = patternTarget(element, variableType)
             if (n.type == Token.EMPTY) {
                 index++
                 continue
@@ -5511,7 +5828,9 @@ public class Parser(
         transformer: Transformer?,
         isFunctionParameter: Boolean,
     ) {
-        val left: Node = n.left!!
+        val left: Node = patternTarget(n.left!!, variableType)
+        // A parenthesized name is no IdentifierRef, so its default stays anonymous.
+        val parenthesized = n.left is ParenthesizedExpression
         val right: Node
         if (left.type == Token.NAME) {
             val name = left.string!!
@@ -5521,8 +5840,8 @@ public class Parser(
             right = transformer?.transform(n.right!!) ?: n.right!!
             // A default for a plain name names an anonymous function or class after it
             // (ECMAScript 2015, 13.3.3.6); a deferred default is named when IRFactory transforms it.
-            val nameNode = Name((left as? AstNode)?.position ?: 0, name)
-            if (transformer != null) inferNameIfMissing(nameNode, right, null)
+            val nameNode = if (parenthesized) null else Name((left as? AstNode)?.position ?: 0, name)
+            if (transformer != null && nameNode != null) inferNameIfMissing(nameNode, right, null)
 
             val condInner =
                 Node(
@@ -5559,8 +5878,12 @@ public class Parser(
                 destructuringNames.add(name)
             }
         } else {
-            // Nested destructuring patterns with defaults, such as [[x, y, z] = [4, 5, 6]].
-            if (left is ArrayLiteral || left is ObjectLiteral) {
+            // Nested destructuring patterns with defaults, such as [[x, y, z] = [4, 5, 6]], and
+            // in an assignment a property with one, such as [o.x = 1] = [] (ECMAScript 2015,
+            // 12.14.5); upstream took patterns only.
+            if (left is ArrayLiteral || left is ObjectLiteral ||
+                (variableType == -1 && (left.type == Token.GETPROP || left.type == Token.GETELEM))
+            ) {
                 right = transformer?.transform(n.right!!) ?: n.right!!
 
                 val condDefault =
@@ -5700,7 +6023,7 @@ public class Parser(
                 defaultValuesSetup = true
             }
 
-            val value = prop.value!!
+            val value = patternTarget(prop.value!!, variableType)
             if (value.type == Token.NAME) {
                 val name = (value as Name).identifier!!
                 parent.addChildToBack(
@@ -5846,6 +6169,21 @@ public class Parser(
         }
     }
 
+    /**
+     * The target an element of a pattern assigns to. In an assignment a name or property in
+     * parentheses is that name or property, as in `[(a)] = [1]`, but a pattern in parentheses is
+     * no pattern, and a declaration takes no parentheses at all (ECMAScript 2015, 12.14.5.1 and
+     * 13.3.3). Upstream rejected every parenthesized element.
+     */
+    private fun patternTarget(element: AstNode, variableType: Int): AstNode {
+        if (element !is ParenthesizedExpression) return element
+        val inner = removeParens(element)
+        if (variableType != -1 || !(inner is Name || inner.type == Token.GETPROP || inner.type == Token.GETELEM)) {
+            reportError("msg.bad.assign.left")
+        }
+        return inner
+    }
+
     /** Removes any [ParenthesizedExpression] wrappers. */
     internal fun removeParens(node: AstNode): AstNode {
         var n = node
@@ -5853,6 +6191,59 @@ public class Parser(
             n = n.expression!!
         }
         return n
+    }
+
+    /** Adds the names [target] binds to [out], in source order (ECMAScript 2015, 13.3.3.1, BoundNames). */
+    private fun boundNames(target: AstNode?, out: MutableList<String>) {
+        when (target) {
+            is Name -> target.identifier?.let { out.add(it) }
+            is ParenthesizedExpression -> boundNames(target.expression, out)
+            is Assignment -> boundNames(target.left, out)
+            is Spread -> boundNames(target.expression, out)
+            is ArrayLiteral -> for (element in target.elements) boundNames(element, out)
+            is ObjectLiteral -> for (property in target.elements) {
+                when (property) {
+                    is ObjectProperty -> boundNames(property.value, out)
+                    is SpreadObjectProperty -> boundNames(property.spreadNode.expression, out)
+                }
+            }
+        }
+    }
+
+    /** Adds the names an arrow parameter [pattern] binds to [paramNames], none of them twice. */
+    private fun arrowPatternNames(pattern: AstNode, paramNames: MutableSet<String>) {
+        val names = ArrayList<String>()
+        boundNames(pattern, names)
+        for (name in names) if (!paramNames.add(name)) addError("msg.dup.param.strict", name)
+    }
+
+    /**
+     * A "use strict" in a function body makes the function's own name and its parameters strict
+     * code too, so they follow the strict rules after the fact: no `eval` or `arguments`, no
+     * reserved word of strict code and no parameter twice (ECMAScript 2015, 12.1.1 and 14.1.2).
+     * Upstream checked them only when the code around was strict already.
+     */
+    private fun checkNamesOfStrictFunction(fnNode: FunctionNode) {
+        if (inUseStrictDirective) return
+        val names = ArrayList<String>()
+        if (!fnNode.isMethodDefinition) fnNode.functionName?.identifier?.let { names.add(it) }
+        val paramNames = ArrayList<String>()
+        for (param in fnNode.params) boundNames(param, paramNames)
+        names.addAll(paramNames)
+        for (name in names) {
+            when (name) {
+                "eval", "arguments" -> reportError("msg.bad.id.strict", name)
+                "implements", "interface", "let", "package", "private", "protected", "public", "static", "yield" ->
+                    reportError("msg.reserved.id", name)
+            }
+        }
+        firstDuplicate(paramNames)?.let { addError("msg.dup.param.strict", it) }
+    }
+
+    /** The first name [names] holds twice, or null. */
+    private fun firstDuplicate(names: List<String>): String? {
+        val seen = HashSet<String>()
+        return names.firstOrNull { !seen.add(it) }
     }
 
     internal fun markDestructuring(node: AstNode?) {
@@ -5891,6 +6282,11 @@ public class Parser(
     }
 
     public companion object {
+        private const val AWAIT_NAME = 0
+        private const val AWAIT_OPERATOR = 1
+        private const val AWAIT_IN_PARAMS = 2
+        private const val AWAIT_IN_STATIC_BLOCK = 3
+
         /** Maximum number of allowed function or constructor arguments, following SpiderMonkey. */
         public const val ARGC_LIMIT: Int = 1 shl 16
 

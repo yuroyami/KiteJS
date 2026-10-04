@@ -42,12 +42,14 @@ class PositionParityTest {
 
     /**
      * Tokens the port lexes differently on purpose, by source and token index: a keyword spelled
-     * with an escape is a name (ECMAScript 2015, 11.6.2), and `class` is a keyword of its own now
-     * that the port parses classes (D-95).
+     * with an escape is a name (ECMAScript 2015, 11.6.2), `class` is a keyword of its own now
+     * that the port parses classes (D-95), and `await` is a name the parser makes a keyword inside
+     * async functions (D-97).
      */
     private val intended = mapOf(
         ("\\u0069f \\u0041bc" to 0) to io.github.yuroyami.kitejs.Token.NAME,
         ("if else class let await yield undefined" to 2) to io.github.yuroyami.kitejs.Token.CLASS,
+        ("if else class let await yield undefined" to 4) to io.github.yuroyami.kitejs.Token.NAME,
     )
 
     @Test

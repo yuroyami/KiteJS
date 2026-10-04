@@ -18,8 +18,8 @@ class MessageParityTest {
 
     /**
      * Keys upstream's code uses but its properties file never defines (D-49), and keys for errors
-     * only the port raises, such as a refused definition (D-88) or the class syntax and the early
-     * errors upstream never checks (D-95). Asking upstream for one of them raises a missing-resource
+     * only the port raises, such as a refused definition (D-88), the class syntax and the early
+     * errors upstream never checks (D-95), or async functions (D-97). Asking upstream for one of them raises a missing-resource
      * error rather than returning text, so there is nothing to compare against and the port writes
      * its own wording, after V8's where V8 has one.
      */
@@ -39,6 +39,8 @@ class MessageParityTest {
         // D-95: early errors of plain functions that upstream lets through.
         "msg.getter.params", "msg.setter.params", "msg.keyword.escaped", "msg.rest.default",
         "msg.use.strict.non.simple",
+        // D-97: async functions.
+        "msg.async.decl.not.in.block", "msg.async.generator.unsupported", "msg.async.yield", "msg.await.params",
     )
 
     private fun portedKeys(): List<String> {

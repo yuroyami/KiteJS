@@ -130,7 +130,7 @@ public open class NodeTransformer {
                     }
                 }
 
-                Token.YIELD, Token.YIELD_STAR -> (tree as FunctionNode).addResumptionPoint(n)
+                Token.YIELD, Token.YIELD_STAR, Token.AWAIT -> (tree as FunctionNode).addResumptionPoint(n)
 
                 Token.RETURN -> {
                     val isGenerator =
@@ -168,12 +168,17 @@ public open class NodeTransformer {
                             var returnNode = n
                             val returnExpr = returnNode.firstChild
                             node = replaceCurrent(parent, previous, n, unwindBlock)
-                            if (returnExpr == null || isGenerator) {
+                            if (returnExpr == null) {
                                 unwindBlock.addChildToBack(returnNode)
                             } else {
+                                // The value is computed before the finally blocks run and the
+                                // scopes close, a generator's too. Upstream left a generator's
+                                // return expression after them, so it saw the finally blocks'
+                                // effects and no block-scoped name (D-97).
                                 val store = Node(Token.EXPR_RESULT, returnExpr)
                                 unwindBlock.addChildToFront(store)
                                 returnNode = Node(Token.RETURN_RESULT)
+                                if (isGenerator) returnNode.putIntProp(Node.GENERATOR_END_PROP, 1)
                                 unwindBlock.addChildToBack(returnNode)
                                 // Transform the return expression.
                                 transformCompilationUnitR(

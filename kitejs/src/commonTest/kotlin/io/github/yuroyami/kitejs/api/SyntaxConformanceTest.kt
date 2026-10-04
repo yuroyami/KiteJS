@@ -8,10 +8,10 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * Parser and runtime rules that the class tests of test262 turned up, which apply to plain
- * functions as much as to classes, and which upstream Rhino gets wrong (#2, D-95). Every expected
- * value is what V8 answers. An early error is checked through `eval`, whose SyntaxError a script
- * can catch.
+ * Parser and runtime rules that the class and async function tests of test262 turned up, which
+ * apply to plain functions as much as to classes and async functions, and which upstream Rhino
+ * gets wrong (#2, D-95; #12, D-97). Every expected value is what V8 answers. An early error is
+ * checked through `eval`, whose SyntaxError a script can catch.
  */
 class SyntaxConformanceTest {
 
@@ -150,6 +150,126 @@ class SyntaxConformanceTest {
         check("7", "var { 1.5: a } = { '1.5': 7, 1: 3 }; a")
         check("6", "var { 1n: a } = [5, 6]; a")
         check("5", "var { '0': a } = [5]; a")
+    }
+
+    /**
+     * No name twice in a parameter list with a default, a pattern or a rest parameter, nor in a
+     * method's or an arrow function's, in sloppy code too (ECMAScript 2015, 14.1.2, 14.2.1 and
+     * 14.3.1); a plain list of a plain function may repeat one.
+     */
+    @Test
+    fun duplicate_parameters() {
+        check("SyntaxError", early("function f(x = 0, x) {}"))
+        check("SyntaxError", early("function f(x, [x]) {}"))
+        check("SyntaxError", early("function f(x, ...x) {}"))
+        check("SyntaxError", early("function f({ a }, a) {}"))
+        check("SyntaxError", early("({ m(a, a) {} })"))
+        check("SyntaxError", early("({ *g(a, a) {} })"))
+        check("SyntaxError", early("(a, [a]) => 1"))
+        check("SyntaxError", early("({ a }, a) => 1"))
+        check("ok", early("function f(a, a) {}"))
+        check("ok", early("(function* (a, a) {})"))
+    }
+
+    /** A "use strict" body makes the function's name and parameters strict code too (ECMAScript 2015, 14.1.2). */
+    @Test
+    fun use_strict_reaches_back_to_the_parameters() {
+        check("SyntaxError", early("function f(a, a) { 'use strict' }"))
+        check("SyntaxError", early("function f(eval) { 'use strict' }"))
+        check("SyntaxError", early("function eval() { 'use strict' }"))
+        check("SyntaxError", early("(function arguments() { 'use strict' })"))
+        check("SyntaxError", early("function static() { 'use strict' }"))
+        check("SyntaxError", early("function f(implements) { 'use strict' }"))
+        check("ok", early("({ eval() { 'use strict' } })"))
+    }
+
+    /**
+     * Two functions declared in one block may share a name only when both are plain functions in
+     * sloppy code (ECMAScript 2015, 13.2.1.1 and Annex B.3.3.4).
+     */
+    @Test
+    fun block_function_redeclarations() {
+        check("ok", early("{ function f() {} function f() {} }"))
+        check("SyntaxError", early("{ function* f() {} function f() {} }"))
+        check("SyntaxError", early("{ function f() {} function* f() {} }"))
+        check("SyntaxError", early("{ async function f() {} function f() {} }"))
+        check("SyntaxError", early("{ function f() {} async function f() {} }"))
+        check("SyntaxError", early("'use strict'; { function f() {} function f() {} }"))
+        check("SyntaxError", early("switch (0) { case 1: function* f() {} default: function f() {} }"))
+        check("ok", early("{ function f() {} } { function* f() {} }"))
+    }
+
+    /** A let declaration ends the way any statement does (ECMAScript 2015, 11.9). */
+    @Test
+    fun let_declarations_end_like_statements() {
+        check("SyntaxError", early("let x 0"))
+        check("SyntaxError", early("let\nx 0"))
+        check("ok", early("let x\n0"))
+        check("ok", early("let x = 1, y"))
+        check("SyntaxError", early("function f() { let\nawait 0 }"))
+    }
+
+    /**
+     * A literal in parentheses is no pattern, while a name or property in parentheses inside an
+     * assignment pattern is that name or property, and a property takes a default there too
+     * (ECMAScript 2015, 12.14.1 and 12.14.5.1).
+     */
+    @Test
+    fun assignment_targets() {
+        check("SyntaxError", early("({}) = 1"))
+        check("SyntaxError", early("([]) = 1"))
+        check("SyntaxError", early("() => ({}) = 1"))
+        check("SyntaxError", early("async () => ({}) = 1"))
+        check("1", "var a; [(a)] = [1]; a")
+        check("2", "var o = {}; ({ x: (o.y) } = { x: 2 }); o.y")
+        check("5", "var o = {}; [o.x = 5] = []; o.x")
+        check("6", "var o = {}; ({ a: o['k'] = 6 } = {}); o.k")
+        check("", "var a; [(a) = function () {}] = []; a.name")
+        check("SyntaxError", early("var a; [([a])] = [[1]]"))
+        check("SyntaxError", early("var [(a)] = [1]"))
+        check("SyntaxError", early("function f([(a)]) {}"))
+    }
+
+    /**
+     * A generator's return value is computed where the return is, before its finally blocks run
+     * and its block scopes close, even when a finally block yields (ECMAScript 2015, 13.10.1).
+     */
+    @Test
+    fun generator_return_through_finally() {
+        check(
+            "expr fin true",
+            "var out = []; function f() { out.push('expr'); return true } " +
+                "function* g() { try { return f() } finally { out.push('fin') } } out.push(g().next().value); out.join(' ')",
+        )
+        check("3", "function* h() { { let x = 3; try { return x } finally {} } } h().next().value")
+        check(
+            "1 fin0 2 fin1 2,true",
+            "var out = []; function* k() { for (let x of [1, 2]) { try { if (x == 1) continue; return x } finally { out.push('fin' + (yield x)) } } } " +
+                "var it = k(); out.push(it.next().value); out.push(it.next(0).value); var r = it.next(1); out.push(r.value + ',' + r.done); out.join(' ')",
+        )
+    }
+
+    /**
+     * A return that a finally block's own `break` or caught throw abandons leaves the return
+     * already pending in place, in a plain function as in a generator (ECMAScript 2015, 13.15.8).
+     */
+    @Test
+    fun abandoned_return_in_finally() {
+        check("42", "function f() { try { return 42 } finally { do try { return 43 } finally { break } while (0) } } f()")
+        check("42", "function f() { try { return 41 } finally { try { return 42 } finally { L: try { return 43 } finally { break L } } } } f()")
+        check("42", "function f() { try { return 42 } finally { try { try { return 43 } finally { throw 9 } } catch (e) {} } } f()")
+        check("42", "function* g() { try { return 42 } finally { do try { return 43 } finally { continue } while (0) } } g().next().value")
+        check("2", "function f() { try { return 1 } finally { return 2 } } f()")
+        check("7", "eval('6; try { 7; } finally { 8; }')")
+    }
+
+    /** JavaScript 1.8's expression closures stay plain functions' own. */
+    @Test
+    fun expression_closures() {
+        check("5", "function f() 5; f()")
+        check("SyntaxError", early("function* g() 0"))
+        check("SyntaxError", early("async function f() 0"))
+        check("SyntaxError", early("void async function () 0"))
     }
 
     /** Built-in odds and ends class tests rely on. */

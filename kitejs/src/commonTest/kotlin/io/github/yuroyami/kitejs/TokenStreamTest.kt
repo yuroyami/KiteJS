@@ -218,7 +218,8 @@ class TokenStreamTest {
     @Test
     fun es6Keywords() {
         assertEquals(
-            listOf(Token.IF, Token.ELSE, Token.CLASS, Token.LET, Token.RESERVED, Token.YIELD),
+            // `await` is a name the parser makes a keyword inside async functions (D-97).
+            listOf(Token.IF, Token.ELSE, Token.CLASS, Token.LET, Token.NAME, Token.YIELD),
             tokens("if else class let await yield"),
         )
         assertEquals(listOf(Token.NAME, Token.NAME), tokens("letx ifx"))

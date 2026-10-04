@@ -241,7 +241,8 @@ public object Token {
     public const val FIELD: Int = NEW_TARGET + 1 // ES2022 class field, in the IR of a class
     public const val STATIC_BLOCK: Int = FIELD + 1 // ES2022 class static block, in the IR of a class
     public const val PRIVATE_NAME: Int = STATIC_BLOCK + 1 // ES2022 #name, in a class body
-    public const val LAST_TOKEN: Int = PRIVATE_NAME + 1
+    public const val AWAIT: Int = PRIVATE_NAME + 1 // ES2017 await expression, in the tree and the IR
+    public const val LAST_TOKEN: Int = AWAIT + 1
 
     /**
      * Returns a name for the token. If the engine is compiled with certain hardcoded
@@ -456,6 +457,7 @@ public object Token {
         FIELD -> "FIELD"
         STATIC_BLOCK -> "STATIC_BLOCK"
         PRIVATE_NAME -> "PRIVATE_NAME"
+        AWAIT -> "AWAIT"
         // Token without name
         else -> throw IllegalStateException(token.toString())
     }

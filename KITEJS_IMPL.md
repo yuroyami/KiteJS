@@ -766,6 +766,59 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   each key with `has`, which a proxy answers from its target, so a key the target lacked was
   dropped, remembered only the enumerable keys of the objects it passed, and asked every object
   for `__iterator__` (#90).
+- D-97: Async functions and `await` (ECMAScript 2017, 14.7 and 25.5), which upstream has none
+  of. `async` and `await` stay names to the token stream and the parser reads them by context:
+  `async` before `function` on the same line starts an async function expression or declaration,
+  `async x =>` and `async (...) =>` an async arrow (the parenthesized form parses as a call first
+  and becomes the parameter list once `=>` follows, so a spread becomes the rest parameter and a
+  trailing comma after it is an error), and `async` before a method name on the same line an
+  async method, static or not, in a class or an object literal. `await` is the operator inside an
+  async function body, an error in its parameters (default values, patterns and an async arrow's
+  parameters included) and a name everywhere else; class field initializers read it as a name
+  and static blocks reserve it, as V8 does. The early errors are the spec's: `await` as a binding
+  or label inside, `yield` inside, `await x ** y`, `async constructor`, `async get` and `set`, an
+  async declaration as the body of an `if` or a label, a line break before `=>`, duplicate arrow
+  parameters (which upstream let every arrow have) and "use strict" with a non-simple parameter
+  list. The body compiles the way a generator's does, with one `Icode_AWAIT` per `await` that
+  suspends the frame like a yield, and `AsyncFunctionDriver` runs it: the call creates the
+  promise, runs the body to its first `await`, and each `await` waits through the spec's Await
+  (PromiseResolve with %Promise% and the promise's own reactions, so one tick per `await` and
+  the interleaving V8 shows) and resumes the frame from the microtask queue inside a top call of
+  its own, with the value or with the reason thrown in at the `await`. A return resolves the
+  promise and a throw rejects it, before the first `await` and in a parameter default too, since
+  an async function's defaults run in its body, not before the generator object the way a
+  generator's do. The frame ends with a completion value instead of a StopIteration, and its
+  function declarations are made when the frame starts. %AsyncFunction% and %AsyncFunction.prototype%
+  are realm intrinsics, the prototype of every async function, which has no `prototype` and no
+  [[Construct]], and the `AsyncFunction` constructor compiles its source the way `Function` does.
+  The test262 harness runs tests flagged `async` by capturing `print`, draining the microtask
+  queue after the script and reading `$DONE`'s verdict, on both engines, and the parity test runs
+  `built-ins/AsyncFunction`, `language/expressions/async-function`, `language/expressions/await`
+  and `language/statements/async-function`, which upstream's properties file skips. `for await`
+  and async generators (ECMAScript 2018) are a follow-up of their own (#91), and until then
+  `async function*` and `async *m()` are a SyntaxError that says so. The call's own activation
+  steps aside while the body first runs, which enters it again, or the activation became its own
+  parent and the caller's was lost. Whether `function` follows `async` on the same line is read
+  from the end of the name, since a name's `tokenEnd` sits one character further on, past a line
+  break too, which made `async` then a line break then a function declaration an async one.
+  Running the async tests of test262 also turned up defects upstream shares with plain code: a
+  generator's `return` inside a try with a finally computed its value after the finally blocks
+  and outside the block scopes, so it now stores the value first and ends through
+  `Icode_GENERATOR_RETURN_RESULT`, and a yield hands its value back without the frame result
+  slot the stored value lives in; a list with a default, a pattern or a rest parameter, and a
+  method's or an arrow's, binds no name twice; a "use strict" body makes the function's own name
+  and parameters strict code; two functions of one block share a name only when both are plain
+  and the code sloppy; a `let` declaration ends the way any statement does; and a parenthesized
+  name or property is a target in an assignment pattern, a property there takes a default, and a
+  parenthesized literal is no pattern. A finally block entered on the way out keeps, beside the
+  address it returns to, the result that was pending when it started, and puts it back when it
+  ends normally, as V8 gives each try-finally a result register of its own: upstream kept one
+  result slot per frame, so a `return` inside a finally that a `break` or a caught throw then
+  abandoned replaced the return already pending, in a plain function too (the generators passed
+  the SpiderMonkey test only because they computed the value late), and an eval of
+  `try { 7 } finally { 8 }` answered 8. JavaScript 1.8's expression closures stay plain
+  functions' own: a generator or an async function without a braced body is a SyntaxError, as
+  SpiderMonkey made it. `let` as a name in sloppy code is a gap upstream shares, filed as #92.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

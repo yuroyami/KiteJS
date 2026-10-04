@@ -18,9 +18,10 @@ public open class JSFunction(
         set(_) = throw UnsupportedOperationException("Cannot set home object on JS function.")
 
     init {
-        ScriptRuntime.setFunctionProtoAndParent(this, cx, scope, descriptor.isES6Generator)
-        // A class constructor gets its read-only `prototype` from the class definition.
-        if (!descriptor.isShorthand && !descriptor.isClassConstructor) setupDefaultPrototype(scope)
+        ScriptRuntime.setFunctionProtoAndParent(this, cx, scope, descriptor.isES6Generator, descriptor.isAsyncFunction)
+        // A class constructor gets its read-only `prototype` from the class definition, and an
+        // async function has none.
+        if (!descriptor.isShorthand && !descriptor.isClassConstructor && !descriptor.isAsyncFunction) setupDefaultPrototype(scope)
         // Strict functions, which every class constructor and method is, have no own `arguments`
         // (ECMAScript 2015, 16.1), nor Rhino's `arity`, which upstream gave them all the same.
         if (descriptor.isStrict) {

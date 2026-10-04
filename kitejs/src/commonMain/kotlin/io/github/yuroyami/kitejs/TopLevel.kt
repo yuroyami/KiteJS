@@ -29,6 +29,7 @@ public open class TopLevel : ScriptableObject() {
         Error,
         Symbol,
         GeneratorFunction,
+        AsyncFunction,
         BigInt,
         Promise,
         ArrayBuffer,
@@ -113,6 +114,9 @@ public open class TopLevel : ScriptableObject() {
                     // GeneratorFunction is a real constructor that never gets registered in the
                     // global scope, so it has to be built here.
                     c[builtin] = BaseFunction.initAsGeneratorFunction(scope, sealed) as BaseFunction
+                } else if (builtin == Builtins.AsyncFunction) {
+                    // So is AsyncFunction (D-97).
+                    c[builtin] = BaseFunction.initAsAsyncFunction(scope, sealed) as BaseFunction
                 }
             }
             ctors = c
@@ -178,11 +182,15 @@ public open class TopLevel : ScriptableObject() {
             cachedBuiltinCtor(scope, type)?.let { return it }
             // GeneratorFunction is no global, so the fallback finds it parked on the scope.
             if (type == Builtins.GeneratorFunction) return generatorFunction(scope)
+            if (type == Builtins.AsyncFunction) return asyncFunction(scope)
             return ScriptRuntime.getExistingCtor(cx, scope, type.name)
         }
 
         private fun generatorFunction(scope: Scriptable): BaseFunction? =
             ScriptableObject.getTopScopeValue(scope, BaseFunction.GENERATOR_FUNCTION_CLASS) as? BaseFunction
+
+        private fun asyncFunction(scope: Scriptable): BaseFunction? =
+            ScriptableObject.getTopScopeValue(scope, BaseFunction.ASYNC_FUNCTION_CLASS) as? BaseFunction
 
         internal fun getNativeErrorCtor(
             cx: Context,
@@ -202,6 +210,7 @@ public open class TopLevel : ScriptableObject() {
             check(scope.parentScope == null) { "the scope has to be a top-level scope" }
             (cachedBuiltinCtor(scope, type)?.prototypeProperty as? Scriptable)?.let { return it }
             if (type == Builtins.GeneratorFunction) return generatorFunction(scope)?.prototypeProperty as? Scriptable
+            if (type == Builtins.AsyncFunction) return asyncFunction(scope)?.prototypeProperty as? Scriptable
             return getClassPrototype(scope, type.name)
         }
     }

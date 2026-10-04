@@ -37,8 +37,12 @@ class KeywordParityTest {
         for (word in words) {
             for (version in versions) {
                 for (strict in listOf(false, true)) {
+                    // `await` is a name the parser reads by context, the operator only inside an
+                    // async function, where upstream's ES6 table reserves it everywhere (D-97).
+                    val upstream = TokenStream.isKeyword(word, version, strict) &&
+                        !(word == "await" && version >= Context.VERSION_ES6)
                     assertEquals(
-                        TokenStream.isKeyword(word, version, strict),
+                        upstream,
                         io.github.yuroyami.kitejs.TokenStream.isKeyword(word, version, strict),
                         "isKeyword(\"$word\", $version, strict=$strict) diverges from upstream",
                     )

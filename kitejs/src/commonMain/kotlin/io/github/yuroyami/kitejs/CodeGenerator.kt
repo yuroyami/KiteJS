@@ -28,6 +28,7 @@ import io.github.yuroyami.kitejs.Icode.Companion.Icode_ENTERDQ
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_GENERATOR
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_GENERATOR_END
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_GENERATOR_RETURN
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_GENERATOR_RETURN_RESULT
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_GETVAR1
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_GOSUB
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_IFEQ_POP
@@ -90,6 +91,7 @@ import io.github.yuroyami.kitejs.Icode.Companion.Icode_VALUE_AND_THIS
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_VALUE_AND_THIS_OPTIONAL
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_VAR_INC_DEC
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_YIELD_STAR
+import io.github.yuroyami.kitejs.Icode.Companion.Icode_AWAIT
 import io.github.yuroyami.kitejs.Icode.Companion.Icode_ZERO
 import io.github.yuroyami.kitejs.ast.FunctionNode
 import io.github.yuroyami.kitejs.ast.Jump
@@ -155,7 +157,9 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
                     paramInit = paramInit.next
                 }
             }
-            val functionCount = theFunction.functionCount
+            // An async function's frame starts the way a plain function's does, function
+            // declarations included, and its body runs from the call on (D-97).
+            val functionCount = if (theFunction.isAsyncFunction) 0 else theFunction.functionCount
             for (i in 0 until functionCount) {
                 val fn = theFunction.getFunctionNode(i)
                 if (fn.functionType == FunctionNode.FUNCTION_STATEMENT) addIndexOp(Icode_CLOSURE_STMT, i)
@@ -433,7 +437,15 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
             }
             Token.RETURN_RESULT -> {
                 updateLineNumber(node)
-                addToken(Token.RETURN_RESULT)
+                if (node.getIntProp(Node.GENERATOR_END_PROP, 0) == 0) {
+                    addToken(Token.RETURN_RESULT)
+                } else if (compilerEnv.languageVersion < Context.VERSION_ES6) {
+                    addIcode(Icode_GENERATOR_END)
+                    addUint16(lineNumber and 0xFFFF)
+                } else {
+                    addIcode(Icode_GENERATOR_RETURN_RESULT)
+                    addUint16(lineNumber and 0xFFFF)
+                }
             }
             Token.ENUM_INIT_KEYS, Token.ENUM_INIT_VALUES, Token.ENUM_INIT_ARRAY, Token.ENUM_INIT_VALUES_IN_ORDER -> {
                 visitExpression(child!!, 0)
@@ -818,6 +830,11 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
                     stackChange(1)
                 }
                 if (type == Token.YIELD) addToken(Token.YIELD) else addIcode(Icode_YIELD_STAR)
+                addUint16(node.lineno and 0xFFFF)
+            }
+            Token.AWAIT -> {
+                visitExpression(child!!, 0)
+                addIcode(Icode_AWAIT)
                 addUint16(node.lineno and 0xFFFF)
             }
             Token.WITHEXPR -> {

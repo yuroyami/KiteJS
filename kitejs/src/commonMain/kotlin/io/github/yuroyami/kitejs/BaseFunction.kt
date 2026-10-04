@@ -280,6 +280,9 @@ public open class BaseFunction : ScriptableObject, Function {
 
         internal const val GENERATOR_FUNCTION_CLASS = "__GeneratorFunction"
 
+        /** Where %AsyncFunction% is parked on the global, which has no such global (D-97). */
+        internal const val ASYNC_FUNCTION_CLASS = "__AsyncFunction"
+
         private const val PROTOTYPE_PROPERTY_NAME = "prototype"
 
         private val APPLY_TAG: Any = "APPLY_TAG"
@@ -451,6 +454,36 @@ public open class BaseFunction : ScriptableObject, Function {
         }
 
         /**
+         * Builds %AsyncFunction% and its prototype, which every async function inherits from
+         * (ECMAScript 2017, 25.5.1 and 25.5.3): a constructor named AsyncFunction that makes async
+         * functions from source text, never a global, and a prototype with a `constructor` and a
+         * `Symbol.toStringTag` but no `prototype`, since async functions make no objects.
+         */
+        internal fun initAsAsyncFunction(scope: Scriptable, sealed: Boolean): Any {
+            val proto = NativeObject()
+            val function = getProperty(scope, FUNCTION_CLASS) as Scriptable
+            proto.prototype = getProperty(function, PROTOTYPE_PROPERTY_NAME) as Scriptable
+            proto.parentScope = getTopLevelScope(scope)
+            val ctor = LambdaConstructor(scope, "AsyncFunction", 1, proto, ::js_async_constructorCall, ::js_async_constructor)
+            // The constructor inherits from %Function% itself (ECMAScript 2017, 25.5.2).
+            ctor.prototype = function
+            proto.defineProperty("constructor", ctor, READONLY or DONTENUM)
+            ctor.setPrototypePropertyAttributes(DONTENUM or READONLY or PERMANENT)
+            proto.defineProperty(SymbolKey.TO_STRING_TAG, "AsyncFunction", READONLY or DONTENUM)
+            if (sealed) {
+                ctor.sealObject()
+                proto.sealObject()
+            }
+            return (scope as? ScriptableObject)?.associateValue(ASYNC_FUNCTION_CLASS, ctor) ?: ctor
+        }
+
+        private fun js_async_constructorCall(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
+            js_async_constructor(cx, scope, args)
+
+        private fun js_async_constructor(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable =
+            withoutStrictMode(cx) { jsConstructor(cx, scope, args, "async function ") }
+
+        /**
          * `Function.prototype[Symbol.hasInstance]`, which is OrdinaryHasInstance. Upstream cast a
          * bound function's target to JSFunction, so a bound built-in crashed with a host
          * ClassCastException, and it read the bound target's `prototype` where the spec asks
@@ -500,13 +533,13 @@ public open class BaseFunction : ScriptableObject, Function {
             js_gen_constructor(cx, scope, args)
 
         private fun js_constructor(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable =
-            withoutStrictMode(cx) { jsConstructor(cx, scope, args, false) }
+            withoutStrictMode(cx) { jsConstructor(cx, scope, args, "function ") }
 
         private fun js_constructorCall(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
             js_constructor(cx, scope, args)
 
         private fun js_gen_constructor(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable =
-            withoutStrictMode(cx) { jsConstructor(cx, scope, args, true) }
+            withoutStrictMode(cx) { jsConstructor(cx, scope, args, "function * ") }
 
         /**
          * The Function constructor makes sloppy code even when called from strict code. The frame
@@ -537,11 +570,10 @@ public open class BaseFunction : ScriptableObject, Function {
         }
 
         /** `new Function(p1, p2, body)`: builds source text and compiles it in the global scope. */
-        private fun jsConstructor(cx: Context, scope: Scriptable, args: Array<Any?>, isGeneratorFunction: Boolean): Scriptable {
+        private fun jsConstructor(cx: Context, scope: Scriptable, args: Array<Any?>, prefix: String): Scriptable {
             val arglen = args.size
             val sourceBuf = StringBuilder()
-            sourceBuf.append("function ")
-            if (isGeneratorFunction) sourceBuf.append("* ")
+            sourceBuf.append(prefix)
             // Every version but 1.2 names the function "anonymous", which is closer to the spec.
             if (cx.languageVersion != Context.VERSION_1_2) sourceBuf.append("anonymous")
             sourceBuf.append('(')

@@ -33,6 +33,8 @@ internal object Test262Execution {
         try {
             cx.languageVersion = Context.VERSION_ES6
             val scope = cx.initSafeStandardObjects(TopLevel(), false)
+            val printed = StringBuilder()
+            installPrint(scope, printed)
             for (text in harness) {
                 cx.evaluateString(scope, text, "harness", 1)
             }
@@ -45,8 +47,11 @@ internal object Test262Execution {
                 val script = cx.compileString(text, path, if (strict) 0 else 1)
                 failedEarly = false
                 script.exec(cx, scope, scope)
+                cx.processMicrotasks()
                 if (meta.isNegative) {
                     "expected ${meta.negativeType} at ${meta.negativePhase} but nothing was thrown"
+                } else if (meta.hasFlag("async")) {
+                    asyncOutcome(printed.toString())
                 } else {
                     PASS
                 }
@@ -62,6 +67,26 @@ internal object Test262Execution {
         } finally {
             Context.exit()
         }
+    }
+
+    /**
+     * What an async test reported through `$DONE` once the microtasks ran: a failure is named by
+     * its error, as a synchronous throw is, and no report at all means it never finished.
+     */
+    fun asyncOutcome(printed: String): String {
+        val failure = printed.lineSequence().firstOrNull { it.startsWith("Test262:AsyncTestFailure:") }
+        if (failure != null) return "threw " + failure.removePrefix("Test262:AsyncTestFailure:").substringBefore(":")
+        if (printed.lineSequence().any { it == "Test262:AsyncTestComplete" }) return PASS
+        return "async test never called \$DONE"
+    }
+
+    /** The `print` an async test's `$DONE` reports through, which writes to [out]. */
+    private fun installPrint(scope: ScriptableObject, out: StringBuilder) {
+        val print = LambdaFunction(scope, "print", 1, SerializableCallable { _, _, _, args ->
+            out.append(args.joinToString(" ") { ScriptRuntime.toString(it) }).append('\n')
+            Undefined.instance
+        })
+        scope.defineProperty("print", print, ScriptableObject.DONTENUM)
     }
 
     private fun judge(meta: Test262FrontMatter, errorName: String, failedEarly: Boolean): String {
