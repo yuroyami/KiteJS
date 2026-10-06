@@ -238,6 +238,15 @@ public abstract class ValuesContract<C : KiteJsConfig>(engine: JsEngine<C>) : En
     }
 
     @Test
+    public fun theGlobalObjectTakesItsClassFromItsPrototype(): TestResult = withEngine { js ->
+        assertEquals("[object global]", js.evaluate("Object.prototype.toString.call(globalThis)").asString())
+        assertEquals(false, js.evaluate("Object.getOwnPropertySymbols(globalThis).indexOf(Symbol.toStringTag) >= 0").asBoolean())
+        // A host that models a browser gives the global a prototype of its own, as HTML gives it Window.prototype.
+        js.evaluate("Object.setPrototypeOf(globalThis, Object.create(Object.getPrototypeOf(globalThis), { [Symbol.toStringTag]: { value: 'Window' } }))")
+        assertEquals("[object Window]", js.evaluate("Object.prototype.toString.call(globalThis)").asString())
+    }
+
+    @Test
     public fun toStringNeverThrows(): TestResult = withEngine { js ->
         assertEquals("[object Object]", js.evaluate("({})").toString())
         assertEquals("1,2", js.evaluate("[1, 2]").toString())

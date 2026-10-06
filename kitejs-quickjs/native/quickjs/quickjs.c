@@ -41935,7 +41935,8 @@ static JSValue js_object_toString(JSContext *ctx, JSValueConst this_val,
                 atom = ctx->rt->class_array[p->class_id].class_name;
                 break;
             default:
-                atom = JS_ATOM_Object;
+                /* KiteJS: the global is "global", as on Rhino, and a tag its prototypes carry still wins */
+                atom = p == JS_VALUE_GET_OBJ(ctx->global_obj) ? JS_ATOM_global : JS_ATOM_Object;
                 break;
             }
         }
@@ -57316,7 +57317,7 @@ static const JSCFunctionListEntry js_global_funcs[] = {
     JS_PROP_U2D_DEF("Infinity", 0x7FF0ull<<48, 0 ),
     JS_PROP_U2D_DEF("NaN", 0x7FF8ull<<48, 0 ),
     JS_PROP_UNDEFINED_DEF("undefined", 0 ),
-    JS_PROP_STRING_DEF("[Symbol.toStringTag]", "global", JS_PROP_CONFIGURABLE ),
+    /* KiteJS: no own Symbol.toStringTag; js_object_toString names the global "global" itself */
     JS_CFUNC_DEF("eval", 1, js_global_eval ),
 };
 
