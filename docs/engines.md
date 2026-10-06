@@ -12,8 +12,8 @@ Each engine is its own artifact, so an app only carries the one it uses:
 
 ```kotlin
 commonMain.dependencies {
-    implementation("io.github.yuroyami:kitejs-rhino:0.2.0")    // KiteJs(Rhino)
-    implementation("io.github.yuroyami:kitejs-quickjs:0.2.0")  // KiteJs(QuickJs)
+    implementation("io.github.yuroyami:kitejs-rhino:0.3.0")    // KiteJs(Rhino)
+    implementation("io.github.yuroyami:kitejs-quickjs:0.3.0")  // KiteJs(QuickJs)
 }
 ```
 
