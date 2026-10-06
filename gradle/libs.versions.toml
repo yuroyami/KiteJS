@@ -1,10 +1,10 @@
 [versions] #######################################################################################
 # Toolchain, kept in lock-step with KiteArchive / KiteTorrent / KitePDF so the Kite
 # lineage builds with one shared stack.
-kotlin = "2.4.10"
-agp = "9.2.1"
-vanniktechPublish = "0.36.0"
-dokka = "2.2.0"
+kotlin = "2.4.20"
+agp = "9.4.1"
+vanniktechPublish = "0.37.0"
+dokka = "2.3.0-Beta"
 
 # Time zone data for Date. It is the one piece the engine cannot compute for itself:
 # every platform ships its own IANA database and they have to agree.
