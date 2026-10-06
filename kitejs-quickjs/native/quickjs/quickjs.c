@@ -21272,6 +21272,7 @@ static void async_func_free(JSRuntime *rt, JSAsyncFunctionState *s)
 
 static JSValue async_func_resume(JSContext *ctx, JSAsyncFunctionState *s)
 {
+    KITEJS_FRAME();
     JSValue func_obj;
 
     if (js_check_stack_overflow(ctx->rt, 0))
@@ -24800,6 +24801,7 @@ static int seal_template_obj(JSContext *ctx, JSValue obj)
 
 static __exception int js_parse_template(JSParseState *s, int call, int *argc)
 {
+    KITEJS_PARSER_FRAME();
     JSContext *ctx = s->ctx;
     JSValue raw_array, template_object;
     JSToken cooked;
@@ -24935,6 +24937,7 @@ static int __exception js_parse_property_name(JSParseState *s,
                                               bool allow_method, bool allow_var,
                                               bool allow_private)
 {
+    KITEJS_PARSER_FRAME();
     int is_private = 0;
     bool is_non_reserved_ident;
     JSAtom name;
@@ -25284,6 +25287,7 @@ static void set_object_name_computed(JSParseState *s)
 
 static __exception int js_parse_object_literal(JSParseState *s)
 {
+    KITEJS_PARSER_FRAME();
     JSAtom name = JS_ATOM_NULL;
     const uint8_t *start_ptr;
     int start_line, start_col, prop_type;
@@ -25411,6 +25415,7 @@ static __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags);
 
 static __exception int js_parse_left_hand_side_expr(JSParseState *s)
 {
+    KITEJS_PARSER_FRAME();
     return js_parse_postfix_expr(s, PF_POSTFIX_CALL);
 }
 
@@ -25592,6 +25597,7 @@ static __exception int js_parse_class_default_ctor(JSParseState *s,
 static __exception int js_parse_class(JSParseState *s, bool is_class_expr,
                                       JSParseExportEnum export_flag)
 {
+    KITEJS_PARSER_FRAME();
     JSContext *ctx = s->ctx;
     JSFunctionDef *fd = s->cur_func;
     JSAtom name = JS_ATOM_NULL, class_name = JS_ATOM_NULL, class_name1;
@@ -26118,6 +26124,7 @@ static __exception int js_parse_class(JSParseState *s, bool is_class_expr,
 
 static __exception int js_parse_array_literal(JSParseState *s)
 {
+    KITEJS_PARSER_FRAME();
     uint32_t idx;
     bool need_length;
 
@@ -26508,6 +26515,7 @@ static void put_lvalue(JSParseState *s, int opcode, int scope,
 
 static __exception int js_parse_expr_paren(JSParseState *s)
 {
+    KITEJS_PARSER_FRAME();
     if (js_parse_expect(s, '('))
         return -1;
     if (js_parse_expr(s))
@@ -26647,6 +26655,7 @@ static int js_parse_destructuring_element(JSParseState *s, int tok,
                                           bool allow_initializer,
                                           bool export_flag)
 {
+    KITEJS_PARSER_FRAME();
     int label_parse, label_assign, label_done, label_lvalue, depth_lvalue;
     int start_addr, assign_addr;
     JSAtom prop_name, var_name;
@@ -27112,6 +27121,7 @@ static void optional_chain_test(JSParseState *s, int *poptional_chaining_label,
 /* allowed parse_flags: PF_POSTFIX_CALL */
 static __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags)
 {
+    KITEJS_PARSER_FRAME();
     FuncCallType call_type;
     int optional_chaining_label;
     bool accept_lparen = (parse_flags & PF_POSTFIX_CALL) != 0;
@@ -27769,6 +27779,7 @@ static __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags)
 
 static __exception int js_parse_delete(JSParseState *s)
 {
+    KITEJS_PARSER_FRAME();
     JSFunctionDef *fd = s->cur_func;
     JSAtom name;
     int opcode;
@@ -27865,6 +27876,7 @@ static __exception int js_parse_var(JSParseState *s, int parse_flags, int tok,
 /* allowed parse_flags: PF_POW_ALLOWED, PF_POW_FORBIDDEN */
 static __exception int js_parse_unary(JSParseState *s, int parse_flags)
 {
+    KITEJS_PARSER_FRAME();
     int op;
 
     switch(s->token.val) {
@@ -27993,6 +28005,7 @@ static __exception int js_parse_unary(JSParseState *s, int parse_flags)
 static __exception int js_parse_expr_binary(JSParseState *s, int level,
                                             int parse_flags)
 {
+    KITEJS_PARSER_FRAME();
     int op, opcode;
 
     if (level == 0) {
@@ -28157,6 +28170,7 @@ static __exception int js_parse_expr_binary(JSParseState *s, int level,
 static __exception int js_parse_logical_and_or(JSParseState *s, int op,
                                                int parse_flags)
 {
+    KITEJS_PARSER_FRAME();
     int label1;
 
     if (op == TOK_LAND) {
@@ -28197,6 +28211,7 @@ static __exception int js_parse_logical_and_or(JSParseState *s, int op,
 
 static __exception int js_parse_coalesce_expr(JSParseState *s, int parse_flags)
 {
+    KITEJS_PARSER_FRAME();
     int label1;
 
     if (js_parse_logical_and_or(s, TOK_LOR, parse_flags))
@@ -28225,6 +28240,7 @@ static __exception int js_parse_coalesce_expr(JSParseState *s, int parse_flags)
 /* allowed parse_flags: PF_IN_ACCEPTED */
 static __exception int js_parse_cond_expr(JSParseState *s, int parse_flags)
 {
+    KITEJS_PARSER_FRAME();
     int label1, label2;
 
     if (js_parse_coalesce_expr(s, parse_flags))
@@ -28254,6 +28270,7 @@ static __exception int js_parse_cond_expr(JSParseState *s, int parse_flags)
 /* allowed parse_flags: PF_IN_ACCEPTED */
 static __exception int js_parse_assign_expr2(JSParseState *s, int parse_flags)
 {
+    KITEJS_PARSER_FRAME();
     int opcode, op, scope;
     JSAtom name0 = JS_ATOM_NULL;
     JSAtom name;
@@ -28558,12 +28575,14 @@ static __exception int js_parse_assign_expr2(JSParseState *s, int parse_flags)
 
 static __exception int js_parse_assign_expr(JSParseState *s)
 {
+    KITEJS_PARSER_FRAME();
     return js_parse_assign_expr2(s, PF_IN_ACCEPTED);
 }
 
 /* allowed parse_flags: PF_IN_ACCEPTED */
 static __exception int js_parse_expr2(JSParseState *s, int parse_flags)
 {
+    KITEJS_PARSER_FRAME();
     bool comma = false;
     for(;;) {
         if (js_parse_assign_expr2(s, parse_flags))
@@ -28588,6 +28607,7 @@ static __exception int js_parse_expr2(JSParseState *s, int parse_flags)
 
 static __exception int js_parse_expr(JSParseState *s)
 {
+    KITEJS_PARSER_FRAME();
     return js_parse_expr2(s, PF_IN_ACCEPTED);
 }
 
@@ -28805,11 +28825,13 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
 
 static __exception int js_parse_statement(JSParseState *s)
 {
+    KITEJS_PARSER_FRAME();
     return js_parse_statement_or_decl(s, 0);
 }
 
 static __exception int js_parse_block(JSParseState *s)
 {
+    KITEJS_PARSER_FRAME();
     JSFunctionDef *fd = s->cur_func;
 
     if (js_parse_expect(s, '{'))
@@ -28868,6 +28890,7 @@ static __exception int js_parse_block(JSParseState *s)
 static __exception int js_parse_var(JSParseState *s, int parse_flags, int tok,
                                     bool export_flag)
 {
+    KITEJS_PARSER_FRAME();
     JSContext *ctx = s->ctx;
     JSFunctionDef *fd = s->cur_func;
     JSAtom name = JS_ATOM_NULL;
@@ -29096,6 +29119,7 @@ static __exception int js_parse_for_in_of(JSParseState *s, int label_name,
                                           int source_line_num,
                                           int source_col_num)
 {
+    KITEJS_PARSER_FRAME();
     JSContext *ctx = s->ctx;
     JSFunctionDef *fd = s->cur_func;
     JSAtom var_name;
@@ -29424,6 +29448,7 @@ static void set_eval_ret_undefined(JSParseState *s)
 static __exception int js_parse_statement_or_decl(JSParseState *s,
                                                   int decl_mask)
 {
+    KITEJS_PARSER_FRAME();
     JSContext *ctx = s->ctx;
     JSAtom label_name;
     int tok;
@@ -31530,6 +31555,7 @@ static int js_create_module_function(JSContext *ctx, JSModuleDef *m)
 static int js_inner_module_linking(JSContext *ctx, JSModuleDef *m,
                                    JSModuleDef **pstack_top, int index)
 {
+    KITEJS_FRAME();
     int i;
     JSImportEntry *mi;
     JSModuleDef *m1;
@@ -32112,6 +32138,7 @@ static bool find_in_exec_module_list(ExecModuleList *exec_list, JSModuleDef *m)
 static int gather_available_ancestors(JSContext *ctx, JSModuleDef *module,
                                       ExecModuleList *exec_list)
 {
+    KITEJS_FRAME();
     int i;
 
     if (js_check_stack_overflow(ctx->rt, 0)) {
@@ -32159,6 +32186,7 @@ static JSValue js_async_module_execution_rejected(JSContext *ctx, JSValueConst t
                                                   int argc, JSValueConst *argv, int magic,
                                                   JSValueConst *func_data)
 {
+    KITEJS_FRAME();
     JSModuleDef *module = JS_VALUE_GET_PTR(func_data[0]);
     JSValueConst error = argv[0];
     int i;
@@ -32314,6 +32342,7 @@ static int js_inner_module_evaluation(JSContext *ctx, JSModuleDef *m,
                                       int index, JSModuleDef **pstack_top,
                                       JSValue *pvalue)
 {
+    KITEJS_FRAME();
     JSModuleDef *m1;
     int i;
 
@@ -32619,6 +32648,7 @@ static bool has_unmatched_surrogate(const uint16_t *s, size_t n)
 
 static __exception int js_parse_export(JSParseState *s)
 {
+    KITEJS_PARSER_FRAME();
     JSContext *ctx = s->ctx;
     JSModuleDef *m = s->cur_func->module;
     JSAtom local_name, export_name;
@@ -32969,6 +32999,7 @@ static __exception int js_parse_import(JSParseState *s)
 
 static __exception int js_parse_source_element(JSParseState *s)
 {
+    KITEJS_PARSER_FRAME();
     JSFunctionDef *fd = s->cur_func;
     int tok;
 
@@ -37436,6 +37467,7 @@ static __exception int js_parse_function_decl2(JSParseState *s,
                                                JSParseExportEnum export_flag,
                                                JSFunctionDef **pfd)
 {
+    KITEJS_PARSER_FRAME();
     JSContext *ctx = s->ctx;
     JSFunctionDef *fd = s->cur_func;
     bool is_expr;
@@ -38032,6 +38064,7 @@ static __exception int js_parse_function_decl(JSParseState *s,
                                               int start_line,
                                               int start_col)
 {
+    KITEJS_PARSER_FRAME();
     return js_parse_function_decl2(s, func_type, func_kind, func_name, ptr,
                                    start_line, start_col,
                                    JS_PARSE_EXPORT_NONE, NULL);
@@ -39112,6 +39145,7 @@ static int JS_WriteSet(BCWriterState *s, struct JSMapState *map_state);
 
 static int JS_WriteObjectRec(BCWriterState *s, JSValueConst obj)
 {
+    KITEJS_FRAME();
     uint32_t tag;
 
     if (js_check_stack_overflow(s->ctx->rt, 0)) {
@@ -40409,6 +40443,7 @@ static JSValue JS_ReadSet(BCReaderState *s);
 
 static JSValue JS_ReadObjectRec(BCReaderState *s)
 {
+    KITEJS_FRAME();
     JSContext *ctx = s->ctx;
     uint8_t tag;
     JSValue obj = JS_UNDEFINED;
@@ -44619,6 +44654,7 @@ static int64_t JS_FlattenIntoArray(JSContext *ctx, JSValueConst target,
                                    JSValueConst mapperFunction,
                                    JSValueConst thisArg)
 {
+    KITEJS_FRAME();
     JSValue element;
     int64_t sourceIndex, elementLen;
     int present, is_array;
@@ -51067,6 +51103,7 @@ static void json_free_parse_record(JSContext *ctx, JSONParseRecord *pr)
 /* 'pr' can be NULL */
 static JSValue json_parse_value(JSParseState *s, JSONParseRecord *pr)
 {
+    KITEJS_FRAME();
     JSContext *ctx = s->ctx;
     JSValue val = JS_NULL;
     int ret;
@@ -51289,6 +51326,7 @@ static JSValue internalize_json_property(JSContext *ctx, JSValueConst holder,
                                          JSAtom name, JSValueConst reviver,
                                          const char *text_str, JSONParseRecord *pr)
 {
+    KITEJS_FRAME();
     JSValue val, new_el, name_val, res, context;
     JSValueConst args[3];
     int ret, is_array;
@@ -51574,6 +51612,7 @@ static int js_json_to_str(JSContext *ctx, JSONStringifyContext *jsc,
                           JSValueConst holder, JSValue val,
                           JSValueConst indent)
 {
+    KITEJS_FRAME();
     JSValue indent1, sep, sep1, tab, v, prop;
     JSObject *p;
     int64_t i, len;
@@ -52135,6 +52174,7 @@ static JSValue JS_ThrowTypeErrorRevokedProxy(JSContext *ctx)
 static JSProxyData *get_proxy_method(JSContext *ctx, JSValue *pmethod,
                                      JSValueConst obj, JSAtom name)
 {
+    KITEJS_FRAME();
     JSProxyData *s = JS_GetOpaque(obj, JS_CLASS_PROXY);
     JSValue method;
 
@@ -52977,6 +53017,7 @@ static JSValue js_proxy_call(JSContext *ctx, JSValueConst func_obj,
 
 static int js_proxy_isArray(JSContext *ctx, JSValueConst obj)
 {
+    KITEJS_FRAME();
     JSProxyData *s = JS_GetOpaque(obj, JS_CLASS_PROXY);
     if (!s)
         return false;

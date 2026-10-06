@@ -71,6 +71,12 @@ A script that goes past `memoryLimit` ends the call with a `JsEngineError`, even
 tries to catch it, and the engine stays usable afterwards. A script that recurses past
 `maxStackSize` gets a `RangeError`, which it can catch like any other.
 
+On JavaScript and WebAssembly, the browser's own stack is about 1 MiB and runs out first, so
+`maxStackSize` is 256 KiB at most there. That is about 800 levels of plain calls, 200 nested
+parentheses in a source, and 50 calls that pass through a host function. Each call into a host
+function counts 4 KiB against the limit, for the host's own frames. A host function that itself
+uses much more stack than the KiteJS frames around it can still run the browser out first.
+
 ### Where the native code comes from
 
 - **Kotlin/Native** (iOS, macOS, Linux, Windows): linked into your binary as a static library.

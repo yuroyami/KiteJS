@@ -42,6 +42,7 @@ internal external interface KiteGlue : JsAny {
     fun objectPut(e: Int, obj: Int, key: String, value: Int)
     fun arrayLength(e: Int, array: Int): Int
     fun arrayGet(e: Int, array: Int, index: Int): Int
+    fun get(e: Int, obj: Int, key: String): Int
     fun global(e: Int): Int
     fun compile(e: Int, source: String, file: String): Int
     fun run(e: Int, compiled: Int): Int
@@ -93,6 +94,7 @@ private object WebBridge : QuickJsBridge {
     override fun objectPut(e: Long, obj: Int, key: String, value: Int) = glue.objectPut(e.toInt(), obj, key, value)
     override fun arrayLength(e: Long, array: Int): Int = glue.arrayLength(e.toInt(), array)
     override fun arrayGet(e: Long, array: Int, index: Int): Int = glue.arrayGet(e.toInt(), array, index)
+    override fun get(e: Long, obj: Int, key: String): Int = glue.get(e.toInt(), obj, key)
     override fun global(e: Long): Int = glue.global(e.toInt())
     override fun compile(e: Long, source: String, file: String): Int = glue.compile(e.toInt(), source, file)
     override fun run(e: Long, compiled: Int): Int = glue.run(e.toInt(), compiled)

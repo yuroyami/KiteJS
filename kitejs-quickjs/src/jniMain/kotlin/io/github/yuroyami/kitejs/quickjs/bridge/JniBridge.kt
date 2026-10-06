@@ -31,6 +31,7 @@ internal object JniNatives {
     @JvmStatic external fun objectPut(e: Long, obj: Int, key: String, value: Int)
     @JvmStatic external fun arrayLength(e: Long, array: Int): Int
     @JvmStatic external fun arrayGet(e: Long, array: Int, index: Int): Int
+    @JvmStatic external fun get(e: Long, obj: Int, key: String): Int
     @JvmStatic external fun global(e: Long): Int
     @JvmStatic external fun compile(e: Long, source: String, file: String): Int
     @JvmStatic external fun run(e: Long, compiled: Int): Int
@@ -85,6 +86,7 @@ private object JniBridge : QuickJsBridge {
     override fun objectPut(e: Long, obj: Int, key: String, value: Int) = JniNatives.objectPut(e, obj, key, value)
     override fun arrayLength(e: Long, array: Int): Int = JniNatives.arrayLength(e, array)
     override fun arrayGet(e: Long, array: Int, index: Int): Int = JniNatives.arrayGet(e, array, index)
+    override fun get(e: Long, obj: Int, key: String): Int = JniNatives.get(e, obj, key)
     override fun global(e: Long): Int = JniNatives.global(e)
     override fun compile(e: Long, source: String, file: String): Int = JniNatives.compile(e, source, file)
     override fun run(e: Long, compiled: Int): Int = JniNatives.run(e, compiled)

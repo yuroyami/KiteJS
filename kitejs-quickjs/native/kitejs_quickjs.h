@@ -112,6 +112,9 @@ void kite_object_put(KiteEngine *e, int32_t obj, const uint16_t *key, int32_t ke
 /* An element of an array the engine made itself, such as Object.keys answers. */
 int32_t kite_array_length(KiteEngine *e, int32_t array);
 int32_t kite_array_get(KiteEngine *e, int32_t array, int32_t index);
+/* Reads obj[key] for a string key, getters and proxies included, without a call into script of
+ * its own; -1 when the read threw. */
+int32_t kite_get(KiteEngine *e, int32_t obj, const uint16_t *key, int32_t key_length);
 int32_t kite_global(KiteEngine *e);
 
 /* ---- Running --------------------------------------------------------------------------------- */

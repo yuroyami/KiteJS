@@ -1425,6 +1425,7 @@ static int re_parse_class_set_operand(REParseState *s, REStringList *cr, const u
 
 static int re_parse_nested_class(REParseState *s, REStringList *cr, const uint8_t **pp)
 {
+    KITEJS_FRAME();
     const uint8_t *p;
     uint32_t c1, c2;
     int ret;
@@ -2454,6 +2455,7 @@ static int re_parse_alternative(REParseState *s, bool is_backward_dir)
 
 static int re_parse_disjunction(REParseState *s, bool is_backward_dir)
 {
+    KITEJS_FRAME();
     int start, len, pos;
 
     if (lre_check_stack_overflow(s->opaque, 0))

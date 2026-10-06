@@ -137,6 +137,9 @@ internal const val GLUE: String = """(function () {
         },
         arrayLength: function (e, a) { return exports.kite_array_length(e, a); },
         arrayGet: function (e, a, i) { return exports.kite_array_get(e, a, i); },
+        get: function (e, o, k) {
+            return withString(k, function (p) { return exports.kite_get(e, o, p, k.length); });
+        },
         global: function (e) { return exports.kite_global(e); },
 
         compile: function (e, source, file) {

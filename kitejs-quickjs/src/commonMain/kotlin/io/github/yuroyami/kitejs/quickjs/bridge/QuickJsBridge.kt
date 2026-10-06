@@ -39,6 +39,7 @@ internal interface QuickJsBridge {
     fun objectPut(e: Long, obj: Int, key: String, value: Int)
     fun arrayLength(e: Long, array: Int): Int
     fun arrayGet(e: Long, array: Int, index: Int): Int
+    fun get(e: Long, obj: Int, key: String): Int
     fun global(e: Long): Int
 
     fun compile(e: Long, source: String, file: String): Int

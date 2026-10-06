@@ -27,7 +27,9 @@ internal interface QuickJsHandle {
     /** The object's address, the same for every handle to it while any of them lives. */
     val identity: Double
 
-    fun getAt(key: Any): JsValue = engine.call(drain = false) { engine.helper(Helper.GET, this, key) }
+    fun getAt(key: Any): JsValue = engine.call(drain = false) {
+        if (key is String) engine.read(this, key) else engine.helper(Helper.GET, this, key)
+    }
 
     fun setAt(key: Any, value: Any?) {
         engine.call(drain = false) { engine.helper(Helper.SET, this, key, value) }

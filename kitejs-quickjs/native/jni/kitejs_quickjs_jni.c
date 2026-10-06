@@ -223,6 +223,15 @@ JNIEXPORT jint JNICALL NATIVE(arrayGet)(JNIEnv *env, jclass cls, jlong e, jint a
     return kite_array_get(ENGINE(e), array, index);
 }
 
+JNIEXPORT jint JNICALL NATIVE(get)(JNIEnv *env, jclass cls, jlong e, jint obj, jstring key)
+{
+    jsize length = (*env)->GetStringLength(env, key);
+    const jchar *chars = (*env)->GetStringChars(env, key, NULL);
+    jint h = kite_get(ENGINE(e), obj, (const uint16_t *)chars, length);
+    (*env)->ReleaseStringChars(env, key, chars);
+    return h;
+}
+
 JNIEXPORT jint JNICALL NATIVE(global)(JNIEnv *env, jclass cls, jlong e)
 {
     return kite_global(ENGINE(e));

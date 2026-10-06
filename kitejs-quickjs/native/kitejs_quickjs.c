@@ -212,6 +212,7 @@ static void host_token_finalizer(JSRuntime *rt, JSValueConst val)
 static JSValue host_function(JSContext *ctx, JSValueConst this_val, int argc, JSValueConst *argv,
                              int magic, JSValueConst *data)
 {
+    KITEJS_HOST_FRAME();
     KiteEngine *e = engine_of(ctx);
     JSValueConst saved_this = e->cb_this;
     JSValueConst *saved_argv = e->cb_argv;
@@ -244,6 +245,11 @@ KiteEngine *kite_new(int32_t id, double memory_limit, double stack_size, int32_t
         goto fail;
     if (memory_limit > 0)
         JS_SetMemoryLimit(e->rt, (size_t)memory_limit);
+#ifdef KITEJS_WASM_STACK_LIMIT
+    /* Past this, the host's own stack can run out before QuickJS's check fires; see kitejs_config.h. */
+    if (stack_size <= 0 || stack_size > KITEJS_WASM_STACK_LIMIT)
+        stack_size = KITEJS_WASM_STACK_LIMIT;
+#endif
     if (stack_size > 0)
         JS_SetMaxStackSize(e->rt, (size_t)stack_size);
     e->ctx = JS_NewContext(e->rt);
@@ -463,6 +469,22 @@ int32_t kite_array_length(KiteEngine *e, int32_t array)
 int32_t kite_array_get(KiteEngine *e, int32_t array, int32_t index)
 {
     return keep(e, JS_GetPropertyUint32(e->ctx, at(e, array), (uint32_t)index));
+}
+
+static int32_t answer(KiteEngine *e, JSValue v);
+
+int32_t kite_get(KiteEngine *e, int32_t obj, const uint16_t *key, int32_t key_length)
+{
+    JSValue name = JS_NewStringUTF16(e->ctx, key, key_length);
+    if (JS_IsException(name))
+        return -1;
+    JSAtom atom = JS_ValueToAtom(e->ctx, name);
+    JS_FreeValue(e->ctx, name);
+    if (atom == JS_ATOM_NULL)
+        return -1;
+    JSValue v = JS_GetProperty(e->ctx, at(e, obj), atom);
+    JS_FreeAtom(e->ctx, atom);
+    return answer(e, v);
 }
 
 int32_t kite_global(KiteEngine *e)

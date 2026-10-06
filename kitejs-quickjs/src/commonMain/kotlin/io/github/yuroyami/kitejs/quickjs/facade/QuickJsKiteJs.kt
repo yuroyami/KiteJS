@@ -65,6 +65,12 @@ internal class QuickJsKiteJs private constructor(
     /** What a host function or the interrupt hook threw, on its way out of the script. */
     private var hostFailure: Throwable? = null
 
+    /**
+     * Whether a thrown value is being read into a [JsError]. A read that throws then, as one at
+     * the stack limit does, must not be read in turn, or each failure starts another.
+     */
+    private var readingError = false
+
     private val functions = HashMap<Int, (JsValue, List<JsValue>) -> Any?>()
     private var nextFunction = 0
 
@@ -232,6 +238,16 @@ internal class QuickJsKiteJs private constructor(
     private fun errorOf(h: Int): JsException = errorOf(toJs(h))
 
     private fun errorOf(value: JsValue): JsException {
+        if (readingError) return JsError(value, "Error", "a thrown value could not be read", emptyList(), null)
+        readingError = true
+        try {
+            return readError(value)
+        } finally {
+            readingError = false
+        }
+    }
+
+    private fun readError(value: JsValue): JsException {
         val base = JsError.from(value)
         if (base.name == "InternalError" && base.errorMessage == "out of memory") {
             return JsEngineError("the engine ran out of memory")
@@ -242,12 +258,12 @@ internal class QuickJsKiteJs private constructor(
     private fun framesOf(value: JsValue): List<JsStackFrame> {
         if (value.asObjectOrNull() == null) return emptyList()
         val stack = try {
-            helper(Helper.STACK, value)
+            value.asObject()["stack"]
         } catch (e: JsError) {
             return emptyList()
         }
-        if (stack.isUndefined) return emptyList()
-        return stack.asString().lineSequence().mapNotNull(::frameOf).toList()
+        val text = stack.raw as? String ?: return emptyList()
+        return text.lineSequence().mapNotNull(::frameOf).toList()
     }
 
     private fun compileHandle(source: String, fileName: String): Int {
@@ -407,6 +423,9 @@ internal class QuickJsKiteJs private constructor(
 
     private fun foreign(): JsEngineError =
         JsEngineError("this value belongs to another engine, and values cannot move between engines")
+
+    /** obj[key], read in C so that no script runs unless the property is a getter or a proxy's. */
+    fun read(obj: QuickJsHandle, key: String): JsValue = toJs(check(bridge.get(ptr, ownHandle(obj), key)))
 
     /** Calls a prelude helper with handles it borrows, answering the handle it gives back. */
     private fun callHelper(helper: Helper, args: IntArray): Int {

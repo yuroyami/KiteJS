@@ -20,12 +20,10 @@
  
  struct JSContext {
      JSGCObjectHeader header; /* must come first */
-@@ -2550,8 +2555,37 @@
-     js_free(ctx, e);
-     *pctx = ctx;
+@@ -2552,6 +2557,35 @@
      return ret;
-+}
-+
+ }
+ 
 +/* KiteJS: drop every pending job without running it */
 +void JS_KiteDiscardPendingJobs(JSRuntime *rt)
 +{
@@ -47,8 +45,8 @@
 +{
 +    rt->kite_now = now;
 +    rt->kite_tz_offset = tz_offset;
- }
- 
++}
++
 +/* KiteJS: how many times the runtime has thrown for lack of memory */
 +uint32_t JS_KiteOutOfMemoryCount(JSRuntime *rt)
 +{
@@ -67,7 +65,284 @@
      if (!rt->in_out_of_memory) {
          rt->in_out_of_memory = true;
          JS_ThrowInternalError(ctx, "out of memory");
-@@ -41899,7 +41935,8 @@
+@@ -21236,6 +21272,7 @@
+ 
+ static JSValue async_func_resume(JSContext *ctx, JSAsyncFunctionState *s)
+ {
++    KITEJS_FRAME();
+     JSValue func_obj;
+ 
+     if (js_check_stack_overflow(ctx->rt, 0))
+@@ -24764,6 +24801,7 @@
+ 
+ static __exception int js_parse_template(JSParseState *s, int call, int *argc)
+ {
++    KITEJS_PARSER_FRAME();
+     JSContext *ctx = s->ctx;
+     JSValue raw_array, template_object;
+     JSToken cooked;
+@@ -24899,6 +24937,7 @@
+                                               bool allow_method, bool allow_var,
+                                               bool allow_private)
+ {
++    KITEJS_PARSER_FRAME();
+     int is_private = 0;
+     bool is_non_reserved_ident;
+     JSAtom name;
+@@ -25248,6 +25287,7 @@
+ 
+ static __exception int js_parse_object_literal(JSParseState *s)
+ {
++    KITEJS_PARSER_FRAME();
+     JSAtom name = JS_ATOM_NULL;
+     const uint8_t *start_ptr;
+     int start_line, start_col, prop_type;
+@@ -25375,6 +25415,7 @@
+ 
+ static __exception int js_parse_left_hand_side_expr(JSParseState *s)
+ {
++    KITEJS_PARSER_FRAME();
+     return js_parse_postfix_expr(s, PF_POSTFIX_CALL);
+ }
+ 
+@@ -25556,6 +25597,7 @@
+ static __exception int js_parse_class(JSParseState *s, bool is_class_expr,
+                                       JSParseExportEnum export_flag)
+ {
++    KITEJS_PARSER_FRAME();
+     JSContext *ctx = s->ctx;
+     JSFunctionDef *fd = s->cur_func;
+     JSAtom name = JS_ATOM_NULL, class_name = JS_ATOM_NULL, class_name1;
+@@ -26082,6 +26124,7 @@
+ 
+ static __exception int js_parse_array_literal(JSParseState *s)
+ {
++    KITEJS_PARSER_FRAME();
+     uint32_t idx;
+     bool need_length;
+ 
+@@ -26472,6 +26515,7 @@
+ 
+ static __exception int js_parse_expr_paren(JSParseState *s)
+ {
++    KITEJS_PARSER_FRAME();
+     if (js_parse_expect(s, '('))
+         return -1;
+     if (js_parse_expr(s))
+@@ -26611,6 +26655,7 @@
+                                           bool allow_initializer,
+                                           bool export_flag)
+ {
++    KITEJS_PARSER_FRAME();
+     int label_parse, label_assign, label_done, label_lvalue, depth_lvalue;
+     int start_addr, assign_addr;
+     JSAtom prop_name, var_name;
+@@ -27076,6 +27121,7 @@
+ /* allowed parse_flags: PF_POSTFIX_CALL */
+ static __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags)
+ {
++    KITEJS_PARSER_FRAME();
+     FuncCallType call_type;
+     int optional_chaining_label;
+     bool accept_lparen = (parse_flags & PF_POSTFIX_CALL) != 0;
+@@ -27733,6 +27779,7 @@
+ 
+ static __exception int js_parse_delete(JSParseState *s)
+ {
++    KITEJS_PARSER_FRAME();
+     JSFunctionDef *fd = s->cur_func;
+     JSAtom name;
+     int opcode;
+@@ -27829,6 +27876,7 @@
+ /* allowed parse_flags: PF_POW_ALLOWED, PF_POW_FORBIDDEN */
+ static __exception int js_parse_unary(JSParseState *s, int parse_flags)
+ {
++    KITEJS_PARSER_FRAME();
+     int op;
+ 
+     switch(s->token.val) {
+@@ -27957,6 +28005,7 @@
+ static __exception int js_parse_expr_binary(JSParseState *s, int level,
+                                             int parse_flags)
+ {
++    KITEJS_PARSER_FRAME();
+     int op, opcode;
+ 
+     if (level == 0) {
+@@ -28121,6 +28170,7 @@
+ static __exception int js_parse_logical_and_or(JSParseState *s, int op,
+                                                int parse_flags)
+ {
++    KITEJS_PARSER_FRAME();
+     int label1;
+ 
+     if (op == TOK_LAND) {
+@@ -28161,6 +28211,7 @@
+ 
+ static __exception int js_parse_coalesce_expr(JSParseState *s, int parse_flags)
+ {
++    KITEJS_PARSER_FRAME();
+     int label1;
+ 
+     if (js_parse_logical_and_or(s, TOK_LOR, parse_flags))
+@@ -28189,6 +28240,7 @@
+ /* allowed parse_flags: PF_IN_ACCEPTED */
+ static __exception int js_parse_cond_expr(JSParseState *s, int parse_flags)
+ {
++    KITEJS_PARSER_FRAME();
+     int label1, label2;
+ 
+     if (js_parse_coalesce_expr(s, parse_flags))
+@@ -28218,6 +28270,7 @@
+ /* allowed parse_flags: PF_IN_ACCEPTED */
+ static __exception int js_parse_assign_expr2(JSParseState *s, int parse_flags)
+ {
++    KITEJS_PARSER_FRAME();
+     int opcode, op, scope;
+     JSAtom name0 = JS_ATOM_NULL;
+     JSAtom name;
+@@ -28522,12 +28575,14 @@
+ 
+ static __exception int js_parse_assign_expr(JSParseState *s)
+ {
++    KITEJS_PARSER_FRAME();
+     return js_parse_assign_expr2(s, PF_IN_ACCEPTED);
+ }
+ 
+ /* allowed parse_flags: PF_IN_ACCEPTED */
+ static __exception int js_parse_expr2(JSParseState *s, int parse_flags)
+ {
++    KITEJS_PARSER_FRAME();
+     bool comma = false;
+     for(;;) {
+         if (js_parse_assign_expr2(s, parse_flags))
+@@ -28552,6 +28607,7 @@
+ 
+ static __exception int js_parse_expr(JSParseState *s)
+ {
++    KITEJS_PARSER_FRAME();
+     return js_parse_expr2(s, PF_IN_ACCEPTED);
+ }
+ 
+@@ -28769,11 +28825,13 @@
+ 
+ static __exception int js_parse_statement(JSParseState *s)
+ {
++    KITEJS_PARSER_FRAME();
+     return js_parse_statement_or_decl(s, 0);
+ }
+ 
+ static __exception int js_parse_block(JSParseState *s)
+ {
++    KITEJS_PARSER_FRAME();
+     JSFunctionDef *fd = s->cur_func;
+ 
+     if (js_parse_expect(s, '{'))
+@@ -28832,6 +28890,7 @@
+ static __exception int js_parse_var(JSParseState *s, int parse_flags, int tok,
+                                     bool export_flag)
+ {
++    KITEJS_PARSER_FRAME();
+     JSContext *ctx = s->ctx;
+     JSFunctionDef *fd = s->cur_func;
+     JSAtom name = JS_ATOM_NULL;
+@@ -29060,6 +29119,7 @@
+                                           int source_line_num,
+                                           int source_col_num)
+ {
++    KITEJS_PARSER_FRAME();
+     JSContext *ctx = s->ctx;
+     JSFunctionDef *fd = s->cur_func;
+     JSAtom var_name;
+@@ -29388,6 +29448,7 @@
+ static __exception int js_parse_statement_or_decl(JSParseState *s,
+                                                   int decl_mask)
+ {
++    KITEJS_PARSER_FRAME();
+     JSContext *ctx = s->ctx;
+     JSAtom label_name;
+     int tok;
+@@ -31494,6 +31555,7 @@
+ static int js_inner_module_linking(JSContext *ctx, JSModuleDef *m,
+                                    JSModuleDef **pstack_top, int index)
+ {
++    KITEJS_FRAME();
+     int i;
+     JSImportEntry *mi;
+     JSModuleDef *m1;
+@@ -32076,6 +32138,7 @@
+ static int gather_available_ancestors(JSContext *ctx, JSModuleDef *module,
+                                       ExecModuleList *exec_list)
+ {
++    KITEJS_FRAME();
+     int i;
+ 
+     if (js_check_stack_overflow(ctx->rt, 0)) {
+@@ -32123,6 +32186,7 @@
+                                                   int argc, JSValueConst *argv, int magic,
+                                                   JSValueConst *func_data)
+ {
++    KITEJS_FRAME();
+     JSModuleDef *module = JS_VALUE_GET_PTR(func_data[0]);
+     JSValueConst error = argv[0];
+     int i;
+@@ -32278,6 +32342,7 @@
+                                       int index, JSModuleDef **pstack_top,
+                                       JSValue *pvalue)
+ {
++    KITEJS_FRAME();
+     JSModuleDef *m1;
+     int i;
+ 
+@@ -32583,6 +32648,7 @@
+ 
+ static __exception int js_parse_export(JSParseState *s)
+ {
++    KITEJS_PARSER_FRAME();
+     JSContext *ctx = s->ctx;
+     JSModuleDef *m = s->cur_func->module;
+     JSAtom local_name, export_name;
+@@ -32933,6 +32999,7 @@
+ 
+ static __exception int js_parse_source_element(JSParseState *s)
+ {
++    KITEJS_PARSER_FRAME();
+     JSFunctionDef *fd = s->cur_func;
+     int tok;
+ 
+@@ -37400,6 +37467,7 @@
+                                                JSParseExportEnum export_flag,
+                                                JSFunctionDef **pfd)
+ {
++    KITEJS_PARSER_FRAME();
+     JSContext *ctx = s->ctx;
+     JSFunctionDef *fd = s->cur_func;
+     bool is_expr;
+@@ -37996,6 +38064,7 @@
+                                               int start_line,
+                                               int start_col)
+ {
++    KITEJS_PARSER_FRAME();
+     return js_parse_function_decl2(s, func_type, func_kind, func_name, ptr,
+                                    start_line, start_col,
+                                    JS_PARSE_EXPORT_NONE, NULL);
+@@ -39076,6 +39145,7 @@
+ 
+ static int JS_WriteObjectRec(BCWriterState *s, JSValueConst obj)
+ {
++    KITEJS_FRAME();
+     uint32_t tag;
+ 
+     if (js_check_stack_overflow(s->ctx->rt, 0)) {
+@@ -40373,6 +40443,7 @@
+ 
+ static JSValue JS_ReadObjectRec(BCReaderState *s)
+ {
++    KITEJS_FRAME();
+     JSContext *ctx = s->ctx;
+     uint8_t tag;
+     JSValue obj = JS_UNDEFINED;
+@@ -41899,7 +41970,8 @@
                  atom = ctx->rt->class_array[p->class_id].class_name;
                  break;
              default:
@@ -77,7 +352,15 @@
                  break;
              }
          }
-@@ -49127,7 +49164,9 @@
+@@ -44582,6 +44654,7 @@
+                                    JSValueConst mapperFunction,
+                                    JSValueConst thisArg)
+ {
++    KITEJS_FRAME();
+     JSValue element;
+     int64_t sourceIndex, elementLen;
+     int present, is_array;
+@@ -49127,7 +49200,9 @@
  
  /* OS dependent. d = argv[0] is in ms from 1970. Return the difference
     between UTC time and local time 'd' in minutes */
@@ -88,7 +371,47 @@
  #if defined(_WIN32)
      DWORD r;
      TIME_ZONE_INFORMATION t;
-@@ -57278,7 +57317,7 @@
+@@ -51028,6 +51103,7 @@
+ /* 'pr' can be NULL */
+ static JSValue json_parse_value(JSParseState *s, JSONParseRecord *pr)
+ {
++    KITEJS_FRAME();
+     JSContext *ctx = s->ctx;
+     JSValue val = JS_NULL;
+     int ret;
+@@ -51250,6 +51326,7 @@
+                                          JSAtom name, JSValueConst reviver,
+                                          const char *text_str, JSONParseRecord *pr)
+ {
++    KITEJS_FRAME();
+     JSValue val, new_el, name_val, res, context;
+     JSValueConst args[3];
+     int ret, is_array;
+@@ -51535,6 +51612,7 @@
+                           JSValueConst holder, JSValue val,
+                           JSValueConst indent)
+ {
++    KITEJS_FRAME();
+     JSValue indent1, sep, sep1, tab, v, prop;
+     JSObject *p;
+     int64_t i, len;
+@@ -52096,6 +52174,7 @@
+ static JSProxyData *get_proxy_method(JSContext *ctx, JSValue *pmethod,
+                                      JSValueConst obj, JSAtom name)
+ {
++    KITEJS_FRAME();
+     JSProxyData *s = JS_GetOpaque(obj, JS_CLASS_PROXY);
+     JSValue method;
+ 
+@@ -52938,6 +53017,7 @@
+ 
+ static int js_proxy_isArray(JSContext *ctx, JSValueConst obj)
+ {
++    KITEJS_FRAME();
+     JSProxyData *s = JS_GetOpaque(obj, JS_CLASS_PROXY);
+     if (!s)
+         return false;
+@@ -57278,7 +57358,7 @@
      JS_PROP_U2D_DEF("Infinity", 0x7FF0ull<<48, 0 ),
      JS_PROP_U2D_DEF("NaN", 0x7FF8ull<<48, 0 ),
      JS_PROP_UNDEFINED_DEF("undefined", 0 ),
@@ -97,7 +420,7 @@
      JS_CFUNC_DEF("eval", 1, js_global_eval ),
  };
  
-@@ -57377,7 +57416,7 @@
+@@ -57377,7 +57457,7 @@
      } else {
          d = dval;     /* assuming -8.64e15 <= dval <= -8.64e15 */
          if (is_local) {
@@ -106,7 +429,7 @@
              d += tz * 60000;
          }
      }
-@@ -57423,7 +57462,7 @@
+@@ -57423,7 +57503,7 @@
  
  /* The spec mandates the use of 'double' and it specifies the order
     of the operations */
@@ -115,7 +438,7 @@
      double y, m, dt, ym, mn, day, h, s, milli, time, tv;
      int yi, mi, i;
      int64_t days;
-@@ -57477,7 +57516,7 @@
+@@ -57477,7 +57557,7 @@
      /* adjust for local time and clip */
      if (is_local) {
          int64_t ti = tv < INT64_MIN ? INT64_MIN : tv >= 0x1p63 ? INT64_MAX : (int64_t)tv;
@@ -124,7 +447,7 @@
      }
      d = time_clip(tv);
  out:
-@@ -57537,7 +57576,7 @@
+@@ -57537,7 +57617,7 @@
          return JS_NAN;
  
      if (argc > 0)
@@ -133,7 +456,7 @@
  
      return JS_SetThisTimeValue(ctx, this_val, d);
  }
-@@ -57661,7 +57700,9 @@
+@@ -57661,7 +57741,9 @@
  }
  
  /* OS dependent: return the UTC time in ms since 1970. */
@@ -144,7 +467,7 @@
      return js__gettimeofday_us() / 1000;
  }
  
-@@ -57679,7 +57720,7 @@
+@@ -57679,7 +57761,7 @@
      }
      n = argc;
      if (n == 0) {
@@ -153,7 +476,7 @@
      } else if (n == 1) {
          JSValue v, dv;
          if (JS_VALUE_GET_TAG(argv[0]) == JS_TAG_OBJECT) {
-@@ -57717,7 +57758,7 @@
+@@ -57717,7 +57799,7 @@
              if (i == 0 && fields[0] >= 0 && fields[0] < 100)
                  fields[0] += 1900;
          }
@@ -162,7 +485,7 @@
      }
  has_val:
      rv = js_create_from_ctor(ctx, new_target, JS_CLASS_DATE);
-@@ -57755,7 +57796,7 @@
+@@ -57755,7 +57837,7 @@
          if (i == 0 && fields[0] >= 0 && fields[0] < 100)
              fields[0] += 1900;
      }
@@ -171,7 +494,7 @@
  }
  
  /* Date string parsing */
-@@ -58211,7 +58252,7 @@
+@@ -58211,7 +58293,7 @@
          if (valid) {
              for(i = 0; i < 7; i++)
                  fields1[i] = fields[i];
@@ -180,7 +503,7 @@
              rv = js_float64(d);
          }
      }
-@@ -58223,7 +58264,7 @@
+@@ -58223,7 +58305,7 @@
                             int argc, JSValueConst *argv)
  {
      // now()
@@ -189,7 +512,7 @@
  }
  
  static JSValue js_date_Symbol_toPrimitive(JSContext *ctx, JSValueConst this_val,
-@@ -58270,7 +58311,7 @@
+@@ -58270,7 +58352,7 @@
          return JS_NAN;
      else
          /* assuming -8.64e15 <= v <= -8.64e15 */
@@ -217,3 +540,21 @@
  
  /* Structure to retrieve (de)serialized SharedArrayBuffer objects. */
  typedef struct JSSABTab {
+--- a/libregexp.c
++++ b/libregexp.c
+@@ -1425,6 +1425,7 @@
+ 
+ static int re_parse_nested_class(REParseState *s, REStringList *cr, const uint8_t **pp)
+ {
++    KITEJS_FRAME();
+     const uint8_t *p;
+     uint32_t c1, c2;
+     int ret;
+@@ -2454,6 +2455,7 @@
+ 
+ static int re_parse_disjunction(REParseState *s, bool is_backward_dir)
+ {
++    KITEJS_FRAME();
+     int start, len, pos;
+ 
+     if (lre_check_stack_overflow(s->opaque, 0))

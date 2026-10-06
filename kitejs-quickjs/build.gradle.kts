@@ -262,16 +262,21 @@ val wasmExports: List<String> = Regex("""\b(kite_[a-z_]+)\(""")
     .distinct()
     .toList()
 
+/** The WebAssembly shadow stack, from kitejs_config.h, so the link and the engine's limit agree. */
+val wasmStackSize: Int = Regex("""#define KITEJS_WASM_STACK_SIZE \((\d+) \* 1024 \* 1024\)""")
+    .find(nativeDir.file("kitejs_config.h").asFile.readText())!!.groupValues[1].toInt() * 1024 * 1024
+
 val buildWasm = tasks.register<ZigCompile>("buildQuickJsWasm") {
     group = "build"
     description = "Builds QuickJS as a WebAssembly module with zig."
     zig.set(zigPath)
     target.set("wasm32-wasi")
     flags.set(
-        listOf("-mexec-model=reactor") + cFlags + listOf("-I${nativeDir.asFile}", "-Wl,-z,stack-size=1048576") +
+        listOf("-mexec-model=reactor") + cFlags + listOf("-I${nativeDir.asFile}", "-Wl,-z,stack-size=$wasmStackSize") +
             wasmExports.map { "-Wl,--export=$it" },
     )
     sources.from(cSources.map { nativeDir.file(it) })
+    headers.from(cHeaders)
     output.set(layout.buildDirectory.file("quickjs/wasm/kitejs_quickjs.wasm"))
 }
 

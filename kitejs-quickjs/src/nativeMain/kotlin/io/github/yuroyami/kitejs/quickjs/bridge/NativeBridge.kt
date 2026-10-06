@@ -8,6 +8,7 @@ package io.github.yuroyami.kitejs.quickjs.bridge
 
 import cnames.structs.KiteEngine
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_array_get
+import io.github.yuroyami.kitejs.quickjs.cinterop.kite_get
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_array_length
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_array_push
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_ask_host
@@ -130,6 +131,7 @@ private object NativeBridge : QuickJsBridge {
     override fun objectPut(e: Long, obj: Int, key: String, value: Int) = kite_object_put(e(e), obj, key.wcstr, key.length, value)
     override fun arrayLength(e: Long, array: Int): Int = kite_array_length(e(e), array)
     override fun arrayGet(e: Long, array: Int, index: Int): Int = kite_array_get(e(e), array, index)
+    override fun get(e: Long, obj: Int, key: String): Int = kite_get(e(e), obj, key.wcstr, key.length)
     override fun global(e: Long): Int = kite_global(e(e))
 
     override fun compile(e: Long, source: String, file: String): Int =
