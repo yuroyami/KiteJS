@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -232,6 +234,64 @@ static JSValue host_function(JSContext *ctx, JSValueConst this_val, int argc, JS
     return v;
 }
 
+/* ---- Memory -------------------------------------------------------------------------------- */
+
+/* QuickJS counts each block by its usable size when it allocates and when it frees it, and aborts
+ * when the two differ. A libc may grow a live block: emmalloc, which zig 0.14 links on
+ * wasm32-wasi, does so when it aligns the next one (#124). So every block keeps the size QuickJS
+ * asked for in a header of its own, which also makes the count, and a memory limit, the same on
+ * every platform. */
+#define KITE_BLOCK_HEADER _Alignof(max_align_t)
+
+static void *kite_block(void *raw, size_t size)
+{
+    if (!raw)
+        return NULL;
+    *(size_t *)raw = size;
+    return (char *)raw + KITE_BLOCK_HEADER;
+}
+
+static void *kite_malloc(void *opaque, size_t size)
+{
+    (void)opaque;
+    if (size > SIZE_MAX - KITE_BLOCK_HEADER)
+        return NULL;
+    return kite_block(malloc(size + KITE_BLOCK_HEADER), size);
+}
+
+static void *kite_calloc(void *opaque, size_t count, size_t size)
+{
+    (void)opaque;
+    if (size != 0 && count > (SIZE_MAX - KITE_BLOCK_HEADER) / size)
+        return NULL;
+    return kite_block(calloc(1, count * size + KITE_BLOCK_HEADER), count * size);
+}
+
+static void kite_mfree(void *opaque, void *ptr)
+{
+    (void)opaque;
+    if (ptr)
+        free((char *)ptr - KITE_BLOCK_HEADER);
+}
+
+static void *kite_realloc(void *opaque, void *ptr, size_t size)
+{
+    if (!ptr)
+        return kite_malloc(opaque, size);
+    if (size > SIZE_MAX - KITE_BLOCK_HEADER)
+        return NULL;
+    return kite_block(realloc((char *)ptr - KITE_BLOCK_HEADER, size + KITE_BLOCK_HEADER), size);
+}
+
+static size_t kite_usable_size(const void *ptr)
+{
+    return ptr ? *(const size_t *)((const char *)ptr - KITE_BLOCK_HEADER) : 0;
+}
+
+static const JSMallocFunctions kite_malloc_functions = {
+    kite_calloc, kite_malloc, kite_mfree, kite_realloc, kite_usable_size,
+};
+
 /* ---- Engines ------------------------------------------------------------------------------- */
 
 KiteEngine *kite_new(int32_t id, double memory_limit, double stack_size, int32_t options)
@@ -240,7 +300,7 @@ KiteEngine *kite_new(int32_t id, double memory_limit, double stack_size, int32_t
     if (!e)
         return NULL;
     e->id = id;
-    e->rt = JS_NewRuntime();
+    e->rt = JS_NewRuntime2(&kite_malloc_functions, NULL);
     if (!e->rt)
         goto fail;
     if (memory_limit > 0)
