@@ -12,8 +12,8 @@ Each engine is its own artifact, so an app only carries the one it uses:
 
 ```kotlin
 commonMain.dependencies {
-    implementation("io.github.yuroyami:kitejs-rhino:0.4.0")    // KiteJs(Rhino)
-    implementation("io.github.yuroyami:kitejs-quickjs:0.4.0")  // KiteJs(QuickJs)
+    implementation("io.github.yuroyami:kitejs-rhino:0.5.0")    // KiteJs(Rhino)
+    implementation("io.github.yuroyami:kitejs-quickjs:0.5.0")  // KiteJs(QuickJs)
 }
 ```
 
@@ -107,7 +107,7 @@ val quickJsDesktop: Configuration by configurations.creating {
         attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
     }
 }
-dependencies { quickJsDesktop("io.github.yuroyami:kitejs-quickjs:0.4.0") }
+dependencies { quickJsDesktop("io.github.yuroyami:kitejs-quickjs:0.5.0") }
 
 tasks.withType<Test>().matching { it.name == "testAndroidHostTest" }.configureEach {
     val desktop = quickJsDesktop
