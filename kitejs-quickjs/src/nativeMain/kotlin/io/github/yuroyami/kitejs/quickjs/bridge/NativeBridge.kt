@@ -55,16 +55,17 @@ import kotlin.native.concurrent.ThreadLocal
 import kotlin.native.ref.createCleaner
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.UShortVar
 import kotlinx.cinterop.addressOf
+import kotlinx.cinterop.convert
 import kotlinx.cinterop.get
-import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.usePinned
+import platform.posix.memcpy
 import kotlinx.cinterop.staticCFunction
 import kotlinx.cinterop.toCPointer
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.toLong
-import kotlinx.cinterop.wcstr
 
 /** QuickJS linked into the binary through cinterop. */
 private object NativeBridge : QuickJsBridge {
@@ -121,7 +122,8 @@ private object NativeBridge : QuickJsBridge {
         val engine = e(e)
         val chars = kite_string(engine, h) ?: return null
         val length = kite_string_length(engine)
-        val text = CharArray(length) { chars[it].toInt().toChar() }.concatToString()
+        val text = CharArray(length).also { if (length > 0) it.usePinned { p -> memcpy(p.addressOf(0), chars, (length * 2).convert()) } }
+            .concatToString()
         kite_string_free(engine)
         return text
     }
@@ -132,23 +134,24 @@ private object NativeBridge : QuickJsBridge {
     override fun release(e: Long, h: Int) = kite_release(e(e), h)
 
     override fun newNumber(e: Long, d: Double): Int = kite_new_number(e(e), d)
-    override fun newString(e: Long, s: String): Int = kite_new_string(e(e), s.wcstr, s.length)
+    override fun newString(e: Long, s: String): Int = utf16(s) { kite_new_string(e(e), it, s.length) }
     override fun newObject(e: Long): Int = kite_new_object(e(e))
     override fun newArray(e: Long): Int = kite_new_array(e(e))
     override fun arrayPush(e: Long, array: Int, value: Int) = kite_array_push(e(e), array, value)
-    override fun objectPut(e: Long, obj: Int, key: String, value: Int) = kite_object_put(e(e), obj, key.wcstr, key.length, value)
+    override fun objectPut(e: Long, obj: Int, key: String, value: Int) = utf16(key) { kite_object_put(e(e), obj, it, key.length, value) }
     override fun arrayLength(e: Long, array: Int): Int = kite_array_length(e(e), array)
     override fun arrayGet(e: Long, array: Int, index: Int): Int = kite_array_get(e(e), array, index)
-    override fun get(e: Long, obj: Int, key: String): Int = kite_get(e(e), obj, key.wcstr, key.length)
+    override fun get(e: Long, obj: Int, key: String): Int = utf16(key) { kite_get(e(e), obj, it, key.length) }
     override fun global(e: Long): Int = kite_global(e(e))
 
     override fun compile(e: Long, source: String, file: String): Int =
-        kite_compile(e(e), source.wcstr, source.length, file.wcstr, file.length)
+        utf16(source) { s -> utf16(file) { f -> kite_compile(e(e), s, source.length, f, file.length) } }
 
     override fun writeScript(e: Long, compiled: Int): ByteArray? {
         val engine = e(e)
         val bytes = kite_write_script(engine, compiled) ?: return null
-        val out = bytes.readBytes(kite_bytes_length(engine))
+        val length = kite_bytes_length(engine)
+        val out = ByteArray(length).also { if (length > 0) it.usePinned { p -> memcpy(p.addressOf(0), bytes, length.convert()) } }
         kite_bytes_free(engine)
         return out
     }
@@ -166,11 +169,18 @@ private object NativeBridge : QuickJsBridge {
     override fun exception(e: Long): Int = kite_exception(e(e))
 
     override fun newFunction(e: Long, fn: Int, name: String, arity: Int): Int =
-        kite_new_function(e(e), fn, name.wcstr, name.length, arity)
+        utf16(name) { kite_new_function(e(e), fn, it, name.length, arity) }
 
     override fun deadFunction(e: Long): Int = kite_dead_function(e(e))
     override fun cbThis(e: Long): Int = kite_cb_this(e(e))
     override fun cbArg(e: Long, index: Int): Int = kite_cb_arg(e(e), index)
+
+    /**
+     * [s] as UTF-16 in memory while [block] runs. Strings and bytes cross with one copy in native
+     * code, since a loop over each character runs slowly in a debug build.
+     */
+    private inline fun <T> utf16(s: String, block: (CPointer<UShortVar>) -> T): T =
+        (if (s.isEmpty()) CharArray(1) else s.toCharArray()).usePinned { block(it.addressOf(0).reinterpret()) }
 }
 
 internal actual fun bridge(): QuickJsBridge = NativeBridge
