@@ -35,6 +35,12 @@ internal interface QuickJsBridge {
     fun newString(e: Long, s: String): Int
     fun newObject(e: Long): Int
     fun newArray(e: Long): Int
+
+    /** A Uint8Array over a new ArrayBuffer with a copy of [bytes]. */
+    fun newBytes(e: Long, bytes: ByteArray): Int
+
+    /** A copy of the bytes [h], of [TYPE_BYTES], views, or null when copying threw. */
+    fun viewBytes(e: Long, h: Int): ByteArray?
     fun arrayPush(e: Long, array: Int, value: Int)
     fun objectPut(e: Long, obj: Int, key: String, value: Int)
     fun arrayLength(e: Long, array: Int): Int
@@ -86,6 +92,7 @@ internal interface QuickJsBridge {
         const val TYPE_SYMBOL = 6
         const val TYPE_ARRAY = 7
         const val TYPE_FUNCTION = 8
+        const val TYPE_BYTES = 10
 
         const val STOP_NONE = 0
         const val STOP_BUDGET = 1

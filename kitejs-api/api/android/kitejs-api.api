@@ -46,7 +46,7 @@ public final class io/github/yuroyami/kitejs/api/Converters {
 	public final fun clearRegistrations ()V
 	public final fun isCollection (Ljava/lang/Object;)Z
 	public final fun register (Lkotlin/jvm/functions/Function1;)V
-	public final fun toEngine (Ljava/lang/Object;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public final fun toEngine (Ljava/lang/Object;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
 }
 
 public final class io/github/yuroyami/kitejs/api/HostBindingKt {
@@ -150,6 +150,7 @@ public abstract class io/github/yuroyami/kitejs/api/JsObject {
 	public abstract fun isUsableHere ()Z
 	public abstract fun set (ILjava/lang/Object;)V
 	public abstract fun set (Ljava/lang/String;Ljava/lang/Object;)V
+	public fun toByteArrayOrNull ()[B
 	public final fun toMap ()Ljava/util/Map;
 	public abstract fun toPrimitive-VZQqt38 (Lio/github/yuroyami/kitejs/api/PrimitiveHint;)Ljava/lang/Object;
 	public fun toString ()Ljava/lang/String;

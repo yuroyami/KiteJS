@@ -63,6 +63,14 @@ println(list.toList())  // [1.0, 2.0, 3.0]
 `List`, a number becomes a `Double`, and `undefined` becomes null. A function has no Kotlin twin,
 so it stays a `JsFunction`.
 
+An `ArrayBuffer`, a typed array or a `DataView` becomes a `ByteArray` with a copy of the bytes it
+views. `JsObject.toByteArrayOrNull()` gives the same copy for one object, and null for any other
+object. Neither runs a getter that the script redefined. A detached buffer gives no bytes.
+
+```kotlin
+val pixels = js.evaluate("new Uint8ClampedArray([255, 0, 0, 255])").toKotlin() as ByteArray
+```
+
 ```kotlin
 val config = js.evaluate("({ retries: 3, hosts: ['a', 'b'] })").toKotlin()
 // {retries=3.0, hosts=[a, b]}
@@ -178,7 +186,8 @@ The conversion table is fixed and does not use reflection:
 | `Long` inside the safe range | number |
 | `Long` outside the safe range | BigInt |
 | `Char`, `String`, any `CharSequence` | string |
-| `List`, `Array`, `Set`, the primitive arrays | array |
+| `ByteArray` | `Uint8Array` over a new `ArrayBuffer` with a copy of the bytes |
+| `List`, `Array`, `Set`, the other primitive arrays | array |
 | `Map` | object, with every key turned into a string |
 | `JsValue`, `JsObject` | itself |
 

@@ -22,6 +22,9 @@ import io.github.yuroyami.kitejs.rhino.ScriptRuntime
 import io.github.yuroyami.kitejs.rhino.Scriptable
 import io.github.yuroyami.kitejs.rhino.ScriptableObject
 import io.github.yuroyami.kitejs.rhino.SymbolKey
+import io.github.yuroyami.kitejs.rhino.typedarrays.NativeArrayBuffer
+import io.github.yuroyami.kitejs.rhino.typedarrays.NativeDataView
+import io.github.yuroyami.kitejs.rhino.typedarrays.NativeTypedArrayView
 
 /*
  * The handles a Rhino engine gives out. JsObject, JsArray and JsFunction are classes, so the three
@@ -75,6 +78,16 @@ internal interface RhinoHandle {
     fun usable(): Boolean = engine.isUsableHere
 
     fun inert(): String = inertText(target)
+
+    /** A copy of the bytes the target views when it is an ArrayBuffer, a typed array or a DataView. */
+    fun viewedBytes(): ByteArray? = engine.call(drain = false) {
+        when (val t = target) {
+            is NativeArrayBuffer -> t.buffer?.copyOf() ?: ByteArray(0)
+            is NativeTypedArrayView -> if (t.isTypedArrayOutOfBounds) ByteArray(0) else t.buffer.buffer!!.copyOfRange(t.offset, t.offset + t.byteLength)
+            is NativeDataView -> if (t.isDataViewOutOfBounds) ByteArray(0) else t.buffer.buffer!!.copyOfRange(t.offset, t.offset + t.byteLength)
+            else -> null
+        }
+    }
 
     fun defineData(name: String, value: Any?, flags: PropertyFlags) {
         engine.call(top = false, drain = false) { holder().defineProperty(name, engine.toRhino(value), flags.attributes()) }
@@ -133,6 +146,7 @@ internal class RhinoObject(override val engine: RhinoKiteJs, override val target
     override fun toPrimitive(hint: PrimitiveHint): JsValue = primitive(hint)
     override fun isUsableHere(): Boolean = usable()
     override fun inertText(): String = inert()
+    override fun toByteArrayOrNull(): ByteArray? = viewedBytes()
     override fun defineValue(name: String, value: Any?, flags: PropertyFlags) = defineData(name, value, flags)
     override fun defineAccessor(name: String, read: (() -> Any?)?, write: ((JsValue) -> Unit)?, flags: PropertyFlags) =
         defineAccessorProperty(name, read, write, flags)

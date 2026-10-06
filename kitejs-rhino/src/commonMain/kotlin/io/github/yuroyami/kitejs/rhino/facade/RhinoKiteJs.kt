@@ -28,6 +28,7 @@ import io.github.yuroyami.kitejs.rhino.Context
 import io.github.yuroyami.kitejs.rhino.ContextFactory
 import io.github.yuroyami.kitejs.rhino.EcmaError
 import io.github.yuroyami.kitejs.rhino.EvaluatorException
+import io.github.yuroyami.kitejs.rhino.Intrinsics
 import io.github.yuroyami.kitejs.rhino.JavaScriptException
 import io.github.yuroyami.kitejs.rhino.LambdaConstructor
 import io.github.yuroyami.kitejs.rhino.LambdaFunction
@@ -47,6 +48,7 @@ import io.github.yuroyami.kitejs.rhino.SerializableConstructable
 import io.github.yuroyami.kitejs.rhino.SymbolKey
 import io.github.yuroyami.kitejs.rhino.TopLevel
 import io.github.yuroyami.kitejs.rhino.Undefined
+import io.github.yuroyami.kitejs.rhino.typedarrays.NativeTypedArrayView
 
 /**
  * A Rhino engine behind the KiteJS API: one [Context], entered on the thread that opened it, and
@@ -243,6 +245,12 @@ internal class RhinoKiteJs private constructor(
             val obj = cx.newObject(scope)
             for ((key, v) in entries) ScriptRuntime.setObjectElem(obj, key, v, cx)
             obj
+        },
+        bytes = { bytes ->
+            // The realm's own constructor, so a script that replaced the global Uint8Array runs nothing.
+            val array = Intrinsics.constructor(cx, scope, "Uint8Array").construct(cx, scope, arrayOf<Any?>(bytes.size)) as NativeTypedArrayView
+            bytes.copyInto(array.buffer.buffer!!)
+            array
         },
     )
 

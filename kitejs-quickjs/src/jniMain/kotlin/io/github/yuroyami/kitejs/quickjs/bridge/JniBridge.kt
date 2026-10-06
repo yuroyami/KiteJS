@@ -27,6 +27,8 @@ internal object JniNatives {
     @JvmStatic external fun newString(e: Long, s: String): Int
     @JvmStatic external fun newObject(e: Long): Int
     @JvmStatic external fun newArray(e: Long): Int
+    @JvmStatic external fun newBytes(e: Long, bytes: ByteArray): Int
+    @JvmStatic external fun viewBytes(e: Long, h: Int): ByteArray?
     @JvmStatic external fun arrayPush(e: Long, array: Int, value: Int)
     @JvmStatic external fun objectPut(e: Long, obj: Int, key: String, value: Int)
     @JvmStatic external fun arrayLength(e: Long, array: Int): Int
@@ -84,6 +86,8 @@ private object JniBridge : QuickJsBridge {
     override fun newString(e: Long, s: String): Int = JniNatives.newString(e, s)
     override fun newObject(e: Long): Int = JniNatives.newObject(e)
     override fun newArray(e: Long): Int = JniNatives.newArray(e)
+    override fun newBytes(e: Long, bytes: ByteArray): Int = JniNatives.newBytes(e, bytes)
+    override fun viewBytes(e: Long, h: Int): ByteArray? = JniNatives.viewBytes(e, h)
     override fun arrayPush(e: Long, array: Int, value: Int) = JniNatives.arrayPush(e, array, value)
     override fun objectPut(e: Long, obj: Int, key: String, value: Int) = JniNatives.objectPut(e, obj, key, value)
     override fun arrayLength(e: Long, array: Int): Int = JniNatives.arrayLength(e, array)

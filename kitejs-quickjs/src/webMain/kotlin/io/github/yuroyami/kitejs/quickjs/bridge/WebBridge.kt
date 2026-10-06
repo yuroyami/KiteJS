@@ -38,6 +38,10 @@ internal external interface KiteGlue : JsAny {
     fun newString(e: Int, s: String): Int
     fun newObject(e: Int): Int
     fun newArray(e: Int): Int
+
+    /** The bytes go in, and come out, as a string with one code unit for each byte. */
+    fun newBytes(e: Int, bytes: String): Int
+    fun viewBytes(e: Int, h: Int): String?
     fun arrayPush(e: Int, array: Int, value: Int)
     fun objectPut(e: Int, obj: Int, key: String, value: Int)
     fun arrayLength(e: Int, array: Int): Int
@@ -98,6 +102,8 @@ private object WebBridge : QuickJsBridge {
     override fun newString(e: Long, s: String): Int = glue.newString(e.toInt(), s)
     override fun newObject(e: Long): Int = glue.newObject(e.toInt())
     override fun newArray(e: Long): Int = glue.newArray(e.toInt())
+    override fun newBytes(e: Long, bytes: ByteArray): Int = glue.newBytes(e.toInt(), latin1(bytes))
+    override fun viewBytes(e: Long, h: Int): ByteArray? = glue.viewBytes(e.toInt(), h)?.let(::bytesOf)
     override fun arrayPush(e: Long, array: Int, value: Int) = glue.arrayPush(e.toInt(), array, value)
     override fun objectPut(e: Long, obj: Int, key: String, value: Int) = glue.objectPut(e.toInt(), obj, key, value)
     override fun arrayLength(e: Long, array: Int): Int = glue.arrayLength(e.toInt(), array)
@@ -124,10 +130,13 @@ private object WebBridge : QuickJsBridge {
             },
         )
     }
-    override fun writeScript(e: Long, compiled: Int): ByteArray? =
-        glue.writeScript(e.toInt(), compiled)?.let { s -> ByteArray(s.length) { s[it].code.toByte() } }
-    override fun readScript(e: Long, bytes: ByteArray): Int =
-        glue.readScript(e.toInt(), CharArray(bytes.size) { (bytes[it].toInt() and 0xFF).toChar() }.concatToString())
+    override fun writeScript(e: Long, compiled: Int): ByteArray? = glue.writeScript(e.toInt(), compiled)?.let(::bytesOf)
+    override fun readScript(e: Long, bytes: ByteArray): Int = glue.readScript(e.toInt(), latin1(bytes))
+
+    /** [bytes] as a string with one code unit for each byte, the form the glue takes. */
+    private fun latin1(bytes: ByteArray): String = CharArray(bytes.size) { (bytes[it].toInt() and 0xFF).toChar() }.concatToString()
+
+    private fun bytesOf(s: String): ByteArray = ByteArray(s.length) { s[it].code.toByte() }
     override fun pushArg(e: Long, h: Int) = glue.pushArg(e.toInt(), h)
     override fun call(e: Long, fn: Int, self: Int): Int = glue.call(e.toInt(), fn, self)
     override fun construct(e: Long, fn: Int): Int = glue.construct(e.toInt(), fn)

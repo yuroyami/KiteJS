@@ -14,6 +14,7 @@ import io.github.yuroyami.kitejs.api.JsType
 import io.github.yuroyami.kitejs.api.JsValue
 import io.github.yuroyami.kitejs.api.KBigInt
 import io.github.yuroyami.kitejs.api.KiteJsConfig
+import io.github.yuroyami.kitejs.api.function
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -110,6 +111,69 @@ public abstract class ValuesContract<C : KiteJsConfig>(engine: JsEngine<C>) : En
         val map = js.evaluate("var a = { name: 'root' }; a.self = a; a").asObject().toMap()
         assertEquals("root", map["name"])
         assertTrue(map["self"] is JsObject)
+    }
+
+    @Test
+    public fun aByteArrayReachesTheScriptAsAUint8ArrayOfACopy(): TestResult = withEngine { js ->
+        val bytes = byteArrayOf(1, 2, 3, -1)
+        js.global.function("bytes") { _ -> bytes }
+        assertEquals("true,4,1,2,3,255", js.evaluate("var b = bytes(); [b instanceof Uint8Array, b.length, b[0], b[1], b[2], b[3]].join()").asString())
+        js.evaluate("b[0] = 9")
+        assertEquals(1, bytes[0], "the script wrote to the Kotlin array")
+        js.global["empty"] = ByteArray(0)
+        assertEquals("true,0", js.evaluate("[empty instanceof Uint8Array, empty.byteLength].join()").asString())
+    }
+
+    @Test
+    public fun aByteArrayIgnoresAUint8ArrayTheScriptReplaced(): TestResult = withEngine { js ->
+        js.evaluate("var Original = Uint8Array; Uint8Array = function () { throw new Error('replaced') }")
+        js.global["b"] = byteArrayOf(7, 8)
+        assertEquals("true,7,8", js.evaluate("[b instanceof Original, b[0], b[1]].join()").asString())
+    }
+
+    @Test
+    public fun theOtherPrimitiveArraysBecomeArrays(): TestResult = withEngine { js ->
+        js.global["shorts"] = shortArrayOf(1, -2)
+        js.global["floats"] = floatArrayOf(0.5f, 2f)
+        js.global["chars"] = charArrayOf('a', 'b')
+        assertEquals("true,1,-2", js.evaluate("[Array.isArray(shorts), shorts[0], shorts[1]].join()").asString())
+        assertEquals("true,0.5,2", js.evaluate("[Array.isArray(floats), floats[0], floats[1]].join()").asString())
+        assertEquals("true,a,b", js.evaluate("[Array.isArray(chars), chars[0], chars[1]].join()").asString())
+    }
+
+    @Test
+    public fun binaryDataComesBackAsTheBytesItViews(): TestResult = withEngine { js ->
+        fun bytes(source: String): List<Byte> = (js.evaluate(source).toKotlin() as ByteArray).toList()
+        assertEquals(listOf<Byte>(1, 2, -1), bytes("new Uint8Array([1, 2, 255])"))
+        assertEquals(listOf<Byte>(5, 6), bytes("new Uint8Array([5, 6]).buffer"))
+        // A view sees only its own window of the buffer, in the engine's little-endian order.
+        assertEquals(listOf<Byte>(3, 0, -2, -1), bytes("new Int16Array(new Int16Array([9, 3, -2]).buffer, 2, 2)"))
+        assertEquals(listOf<Byte>(2, 3), bytes("new DataView(new Uint8Array([1, 2, 3, 4]).buffer, 1, 2)"))
+        assertEquals(listOf<Byte>(), bytes("var d = new ArrayBuffer(4); d.transfer(); d"))
+        assertEquals(listOf<Byte>(), bytes("var g = new ArrayBuffer(4), v = new Uint8Array(g); g.transfer(); v"))
+        // A host function gets the bytes of a typed array it is passed.
+        var got: ByteArray? = null
+        js.global.function("take") { args -> got = args[0].toKotlin() as ByteArray; null }
+        js.evaluate("take(new Uint8ClampedArray([300, -5, 7]))")
+        assertEquals(listOf<Byte>(-1, 0, 7), got!!.toList())
+        // Inside an object, as everywhere on the way down.
+        @Suppress("UNCHECKED_CAST")
+        val map = js.evaluate("({ data: new Uint8Array([4]) })").toKotlin() as Map<String, Any?>
+        assertEquals(listOf<Byte>(4), (map["data"] as ByteArray).toList())
+    }
+
+    @Test
+    public fun theBytesIgnoreGettersTheScriptRedefined(): TestResult = withEngine { js ->
+        val view = js.evaluate(
+            "var u = new Uint8Array([1, 2, 3]).subarray(1);" +
+                "Object.defineProperty(Object.getPrototypeOf(Uint8Array.prototype), 'byteLength', { get: function () { throw new Error('ran') } });" +
+                "Object.defineProperty(u, 'buffer', { value: new ArrayBuffer(9) }); u",
+        ).asObject()
+        assertEquals(listOf<Byte>(2, 3), view.toByteArrayOrNull()!!.toList())
+        assertNull(js.evaluate("({ length: 2, 0: 1, 1: 2 })").asObject().toByteArrayOrNull())
+        assertNull(js.evaluate("[1, 2]").asObject().toByteArrayOrNull())
+        // toMap still answers the keys of a typed array.
+        assertEquals(mapOf("0" to 2.0, "1" to 3.0), view.toMap())
     }
 
     @Test

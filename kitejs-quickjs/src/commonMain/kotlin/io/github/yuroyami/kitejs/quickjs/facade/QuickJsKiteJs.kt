@@ -450,6 +450,7 @@ internal class QuickJsKiteJs private constructor(
             }
             QuickJsBridge.TYPE_ARRAY -> JsValue(QuickJsArray(this, adopt(h)))
             QuickJsBridge.TYPE_FUNCTION -> JsValue(QuickJsFunction(this, adopt(h)))
+            QuickJsBridge.TYPE_BYTES -> JsValue(QuickJsObject(this, adopt(h), viewsBytes = true))
             else -> JsValue(QuickJsObject(this, adopt(h)))
         }
     }
@@ -487,7 +488,11 @@ internal class QuickJsKiteJs private constructor(
             }
             obj
         },
+        bytes = { check(bridge.newBytes(ptr, it)) },
     )
+
+    /** A copy of the bytes [obj], an object of [QuickJsBridge.TYPE_BYTES], views. */
+    fun bytesOf(obj: QuickJsHandle): ByteArray = call(drain = false) { bridge.viewBytes(ptr, ownHandle(obj)) ?: raise() }
 
     private fun scalarHandle(value: Any?): Int = when (value) {
         JsUndefined -> UNDEFINED

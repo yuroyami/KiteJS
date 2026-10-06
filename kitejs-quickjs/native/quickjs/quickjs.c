@@ -62128,6 +62128,54 @@ static bool dataview_is_oob(JSObject *p)
     return (int64_t)ta->offset + ta->length > abuf->byte_length;
 }
 
+/* KiteJS: the bytes an ArrayBuffer, a typed array or a DataView views, read without running any
+   script, so a getter the script redefined cannot change them. False for any other value. A
+   detached buffer or a view out of its bounds views no bytes, as its byteLength says. */
+bool JS_KiteGetViewedBytes(JSValueConst obj, uint8_t **pdata, size_t *psize)
+{
+    JSObject *p;
+    JSArrayBuffer *abuf;
+    JSTypedArray *ta;
+    size_t length;
+
+    *pdata = NULL;
+    *psize = 0;
+    if (JS_VALUE_GET_TAG(obj) != JS_TAG_OBJECT)
+        return false;
+    p = JS_VALUE_GET_OBJ(obj);
+    if (p->class_id == JS_CLASS_ARRAY_BUFFER ||
+        p->class_id == JS_CLASS_SHARED_ARRAY_BUFFER) {
+        abuf = p->u.array_buffer;
+        if (!abuf->detached) {
+            *pdata = abuf->data;
+            *psize = abuf->byte_length;
+        }
+        return true;
+    }
+    if (is_typed_array(p->class_id)) {
+        if (typed_array_is_oob(p))
+            return true;
+        ta = p->u.typed_array;
+        if (ta->track_rab)
+            length = (size_t)p->u.array.count << typed_array_size_log2(p->class_id);
+        else
+            length = ta->length;
+    } else if (p->class_id == JS_CLASS_DATAVIEW) {
+        if (dataview_is_oob(p))
+            return true;
+        ta = p->u.typed_array;
+        if (ta->track_rab)
+            length = ta->buffer->u.array_buffer->byte_length - ta->offset;
+        else
+            length = ta->length;
+    } else {
+        return false;
+    }
+    *pdata = ta->buffer->u.array_buffer->data + ta->offset;
+    *psize = length;
+    return true;
+}
+
 static JSObject *get_dataview(JSContext *ctx, JSValueConst this_val)
 {
     JSObject *p;

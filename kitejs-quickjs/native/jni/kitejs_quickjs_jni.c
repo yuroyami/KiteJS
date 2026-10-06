@@ -200,6 +200,31 @@ JNIEXPORT jint JNICALL NATIVE(newArray)(JNIEnv *env, jclass cls, jlong e)
     return kite_new_array(ENGINE(e));
 }
 
+JNIEXPORT jint JNICALL NATIVE(newBytes)(JNIEnv *env, jclass cls, jlong e, jbyteArray bytes)
+{
+    jsize length = (*env)->GetArrayLength(env, bytes);
+    jbyte *data = (*env)->GetByteArrayElements(env, bytes, NULL);
+    if (!data)
+        return -1;
+    jint h = kite_new_bytes(ENGINE(e), (const uint8_t *)data, length);
+    (*env)->ReleaseByteArrayElements(env, bytes, data, JNI_ABORT);
+    return h;
+}
+
+JNIEXPORT jbyteArray JNICALL NATIVE(viewBytes)(JNIEnv *env, jclass cls, jlong e, jint h)
+{
+    KiteEngine *engine = ENGINE(e);
+    const uint8_t *bytes = kite_view_bytes(engine, h);
+    if (!bytes)
+        return NULL;
+    jsize length = kite_bytes_length(engine);
+    jbyteArray out = (*env)->NewByteArray(env, length);
+    if (out)
+        (*env)->SetByteArrayRegion(env, out, 0, length, (const jbyte *)bytes);
+    kite_bytes_free(engine);
+    return out;
+}
+
 JNIEXPORT void JNICALL NATIVE(arrayPush)(JNIEnv *env, jclass cls, jlong e, jint array, jint value)
 {
     kite_array_push(ENGINE(e), array, value);

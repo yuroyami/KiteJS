@@ -74,7 +74,12 @@ internal interface QuickJsHandle {
         other is QuickJsHandle && other.engine === engine && other.identity == identity
 }
 
-internal class QuickJsObject(override val engine: QuickJsKiteJs, adopted: QuickJsKiteJs.Adopted) : JsObject(), QuickJsHandle {
+/** An object handle; [viewsBytes] when the object is an ArrayBuffer, a typed array or a DataView. */
+internal class QuickJsObject(
+    override val engine: QuickJsKiteJs,
+    adopted: QuickJsKiteJs.Adopted,
+    private val viewsBytes: Boolean = false,
+) : JsObject(), QuickJsHandle {
     override val handle: Int = adopted.handle
     override val identity: Double = adopted.identity
 
@@ -92,6 +97,7 @@ internal class QuickJsObject(override val engine: QuickJsKiteJs, adopted: QuickJ
     override fun toPrimitive(hint: PrimitiveHint): JsValue = primitive(hint)
     override fun isUsableHere(): Boolean = usable()
     override fun inertText(): String = "[object Object]"
+    override fun toByteArrayOrNull(): ByteArray? = if (viewsBytes) engine.bytesOf(this) else null
     override fun defineValue(name: String, value: Any?, flags: PropertyFlags) = defineData(name, value, flags)
     override fun defineAccessor(name: String, read: (() -> Any?)?, write: ((JsValue) -> Unit)?, flags: PropertyFlags) =
         defineAccessorProperty(name, read, write, flags)

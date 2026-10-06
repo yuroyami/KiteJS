@@ -51,9 +51,16 @@ public abstract class JsObject @InternalKiteJsApi constructor() {
     /** Calls a method on this object, the way `obj.name(...)` does in a script. */
     public abstract fun call(name: String, vararg args: Any?): JsValue
 
+    /**
+     * A copy of the bytes this object views when it is an `ArrayBuffer`, a typed array or a
+     * `DataView`, read without running any script, or null for any other object. A detached
+     * buffer, or a view past the end of its buffer, gives no bytes.
+     */
+    public open fun toByteArrayOrNull(): ByteArray? = null
+
     /** A plain Kotlin map, all the way down. Cycles come back as the [JsObject] that closed them. */
     @Suppress("UNCHECKED_CAST")
-    public fun toMap(): Map<String, Any?> = Converters.toKotlin(value, HashSet()) as Map<String, Any?>
+    public fun toMap(): Map<String, Any?> = Converters.toKotlinMap(this, HashSet()) as Map<String, Any?>
 
     /**
      * What `String(obj)` gives, without ever throwing. Where the engine cannot be used, or the

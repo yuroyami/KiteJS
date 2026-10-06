@@ -1260,6 +1260,9 @@ typedef int JSKiteTimezoneOffsetFunc(JSContext *ctx, int64_t time);
 JS_EXTERN void JS_KiteSetDateHooks(JSRuntime *rt, JSKiteNowFunc *now,
                                    JSKiteTimezoneOffsetFunc *tz_offset);
 JS_EXTERN uint32_t JS_KiteOutOfMemoryCount(JSRuntime *rt);
+/* the bytes an ArrayBuffer, a typed array or a DataView views, running no script; false for any
+   other value, and no bytes for a detached or out-of-bounds view */
+JS_EXTERN bool JS_KiteGetViewedBytes(JSValueConst obj, uint8_t **pdata, size_t *psize);
 
 /* Structure to retrieve (de)serialized SharedArrayBuffer objects. */
 typedef struct JSSABTab {

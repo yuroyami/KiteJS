@@ -152,8 +152,9 @@ public value class JsValue @InternalKiteJsApi constructor(
     public fun asFunctionOrNull(): JsFunction? = raw as? JsFunction
 
     /**
-     * A plain Kotlin value, all the way down: `Map` for an object, `List` for an array, `Double`,
-     * `String`, `Boolean`, [KBigInt], or null. A function stays a [JsFunction] and a symbol a
+     * A plain Kotlin value, all the way down: `Map` for an object, `List` for an array, `ByteArray`
+     * for an `ArrayBuffer`, a typed array or a `DataView`, `Double`, `String`, `Boolean`, [KBigInt],
+     * or null. A function stays a [JsFunction] and a symbol a
      * [JsSymbol], since they have no Kotlin twin, and an object that closes a cycle stays the
      * [JsObject] it is.
      */

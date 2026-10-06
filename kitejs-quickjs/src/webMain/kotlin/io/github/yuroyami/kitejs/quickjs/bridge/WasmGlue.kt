@@ -169,6 +169,20 @@ internal const val GLUE: String = """(function () {
         },
         newObject: function (e) { return exports.kite_new_object(e); },
         newArray: function (e) { return exports.kite_new_array(e); },
+        newBytes: function (e, bytes) {
+            var n = bytes.length, p = exports.kite_alloc(n || 1);
+            var a = new Uint8Array(memory.buffer, p, n);
+            for (var i = 0; i < n; i++) a[i] = bytes.charCodeAt(i);
+            try { return exports.kite_new_bytes(e, p, n); } finally { exports.kite_dealloc(p); }
+        },
+        viewBytes: function (e, h) {
+            var p = exports.kite_view_bytes(e, h);
+            if (p === 0) return null;
+            var n = exports.kite_bytes_length(e), a = new Uint8Array(memory.buffer, p, n), out = '';
+            for (var i = 0; i < n; i += 8192) out += String.fromCharCode.apply(null, a.subarray(i, Math.min(n, i + 8192)));
+            exports.kite_bytes_free(e);
+            return out;
+        },
         arrayPush: function (e, a, v) { exports.kite_array_push(e, a, v); },
         objectPut: function (e, o, k, v) {
             withString(k, function (p) { exports.kite_object_put(e, o, p, k.length, v); });

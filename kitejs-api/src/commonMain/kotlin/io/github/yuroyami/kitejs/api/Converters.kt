@@ -13,13 +13,14 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
  *
  * Kotlin to JavaScript: `null` and `Unit` become `undefined`, `Boolean` stays, every number widens
  * to a JavaScript number, a `Long` outside the range a JavaScript number holds exactly becomes a
- * BigInt, a `Char` or any `CharSequence` becomes a string, and `List`, `Array`, the primitive
- * arrays and `Set` become arrays and `Map` a plain object, all the way down. A [JsValue] or a
- * handle passes straight through. Anything else goes to the converters [register] added, and is
+ * BigInt, a `Char` or any `CharSequence` becomes a string, a `ByteArray` becomes a `Uint8Array`
+ * over a copy of its bytes, and `List`, `Array`, the other primitive arrays and `Set` become arrays
+ * and `Map` a plain object, all the way down. A [JsValue] or a handle passes straight through. Anything else goes to the converters [register] added, and is
  * refused when none of them takes it.
  *
  * JavaScript to Kotlin, as [JsValue.toKotlin] does it: undefined and null become `null`, numbers
- * `Double`, strings `String`, booleans `Boolean`, BigInts [KBigInt], arrays `List` and other
+ * `Double`, strings `String`, booleans `Boolean`, BigInts [KBigInt], arrays `List`, an
+ * `ArrayBuffer`, a typed array or a `DataView` a `ByteArray` of the bytes it views, and other
  * objects `Map`, all the way down. A function stays a [JsFunction] and a symbol a [JsSymbol].
  */
 @OptIn(ExperimentalAtomicApi::class)
@@ -66,23 +67,23 @@ public object Converters {
         is Long -> if (value in -MAX_SAFE..MAX_SAFE) value.toDouble() else KBigInt.fromLong(value)
         is Char -> value.toString()
         is CharSequence -> value.toString()
-        is List<*>, is Array<*>, is Set<*>, is Map<*, *>,
-        is IntArray, is LongArray, is DoubleArray, is BooleanArray -> value
+        is List<*>, is Array<*>, is Set<*>, is Map<*, *>, is ByteArray, is ShortArray, is CharArray,
+        is IntArray, is LongArray, is FloatArray, is DoubleArray, is BooleanArray -> value
         else -> canonical(firstCustom(value) ?: refuse(value))
     }
 
     /** Whether [canonical] left [value] as a collection for [toEngine] to walk. */
     @InternalKiteJsApi
     public fun isCollection(value: Any?): Boolean = when (value) {
-        is List<*>, is Array<*>, is Set<*>, is Map<*, *>,
-        is IntArray, is LongArray, is DoubleArray, is BooleanArray -> true
+        is List<*>, is Array<*>, is Set<*>, is Map<*, *>, is ByteArray, is ShortArray, is CharArray,
+        is IntArray, is LongArray, is FloatArray, is DoubleArray, is BooleanArray -> true
         else -> false
     }
 
     /**
      * Builds [value] in an engine: [scalar] takes a canonical scalar or a handle and answers the
-     * engine's own value, [array] builds an array from elements already built, and [obj] a plain
-     * object from keys and values already built.
+     * engine's own value, [array] builds an array from elements already built, [obj] a plain
+     * object from keys and values already built, and [bytes] a `Uint8Array` over a copy of bytes.
      */
     @InternalKiteJsApi
     public fun <V> toEngine(
@@ -90,13 +91,18 @@ public object Converters {
         scalar: (Any?) -> V,
         array: (List<V>) -> V,
         obj: (List<Pair<String, V>>) -> V,
+        bytes: (ByteArray) -> V,
     ): V {
         fun build(v: Any?): V = when (val c = canonical(v)) {
             is List<*> -> array(c.map(::build))
             is Array<*> -> array(c.map(::build))
             is Set<*> -> array(c.map(::build))
+            is ByteArray -> bytes(c)
+            is ShortArray -> array(c.map { scalar(it.toDouble()) })
+            is CharArray -> array(c.map { scalar(it.toString()) })
             is IntArray -> array(c.map { scalar(it.toDouble()) })
             is LongArray -> array(c.map { build(it) })
+            is FloatArray -> array(c.map { scalar(it.toDouble()) })
             is DoubleArray -> array(c.map { scalar(it) })
             is BooleanArray -> array(c.map { scalar(it) })
             is Map<*, *> -> obj(c.entries.map { (k, e) -> k.toString() to build(e) })
@@ -125,10 +131,12 @@ public object Converters {
             if (!seen.add(r)) r
             else r.values().map { toKotlin(it, seen) }.also { seen.remove(r) }
         }
-        is JsObject -> {
-            if (!seen.add(r)) r
-            else buildMap { for (key in r.keys) put(key, toKotlin(r[key], seen)) }.also { seen.remove(r) }
-        }
+        is JsObject -> r.toByteArrayOrNull() ?: toKotlinMap(r, seen)
         else -> r
     }
+
+    /** [obj] as a map of its own keys, even when it views bytes, or the handle when it closes a cycle. */
+    internal fun toKotlinMap(obj: JsObject, seen: MutableSet<JsObject>): Any =
+        if (!seen.add(obj)) obj
+        else buildMap { for (key in obj.keys) put(key, toKotlin(obj[key], seen)) }.also { seen.remove(obj) }
 }

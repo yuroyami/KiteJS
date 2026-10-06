@@ -119,6 +119,7 @@ abstract class io.github.yuroyami.kitejs.api/JsObject { // io.github.yuroyami.ki
     abstract fun set(kotlin/String, kotlin/Any?) // io.github.yuroyami.kitejs.api/JsObject.set|set(kotlin.String;kotlin.Any?){}[0]
     abstract fun toPrimitive(io.github.yuroyami.kitejs.api/PrimitiveHint): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.api/JsObject.toPrimitive|toPrimitive(io.github.yuroyami.kitejs.api.PrimitiveHint){}[0]
     final fun toMap(): kotlin.collections/Map<kotlin/String, kotlin/Any?> // io.github.yuroyami.kitejs.api/JsObject.toMap|toMap(){}[0]
+    open fun toByteArrayOrNull(): kotlin/ByteArray? // io.github.yuroyami.kitejs.api/JsObject.toByteArrayOrNull|toByteArrayOrNull(){}[0]
     open fun toString(): kotlin/String // io.github.yuroyami.kitejs.api/JsObject.toString|toString(){}[0]
 }
 
@@ -431,7 +432,7 @@ final object io.github.yuroyami.kitejs.api/ConsolePrinters { // io.github.yuroya
 }
 
 final object io.github.yuroyami.kitejs.api/Converters { // io.github.yuroyami.kitejs.api/Converters|null[0]
-    final fun <#A1: kotlin/Any?> toEngine(kotlin/Any?, kotlin/Function1<kotlin/Any?, #A1>, kotlin/Function1<kotlin.collections/List<#A1>, #A1>, kotlin/Function1<kotlin.collections/List<kotlin/Pair<kotlin/String, #A1>>, #A1>): #A1 // io.github.yuroyami.kitejs.api/Converters.toEngine|toEngine(kotlin.Any?;kotlin.Function1<kotlin.Any?,0:0>;kotlin.Function1<kotlin.collections.List<0:0>,0:0>;kotlin.Function1<kotlin.collections.List<kotlin.Pair<kotlin.String,0:0>>,0:0>){0§<kotlin.Any?>}[0]
+    final fun <#A1: kotlin/Any?> toEngine(kotlin/Any?, kotlin/Function1<kotlin/Any?, #A1>, kotlin/Function1<kotlin.collections/List<#A1>, #A1>, kotlin/Function1<kotlin.collections/List<kotlin/Pair<kotlin/String, #A1>>, #A1>, kotlin/Function1<kotlin/ByteArray, #A1>): #A1 // io.github.yuroyami.kitejs.api/Converters.toEngine|toEngine(kotlin.Any?;kotlin.Function1<kotlin.Any?,0:0>;kotlin.Function1<kotlin.collections.List<0:0>,0:0>;kotlin.Function1<kotlin.collections.List<kotlin.Pair<kotlin.String,0:0>>,0:0>;kotlin.Function1<kotlin.ByteArray,0:0>){0§<kotlin.Any?>}[0]
     final fun canonical(kotlin/Any?): kotlin/Any? // io.github.yuroyami.kitejs.api/Converters.canonical|canonical(kotlin.Any?){}[0]
     final fun clearRegistrations() // io.github.yuroyami.kitejs.api/Converters.clearRegistrations|clearRegistrations(){}[0]
     final fun isCollection(kotlin/Any?): kotlin/Boolean // io.github.yuroyami.kitejs.api/Converters.isCollection|isCollection(kotlin.Any?){}[0]

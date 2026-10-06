@@ -40,6 +40,8 @@ typedef struct KiteEngine KiteEngine;
 #define KITE_TYPE_ARRAY 7
 #define KITE_TYPE_FUNCTION 8
 #define KITE_TYPE_OBJECT 9
+/* An ArrayBuffer, a typed array or a DataView: an object whose bytes kite_view_bytes copies. */
+#define KITE_TYPE_BYTES 10
 
 /* Why the engine stopped a script, as kite_stop_reason answers. */
 #define KITE_STOP_NONE 0
@@ -111,6 +113,12 @@ int32_t kite_new_number(KiteEngine *e, double d);
 int32_t kite_new_string(KiteEngine *e, const uint16_t *chars, int32_t length);
 int32_t kite_new_object(KiteEngine *e);
 int32_t kite_new_array(KiteEngine *e);
+/* A Uint8Array over a new ArrayBuffer that holds a copy of the bytes. */
+int32_t kite_new_bytes(KiteEngine *e, const uint8_t *bytes, int32_t length);
+/* A copy of the bytes a value of KITE_TYPE_BYTES views, kite_bytes_length bytes long, read without
+ * running any script. Free it with kite_bytes_free. A detached buffer views no bytes. Null when
+ * the value views no bytes at all or there is no memory left for the copy. */
+const uint8_t *kite_view_bytes(KiteEngine *e, int32_t h);
 /* Appends to an array made by kite_new_array, running nothing. */
 void kite_array_push(KiteEngine *e, int32_t array, int32_t value);
 /* Sets a plain data property on an object made by kite_new_object, running nothing. */

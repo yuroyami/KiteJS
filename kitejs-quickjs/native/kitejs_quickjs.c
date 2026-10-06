@@ -444,6 +444,12 @@ int32_t kite_type(KiteEngine *e, int32_t h)
             return KITE_TYPE_ARRAY;
         if (JS_IsFunction(e->ctx, v))
             return KITE_TYPE_FUNCTION;
+        {
+            uint8_t *data;
+            size_t length;
+            if (JS_KiteGetViewedBytes(v, &data, &length))
+                return KITE_TYPE_BYTES;
+        }
         return KITE_TYPE_OBJECT;
     default:
         /* What a script cannot see, such as the bytecode kite_compile makes. */
@@ -518,6 +524,35 @@ int32_t kite_new_object(KiteEngine *e)
 int32_t kite_new_array(KiteEngine *e)
 {
     return keep(e, JS_NewArray(e->ctx));
+}
+
+static int32_t answer(KiteEngine *e, JSValue v);
+
+int32_t kite_new_bytes(KiteEngine *e, const uint8_t *bytes, int32_t length)
+{
+    return answer(e, JS_NewUint8ArrayCopy(e->ctx, bytes, (size_t)length));
+}
+
+const uint8_t *kite_view_bytes(KiteEngine *e, int32_t h)
+{
+    uint8_t *data;
+    size_t length;
+    kite_bytes_free(e);
+    if (!JS_KiteGetViewedBytes(at(e, h), &data, &length))
+        return NULL;
+    if (length > INT32_MAX) {
+        JS_ThrowRangeError(e->ctx, "the bytes are more than 2 GiB");
+        return NULL;
+    }
+    /* One byte at least, so an empty view still answers a pointer. */
+    uint8_t *copy = js_malloc(e->ctx, length ? length : 1);
+    if (!copy)
+        return NULL;
+    if (length)
+        memcpy(copy, data, length);
+    e->bytes = copy;
+    e->bytes_length = (int32_t)length;
+    return copy;
 }
 
 void kite_array_push(KiteEngine *e, int32_t array, int32_t value)

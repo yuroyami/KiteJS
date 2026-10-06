@@ -14,6 +14,7 @@ import io.github.yuroyami.kitejs.quickjs.cinterop.kite_array_push
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_bytes_free
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_bytes_length
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_read_script
+import io.github.yuroyami.kitejs.quickjs.cinterop.kite_view_bytes
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_write_script
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_ask_host
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_call
@@ -33,6 +34,7 @@ import io.github.yuroyami.kitejs.quickjs.cinterop.kite_identity
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_is_promise
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_new
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_new_array
+import io.github.yuroyami.kitejs.quickjs.cinterop.kite_new_bytes
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_new_function
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_new_number
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_new_object
@@ -137,6 +139,18 @@ private object NativeBridge : QuickJsBridge {
     override fun newString(e: Long, s: String): Int = utf16(s) { kite_new_string(e(e), it, s.length) }
     override fun newObject(e: Long): Int = kite_new_object(e(e))
     override fun newArray(e: Long): Int = kite_new_array(e(e))
+    override fun newBytes(e: Long, bytes: ByteArray): Int =
+        if (bytes.isEmpty()) kite_new_bytes(e(e), null, 0)
+        else bytes.usePinned { kite_new_bytes(e(e), it.addressOf(0).reinterpret(), bytes.size) }
+
+    override fun viewBytes(e: Long, h: Int): ByteArray? {
+        val engine = e(e)
+        val bytes = kite_view_bytes(engine, h) ?: return null
+        val length = kite_bytes_length(engine)
+        val out = ByteArray(length).also { if (length > 0) it.usePinned { p -> memcpy(p.addressOf(0), bytes, length.convert()) } }
+        kite_bytes_free(engine)
+        return out
+    }
     override fun arrayPush(e: Long, array: Int, value: Int) = kite_array_push(e(e), array, value)
     override fun objectPut(e: Long, obj: Int, key: String, value: Int) = utf16(key) { kite_object_put(e(e), obj, it, key.length, value) }
     override fun arrayLength(e: Long, array: Int): Int = kite_array_length(e(e), array)
