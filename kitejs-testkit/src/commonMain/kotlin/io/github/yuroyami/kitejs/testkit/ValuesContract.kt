@@ -43,6 +43,19 @@ public abstract class ValuesContract<C : KiteJsConfig>(engine: JsEngine<C>) : En
     }
 
     @Test
+    public fun aLongConcatenationComesBackAsAString(): TestResult = withEngine { js ->
+        // Past a few hundred characters an engine may hold a concatenation as a tree of parts.
+        val built = js.evaluate("var s = ''; for (var i = 0; i < 2000; i++) s += 'part ' + i + ';'; s")
+        assertEquals(JsType.STRING, built.type)
+        assertEquals((0 until 2000).joinToString("") { "part $it;" }, built.asString())
+        val joined = js.evaluate("var a = 'x'.repeat(600); `${'$'}{a}${'$'}{a}`")
+        assertEquals(JsType.STRING, joined.type)
+        assertEquals(1200, joined.asString().length)
+        assertEquals("x".repeat(1200), js.evaluate("({ toString: function () { return a + a; } })").asString())
+        assertEquals(1200, js.evaluate("[a + a]").asArray()[0].asString().length)
+    }
+
+    @Test
     public fun typeOfMatchesTheOperator(): TestResult = withEngine { js ->
         for (source in listOf("1", "'a'", "true", "undefined", "({})", "[]", "(function(){})", "1n", "Symbol()", "null")) {
             assertEquals(js.evaluate("typeof ($source)").asString(), js.evaluate(source).typeOf, source)

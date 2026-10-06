@@ -351,6 +351,8 @@ int32_t kite_type(KiteEngine *e, int32_t h)
     case JS_TAG_BIG_INT:
         return KITE_TYPE_BIGINT;
     case JS_TAG_STRING:
+    case JS_TAG_STRING_ROPE:
+        /* A long concatenation is a rope until something flattens it; to a script it is a string. */
         return KITE_TYPE_STRING;
     case JS_TAG_SYMBOL:
         return KITE_TYPE_SYMBOL;
