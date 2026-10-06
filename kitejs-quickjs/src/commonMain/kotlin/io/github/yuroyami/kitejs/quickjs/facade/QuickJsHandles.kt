@@ -12,6 +12,7 @@ import io.github.yuroyami.kitejs.api.JsSymbol
 import io.github.yuroyami.kitejs.api.JsValue
 import io.github.yuroyami.kitejs.api.PrimitiveHint
 import io.github.yuroyami.kitejs.api.PropertyFlags
+import kotlin.time.Duration
 
 /*
  * The handles a QuickJS engine gives out. JsObject, JsArray and JsFunction are classes, so the
@@ -193,6 +194,8 @@ internal class QuickJsScript(private val engine: QuickJsKiteJs, val handle: Int)
     private val cleanup = engine.register(this, handle)
 
     override fun run(): JsValue = engine.run(this)
+
+    override suspend fun runPausing(slice: Duration): JsValue = engine.runPausing(this, slice)
 
     override fun bytecode(): ByteArray = engine.bytecode(this)
 }

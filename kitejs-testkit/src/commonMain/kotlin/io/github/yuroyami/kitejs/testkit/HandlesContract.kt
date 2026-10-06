@@ -294,4 +294,24 @@ public abstract class HandlesContract<C : KiteJsConfig>(engine: JsEngine<C>) : E
         assertEquals(listOf("n"), o.keys)
         assertTrue(o.isUsableHere())
     }
+
+    @Test
+    public fun aPausingScriptAnswersWhatEvaluateAnswers(): TestResult = withPausingEngine { js ->
+        assertEquals(6.0, js.evaluatePausing("var s = 0; for (var i = 1; i <= 3; i++) s += i; s").asDouble())
+        // The Promise jobs it queued have run when it returns.
+        js.evaluatePausing("var done = false; Promise.resolve().then(function () { done = true; })")
+        assertTrue(js.evaluate("done").asBoolean())
+        val error = assertFailsWith<JsError> { js.evaluatePausing("throw new TypeError('no')", "thrown.js") }
+        assertEquals("TypeError", error.name)
+        assertEquals(2.0, js.evaluatePausing("1 + 1").asDouble())
+        val script = js.compile("s * 2", "double.js")
+        assertEquals(12.0, script.runPausing().asDouble())
+        assertEquals(12.0, script.run().asDouble())
+    }
+
+    @Test
+    public fun aPausingScriptStopsAtItsBudget(): TestResult = withPausingEngine({ instructionBudget = 100_000 }) { js ->
+        assertFailsWith<JsEngineError> { js.evaluatePausing("for (;;) {}") }
+        assertEquals(2.0, js.evaluatePausing("1 + 1").asDouble())
+    }
 }

@@ -1,6 +1,10 @@
 import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsEnvSpec
+import org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsPlugin
+import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsEnvSpec
+import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsPlugin
 
 /*
  * The targets every KiteJS module builds for, in one place so the engines, the API they share and
@@ -14,6 +18,12 @@ plugins {
     id("org.jetbrains.kotlin.multiplatform")
     id("com.android.kotlin.multiplatform.library")
 }
+
+// The JavaScript and WebAssembly tests run on one Node, new enough for WebAssembly stack
+// switching, so a script that pauses on the web is tested on both targets.
+val testNode = "26.10.0"
+plugins.withType<NodeJsPlugin> { the<NodeJsEnvSpec>().version.set(testNode) }
+plugins.withType<WasmNodeJsPlugin> { the<WasmNodeJsEnvSpec>().version.set(testNode) }
 
 /** kitejs-quickjs becomes KiteJSQuickJS, kitejs becomes KiteJS: the Apple framework's name. */
 val frameworkName: String = "KiteJS" + project.name.removePrefix("kitejs").split('-')

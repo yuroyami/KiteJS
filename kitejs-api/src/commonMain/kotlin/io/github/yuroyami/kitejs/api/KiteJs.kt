@@ -4,6 +4,9 @@
 
 package io.github.yuroyami.kitejs.api
 
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+
 /**
  * An engine and the global scope that goes with it. One instance belongs to the thread that opened
  * it: use it and close it there.
@@ -48,6 +51,28 @@ public abstract class KiteJs @InternalKiteJsApi constructor() : AutoCloseable {
      */
     public open fun loadBytecode(bytecode: ByteArray): JsScript =
         throw JsEngineError("${engine.name} has no bytecode")
+
+    /**
+     * Whether [evaluatePausing] really pauses here. Only QuickJS on a browser or Node with
+     * WebAssembly stack switching (JSPI) can; everywhere else it runs like [evaluate].
+     */
+    public open val canPause: Boolean get() = false
+
+    /**
+     * Runs [source] like [evaluate], but where [canPause] is true the script pauses about every
+     * [slice] and lets the event loop run before it goes on. A long script then does not freeze
+     * the page on a platform with one thread.
+     *
+     * The script pauses only while no host function runs, and only one such run pauses at a time
+     * in a process. While a script is paused, every other call into this engine throws a
+     * [JsEngineError]; other engines stay usable. Where the script cannot pause, it runs to the
+     * end in one go.
+     */
+    public open suspend fun evaluatePausing(
+        source: String,
+        fileName: String = "<eval>",
+        slice: Duration = 16.milliseconds,
+    ): JsValue = evaluate(source, fileName)
 
     /**
      * Runs whatever the promise callbacks have queued. Evaluating already drains the queue at the

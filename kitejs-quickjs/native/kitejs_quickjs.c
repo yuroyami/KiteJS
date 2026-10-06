@@ -52,6 +52,7 @@ struct KiteEngine {
     int32_t dead_capacity;
 
     double budget;      /* what is left, when has_budget */
+    int32_t host_depth; /* host functions running, which a pause cannot wait inside */
     int has_budget;
     int ask_host;
     int32_t stop_reason;
@@ -64,6 +65,8 @@ __attribute__((import_module("kitejs"), import_name("call")))
 int32_t kite_host_call(int32_t engine, int32_t fn, int32_t argc);
 __attribute__((import_module("kitejs"), import_name("interrupt")))
 int32_t kite_host_interrupt(int32_t engine);
+__attribute__((import_module("kitejs"), import_name("pause")))
+void kite_host_pause(int32_t engine);
 __attribute__((import_module("kitejs"), import_name("now")))
 double kite_host_now(int32_t engine);
 __attribute__((import_module("kitejs"), import_name("tz_offset")))
@@ -171,6 +174,13 @@ static int interrupt_handler(JSRuntime *rt, void *opaque)
     }
     if (e->ask_host) {
         int32_t answer = kite_host_interrupt(e->id);
+        if (answer == KITE_INTERRUPT_PAUSE) {
+#if defined(__wasm__)
+            if (e->host_depth == 0)
+                kite_host_pause(e->id);
+#endif
+            return 0;
+        }
         if (answer != 0) {
             e->stop_reason = answer == 1 ? KITE_STOP_HOOK : KITE_STOP_HOOK_THREW;
             return 1;
@@ -227,7 +237,9 @@ static JSValue host_function(JSContext *ctx, JSValueConst this_val, int argc, JS
     e->cb_argv = argv;
     e->cb_argc = argc;
     int32_t fn = (int32_t)(intptr_t)JS_GetOpaque(data[0], e->host_class) - 1;
+    e->host_depth++;
     int32_t result = kite_host_call(e->id, fn, argc);
+    e->host_depth--;
     e->cb_this = saved_this;
     e->cb_argv = saved_argv;
     e->cb_argc = saved_argc;

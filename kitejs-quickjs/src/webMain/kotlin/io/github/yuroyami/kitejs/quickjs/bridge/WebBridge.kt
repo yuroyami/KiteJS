@@ -46,6 +46,10 @@ internal external interface KiteGlue : JsAny {
     fun global(e: Int): Int
     fun compile(e: Int, source: String, file: String): Int
     fun run(e: Int, compiled: Int): Int
+    fun canPause(): Boolean
+    fun runPausing(e: Int, compiled: Int): Thenable
+    fun drainPausing(e: Int): Thenable
+    fun pausedAnswer(): Int
 
     /** The bytecode as a string with one code unit for each byte, or null. */
     fun writeScript(e: Int, compiled: Int): String?
@@ -102,6 +106,24 @@ private object WebBridge : QuickJsBridge {
     override fun global(e: Long): Int = glue.global(e.toInt())
     override fun compile(e: Long, source: String, file: String): Int = glue.compile(e.toInt(), source, file)
     override fun run(e: Long, compiled: Int): Int = glue.run(e.toInt(), compiled)
+    override fun canPause(): Boolean = glue.canPause()
+    override suspend fun runPausing(e: Long, compiled: Int): Int = settled(glue.runPausing(e.toInt(), compiled))
+    override suspend fun drainPausing(e: Long): Int = settled(glue.drainPausing(e.toInt()))
+
+    /** Waits for [pending], a run or a drain that may pause, and answers what it answered. */
+    private suspend fun settled(pending: Thenable): Int = suspendCoroutine { continuation ->
+        pending.then(
+            { _ ->
+                continuation.resume(glue.pausedAnswer())
+                null
+            },
+            { error ->
+                // A trap in the paused stack, such as running out of the native stack, ends the call.
+                continuation.resumeWithException(JsEngineError("QuickJS failed while it could pause: $error"))
+                null
+            },
+        )
+    }
     override fun writeScript(e: Long, compiled: Int): ByteArray? =
         glue.writeScript(e.toInt(), compiled)?.let { s -> ByteArray(s.length) { s[it].code.toByte() } }
     override fun readScript(e: Long, bytes: ByteArray): Int =

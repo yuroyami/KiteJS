@@ -48,6 +48,12 @@ typedef struct KiteEngine KiteEngine;
 #define KITE_STOP_HOOK_THREW 3
 #define KITE_STOP_MEMORY 4
 
+/* What the interrupt hook answers to have the script pause and go on later. Only the WebAssembly
+ * build pauses: it calls the "pause" import, which the web glue lets wait for a macrotask through
+ * WebAssembly stack switching. A script pauses only while no host function runs, since the wait
+ * cannot hold a host frame; otherwise it goes on. Every other build goes on at once. */
+#define KITE_INTERRUPT_PAUSE 3
+
 /* Options for kite_new. */
 #define KITE_OPT_CLOCK 1      /* Date.now() asks the host */
 #define KITE_OPT_TIME_ZONE 2  /* local time asks the host */
@@ -59,7 +65,7 @@ typedef struct KiteEngine KiteEngine;
  * the script stops with an error no catch sees.
  */
 typedef int32_t (*kite_host_call_fn)(int32_t engine, int32_t fn, int32_t argc);
-/* 0 to go on, 1 to stop, 2 when the host threw while deciding. */
+/* 0 to go on, 1 to stop, 2 when the host threw while deciding, 3 to pause (KITE_INTERRUPT_PAUSE). */
 typedef int32_t (*kite_host_interrupt_fn)(int32_t engine);
 /* Milliseconds since the epoch. */
 typedef double (*kite_host_now_fn)(int32_t engine);

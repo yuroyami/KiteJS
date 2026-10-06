@@ -35,6 +35,15 @@ public abstract class EngineContract<C : KiteJsConfig>(protected val engine: JsE
         open(configure).use(body)
     }
 
+    /**
+     * [withEngine] for a [body] that suspends, as one that waits for [KiteJs.evaluatePausing]
+     * does. Only a script that really pauses suspends, and that happens only on the web.
+     */
+    protected fun withPausingEngine(configure: C.() -> Unit = {}, body: suspend (KiteJs) -> Unit): TestResult = runTest {
+        engine.load()
+        open(configure).use { body(it) }
+    }
+
     /** A fresh engine, for a test that has to manage its lifetime itself. */
     protected fun open(configure: C.() -> Unit = {}): KiteJs = KiteJs(engine, configure)
 }

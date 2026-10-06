@@ -172,6 +172,8 @@ public abstract class io/github/yuroyami/kitejs/api/JsScript {
 	public fun <init> ()V
 	public fun bytecode ()[B
 	public abstract fun run-msBJVuE ()Ljava/lang/Object;
+	public fun runPausing-rFnFneQ (JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun runPausing-rFnFneQ$default (Lio/github/yuroyami/kitejs/api/JsScript;JLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 }
 
 public final class io/github/yuroyami/kitejs/api/JsStackFrame {
@@ -328,6 +330,9 @@ public abstract class io/github/yuroyami/kitejs/api/KiteJs : java/lang/AutoClose
 	public static synthetic fun compile$default (Lio/github/yuroyami/kitejs/api/KiteJs;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsScript;
 	public abstract fun evaluate-ss6hNDw (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;
 	public static synthetic fun evaluate-ss6hNDw$default (Lio/github/yuroyami/kitejs/api/KiteJs;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Ljava/lang/Object;
+	public fun evaluatePausing-zYQ5nqw (Ljava/lang/String;Ljava/lang/String;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun evaluatePausing-zYQ5nqw$default (Lio/github/yuroyami/kitejs/api/KiteJs;Ljava/lang/String;Ljava/lang/String;JLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public fun getCanPause ()Z
 	public abstract fun getEngine ()Lio/github/yuroyami/kitejs/api/JsEngine;
 	public abstract fun getGlobal ()Lio/github/yuroyami/kitejs/api/JsObject;
 	public abstract fun getVersion ()Ljava/lang/String;

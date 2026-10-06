@@ -33,6 +33,7 @@ import io.github.yuroyami.kitejs.quickjs.bridge.bridge
 import io.github.yuroyami.kitejs.quickjs.bridge.currentThreadToken
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.time.Duration
 import kotlin.time.Instant
 import kotlin.time.TimeSource
 import kotlinx.datetime.offsetAt
@@ -61,6 +62,26 @@ internal class QuickJsKiteJs private constructor(
 
     /** How many calls from the host are on the stack; only the outermost meters and drains. */
     private var depth = 0
+
+    /** How many host functions are on the stack. A script cannot pause inside one. */
+    private var hostDepth = 0
+
+    /** When the running slice of [evaluatePausing] started, and how long a slice is. */
+    private var sliceStart = TimeSource.Monotonic.markNow()
+    private var sliceLength = Duration.ZERO
+    private var pauseAsked = false
+
+    /** Whether a run or a drain that may pause is on its way, so the script may be paused now. */
+    private var inPausingRun = false
+
+    private inline fun pausable(body: () -> Int): Int {
+        inPausingRun = true
+        try {
+            return body()
+        } finally {
+            inPausingRun = false
+        }
+    }
 
     /** What a host function or the interrupt hook threw, on its way out of the script. */
     private var hostFailure: Throwable? = null
@@ -123,6 +144,42 @@ internal class QuickJsKiteJs private constructor(
         QuickJsScript(this, h)
     }
 
+    override val canPause: Boolean get() = bridge.canPause()
+
+    override suspend fun evaluatePausing(source: String, fileName: String, slice: Duration): JsValue {
+        if (!canPauseNow()) return evaluate(source, fileName)
+        return pausingCall(slice) {
+            val compiled = compileHandle(source, fileName)
+            try {
+                toJs(check(pausable { bridge.runPausing(ptr, compiled) }))
+            } finally {
+                bridge.release(ptr, compiled)
+            }
+        }
+    }
+
+    suspend fun runPausing(script: QuickJsScript, slice: Duration): JsValue {
+        if (!canPauseNow()) return run(script)
+        return pausingCall(slice) { toJs(check(pausable { bridge.runPausing(ptr, script.handle) })) }
+    }
+
+    /** Whether a run may pause now: one pausing run at a time in the module, as they share one native stack. */
+    private fun canPauseNow(): Boolean = !closed && bridge.canPause() && depth == 0 && pausing == null
+
+    /** [body] as the outermost call, with the interrupt hook asked to pause it about every [slice]. */
+    private suspend inline fun pausingCall(slice: Duration, body: () -> JsValue): JsValue {
+        pausing = this
+        sliceLength = slice
+        sliceStart = TimeSource.Monotonic.markNow()
+        if (config.interruptWhen == null) bridge.askHost(ptr, true)
+        try {
+            return guarded(true, { pausable { bridge.drainPausing(ptr) } }, body)
+        } finally {
+            pausing = null
+            if (config.interruptWhen == null && !closed) bridge.askHost(ptr, false)
+        }
+    }
+
     override fun runMicrotasks() {
         call { }
     }
@@ -173,9 +230,15 @@ internal class QuickJsKiteJs private constructor(
      * API's shape. The outermost call is one call to the budget and, when [drain] is set, runs
      * the Promise jobs it queued before it returns.
      */
-    fun <T> call(drain: Boolean = true, body: () -> T): T {
+    fun <T> call(drain: Boolean = true, body: () -> T): T = guarded(drain, { bridge.drain(ptr) }, body)
+
+    /** [call], with [drainJobs] to run the Promise jobs, which may suspend in [evaluatePausing]. */
+    private inline fun <T> guarded(drain: Boolean, drainJobs: () -> Int, body: () -> T): T {
         if (closed) throw JsEngineError("this engine is closed")
         if (currentThreadToken() !== owner) throw wrongThread()
+        if (inPausingRun && hostDepth == 0) {
+            throw JsEngineError("this engine is paused in a script; call it once evaluatePausing has returned")
+        }
         val outermost = depth == 0
         if (outermost) {
             sweep()
@@ -186,7 +249,7 @@ internal class QuickJsKiteJs private constructor(
         depth++
         try {
             val result = body()
-            if (outermost && drain && bridge.drain(ptr) < 0) raise()
+            if (outermost && drain && drainJobs() < 0) raise()
             // A host failure or a stop that a script swallowed, as a Promise executor swallows
             // what it throws, still ends the call.
             hostFailure?.let { failure ->
@@ -316,6 +379,7 @@ internal class QuickJsKiteJs private constructor(
     }
 
     fun hostCall(fn: Int, argc: Int): Int {
+        hostDepth++
         return try {
             val selfHandle = bridge.cbThis(ptr)
             val argHandles = IntArray(argc) { bridge.cbArg(ptr, it) }
@@ -326,11 +390,29 @@ internal class QuickJsKiteJs private constructor(
         } catch (t: Throwable) {
             hostFailure = t
             -1
+        } finally {
+            hostDepth--
         }
     }
 
     fun hostInterrupt(): Int = try {
-        if (config.interruptWhen?.invoke() == true) 1 else 0
+        when {
+            config.interruptWhen?.invoke() == true -> 1
+            inPausingRun && hostDepth == 0 -> {
+                if (pauseAsked) {
+                    // The pause asked for last time is over; the next slice starts now.
+                    pauseAsked = false
+                    sliceStart = TimeSource.Monotonic.markNow()
+                }
+                if (sliceStart.elapsedNow() >= sliceLength) {
+                    pauseAsked = true
+                    QuickJsBridge.INTERRUPT_PAUSE
+                } else {
+                    0
+                }
+            }
+            else -> 0
+        }
     } catch (t: Throwable) {
         hostFailure = t
         2
@@ -538,6 +620,9 @@ internal class QuickJsKiteJs private constructor(
     }
 
     companion object {
+        /** The engine whose [evaluatePausing] may pause now, if any. Only the web sets it. */
+        private var pausing: QuickJsKiteJs? = null
+
         fun open(config: QuickJsConfig): QuickJsKiteJs {
             val id = QuickJsHost.nextId()
             val engine = QuickJsKiteJs(config, id)

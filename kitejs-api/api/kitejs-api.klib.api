@@ -127,6 +127,7 @@ abstract class io.github.yuroyami.kitejs.api/JsScript { // io.github.yuroyami.ki
 
     abstract fun run(): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.api/JsScript.run|run(){}[0]
     open fun bytecode(): kotlin/ByteArray? // io.github.yuroyami.kitejs.api/JsScript.bytecode|bytecode(){}[0]
+    open suspend fun runPausing(kotlin.time/Duration = ...): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.api/JsScript.runPausing|runPausing(kotlin.time.Duration){}[0]
 }
 
 abstract class io.github.yuroyami.kitejs.api/JsSymbol { // io.github.yuroyami.kitejs.api/JsSymbol|null[0]
@@ -151,6 +152,8 @@ abstract class io.github.yuroyami.kitejs.api/KiteJs : kotlin/AutoCloseable { // 
         abstract fun <get-global>(): io.github.yuroyami.kitejs.api/JsObject // io.github.yuroyami.kitejs.api/KiteJs.global.<get-global>|<get-global>(){}[0]
     abstract val version // io.github.yuroyami.kitejs.api/KiteJs.version|{}version[0]
         abstract fun <get-version>(): kotlin/String // io.github.yuroyami.kitejs.api/KiteJs.version.<get-version>|<get-version>(){}[0]
+    open val canPause // io.github.yuroyami.kitejs.api/KiteJs.canPause|{}canPause[0]
+        open fun <get-canPause>(): kotlin/Boolean // io.github.yuroyami.kitejs.api/KiteJs.canPause.<get-canPause>|<get-canPause>(){}[0]
 
     abstract fun close() // io.github.yuroyami.kitejs.api/KiteJs.close|close(){}[0]
     abstract fun compile(kotlin/String, kotlin/String = ...): io.github.yuroyami.kitejs.api/JsScript // io.github.yuroyami.kitejs.api/KiteJs.compile|compile(kotlin.String;kotlin.String){}[0]
@@ -164,6 +167,7 @@ abstract class io.github.yuroyami.kitejs.api/KiteJs : kotlin/AutoCloseable { // 
     abstract fun valueOf(kotlin/Any?): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.api/KiteJs.valueOf|valueOf(kotlin.Any?){}[0]
     abstract fun watchSettlement(io.github.yuroyami.kitejs.api/JsValue, kotlin/Function2<io.github.yuroyami.kitejs.api/JsValue, io.github.yuroyami.kitejs.api/JsValue?, kotlin/Unit>): kotlin/Boolean // io.github.yuroyami.kitejs.api/KiteJs.watchSettlement|watchSettlement(io.github.yuroyami.kitejs.api.JsValue;kotlin.Function2<io.github.yuroyami.kitejs.api.JsValue,io.github.yuroyami.kitejs.api.JsValue?,kotlin.Unit>){}[0]
     open fun loadBytecode(kotlin/ByteArray): io.github.yuroyami.kitejs.api/JsScript // io.github.yuroyami.kitejs.api/KiteJs.loadBytecode|loadBytecode(kotlin.ByteArray){}[0]
+    open suspend fun evaluatePausing(kotlin/String, kotlin/String = ..., kotlin.time/Duration = ...): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.api/KiteJs.evaluatePausing|evaluatePausing(kotlin.String;kotlin.String;kotlin.time.Duration){}[0]
 }
 
 final class <#A: kotlin/Any> io.github.yuroyami.kitejs.api/BindScope { // io.github.yuroyami.kitejs.api/BindScope|null[0]

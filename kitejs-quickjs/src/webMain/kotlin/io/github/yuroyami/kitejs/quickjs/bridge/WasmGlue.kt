@@ -14,6 +14,13 @@ internal const val GLUE: String = """(function () {
     var memory = null;
     var host = null;
 
+    // WebAssembly stack switching (JSPI), where the runtime has it: a run that starts through
+    // `promising` can wait inside the "pause" import while the page draws (KiteJS#130).
+    var Suspending = typeof WebAssembly.Suspending === 'function' && typeof WebAssembly.promising === 'function'
+        ? WebAssembly.Suspending : null;
+    var pausingRun = null, pausingDrain = null, pausedAnswer = 0;
+    function nextTask() { return new Promise(function (resolve) { setTimeout(resolve, 0); }); }
+
     function view() { return new DataView(memory.buffer); }
 
     function toMemory(s) {
@@ -95,6 +102,8 @@ internal const val GLUE: String = """(function () {
                     interrupt: function (e) { return host.interrupt(e); },
                     now: function (e) { return host.now(e); },
                     tz_offset: function (e, t) { return host.tzOffset(e, t); },
+                    // Without stack switching the script goes on at once; with it, after a macrotask.
+                    pause: Suspending ? new Suspending(function (e) { return nextTask(); }) : function (e) {},
                 },
             };
             return gunzip(decode(gzippedBase64))
@@ -104,6 +113,10 @@ internal const val GLUE: String = """(function () {
                     exports = result.instance.exports;
                     memory = exports.memory;
                     exports._initialize();
+                    if (Suspending) {
+                        pausingRun = WebAssembly.promising(exports.kite_run);
+                        pausingDrain = WebAssembly.promising(exports.kite_drain);
+                    }
                     return null;
                 });
         },
@@ -178,6 +191,11 @@ internal const val GLUE: String = """(function () {
             try { return exports.kite_read_script(e, p, n); } finally { exports.kite_dealloc(p); }
         },
         run: function (e, c) { return exports.kite_run(e, c); },
+        canPause: function () { return pausingRun !== null; },
+        // Each settles once the run or the drain has ended; pausedAnswer then holds what it answered.
+        runPausing: function (e, c) { return pausingRun(e, c).then(function (h) { pausedAnswer = h; return null; }); },
+        drainPausing: function (e) { return pausingDrain(e).then(function (r) { pausedAnswer = r; return null; }); },
+        pausedAnswer: function () { return pausedAnswer; },
         pushArg: function (e, h) { exports.kite_push_arg(e, h); },
         call: function (e, fn, self) { return exports.kite_call(e, fn, self); },
         construct: function (e, fn) { return exports.kite_construct(e, fn); },

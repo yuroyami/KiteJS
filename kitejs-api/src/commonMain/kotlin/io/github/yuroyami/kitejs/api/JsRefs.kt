@@ -4,6 +4,9 @@
 
 package io.github.yuroyami.kitejs.api
 
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+
 /*
  * A handle belongs to the engine that made it, as a GraalJS `Value` belongs to its context: it
  * works only while that engine is open and only on that engine's thread, and it cannot be handed
@@ -160,6 +163,9 @@ public abstract class JsScript @InternalKiteJsApi constructor() {
 
     /** Runs it in the engine's global scope. The answer is its last expression's value. */
     public abstract fun run(): JsValue
+
+    /** Runs it as [KiteJs.evaluatePausing] runs source: pausing about every [slice] where the engine can. */
+    public open suspend fun runPausing(slice: Duration = 16.milliseconds): JsValue = run()
 
     /**
      * The compiled form, which [KiteJs.loadBytecode] reads back in another engine of the same

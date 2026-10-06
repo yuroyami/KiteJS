@@ -133,6 +133,28 @@ KiteJs(QuickJs).use { js ->
 - The engine runs bytecode without checking it. Load only bytecode your own code wrote, never
   bytes from a document or the network.
 
+## Long scripts on the web
+
+A browser page has one thread. A script that runs for a second freezes the page for that second.
+`evaluatePausing` runs a script like `evaluate`, but the script pauses about once a slice and lets
+the event loop draw and run timers before it goes on.
+
+```kotlin
+scope.launch {
+    val answer = js.evaluatePausing(longScript, "long.js", slice = 16.milliseconds)
+}
+```
+
+- Only QuickJS on a runtime with WebAssembly stack switching (JSPI) pauses: Chrome 137 and newer,
+  and Node 25 and newer. `js.canPause` says whether this one does.
+- Everywhere else, `evaluatePausing` runs the script to the end in one go, as `evaluate` does.
+  On the JVM, Android and native, run a long script on a thread of its own instead.
+- The script does not pause while a host function runs, since a pause cannot hold a Kotlin frame.
+- One script pauses at a time in a process. A second `evaluatePausing` that starts while one is
+  paused runs to the end in one go.
+- While its script is paused, the engine refuses every other call with a `JsEngineError`. Other
+  engines stay usable.
+
 ## Building values
 
 ```kotlin

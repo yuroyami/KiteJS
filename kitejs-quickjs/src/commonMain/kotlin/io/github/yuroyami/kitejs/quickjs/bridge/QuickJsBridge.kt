@@ -50,6 +50,15 @@ internal interface QuickJsBridge {
 
     /** A script from [bytes] that [writeScript] wrote, as [compile] answers one. */
     fun readScript(e: Long, bytes: ByteArray): Int
+    /** Whether [runPausing] and [drainPausing] can pause; only the web, with WebAssembly stack switching. */
+    fun canPause(): Boolean = false
+
+    /** [run], where the script may pause when the interrupt hook answers [INTERRUPT_PAUSE]. */
+    suspend fun runPausing(e: Long, compiled: Int): Int = run(e, compiled)
+
+    /** [drain], where a job may pause the same way. */
+    suspend fun drainPausing(e: Long): Int = drain(e)
+
     fun pushArg(e: Long, h: Int)
     fun call(e: Long, fn: Int, self: Int): Int
     fun construct(e: Long, fn: Int): Int
@@ -83,6 +92,9 @@ internal interface QuickJsBridge {
         const val STOP_HOOK = 2
         const val STOP_HOOK_THREW = 3
         const val STOP_MEMORY = 4
+
+        /** What the interrupt hook answers to have the script pause, as KITE_INTERRUPT_PAUSE. */
+        const val INTERRUPT_PAUSE = 3
 
         const val OPT_CLOCK = 1
         const val OPT_TIME_ZONE = 2
