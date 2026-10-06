@@ -19,7 +19,18 @@ internal const val GLUE: String = """(function () {
     var Suspending = typeof WebAssembly.Suspending === 'function' && typeof WebAssembly.promising === 'function'
         ? WebAssembly.Suspending : null;
     var pausingRun = null, pausingDrain = null, pausedAnswer = 0;
-    function nextTask() { return new Promise(function (resolve) { setTimeout(resolve, 0); }); }
+    // A new task, so the event loop draws and runs timers first. A browser clamps a nested
+    // setTimeout to 4 ms, and a message is not clamped (KiteJS#131).
+    var channel = typeof setImmediate !== 'function' && typeof MessageChannel === 'function' ? new MessageChannel() : null;
+    var waiting = [];
+    if (channel) channel.port1.onmessage = function () { waiting.shift()(); };
+    function nextTask() {
+        return new Promise(function (resolve) {
+            if (typeof setImmediate === 'function') setImmediate(resolve);
+            else if (channel) { waiting.push(resolve); channel.port2.postMessage(0); }
+            else setTimeout(resolve, 0);
+        });
+    }
 
     function view() { return new DataView(memory.buffer); }
 
