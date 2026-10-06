@@ -29,6 +29,16 @@ public interface JsEngine<C : KiteJsConfig> {
      */
     public suspend fun load() {}
 
+    /** True once [load] has finished, and from the start where the engine has nothing to load. */
+    public val isLoaded: Boolean get() = true
+
+    /**
+     * Whether a thread holds one open engine at a time. Where it does, a second engine opens only
+     * after the first closes, or on another thread; where it does not, one thread holds several
+     * engines, each with a global scope of its own.
+     */
+    public val oneEnginePerThread: Boolean get() = false
+
     /** A configuration holding this engine's defaults, for [KiteJs] to hand to the caller. */
     @InternalKiteJsApi
     public fun newConfig(): C

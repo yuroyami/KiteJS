@@ -31,6 +31,27 @@ public abstract class ConfigContract<C : KiteJsConfig>(engine: JsEngine<C>) : En
         assertTrue(js.version.isNotBlank())
     }
 
+    @Test
+    public fun theEngineIsLoadedOnceLoadReturns(): TestResult = test {
+        assertTrue(engine.isLoaded)
+    }
+
+    @Test
+    public fun aThreadHoldsAsManyEnginesAsTheEngineSays(): TestResult = test {
+        open().use { first ->
+            if (engine.oneEnginePerThread) {
+                assertFailsWith<JsEngineError> { open() }
+            } else {
+                open().use { second ->
+                    first.evaluate("var x = 1")
+                    second.evaluate("var x = 2")
+                    assertEquals(1, first.evaluate("x").asInt())
+                    assertEquals(2, second.evaluate("x").asInt())
+                }
+            }
+        }
+    }
+
     // ---- Time -------------------------------------------------------------------------------------
 
     @Test

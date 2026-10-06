@@ -4357,6 +4357,8 @@ final object io.github.yuroyami.kitejs.rhino/NativeGlobal { // io.github.yuroyam
 final object io.github.yuroyami.kitejs.rhino/Rhino : io.github.yuroyami.kitejs.api/JsEngine<io.github.yuroyami.kitejs.rhino/RhinoConfig> { // io.github.yuroyami.kitejs.rhino/Rhino|null[0]
     final val name // io.github.yuroyami.kitejs.rhino/Rhino.name|{}name[0]
         final fun <get-name>(): kotlin/String // io.github.yuroyami.kitejs.rhino/Rhino.name.<get-name>|<get-name>(){}[0]
+    final val oneEnginePerThread // io.github.yuroyami.kitejs.rhino/Rhino.oneEnginePerThread|{}oneEnginePerThread[0]
+        final fun <get-oneEnginePerThread>(): kotlin/Boolean // io.github.yuroyami.kitejs.rhino/Rhino.oneEnginePerThread.<get-oneEnginePerThread>|<get-oneEnginePerThread>(){}[0]
 
     final fun newConfig(): io.github.yuroyami.kitejs.rhino/RhinoConfig // io.github.yuroyami.kitejs.rhino/Rhino.newConfig|newConfig(){}[0]
     final fun open(io.github.yuroyami.kitejs.rhino/RhinoConfig): io.github.yuroyami.kitejs.api/KiteJs // io.github.yuroyami.kitejs.rhino/Rhino.open|open(io.github.yuroyami.kitejs.rhino.RhinoConfig){}[0]

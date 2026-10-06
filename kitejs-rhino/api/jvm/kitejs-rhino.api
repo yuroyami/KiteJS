@@ -1578,6 +1578,8 @@ public final class io/github/yuroyami/kitejs/rhino/RegExpProxy$Companion {
 public final class io/github/yuroyami/kitejs/rhino/Rhino : io/github/yuroyami/kitejs/api/JsEngine {
 	public static final field INSTANCE Lio/github/yuroyami/kitejs/rhino/Rhino;
 	public fun getName ()Ljava/lang/String;
+	public fun getOneEnginePerThread ()Z
+	public fun isLoaded ()Z
 	public fun load (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public synthetic fun newConfig ()Lio/github/yuroyami/kitejs/api/KiteJsConfig;
 	public fun newConfig ()Lio/github/yuroyami/kitejs/rhino/RhinoConfig;

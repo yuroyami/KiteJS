@@ -115,6 +115,8 @@ internal actual fun bridge(): QuickJsBridge {
     return WebBridge
 }
 
+internal actual fun bridgeLoaded(): Boolean = glue.loaded()
+
 internal actual suspend fun loadBridge() {
     if (glue.loaded()) return
     val loading = glue.load(

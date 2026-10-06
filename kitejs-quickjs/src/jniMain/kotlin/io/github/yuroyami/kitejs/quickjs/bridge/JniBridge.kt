@@ -104,6 +104,8 @@ internal actual fun bridge(): QuickJsBridge = JniBridge
 
 internal actual suspend fun loadBridge() {}
 
+internal actual fun bridgeLoaded(): Boolean = true
+
 internal actual fun currentThreadToken(): Any = Thread.currentThread()
 
 internal actual class HandleCleaner actual constructor(private val release: (Int) -> Unit) {

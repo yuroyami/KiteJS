@@ -83,12 +83,16 @@ public abstract class io/github/yuroyami/kitejs/api/JsArray : io/github/yuroyami
 
 public abstract interface class io/github/yuroyami/kitejs/api/JsEngine {
 	public abstract fun getName ()Ljava/lang/String;
+	public fun getOneEnginePerThread ()Z
+	public fun isLoaded ()Z
 	public fun load (Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public abstract fun newConfig ()Lio/github/yuroyami/kitejs/api/KiteJsConfig;
 	public abstract fun open (Lio/github/yuroyami/kitejs/api/KiteJsConfig;)Lio/github/yuroyami/kitejs/api/KiteJs;
 }
 
 public final class io/github/yuroyami/kitejs/api/JsEngine$DefaultImpls {
+	public static fun getOneEnginePerThread (Lio/github/yuroyami/kitejs/api/JsEngine;)Z
+	public static fun isLoaded (Lio/github/yuroyami/kitejs/api/JsEngine;)Z
 	public static fun load (Lio/github/yuroyami/kitejs/api/JsEngine;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 }
 

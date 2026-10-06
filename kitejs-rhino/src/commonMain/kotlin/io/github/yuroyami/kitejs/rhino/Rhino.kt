@@ -26,6 +26,8 @@ public object Rhino : JsEngine<RhinoConfig> {
 
     override val name: String get() = "Rhino"
 
+    override val oneEnginePerThread: Boolean get() = true
+
     @InternalKiteJsApi
     override fun newConfig(): RhinoConfig = RhinoConfig()
 

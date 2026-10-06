@@ -89,6 +89,9 @@ internal expect fun bridge(): QuickJsBridge
 /** Makes the bridge ready. Only the WebAssembly build has anything to do. */
 internal expect suspend fun loadBridge()
 
+/** Whether [bridge] is ready: always, but on the web once [loadBridge] has finished. */
+internal expect fun bridgeLoaded(): Boolean
+
 /** Something that tells this thread from every other, for keeping an engine on its own thread. */
 internal expect fun currentThreadToken(): Any
 

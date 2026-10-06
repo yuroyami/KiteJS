@@ -18,6 +18,8 @@ final class io.github.yuroyami.kitejs.quickjs/QuickJsConfig : io.github.yuroyami
 }
 
 final object io.github.yuroyami.kitejs.quickjs/QuickJs : io.github.yuroyami.kitejs.api/JsEngine<io.github.yuroyami.kitejs.quickjs/QuickJsConfig> { // io.github.yuroyami.kitejs.quickjs/QuickJs|null[0]
+    final val isLoaded // io.github.yuroyami.kitejs.quickjs/QuickJs.isLoaded|{}isLoaded[0]
+        final fun <get-isLoaded>(): kotlin/Boolean // io.github.yuroyami.kitejs.quickjs/QuickJs.isLoaded.<get-isLoaded>|<get-isLoaded>(){}[0]
     final val name // io.github.yuroyami.kitejs.quickjs/QuickJs.name|{}name[0]
         final fun <get-name>(): kotlin/String // io.github.yuroyami.kitejs.quickjs/QuickJs.name.<get-name>|<get-name>(){}[0]
 

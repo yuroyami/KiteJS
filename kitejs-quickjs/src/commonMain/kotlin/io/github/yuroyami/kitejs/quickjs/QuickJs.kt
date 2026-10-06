@@ -8,6 +8,7 @@ import io.github.yuroyami.kitejs.api.InternalKiteJsApi
 import io.github.yuroyami.kitejs.api.JsEngine
 import io.github.yuroyami.kitejs.api.KiteJs
 import io.github.yuroyami.kitejs.api.KiteJsConfig
+import io.github.yuroyami.kitejs.quickjs.bridge.bridgeLoaded
 import io.github.yuroyami.kitejs.quickjs.bridge.loadBridge
 import io.github.yuroyami.kitejs.quickjs.facade.QuickJsKiteJs
 
@@ -30,6 +31,8 @@ public object QuickJs : JsEngine<QuickJsConfig> {
     override suspend fun load() {
         loadBridge()
     }
+
+    override val isLoaded: Boolean get() = bridgeLoaded()
 
     @InternalKiteJsApi
     override fun newConfig(): QuickJsConfig = QuickJsConfig()

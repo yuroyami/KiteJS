@@ -61,6 +61,10 @@ abstract fun interface io.github.yuroyami.kitejs.api/ConsolePrinter { // io.gith
 abstract interface <#A: io.github.yuroyami.kitejs.api/KiteJsConfig> io.github.yuroyami.kitejs.api/JsEngine { // io.github.yuroyami.kitejs.api/JsEngine|null[0]
     abstract val name // io.github.yuroyami.kitejs.api/JsEngine.name|{}name[0]
         abstract fun <get-name>(): kotlin/String // io.github.yuroyami.kitejs.api/JsEngine.name.<get-name>|<get-name>(){}[0]
+    open val isLoaded // io.github.yuroyami.kitejs.api/JsEngine.isLoaded|{}isLoaded[0]
+        open fun <get-isLoaded>(): kotlin/Boolean // io.github.yuroyami.kitejs.api/JsEngine.isLoaded.<get-isLoaded>|<get-isLoaded>(){}[0]
+    open val oneEnginePerThread // io.github.yuroyami.kitejs.api/JsEngine.oneEnginePerThread|{}oneEnginePerThread[0]
+        open fun <get-oneEnginePerThread>(): kotlin/Boolean // io.github.yuroyami.kitejs.api/JsEngine.oneEnginePerThread.<get-oneEnginePerThread>|<get-oneEnginePerThread>(){}[0]
 
     abstract fun newConfig(): #A // io.github.yuroyami.kitejs.api/JsEngine.newConfig|newConfig(){}[0]
     abstract fun open(#A): io.github.yuroyami.kitejs.api/KiteJs // io.github.yuroyami.kitejs.api/JsEngine.open|open(1:0){}[0]

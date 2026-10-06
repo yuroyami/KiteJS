@@ -155,6 +155,8 @@ internal actual fun bridge(): QuickJsBridge = NativeBridge
 
 internal actual suspend fun loadBridge() {}
 
+internal actual fun bridgeLoaded(): Boolean = true
+
 /** One per thread, so comparing them tells threads apart. */
 @ThreadLocal
 private object ThreadToken

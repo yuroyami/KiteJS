@@ -130,7 +130,8 @@ another thread, before any script can run, and they cannot be handed to a differ
 Numbers, strings, booleans, BigInts, null and undefined are copies and work anywhere. A handle's
 `toString()` never throws: where its engine cannot be used it prints the object's class.
 
-JavaScript and WebAssembly run one thread, so there one engine is open at a time.
+JavaScript and WebAssembly run one thread, so there Rhino holds one engine at a time and QuickJS holds
+as many as you open. `JsEngine.oneEnginePerThread` says which kind an engine is.
 
 Use `asyncKiteJs` when you want the calls serialised for you on a thread of its own.
 
