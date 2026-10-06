@@ -33,6 +33,9 @@ val cSources = listOf("quickjs/quickjs.c", "quickjs/dtoa.c", "quickjs/libregexp.
 /** The settings every toolchain compiles with live in native/kitejs_config.h, included first. */
 val cFlags = listOf("-O2", "-include", nativeDir.file("kitejs_config.h").asFile.absolutePath)
 
+/** Every header under native, kitejs_config.h among them. */
+val cHeaders = fileTree(nativeDir) { include("**/*.h") }
+
 // ---- The JVM: a JNI library per desktop platform, cross-compiled with zig ---------------------
 
 /** Builds with `zig cc`, which cross-compiles to every desktop OS and to WebAssembly from any of them. */
@@ -52,6 +55,11 @@ abstract class ZigCompile : DefaultTask() {
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val sources: ConfigurableFileCollection
+
+    /** The headers the sources include, so that a change to one builds the library again. */
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val headers: ConfigurableFileCollection
 
     @get:OutputFile
     abstract val output: RegularFileProperty
@@ -105,6 +113,7 @@ val jniTasks = jniPlatforms.map { (platform, zigTarget, fileName) ->
             },
         )
         sources.from(cSources.map { nativeDir.file(it) } + nativeDir.file("jni/kitejs_quickjs_jni.c"))
+        headers.from(cHeaders)
         output.set(jniOutput.map { it.file("jni/$platform/$fileName") })
     }
 }
@@ -133,6 +142,11 @@ abstract class ClangCompile : DefaultTask() {
     @get:InputFiles
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val sources: ConfigurableFileCollection
+
+    /** The headers the sources include, so that a change to one builds the library again. */
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val headers: ConfigurableFileCollection
 
     @get:OutputFile
     abstract val output: RegularFileProperty
@@ -193,6 +207,7 @@ val androidJniTasks = androidAbis.map { (abi, triple) ->
                 cFlags + listOf("-I${nativeDir.asFile}", "-lm"),
         )
         sources.from(cSources.map { nativeDir.file(it) } + nativeDir.file("jni/kitejs_quickjs_jni.c"))
+        headers.from(cHeaders)
         output.set(androidJniOutput.map { it.file("$abi/libkitejs_quickjs.so") })
     }
 }
@@ -261,6 +276,7 @@ val buildWasm = tasks.register<ZigCompile>("buildQuickJsWasm") {
 }
 
 /**
+    headers.from(cHeaders)
  * The module, gzipped and in base64, as Kotlin source the JS and Wasm targets compile in. A string
  * constant has a size limit, so it is split into chunks the loader joins.
  */
