@@ -60,9 +60,9 @@ KiteJS is on Maven Central. Add the engine you want, or both:
 ```kotlin
 // build.gradle.kts
 commonMain.dependencies {
-    implementation("io.github.yuroyami:kitejs-rhino:0.5.0")       // KiteJs(Rhino)
-    implementation("io.github.yuroyami:kitejs-quickjs:0.5.0")     // KiteJs(QuickJs)
-    implementation("io.github.yuroyami:kitejs-coroutines:0.5.0")  // optional
+    implementation("io.github.yuroyami:kitejs-rhino:0.6.0")       // KiteJs(Rhino)
+    implementation("io.github.yuroyami:kitejs-quickjs:0.6.0")     // KiteJs(QuickJs)
+    implementation("io.github.yuroyami:kitejs-coroutines:0.6.0")  // optional
 }
 ```
 
