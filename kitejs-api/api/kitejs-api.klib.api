@@ -126,6 +126,7 @@ abstract class io.github.yuroyami.kitejs.api/JsScript { // io.github.yuroyami.ki
     constructor <init>() // io.github.yuroyami.kitejs.api/JsScript.<init>|<init>(){}[0]
 
     abstract fun run(): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.api/JsScript.run|run(){}[0]
+    open fun bytecode(): kotlin/ByteArray? // io.github.yuroyami.kitejs.api/JsScript.bytecode|bytecode(){}[0]
 }
 
 abstract class io.github.yuroyami.kitejs.api/JsSymbol { // io.github.yuroyami.kitejs.api/JsSymbol|null[0]
@@ -162,6 +163,7 @@ abstract class io.github.yuroyami.kitejs.api/KiteJs : kotlin/AutoCloseable { // 
     abstract fun thenableCheck(io.github.yuroyami.kitejs.api/JsObject): kotlin/Boolean // io.github.yuroyami.kitejs.api/KiteJs.thenableCheck|thenableCheck(io.github.yuroyami.kitejs.api.JsObject){}[0]
     abstract fun valueOf(kotlin/Any?): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.api/KiteJs.valueOf|valueOf(kotlin.Any?){}[0]
     abstract fun watchSettlement(io.github.yuroyami.kitejs.api/JsValue, kotlin/Function2<io.github.yuroyami.kitejs.api/JsValue, io.github.yuroyami.kitejs.api/JsValue?, kotlin/Unit>): kotlin/Boolean // io.github.yuroyami.kitejs.api/KiteJs.watchSettlement|watchSettlement(io.github.yuroyami.kitejs.api.JsValue;kotlin.Function2<io.github.yuroyami.kitejs.api.JsValue,io.github.yuroyami.kitejs.api.JsValue?,kotlin.Unit>){}[0]
+    open fun loadBytecode(kotlin/ByteArray): io.github.yuroyami.kitejs.api/JsScript // io.github.yuroyami.kitejs.api/KiteJs.loadBytecode|loadBytecode(kotlin.ByteArray){}[0]
 }
 
 final class <#A: kotlin/Any> io.github.yuroyami.kitejs.api/BindScope { // io.github.yuroyami.kitejs.api/BindScope|null[0]

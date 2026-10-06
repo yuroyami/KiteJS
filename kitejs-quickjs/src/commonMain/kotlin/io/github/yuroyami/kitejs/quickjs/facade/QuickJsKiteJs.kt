@@ -110,6 +110,19 @@ internal class QuickJsKiteJs private constructor(
 
     fun run(script: QuickJsScript): JsValue = call { toJs(check(bridge.run(ptr, script.handle))) }
 
+    fun bytecode(script: QuickJsScript): ByteArray = call(drain = false) {
+        bridge.writeScript(ptr, script.handle) ?: raise()
+    }
+
+    override fun loadBytecode(bytecode: ByteArray): JsScript = call(drain = false) {
+        val h = bridge.readScript(ptr, bytecode)
+        if (h < 0) {
+            val error = errorOf(bridge.exception(ptr))
+            throw JsEngineError("the bytecode could not be read: ${error.message}", error)
+        }
+        QuickJsScript(this, h)
+    }
+
     override fun runMicrotasks() {
         call { }
     }

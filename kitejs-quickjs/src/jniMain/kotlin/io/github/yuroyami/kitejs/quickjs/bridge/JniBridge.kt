@@ -35,6 +35,8 @@ internal object JniNatives {
     @JvmStatic external fun global(e: Long): Int
     @JvmStatic external fun compile(e: Long, source: String, file: String): Int
     @JvmStatic external fun run(e: Long, compiled: Int): Int
+    @JvmStatic external fun writeScript(e: Long, compiled: Int): ByteArray?
+    @JvmStatic external fun readScript(e: Long, bytes: ByteArray): Int
     @JvmStatic external fun pushArg(e: Long, h: Int)
     @JvmStatic external fun call(e: Long, fn: Int, self: Int): Int
     @JvmStatic external fun construct(e: Long, fn: Int): Int
@@ -89,6 +91,8 @@ private object JniBridge : QuickJsBridge {
     override fun get(e: Long, obj: Int, key: String): Int = JniNatives.get(e, obj, key)
     override fun global(e: Long): Int = JniNatives.global(e)
     override fun compile(e: Long, source: String, file: String): Int = JniNatives.compile(e, source, file)
+    override fun writeScript(e: Long, compiled: Int): ByteArray? = JniNatives.writeScript(e, compiled)
+    override fun readScript(e: Long, bytes: ByteArray): Int = JniNatives.readScript(e, bytes)
     override fun run(e: Long, compiled: Int): Int = JniNatives.run(e, compiled)
     override fun pushArg(e: Long, h: Int) = JniNatives.pushArg(e, h)
     override fun call(e: Long, fn: Int, self: Int): Int = JniNatives.call(e, fn, self)

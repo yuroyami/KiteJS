@@ -41,6 +41,15 @@ public abstract class KiteJs @InternalKiteJsApi constructor() : AutoCloseable {
     public abstract fun compile(source: String, fileName: String = "<script>"): JsScript
 
     /**
+     * A script from [bytecode] that [JsScript.bytecode] wrote in an engine of the same kind and
+     * version, ready to run here without a parse. The engine runs bytecode without checking it,
+     * so load only bytecode the host wrote itself, never bytes from a document or the network.
+     * Throws a [JsEngineError] on an engine that has no bytecode, and for bytes it cannot read.
+     */
+    public open fun loadBytecode(bytecode: ByteArray): JsScript =
+        throw JsEngineError("${engine.name} has no bytecode")
+
+    /**
      * Runs whatever the promise callbacks have queued. Evaluating already drains the queue at the
      * end of the call, so this is only for work queued from a host callback afterwards.
      */

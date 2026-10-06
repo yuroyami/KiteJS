@@ -170,6 +170,7 @@ public final class io/github/yuroyami/kitejs/api/JsPromiseSupportKt {
 
 public abstract class io/github/yuroyami/kitejs/api/JsScript {
 	public fun <init> ()V
+	public fun bytecode ()[B
 	public abstract fun run-msBJVuE ()Ljava/lang/Object;
 }
 
@@ -330,6 +331,7 @@ public abstract class io/github/yuroyami/kitejs/api/KiteJs : java/lang/AutoClose
 	public abstract fun getEngine ()Lio/github/yuroyami/kitejs/api/JsEngine;
 	public abstract fun getGlobal ()Lio/github/yuroyami/kitejs/api/JsObject;
 	public abstract fun getVersion ()Ljava/lang/String;
+	public fun loadBytecode ([B)Lio/github/yuroyami/kitejs/api/JsScript;
 	public abstract fun newArray ([Ljava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsArray;
 	public abstract fun newConstructor (Ljava/lang/String;ILkotlin/jvm/functions/Function2;)Lio/github/yuroyami/kitejs/api/JsFunction;
 	public abstract fun newFunction (Ljava/lang/String;ILkotlin/jvm/functions/Function2;)Lio/github/yuroyami/kitejs/api/JsFunction;

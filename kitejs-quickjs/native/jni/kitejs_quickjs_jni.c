@@ -252,6 +252,31 @@ JNIEXPORT jint JNICALL NATIVE(compile)(JNIEnv *env, jclass cls, jlong e, jstring
     return h;
 }
 
+JNIEXPORT jbyteArray JNICALL NATIVE(writeScript)(JNIEnv *env, jclass cls, jlong e, jint compiled)
+{
+    KiteEngine *engine = ENGINE(e);
+    const uint8_t *bytes = kite_write_script(engine, compiled);
+    if (!bytes)
+        return NULL;
+    jsize length = kite_bytes_length(engine);
+    jbyteArray out = (*env)->NewByteArray(env, length);
+    if (out)
+        (*env)->SetByteArrayRegion(env, out, 0, length, (const jbyte *)bytes);
+    kite_bytes_free(engine);
+    return out;
+}
+
+JNIEXPORT jint JNICALL NATIVE(readScript)(JNIEnv *env, jclass cls, jlong e, jbyteArray bytes)
+{
+    jsize length = (*env)->GetArrayLength(env, bytes);
+    jbyte *data = (*env)->GetByteArrayElements(env, bytes, NULL);
+    if (!data)
+        return -1;
+    jint h = kite_read_script(ENGINE(e), (const uint8_t *)data, length);
+    (*env)->ReleaseByteArrayElements(env, bytes, data, JNI_ABORT);
+    return h;
+}
+
 JNIEXPORT jint JNICALL NATIVE(run)(JNIEnv *env, jclass cls, jlong e, jint compiled)
 {
     return kite_run(ENGINE(e), compiled);

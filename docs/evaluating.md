@@ -113,6 +113,26 @@ for (order in orders) {
 }
 ```
 
+## Running the same script in many engines
+
+A `JsScript` belongs to its engine. To skip the parse in other engines, keep its bytecode and load
+that bytecode in each new engine. QuickJS has bytecode; on Rhino `bytecode()` answers null and
+`loadBytecode` throws a `JsEngineError`.
+
+```kotlin
+val bytes = KiteJs(QuickJs).use { it.compile(bigLibrary, "library.js").bytecode() }
+
+KiteJs(QuickJs).use { js ->
+    if (bytes != null) js.loadBytecode(bytes).run() else js.evaluate(bigLibrary, "library.js")
+}
+```
+
+- The bytecode keeps the file name and the lines, so a stack trace still points at the source.
+- Bytecode fits only the engine build that wrote it. Keep it for the process, or key a saved
+  copy on `KiteJs.version`.
+- The engine runs bytecode without checking it. Load only bytecode your own code wrote, never
+  bytes from a document or the network.
+
 ## Building values
 
 ```kotlin

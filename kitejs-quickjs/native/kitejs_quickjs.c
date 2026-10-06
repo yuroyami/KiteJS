@@ -41,6 +41,10 @@ struct KiteEngine {
     const uint16_t *string;
     int32_t string_length;
 
+    /* The last bytes handed out, such as a script's bytecode. */
+    uint8_t *bytes;
+    int32_t bytes_length;
+
     /* Host functions QuickJS has collected, for the host to forget. */
     JSClassID host_class;
     int32_t *dead;
@@ -355,6 +359,7 @@ void kite_free(KiteEngine *e)
     if (!e)
         return;
     kite_string_free(e);
+    kite_bytes_free(e);
     if (e->ctx) {
         for (int32_t i = 0; i < e->argc; i++)
             JS_FreeValue(e->ctx, e->args[i]);
@@ -588,6 +593,51 @@ int32_t kite_compile(KiteEngine *e, const uint16_t *source, int32_t length,
     JS_FreeCString(ctx, utf8);
     JS_FreeCString(ctx, file_utf8);
     return answer(e, compiled);
+}
+
+const uint8_t *kite_write_script(KiteEngine *e, int32_t compiled)
+{
+    kite_bytes_free(e);
+    size_t length = 0;
+    uint8_t *bytes = JS_WriteObject(e->ctx, &length, at(e, compiled), JS_WRITE_OBJ_BYTECODE);
+    if (!bytes)
+        return NULL;
+    if (length > INT32_MAX) {
+        js_free(e->ctx, bytes);
+        JS_ThrowRangeError(e->ctx, "the bytecode is larger than 2 GiB");
+        return NULL;
+    }
+    e->bytes = bytes;
+    e->bytes_length = (int32_t)length;
+    return bytes;
+}
+
+int32_t kite_bytes_length(KiteEngine *e)
+{
+    return e->bytes_length;
+}
+
+void kite_bytes_free(KiteEngine *e)
+{
+    if (e->bytes) {
+        js_free(e->ctx, e->bytes);
+        e->bytes = NULL;
+        e->bytes_length = 0;
+    }
+}
+
+int32_t kite_read_script(KiteEngine *e, const uint8_t *bytes, int32_t length)
+{
+    JSValue v = JS_ReadObject(e->ctx, bytes, (size_t)length, JS_READ_OBJ_BYTECODE);
+    if (JS_IsException(v))
+        return -1;
+    /* Only global code that kite_compile made runs; any other value is not a script. */
+    if (JS_VALUE_GET_TAG(v) != JS_TAG_FUNCTION_BYTECODE) {
+        JS_FreeValue(e->ctx, v);
+        JS_ThrowTypeError(e->ctx, "the bytes are not the bytecode of a script");
+        return -1;
+    }
+    return keep(e, v);
 }
 
 int32_t kite_run(KiteEngine *e, int32_t compiled)

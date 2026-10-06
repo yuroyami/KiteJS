@@ -160,4 +160,12 @@ public abstract class JsScript @InternalKiteJsApi constructor() {
 
     /** Runs it in the engine's global scope. The answer is its last expression's value. */
     public abstract fun run(): JsValue
+
+    /**
+     * The compiled form, which [KiteJs.loadBytecode] reads back in another engine of the same
+     * kind without parsing the source again. Null on an engine that has no bytecode, such as Rhino.
+     * Bytecode fits only the build of the engine that wrote it, so keep it for this process, or
+     * key a saved copy on [KiteJs.version].
+     */
+    public open fun bytecode(): ByteArray? = null
 }

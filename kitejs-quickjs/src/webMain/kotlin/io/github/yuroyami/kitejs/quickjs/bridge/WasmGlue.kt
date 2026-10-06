@@ -163,6 +163,20 @@ internal const val GLUE: String = """(function () {
                 });
             });
         },
+        writeScript: function (e, c) {
+            var p = exports.kite_write_script(e, c);
+            if (p === 0) return null;
+            var n = exports.kite_bytes_length(e), a = new Uint8Array(memory.buffer, p, n), out = '';
+            for (var i = 0; i < n; i += 8192) out += String.fromCharCode.apply(null, a.subarray(i, Math.min(n, i + 8192)));
+            exports.kite_bytes_free(e);
+            return out;
+        },
+        readScript: function (e, bytes) {
+            var n = bytes.length, p = exports.kite_alloc(n || 1);
+            var a = new Uint8Array(memory.buffer, p, n);
+            for (var i = 0; i < n; i++) a[i] = bytes.charCodeAt(i);
+            try { return exports.kite_read_script(e, p, n); } finally { exports.kite_dealloc(p); }
+        },
         run: function (e, c) { return exports.kite_run(e, c); },
         pushArg: function (e, h) { exports.kite_push_arg(e, h); },
         call: function (e, fn, self) { return exports.kite_call(e, fn, self); },

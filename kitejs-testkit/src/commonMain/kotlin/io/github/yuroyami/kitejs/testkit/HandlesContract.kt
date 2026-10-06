@@ -142,6 +142,41 @@ public abstract class HandlesContract<C : KiteJsConfig>(engine: JsEngine<C>) : E
         assertEquals("undefined", js.evaluate("typeof ran").asString())
     }
 
+    @Test
+    public fun bytecodeRunsInAnotherEngineWithoutTheSource(): TestResult = test {
+        val source = "var greet = function (n) { return 'héllo ' + n; };\n" +
+            "function fail() { throw new Error('in a loaded script'); }\n" +
+            "count = (typeof count === 'undefined' ? 0 : count) + 1;\n" +
+            "greet('wörld') + ' ' + count"
+        val bytes = open().use { first -> first.compile(source, "made.js").bytecode() }
+        if (bytes == null) {
+            // An engine without bytecode says so instead of loading anything.
+            open().use { js -> assertFailsWith<JsEngineError> { js.loadBytecode(byteArrayOf(1, 2, 3)) } }
+            return@test
+        }
+        open().use { js ->
+            val script = js.loadBytecode(bytes)
+            assertEquals("héllo wörld 1", script.run().asString())
+            assertEquals("héllo wörld 2", script.run().asString())
+            val e = assertFailsWith<JsError> { js.evaluate("fail()") }
+            assertEquals("in a loaded script", e.errorMessage)
+            // The bytecode keeps the file name and lines, so a stack still points at the source.
+            assertTrue(e.scriptStack.any { it.fileName == "made.js" && it.lineNumber == 2 }, e.scriptStack.toString())
+            // A loaded script writes the same bytecode again.
+            assertEquals(bytes.size, script.bytecode()!!.size)
+        }
+    }
+
+    @Test
+    public fun bytesThatAreNotBytecodeAreRefused(): TestResult = withEngine { js ->
+        assertFailsWith<JsEngineError> { js.loadBytecode(ByteArray(0)) }
+        val bytes = js.compile("40 + 2").bytecode() ?: return@withEngine
+        assertFailsWith<JsEngineError> { js.loadBytecode(bytes.copyOf(bytes.size / 2)) }
+        // A value that is not a script, here a string, is refused as well.
+        assertFailsWith<JsEngineError> { js.loadBytecode(byteArrayOf(2, 0)) }
+        assertEquals(42.0, js.loadBytecode(bytes).run().asDouble())
+    }
+
     // ---- Ownership ------------------------------------------------------------------------------
 
     @Test

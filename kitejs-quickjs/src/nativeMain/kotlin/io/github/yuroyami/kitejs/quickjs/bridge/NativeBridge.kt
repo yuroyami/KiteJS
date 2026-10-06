@@ -11,6 +11,10 @@ import io.github.yuroyami.kitejs.quickjs.cinterop.kite_array_get
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_get
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_array_length
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_array_push
+import io.github.yuroyami.kitejs.quickjs.cinterop.kite_bytes_free
+import io.github.yuroyami.kitejs.quickjs.cinterop.kite_bytes_length
+import io.github.yuroyami.kitejs.quickjs.cinterop.kite_read_script
+import io.github.yuroyami.kitejs.quickjs.cinterop.kite_write_script
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_ask_host
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_call
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_cb_arg
@@ -51,7 +55,11 @@ import kotlin.native.concurrent.ThreadLocal
 import kotlin.native.ref.createCleaner
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.addressOf
 import kotlinx.cinterop.get
+import kotlinx.cinterop.readBytes
+import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.usePinned
 import kotlinx.cinterop.staticCFunction
 import kotlinx.cinterop.toCPointer
 import kotlinx.cinterop.toKString
@@ -136,6 +144,18 @@ private object NativeBridge : QuickJsBridge {
 
     override fun compile(e: Long, source: String, file: String): Int =
         kite_compile(e(e), source.wcstr, source.length, file.wcstr, file.length)
+
+    override fun writeScript(e: Long, compiled: Int): ByteArray? {
+        val engine = e(e)
+        val bytes = kite_write_script(engine, compiled) ?: return null
+        val out = bytes.readBytes(kite_bytes_length(engine))
+        kite_bytes_free(engine)
+        return out
+    }
+
+    override fun readScript(e: Long, bytes: ByteArray): Int =
+        if (bytes.isEmpty()) kite_read_script(e(e), null, 0)
+        else bytes.usePinned { kite_read_script(e(e), it.addressOf(0).reinterpret(), bytes.size) }
 
     override fun run(e: Long, compiled: Int): Int = kite_run(e(e), compiled)
     override fun pushArg(e: Long, h: Int) = kite_push_arg(e(e), h)

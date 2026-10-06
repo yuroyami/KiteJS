@@ -193,4 +193,6 @@ internal class QuickJsScript(private val engine: QuickJsKiteJs, val handle: Int)
     private val cleanup = engine.register(this, handle)
 
     override fun run(): JsValue = engine.run(this)
+
+    override fun bytecode(): ByteArray = engine.bytecode(this)
 }

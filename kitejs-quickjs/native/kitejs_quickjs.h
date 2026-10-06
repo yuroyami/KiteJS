@@ -124,7 +124,16 @@ int32_t kite_global(KiteEngine *e);
 /* Compiles global code without running it. */
 int32_t kite_compile(KiteEngine *e, const uint16_t *source, int32_t length,
                      const uint16_t *file, int32_t file_length);
-/* Runs what kite_compile made; it can run again. */
+/* The bytecode of what kite_compile made, kite_bytes_length bytes long, for kite_read_script in
+ * another engine of the same build. Free it with kite_bytes_free before asking for more bytes.
+ * Null when writing threw. */
+const uint8_t *kite_write_script(KiteEngine *e, int32_t compiled);
+int32_t kite_bytes_length(KiteEngine *e);
+void kite_bytes_free(KiteEngine *e);
+/* A script from bytecode that kite_write_script wrote, as kite_compile answers one. Bytecode runs
+ * unchecked, so it must come from kite_write_script, never from a document or the network. */
+int32_t kite_read_script(KiteEngine *e, const uint8_t *bytes, int32_t length);
+/* Runs what kite_compile or kite_read_script made; it can run again. */
 int32_t kite_run(KiteEngine *e, int32_t compiled);
 /* Arguments for the next kite_call or kite_construct, pushed in order. */
 void kite_push_arg(KiteEngine *e, int32_t h);

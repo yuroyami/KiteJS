@@ -44,6 +44,12 @@ internal interface QuickJsBridge {
 
     fun compile(e: Long, source: String, file: String): Int
     fun run(e: Long, compiled: Int): Int
+
+    /** The bytecode of [compiled], or null when writing it threw. */
+    fun writeScript(e: Long, compiled: Int): ByteArray?
+
+    /** A script from [bytes] that [writeScript] wrote, as [compile] answers one. */
+    fun readScript(e: Long, bytes: ByteArray): Int
     fun pushArg(e: Long, h: Int)
     fun call(e: Long, fn: Int, self: Int): Int
     fun construct(e: Long, fn: Int): Int

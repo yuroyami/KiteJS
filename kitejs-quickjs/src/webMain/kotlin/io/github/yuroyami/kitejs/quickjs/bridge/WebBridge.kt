@@ -46,6 +46,10 @@ internal external interface KiteGlue : JsAny {
     fun global(e: Int): Int
     fun compile(e: Int, source: String, file: String): Int
     fun run(e: Int, compiled: Int): Int
+
+    /** The bytecode as a string with one code unit for each byte, or null. */
+    fun writeScript(e: Int, compiled: Int): String?
+    fun readScript(e: Int, bytes: String): Int
     fun pushArg(e: Int, h: Int)
     fun call(e: Int, fn: Int, self: Int): Int
     fun construct(e: Int, fn: Int): Int
@@ -98,6 +102,10 @@ private object WebBridge : QuickJsBridge {
     override fun global(e: Long): Int = glue.global(e.toInt())
     override fun compile(e: Long, source: String, file: String): Int = glue.compile(e.toInt(), source, file)
     override fun run(e: Long, compiled: Int): Int = glue.run(e.toInt(), compiled)
+    override fun writeScript(e: Long, compiled: Int): ByteArray? =
+        glue.writeScript(e.toInt(), compiled)?.let { s -> ByteArray(s.length) { s[it].code.toByte() } }
+    override fun readScript(e: Long, bytes: ByteArray): Int =
+        glue.readScript(e.toInt(), CharArray(bytes.size) { (bytes[it].toInt() and 0xFF).toChar() }.concatToString())
     override fun pushArg(e: Long, h: Int) = glue.pushArg(e.toInt(), h)
     override fun call(e: Long, fn: Int, self: Int): Int = glue.call(e.toInt(), fn, self)
     override fun construct(e: Long, fn: Int): Int = glue.construct(e.toInt(), fn)
