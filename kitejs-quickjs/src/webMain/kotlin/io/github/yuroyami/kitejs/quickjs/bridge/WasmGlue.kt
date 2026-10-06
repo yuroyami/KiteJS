@@ -36,6 +36,16 @@ internal const val GLUE: String = """(function () {
         try { return body(p); } finally { exports.kite_dealloc(p); }
     }
 
+    // What the module writes to stdout and stderr, such as a failed assertion, goes to the console a line at a time.
+    var output = {};
+
+    function print(fd, bytes) {
+        var o = output[fd] || (output[fd] = { decoder: new TextDecoder(), line: '' });
+        var lines = (o.line + o.decoder.decode(bytes, { stream: true })).split('\n');
+        o.line = lines.pop();
+        for (var i = 0; i < lines.length; i++) (fd === 2 ? console.error : console.log)('QuickJS: ' + lines[i]);
+    }
+
     var EBADF = 8;
     var wasi = {
         clock_time_get: function (id, precision, out) {
@@ -46,7 +56,11 @@ internal const val GLUE: String = """(function () {
         fd_write: function (fd, iovs, count, written) {
             var dv = view();
             var total = 0;
-            for (var i = 0; i < count; i++) total += dv.getUint32(iovs + i * 8 + 4, true);
+            for (var i = 0; i < count; i++) {
+                var length = dv.getUint32(iovs + i * 8 + 4, true);
+                if (fd === 1 || fd === 2) print(fd, new Uint8Array(memory.buffer, dv.getUint32(iovs + i * 8, true), length).slice());
+                total += length;
+            }
             dv.setUint32(written, total, true);
             return 0;
         },
