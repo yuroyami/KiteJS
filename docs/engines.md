@@ -81,9 +81,11 @@ uses much more stack than the KiteJS frames around it can still run the browser 
 
 - **Kotlin/Native** (iOS, macOS, Linux, Windows): linked into your binary as a static library.
 - **JVM**: the jar carries a JNI library for Linux on x64 and arm64, macOS on x64 and arm64, and
-  Windows on x64, and loads the one for the machine it runs on. For any other platform, build the
-  library yourself from the module's `native` folder and set the system property
-  `kitejs.quickjs.library` to its path.
+  Windows on x64, and loads the one for the machine it runs on. The library has to be a file to
+  load, so the first process copies it to a folder under the temporary folder that only the user
+  can write, named for the library's SHA-256. Later processes load that file again, which macOS
+  then does not check a second time. For any other platform, build the library yourself from the
+  module's `native` folder and set the system property `kitejs.quickjs.library` to its path.
 - **Android**: the AAR carries a JNI library for arm64-v8a, armeabi-v7a, x86_64 and x86, aligned
   for 16 KB pages, and keep rules so R8 leaves the classes it calls alone.
 - **JavaScript and Wasm**: a WebAssembly module embedded in the code, loaded by `QuickJs.load()`.
