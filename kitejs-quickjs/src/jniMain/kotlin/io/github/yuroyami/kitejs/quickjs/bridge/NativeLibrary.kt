@@ -44,7 +44,11 @@ internal fun loadNativeLibrary() {
     }
     val resource = "/jni/$platform-$arch/$file"
     val stream = HandleCleaner::class.java.getResourceAsStream(resource)
-        ?: throw JsEngineError("QuickJS has no JNI library for $platform on $arch; set kitejs.quickjs.library to one built for it")
+        ?: throw JsEngineError(
+            "QuickJS has no JNI library for $platform on $arch; set kitejs.quickjs.library to one built for it. " +
+                "An Android host test needs the JVM artifact of kitejs-quickjs on its classpath: " +
+                "https://yuroyami.github.io/KiteJS/engines/#android-host-tests",
+        )
     val dir = Files.createTempDirectory("kitejs-quickjs").toFile()
     val target = File(dir, file)
     stream.use { Files.copy(it, target.toPath(), StandardCopyOption.REPLACE_EXISTING) }

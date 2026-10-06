@@ -87,3 +87,32 @@ uses much more stack than the KiteJS frames around it can still run the browser 
 - **Android**: the AAR carries a JNI library for arm64-v8a, armeabi-v7a, x86_64 and x86, aligned
   for 16 KB pages, and keep rules so R8 leaves the classes it calls alone.
 - **JavaScript and Wasm**: a WebAssembly module embedded in the code, loaded by `QuickJs.load()`.
+
+### Android host tests
+
+Android host tests (`testAndroidHostTest`) run on the desktop JVM, where the Android libraries of
+the AAR do not load. The JVM artifact of `kitejs-quickjs` carries a library for each desktop
+platform, and the loader finds the one for the machine on the classpath. Add that artifact to the
+classpath of the host tests:
+
+```kotlin
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+
+val quickJsDesktop: Configuration by configurations.creating {
+    isCanBeConsumed = false
+    attributes {
+        attribute(KotlinPlatformType.attribute, KotlinPlatformType.jvm)
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage.JAVA_RUNTIME))
+    }
+}
+dependencies { quickJsDesktop("io.github.yuroyami:kitejs-quickjs:0.3.0") }
+
+tasks.withType<Test>().matching { it.name == "testAndroidHostTest" }.configureEach {
+    val desktop = quickJsDesktop
+    inputs.files(desktop).withPropertyName("quickJsDesktop")
+    // The Android plugin sets the classpath late, so add the jar when the task starts.
+    doFirst { classpath += desktop }
+}
+```
+
+An app that runs its tests on a device or an emulator does not need this.
