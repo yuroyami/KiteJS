@@ -826,6 +826,19 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   carries `RESET_LET_PROP` and lowers to an assignment of `undefined`; one directly in the body
   runs once per call or script and keeps upstream's lowering, and the corpus with it.
   `LetWithoutInitializerTest` pins it.
+- D-99: `Number.prototype.toLocaleString` and `BigInt.prototype.toLocaleString` print what
+  `Intl.NumberFormat("en-US", options)` prints, on both engines, where upstream's are `toString`
+  and read the locale argument as a radix, so `(1).toLocaleString("en-US")` threw. The formatter
+  is `EnUsNumberFormat` in kitejs-api: ECMA-402's option reading (InitializeNumberFormat and
+  SetNumberFormatDigitOptions, in order, with their coercions and errors), FormatNumericToString
+  and PartitionNumberPattern over en-US's patterns. It rounds the shortest decimal digits of a
+  double, as ICU does, not its exact binary value. The locale argument is not read, there is no
+  `Intl` global, and `numberingSystem` is validated and ignored. The currency and unit strings
+  in `EnUsNumberData` are generated from ICU by `tools/intl/generate-en-us-number-data.mjs`,
+  which also writes the 1,699 cases `EnUsNumberFormatTest` checks against ICU's output. Rhino
+  reaches it from `LocaleNumbers`; QuickJS-ng, whose own `toLocaleString` is `toString`, from
+  its prelude, through a proxy of a host function so the method still prints as native code
+  and the errors stay catchable. `LocaleNumbersContract` holds both engines to it.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

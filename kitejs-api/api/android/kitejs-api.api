@@ -415,3 +415,28 @@ public final class io/github/yuroyami/kitejs/api/dtoa/RadixFormatter {
 	public final fun toBaseString (ID)Ljava/lang/String;
 }
 
+public final class io/github/yuroyami/kitejs/api/format/EnUsNumberFormat {
+	public static final field Companion Lio/github/yuroyami/kitejs/api/format/EnUsNumberFormat$Companion;
+	public final fun format (D)Ljava/lang/String;
+	public final fun format (Lio/github/yuroyami/kitejs/api/KBigInt;)Ljava/lang/String;
+}
+
+public final class io/github/yuroyami/kitejs/api/format/EnUsNumberFormat$Companion {
+	public final fun getDEFAULT ()Lio/github/yuroyami/kitejs/api/format/EnUsNumberFormat;
+	public final fun resolve (Lio/github/yuroyami/kitejs/api/format/NumberFormatOptionReader;)Lio/github/yuroyami/kitejs/api/format/EnUsNumberFormat;
+}
+
+public final class io/github/yuroyami/kitejs/api/format/NumberFormatOptionError : java/lang/RuntimeException {
+	public fun <init> (ZLjava/lang/String;)V
+	public final fun isTypeError ()Z
+}
+
+public abstract interface class io/github/yuroyami/kitejs/api/format/NumberFormatOptionReader {
+	public abstract fun get (Ljava/lang/String;)Ljava/lang/Object;
+	public abstract fun isTrue (Ljava/lang/Object;)Z
+	public abstract fun isUndefined (Ljava/lang/Object;)Z
+	public abstract fun toBoolean (Ljava/lang/Object;)Z
+	public abstract fun toJsString (Ljava/lang/Object;)Ljava/lang/String;
+	public abstract fun toNumber (Ljava/lang/Object;)D
+}
+

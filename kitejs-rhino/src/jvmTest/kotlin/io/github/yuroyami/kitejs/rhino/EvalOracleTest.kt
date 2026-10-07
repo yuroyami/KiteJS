@@ -1685,6 +1685,15 @@ class EvalOracleTest {
         assertEquals(emptyList(), failures, "corpus evaluation differs from upstream")
     }
 
+    /** toLocaleString formats numbers as Intl.NumberFormat("en-US") does; upstream is toString (D-99). */
+    @Test
+    fun localeNumbersDifferFromTheLegacyOracle() {
+        assertEquals("\"1e+21\"", upstream("(1e21).toLocaleString()"))
+        assertEquals("\"1,000,000,000,000,000,000,000\"", ported("(1e21).toLocaleString()"))
+        assertEquals("throws illegal radix 0.", upstream("(2046430).toLocaleString('en-US')").replace(Regex("^throws [A-Za-z]+: "), "throws "))
+        assertEquals("\"2,046,430\"", ported("(2046430).toLocaleString('en-US')"))
+    }
+
     /** Extra escape arguments follow the standard; the pinned oracle retains its mask extension. */
     @Test
     fun escapeExtraArgumentsDifferFromTheLegacyOracle() {

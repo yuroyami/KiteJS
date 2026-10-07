@@ -68,6 +68,15 @@ again does not reset it. ECMAScript 2015, 13.3.1.4 initializes it to `undefined`
 - Where: `Parser.variables` and the declaration lowering in `NodeTransformer`.
 - Test: `LetWithoutInitializerTest`.
 
+### toLocaleString on numbers reads the locale as a radix (D-99)
+
+`(2046430).toLocaleString("en-US")` throws `RangeError: illegal radix 0.`: Number's and BigInt's
+`toLocaleString` are `toString`, so the locale argument becomes the radix. ECMAScript 2015,
+20.1.3.4 forbids using that position for anything else without ECMA-402.
+
+- Where: `NativeNumber` and `NativeBigInt`, now `LocaleNumbers` over kitejs-api's `EnUsNumberFormat`.
+- Test: `LocaleNumbersContract`, `EnUsNumberFormatTest`, `EvalOracleTest.localeNumbersDifferFromTheLegacyOracle`.
+
 ### A property descriptor of a lazily loaded global leaks the placeholder (D-75)
 
 `typeof Object.getOwnPropertyDescriptor(globalThis, 'JSON').value` throws "Invalid JavaScript

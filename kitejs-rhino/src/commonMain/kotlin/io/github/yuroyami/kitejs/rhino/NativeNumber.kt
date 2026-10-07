@@ -48,7 +48,7 @@ internal class NativeNumber internal constructor(private val doubleValue: Double
                 constructor.defineProperty("parseInt", parseInt, DONTENUM)
             }
             constructor.definePrototypeMethod(scope, "toString", 1, ::js_toString)
-            constructor.definePrototypeMethod(scope, "toLocaleString", 0, ::js_toString)
+            constructor.definePrototypeMethod(scope, "toLocaleString", 0, ::js_toLocaleString)
             constructor.definePrototypeMethod(scope, "toSource", 0, ::js_toSource)
             constructor.definePrototypeMethod(scope, "valueOf", 0, ::js_valueOf)
             constructor.definePrototypeMethod(scope, "toFixed", 1, ::js_toFixed)
@@ -137,6 +137,9 @@ internal class NativeNumber internal constructor(private val doubleValue: Double
             val base = if (args.isEmpty() || Undefined.isUndefined(args[0])) 10 else ScriptRuntime.toInt32(args[0])
             return ScriptRuntime.numberToString(toSelf(thisObj).doubleValue, base)
         }
+
+        private fun js_toLocaleString(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
+            LocaleNumbers.format(cx, scope, args, toSelf(thisObj).doubleValue)
 
         private fun js_toSource(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
             "(new Number(" + ScriptRuntime.toString(toSelf(thisObj).doubleValue) + "))"

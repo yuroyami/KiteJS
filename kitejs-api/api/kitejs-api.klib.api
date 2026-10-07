@@ -71,6 +71,15 @@ abstract interface <#A: io.github.yuroyami.kitejs.api/KiteJsConfig> io.github.yu
     open suspend fun load() // io.github.yuroyami.kitejs.api/JsEngine.load|load(){}[0]
 }
 
+abstract interface io.github.yuroyami.kitejs.api.format/NumberFormatOptionReader { // io.github.yuroyami.kitejs.api.format/NumberFormatOptionReader|null[0]
+    abstract fun get(kotlin/String): kotlin/Any? // io.github.yuroyami.kitejs.api.format/NumberFormatOptionReader.get|get(kotlin.String){}[0]
+    abstract fun isTrue(kotlin/Any?): kotlin/Boolean // io.github.yuroyami.kitejs.api.format/NumberFormatOptionReader.isTrue|isTrue(kotlin.Any?){}[0]
+    abstract fun isUndefined(kotlin/Any?): kotlin/Boolean // io.github.yuroyami.kitejs.api.format/NumberFormatOptionReader.isUndefined|isUndefined(kotlin.Any?){}[0]
+    abstract fun toBoolean(kotlin/Any?): kotlin/Boolean // io.github.yuroyami.kitejs.api.format/NumberFormatOptionReader.toBoolean|toBoolean(kotlin.Any?){}[0]
+    abstract fun toJsString(kotlin/Any?): kotlin/String // io.github.yuroyami.kitejs.api.format/NumberFormatOptionReader.toJsString|toJsString(kotlin.Any?){}[0]
+    abstract fun toNumber(kotlin/Any?): kotlin/Double // io.github.yuroyami.kitejs.api.format/NumberFormatOptionReader.toNumber|toNumber(kotlin.Any?){}[0]
+}
+
 abstract class io.github.yuroyami.kitejs.api/JsArray : io.github.yuroyami.kitejs.api/JsObject { // io.github.yuroyami.kitejs.api/JsArray|null[0]
     constructor <init>() // io.github.yuroyami.kitejs.api/JsArray.<init>|<init>(){}[0]
 
@@ -186,6 +195,25 @@ final class io.github.yuroyami.kitejs.api.dtoa/Decimal { // io.github.yuroyami.k
         final const val MAX_CHARS // io.github.yuroyami.kitejs.api.dtoa/Decimal.Companion.MAX_CHARS|{}MAX_CHARS[0]
             final fun <get-MAX_CHARS>(): kotlin/Int // io.github.yuroyami.kitejs.api.dtoa/Decimal.Companion.MAX_CHARS.<get-MAX_CHARS>|<get-MAX_CHARS>(){}[0]
     }
+}
+
+final class io.github.yuroyami.kitejs.api.format/EnUsNumberFormat { // io.github.yuroyami.kitejs.api.format/EnUsNumberFormat|null[0]
+    final fun format(io.github.yuroyami.kitejs.api/KBigInt): kotlin/String // io.github.yuroyami.kitejs.api.format/EnUsNumberFormat.format|format(io.github.yuroyami.kitejs.api.KBigInt){}[0]
+    final fun format(kotlin/Double): kotlin/String // io.github.yuroyami.kitejs.api.format/EnUsNumberFormat.format|format(kotlin.Double){}[0]
+
+    final object Companion { // io.github.yuroyami.kitejs.api.format/EnUsNumberFormat.Companion|null[0]
+        final val DEFAULT // io.github.yuroyami.kitejs.api.format/EnUsNumberFormat.Companion.DEFAULT|{}DEFAULT[0]
+            final fun <get-DEFAULT>(): io.github.yuroyami.kitejs.api.format/EnUsNumberFormat // io.github.yuroyami.kitejs.api.format/EnUsNumberFormat.Companion.DEFAULT.<get-DEFAULT>|<get-DEFAULT>(){}[0]
+
+        final fun resolve(io.github.yuroyami.kitejs.api.format/NumberFormatOptionReader?): io.github.yuroyami.kitejs.api.format/EnUsNumberFormat // io.github.yuroyami.kitejs.api.format/EnUsNumberFormat.Companion.resolve|resolve(io.github.yuroyami.kitejs.api.format.NumberFormatOptionReader?){}[0]
+    }
+}
+
+final class io.github.yuroyami.kitejs.api.format/NumberFormatOptionError : kotlin/RuntimeException { // io.github.yuroyami.kitejs.api.format/NumberFormatOptionError|null[0]
+    constructor <init>(kotlin/Boolean, kotlin/String) // io.github.yuroyami.kitejs.api.format/NumberFormatOptionError.<init>|<init>(kotlin.Boolean;kotlin.String){}[0]
+
+    final val isTypeError // io.github.yuroyami.kitejs.api.format/NumberFormatOptionError.isTypeError|{}isTypeError[0]
+        final fun <get-isTypeError>(): kotlin/Boolean // io.github.yuroyami.kitejs.api.format/NumberFormatOptionError.isTypeError.<get-isTypeError>|<get-isTypeError>(){}[0]
 }
 
 final class io.github.yuroyami.kitejs.api/ConsoleMessage { // io.github.yuroyami.kitejs.api/ConsoleMessage|null[0]

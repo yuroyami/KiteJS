@@ -16,10 +16,11 @@ internal const val PRELUDE_FILE = "kitejs:prelude"
  * Its own frames are left out of the stacks the host sees.
  *
  * The console formats exactly as Rhino's does (NativeConsole.format there), so a host that
- * switches engines sees the same lines.
+ * switches engines sees the same lines, and `toLocaleString` of Number and BigInt goes to the
+ * formatter Rhino uses too.
  */
 internal const val PRELUDE: String = """
-(function (print, monotonic, sealBuiltins) {
+(function (print, monotonic, formatNumber, sealBuiltins) {
     var apply = Reflect.apply;
     var slice = Function.prototype.call.bind(Array.prototype.slice);
     var push = Function.prototype.call.bind(Array.prototype.push);
@@ -291,6 +292,33 @@ internal const val PRELUDE: String = """
         if (sealBuiltins) freeze(console);
         defineProperty(globalThis, 'console', { value: console, writable: true, enumerable: false, configurable: true });
     }
+
+    // ---- toLocaleString of Number and BigInt ------------------------------------------------
+
+    // What Intl.NumberFormat("en-US", options) prints, from the host's EnUsNumberFormat, which
+    // Rhino uses too. The method is a proxy of the host function, so it prints as native code,
+    // and its trap turns what the host reports into an error a script can catch.
+    var Proxy_ = Proxy;
+    var RangeError_ = RangeError;
+    var numberValue = Function.prototype.call.bind(Number.prototype.valueOf);
+    var bigintValue = Function.prototype.call.bind(BigInt.prototype.valueOf);
+    var Object_ = Object;
+    var localeMethod = function (thisValue) {
+        return new Proxy_(formatNumber, {
+            apply: function (target, self, args) {
+                var x = thisValue(self);
+                var options = args[1];
+                if (options === null) throw new TypeError_('cannot convert to object');
+                if (options !== undefined) options = Object_(options);
+                var r = apply(target, undefined, [x, options]);
+                if (typeof r === 'string') return r;
+                if (r[0] === 0) throw r[1];
+                throw r[0] === 1 ? new RangeError_(r[1]) : new TypeError_(r[1]);
+            },
+        });
+    };
+    defineProperty(Number.prototype, 'toLocaleString', { value: localeMethod(numberValue), writable: true, configurable: true });
+    defineProperty(BigInt.prototype, 'toLocaleString', { value: localeMethod(bigintValue), writable: true, configurable: true });
 
     // ---- Sealing the built-ins --------------------------------------------------------------
 

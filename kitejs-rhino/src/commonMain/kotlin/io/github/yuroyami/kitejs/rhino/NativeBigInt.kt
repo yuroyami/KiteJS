@@ -42,9 +42,8 @@ internal class NativeBigInt(private val bigIntValue: KBigInt) : ScriptableObject
             constructor.definePrototypeMethod(scope, "toString", 0, SerializableCallable { _, _, thisObj, args ->
                 js_toString(thisObj, args)
             })
-            // toLocaleString is toString here: there is no Intl to ask for anything else.
-            constructor.definePrototypeMethod(scope, "toLocaleString", 0, SerializableCallable { _, _, thisObj, args ->
-                js_toString(thisObj, args)
+            constructor.definePrototypeMethod(scope, "toLocaleString", 0, SerializableCallable { cx, scope, thisObj, args ->
+                LocaleNumbers.format(cx, scope, args, toSelf(thisObj).bigIntValue)
             })
             constructor.definePrototypeMethod(scope, "toSource", 0, SerializableCallable { _, _, thisObj, _ ->
                 "(new BigInt(" + ScriptRuntime.toString(toSelf(thisObj).bigIntValue) + "))"

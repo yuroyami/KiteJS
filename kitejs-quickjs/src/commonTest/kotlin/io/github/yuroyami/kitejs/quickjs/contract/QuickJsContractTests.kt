@@ -10,6 +10,7 @@ import io.github.yuroyami.kitejs.testkit.ConfigContract
 import io.github.yuroyami.kitejs.testkit.ErrorsContract
 import io.github.yuroyami.kitejs.testkit.HandlesContract
 import io.github.yuroyami.kitejs.testkit.HostBindingContract
+import io.github.yuroyami.kitejs.testkit.LocaleNumbersContract
 import io.github.yuroyami.kitejs.testkit.PromisesContract
 import io.github.yuroyami.kitejs.testkit.ValuesContract
 
@@ -26,3 +27,5 @@ class QuickJsErrorsTest : ErrorsContract<QuickJsConfig>(QuickJs)
 class QuickJsPromisesTest : PromisesContract<QuickJsConfig>(QuickJs)
 
 class QuickJsConfigTest : ConfigContract<QuickJsConfig>(QuickJs)
+
+class QuickJsLocaleNumbersTest : LocaleNumbersContract<QuickJsConfig>(QuickJs)

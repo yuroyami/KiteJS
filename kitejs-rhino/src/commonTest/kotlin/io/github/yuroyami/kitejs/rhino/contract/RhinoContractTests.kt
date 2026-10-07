@@ -10,6 +10,7 @@ import io.github.yuroyami.kitejs.testkit.ConfigContract
 import io.github.yuroyami.kitejs.testkit.ErrorsContract
 import io.github.yuroyami.kitejs.testkit.HandlesContract
 import io.github.yuroyami.kitejs.testkit.HostBindingContract
+import io.github.yuroyami.kitejs.testkit.LocaleNumbersContract
 import io.github.yuroyami.kitejs.testkit.PromisesContract
 import io.github.yuroyami.kitejs.testkit.ValuesContract
 
@@ -26,3 +27,5 @@ class RhinoErrorsTest : ErrorsContract<RhinoConfig>(Rhino)
 class RhinoPromisesTest : PromisesContract<RhinoConfig>(Rhino)
 
 class RhinoConfigTest : ConfigContract<RhinoConfig>(Rhino)
+
+class RhinoLocaleNumbersTest : LocaleNumbersContract<RhinoConfig>(Rhino)

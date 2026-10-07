@@ -16,10 +16,14 @@ import io.github.yuroyami.kitejs.api.JsScript
 import io.github.yuroyami.kitejs.api.JsStackFrame
 import io.github.yuroyami.kitejs.api.JsSymbol
 import io.github.yuroyami.kitejs.api.JsSyntaxError
+import io.github.yuroyami.kitejs.api.JsType
 import io.github.yuroyami.kitejs.api.JsUndefined
 import io.github.yuroyami.kitejs.api.JsValue
 import io.github.yuroyami.kitejs.api.KBigInt
 import io.github.yuroyami.kitejs.api.KiteJs
+import io.github.yuroyami.kitejs.api.format.EnUsNumberFormat
+import io.github.yuroyami.kitejs.api.format.NumberFormatOptionError
+import io.github.yuroyami.kitejs.api.format.NumberFormatOptionReader
 import io.github.yuroyami.kitejs.quickjs.QuickJs
 import io.github.yuroyami.kitejs.quickjs.QuickJsConfig
 import io.github.yuroyami.kitejs.quickjs.bridge.HandleCleaner
@@ -378,6 +382,39 @@ internal class QuickJsKiteJs private constructor(
         return toJs(h).asFunction()
     }
 
+    /**
+     * The prelude's `toLocaleString`, given the number or BigInt and the options object, or
+     * undefined. Answers the text, or what the prelude is to throw: `[0, value]` to rethrow what a
+     * getter or a conversion threw, `[1, message]` for a RangeError and `[2, message]` for a
+     * TypeError, since a host function cannot throw anything a script can catch.
+     */
+    private fun formatLocaleNumber(args: List<JsValue>): Any {
+        val x = args[0]
+        val options = args.getOrNull(1)
+        return try {
+            val format = if (options == null || options.isUndefined) {
+                EnUsNumberFormat.DEFAULT
+            } else {
+                EnUsNumberFormat.resolve(JsValueOptionReader(options.asObject()))
+            }
+            if (x.type == JsType.BIGINT) format.format(x.asBigInt()) else format.format(x.asDouble())
+        } catch (e: NumberFormatOptionError) {
+            listOf(if (e.isTypeError) 2 else 1, e.message ?: "")
+        } catch (e: JsError) {
+            // A conversion the API refused on its own, as for a Symbol, has no script value.
+            if (e.value.isUndefined && e.name == "TypeError") listOf(2, e.errorMessage) else listOf(0, e.value)
+        }
+    }
+
+    private class JsValueOptionReader(private val options: JsObject) : NumberFormatOptionReader {
+        override fun get(name: String): Any = options.get(name)
+        override fun isUndefined(value: Any?): Boolean = (value as JsValue).isUndefined
+        override fun toNumber(value: Any?): Double = (value as JsValue).asDouble()
+        override fun toJsString(value: Any?): String = (value as JsValue).asString()
+        override fun toBoolean(value: Any?): Boolean = (value as JsValue).asBoolean()
+        override fun isTrue(value: Any?): Boolean = (value as JsValue).raw == true
+    }
+
     fun hostCall(fn: Int, argc: Int): Int {
         hostDepth++
         return try {
@@ -613,7 +650,8 @@ internal class QuickJsKiteJs private constructor(
                     }
                 }
                 val monotonic = hostFunction("monotonic", 0) { _, _ -> started.elapsedNow().inWholeNanoseconds / 1_000_000.0 }
-                val list = callWith(factory, UNDEFINED, arrayOf(print, monotonic, config.sealBuiltins))
+                val formatNumber = hostFunction("toLocaleString", 0) { _, args -> formatLocaleNumber(args) }
+                val list = callWith(factory, UNDEFINED, arrayOf(print, monotonic, formatNumber, config.sealBuiltins))
                 try {
                     helpers = IntArray(Helper.entries.size) { bridge.arrayGet(ptr, list, it) }
                 } finally {

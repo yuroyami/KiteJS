@@ -98,6 +98,21 @@ hundred. Where that argument is an integer power, the answer here is the correct
 121.60979304462671 ** 21   // 6.086106353125176e43 here, 6.086106353125175e43 in Chrome
 ```
 
+### Numbers format for en-US only
+
+`toLocaleString` on a number or a BigInt prints what `Intl.NumberFormat("en-US", options)` prints
+in a browser, whatever locale it is given: `(2046430).toLocaleString("de-DE")` is `2,046,430`.
+Every option of `Intl.NumberFormat` applies, in English: digits and rounding, grouping, sign
+display, `percent`, `currency` (symbols, codes and names), `unit`, and scientific, engineering
+and compact notation. `numberingSystem` is checked and then ignored, so digits are always 0 to 9.
+There is no `Intl` object itself; this holds on both engines.
+
+```js
+(1234.5).toLocaleString("en-US", { style: "currency", currency: "EUR" })   // "€1,234.50"
+(0.256).toLocaleString(undefined, { style: "percent" })                    // "26%"
+(1234).toLocaleString("ja-JP", { notation: "compact" })                    // "1.2K", not "1234"
+```
+
 ### Dates format for en-US only
 
 `toLocaleString`, `toLocaleDateString` and `toLocaleTimeString` use fixed en-US patterns and
