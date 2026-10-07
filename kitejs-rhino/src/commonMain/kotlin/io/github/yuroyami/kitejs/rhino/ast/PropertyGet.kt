@@ -58,7 +58,7 @@ public class PropertyGet : InfixExpression {
         val sb = StringBuilder()
         sb.append(makeIndent(depth))
         sb.append(left!!.toSource(0))
-        sb.append(".")
+        sb.append(if (type == Token.QUESTION_DOT) "?." else ".")
         sb.append(right!!.toSource(0))
         return sb.toString()
     }

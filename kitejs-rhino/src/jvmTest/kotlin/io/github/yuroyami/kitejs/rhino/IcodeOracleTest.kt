@@ -178,6 +178,12 @@ class IcodeOracleTest {
             compared++
             val e = expected.getOrThrow()
             val a = actual.getOrThrow()
+            if (file.name == "optional-chaining.js") {
+                // #132 changes instructions and frame sizing; pools and descriptor data still match.
+                fun metadata(text: String) = text.lines().filterNot { it.startsWith("icode=") || it.startsWith("max=") }
+                assertEquals(metadata(e), metadata(a))
+                continue
+            }
             if (e != a) {
                 val el = e.lines()
                 val al = a.lines()
@@ -206,7 +212,6 @@ class IcodeOracleTest {
             "var o = { a: 1, 'b': 2, 3: 3, [1 + 1]: 4, get g() { return 1 }, set s(v) {}, m() {} }",
             "var o = { ...x, a: 1 }",
             "var a = [1, , 3, ...b]",
-            "a?.b?.[c]?.(d)",
             "a ?? b",
             "try { f() } catch (e) { g(e) } finally { h() }",
             "try { f() } catch ({ x }) { g(x) }",
@@ -274,6 +279,17 @@ class IcodeOracleTest {
         }
         assertTrue(compared > 30, "only $compared sources were compared")
         assertEquals(emptyList(), failures, "icode differs from upstream")
+    }
+
+    @Test
+    fun optionalChainsUseASharedExitForPropertiesAndCalls() {
+        // This exact control flow deliberately differs from upstream's per-link exits (#132).
+        val compiled = portedIcode("a?.b?.[c]?.(d)")
+        val instructions = compiled.lineSequence().single { it.startsWith("icode=") }
+        assertEquals(
+            "icode=-31,0,1,-48,44,-1,-83,0,24,-49,33,-1,-83,0,18,-50,44,-17,-103,-1,-83,0,10,-51,44,-40,43,5,0,5,-4,-57,-5,71",
+            instructions,
+        )
     }
 
     /** Syntax the port added, which upstream still rejects: class definitions (D-95) and async functions (D-97). */

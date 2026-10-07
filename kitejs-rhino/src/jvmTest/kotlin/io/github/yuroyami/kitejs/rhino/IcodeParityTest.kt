@@ -88,10 +88,11 @@ class IcodeParityTest {
             // A class definition, `new.target` and the `super` call of a derived constructor
             // (D-95), which upstream has no syntax for. The `await` of an async function, and the
             // generator return whose value was stored before its finally blocks ran (D-97).
+            // Testing a call reference's callee without losing its receiver (#132).
             listOf(
                 "Icode_AWAIT", "Icode_CALL_SPREAD", "Icode_CLASS_BEGIN", "Icode_CLASS_CTOR", "Icode_CLASS_ELEMENT",
                 "Icode_CLASS_END", "Icode_CLASS_PRIVATE_NAMES", "Icode_GENERATOR_RETURN_RESULT", "Icode_INITCONST", "Icode_INITCONSTVAR",
-                "Icode_NEW_SPREAD", "Icode_NEW_TARGET", "Icode_SUPER_CALL", "Icode_SUPER_CALL_SPREAD",
+                "Icode_NEW_SPREAD", "Icode_NEW_TARGET", "Icode_OPTIONAL_CALL_LOOKUP", "Icode_SUPER_CALL", "Icode_SUPER_CALL_SPREAD",
                 "Icode_SUPER_CTOR",
             ),
             extras.keys.toList(),

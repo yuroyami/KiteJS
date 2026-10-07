@@ -57,7 +57,7 @@ public class ElementGet : AstNode {
         val sb = StringBuilder()
         sb.append(makeIndent(depth))
         sb.append(target!!.toSource(0))
-        sb.append("[")
+        sb.append(if (type == Token.QUESTION_DOT) "?.[" else "[")
         sb.append(element!!.toSource(0))
         sb.append("]")
         return sb.toString()

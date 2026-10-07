@@ -113,6 +113,12 @@ public class IRFactory(
     }
 
     private fun transform(node: AstNode): Node {
+        val result = transformNode(node)
+        // A chain boundary encloses every continued access/call, including nonoptional links.
+        return if (node.getIntProp(Node.OPTIONAL_CHAINING, 0) == Node.OPTIONAL_CHAIN_ROOT) Node(Token.QUESTION_DOT, result) else result
+    }
+
+    private fun transformNode(node: AstNode): Node {
         when (node.type) {
             Token.ARRAYCOMP -> return transformArrayComp(node as ArrayComprehension)
             Token.ARRAYLIT -> return transformArrayLiteral(node as ArrayLiteral)
@@ -2191,6 +2197,13 @@ public class IRFactory(
             val childType = child.type
             when (nodeType) {
                 Token.DELPROP -> {
+                    if (childType == Token.QUESTION_DOT) {
+                        val expression = child.firstChild!!
+                        child.removeChild(expression)
+                        child.addChildToBack(createUnary(nodeType, expression))
+                        child.putIntProp(Node.OPTIONAL_CHAINING, Node.OPTIONAL_CHAIN_DELETE)
+                        return child
+                    }
                     val n: Node
                     if (childType == Token.NAME) {
                         // Delete(Name "a") becomes Delete(Bind("a"), String("a")).
@@ -2217,6 +2230,9 @@ public class IRFactory(
                     }
                     if (child.getIntProp(Node.SUPER_PROPERTY_ACCESS, 0) == 1) {
                         n.putIntProp(Node.SUPER_PROPERTY_ACCESS, 1)
+                    }
+                    if (child.getIntProp(Node.OPTIONAL_CHAINING, 0) == 1) {
+                        n.putIntProp(Node.OPTIONAL_CHAINING, 1)
                     }
                     return n
                 }

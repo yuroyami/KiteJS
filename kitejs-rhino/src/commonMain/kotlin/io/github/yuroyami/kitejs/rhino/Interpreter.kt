@@ -7,6 +7,7 @@ package io.github.yuroyami.kitejs.rhino
 import io.github.yuroyami.kitejs.api.KBigInt
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CALLSPECIAL
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CALLSPECIAL_OPTIONAL
+import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_OPTIONAL_CALL_LOOKUP
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CALL_ON_SUPER
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CLOSURE_EXPR
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CLOSURE_STMT
@@ -1286,6 +1287,13 @@ public class Interpreter : Evaluator {
                 }
                 Icode_NAME_AND_THIS -> {
                     stack[++state.stackTop] = ScriptRuntime.getNameAndThis(state.stringReg!!, cx, frame.scope!!)
+                    return null
+                }
+                Icode_OPTIONAL_CALL_LOOKUP -> {
+                    val value = (stack[state.stackTop] as ScriptRuntime.LookupResult).result
+                    if (value == null || Undefined.isUndefined(value) || value === Scriptable.NOT_FOUND) {
+                        stack[state.stackTop] = null
+                    }
                     return null
                 }
                 Icode_NAME_AND_THIS_OPTIONAL -> {

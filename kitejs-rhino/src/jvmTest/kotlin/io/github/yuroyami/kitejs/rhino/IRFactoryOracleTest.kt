@@ -69,6 +69,12 @@ class IRFactoryOracleTest {
                 continue
             }
             compared++
+            if (file.name == "optional-chaining.js") {
+                val env = CompilerEnvirons().also { it.languageVersion = portedVersion }
+                val ast = Parser(env).parse(source, "corpus.js", 1)
+                OptionalChainOracleExpectations.assertStructure(IRFactory(env, "corpus.js", source, env.errorReporter).transformTree(ast)!!)
+                continue
+            }
             if (expected.getOrThrow() != actual.getOrThrow()) {
                 failures.add(
                     "${file.name}: IR " +

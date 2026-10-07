@@ -824,6 +824,8 @@ public open class Node : Iterable<Node> {
         public const val TRAILING_COMMA: Int = 28
         public const val OBJECT_LITERAL_DESTRUCTURING: Int = 29
         public const val OPTIONAL_CHAINING: Int = 30
+        internal const val OPTIONAL_CHAIN_ROOT: Int = 2
+        internal const val OPTIONAL_CHAIN_DELETE: Int = 3
         public const val SUPER_PROPERTY_ACCESS: Int = 31
         public const val NUMBER_OF_SPREAD: Int = 32
         // The port's own: a const a loop declares, given its value afresh on every pass (D-72).

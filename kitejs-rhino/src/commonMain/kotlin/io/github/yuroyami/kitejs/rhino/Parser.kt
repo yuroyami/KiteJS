@@ -3477,7 +3477,7 @@ public class Parser(
                     if (!allowCallSyntax) {
                         break@tailLoop
                     }
-                    node = makeFunctionCall(node, pos, isOptionalChain)
+                    node = makeFunctionCall(node, pos, false)
                 }
 
                 Token.COMMENT -> {
@@ -3500,10 +3500,11 @@ public class Parser(
                 else -> break@tailLoop
             }
         }
+        if (isOptionalChain) node.putIntProp(Node.OPTIONAL_CHAINING, Node.OPTIONAL_CHAIN_ROOT)
         return node
     }
 
-    private fun makeFunctionCall(pn: AstNode, pos: Int, isOptionalChain: Boolean): FunctionCall {
+    private fun makeFunctionCall(pn: AstNode, pos: Int, isOptionalCall: Boolean): FunctionCall {
         consumeToken()
         checkCallRequiresActivation(pn)
         val f = FunctionCall(pos)
@@ -3517,7 +3518,7 @@ public class Parser(
             f.putIntProp(Node.TRAILING_COMMA, 1)
         }
         f.length = ts.tokenEnd - pos
-        if (isOptionalChain) {
+        if (isOptionalCall) {
             f.markIsOptionalCall()
         }
         return f
@@ -3582,7 +3583,7 @@ public class Parser(
                 g.target = pn
                 g.element = name
                 g.setLineColumnNumber(lineno, column)
-                if (isOptionalChain) g.type = Token.QUESTION_DOT
+                if (tt == Token.QUESTION_DOT) g.type = Token.QUESTION_DOT
                 return g
             }
 
@@ -3656,7 +3657,7 @@ public class Parser(
         // KMP: upstream builds an XmlMemberGet when ref is an XmlRef. E4X is out of scope, so
         // propertyName never returns one and a PropertyGet is always the right node (D-16).
         val result: InfixExpression = PropertyGet()
-        if (isOptionalChain) {
+        if (tt == Token.QUESTION_DOT) {
             result.type = Token.QUESTION_DOT
         }
         val pos = pn.position

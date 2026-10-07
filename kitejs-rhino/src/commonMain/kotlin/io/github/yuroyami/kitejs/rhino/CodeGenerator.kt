@@ -6,6 +6,7 @@ package io.github.yuroyami.kitejs.rhino
 
 import io.github.yuroyami.kitejs.api.KBigInt
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CALLSPECIAL
+import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_OPTIONAL_CALL_LOOKUP
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CALL_ON_SUPER
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CLASS_BEGIN
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CLASS_CTOR
@@ -23,7 +24,6 @@ import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_DELPROP_SUPER
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_DUP
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_DUP2
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_ELEM_AND_THIS
-import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_ELEM_AND_THIS_OPTIONAL
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_ELEM_INC_DEC
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_ENTERDQ
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_GENERATOR
@@ -47,13 +47,11 @@ import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_LITERAL_SETTER
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_LOCAL_CLEAR
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_METHOD_EXPR
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_NAME_AND_THIS
-import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_NAME_AND_THIS_OPTIONAL
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_NAME_INC_DEC
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_ONE
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_POP
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_POP_RESULT
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_PROP_AND_THIS
-import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_PROP_AND_THIS_OPTIONAL
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_PROP_INC_DEC
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_REF_INC_DEC
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_REG_BIGINT1
@@ -89,7 +87,6 @@ import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_TEMPLATE_LITERAL_CA
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_TYPEOFNAME
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_UNDEF
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_VALUE_AND_THIS
-import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_VALUE_AND_THIS_OPTIONAL
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_VAR_INC_DEC
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_YIELD_STAR
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_AWAIT
@@ -112,6 +109,7 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
     private lateinit var scriptOrFn: ScriptNode
     private var iCodeTop = 0
     private var stackDepth = 0
+    private var optionalChainJumps: MutableList<Int>? = null
     private var lineNumber = -1
     private var doubleTableTop = 0
     private val strings = HashMap<String, Int>()
@@ -488,6 +486,7 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
                 visitExpression(child!!, contextFlags and ECF_TAIL)
             }
             Token.USE_STACK -> stackChange(1)
+            Token.QUESTION_DOT -> visitOptionalChain(child!!, contextFlags, false, node.getIntProp(Node.OPTIONAL_CHAINING, 0) == Node.OPTIONAL_CHAIN_DELETE)
             Token.CLASS -> visitClass(node)
             Token.NEW_TARGET -> {
                 addIcode(Icode_NEW_TARGET)
@@ -503,12 +502,10 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
                     visitCallWithSpread(node, child!!, type, isOptionalChainingCall)
                     return
                 }
-                var completeOptionalCallJump: CompleteOptionalCallJump? = null
                 if (type == Token.NEW) {
                     visitExpression(child!!, 0)
                 } else {
-                    completeOptionalCallJump = generateCallFunAndThis(child!!, isOptionalChainingCall)
-                    if (completeOptionalCallJump != null) resolveForwardGoto(completeOptionalCallJump.putArgsAndDoCallLabel)
+                    generateCallFunAndThis(child!!, isOptionalChainingCall)
                 }
                 var argCount = 0
                 child = child.next
@@ -536,7 +533,6 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
                 }
                 if (type == Token.NEW) stackChange(-argCount) else stackChange(-1 - argCount)
                 if (argCount > itsData.itsMaxCalleeArgs) itsData.itsMaxCalleeArgs = argCount
-                if (completeOptionalCallJump != null) resolveForwardGoto(completeOptionalCallJump.afterLabel)
             }
             Token.AND, Token.OR -> {
                 visitExpression(child!!, 0)
@@ -571,18 +567,8 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
                 visitExpression(child!!, 0)
                 child = child.next!!
                 if (node.getIntProp(Node.OPTIONAL_CHAINING, 0) == 1) {
-                    addIcode(Icode_DUP)
-                    stackChange(1)
-                    val putUndefinedLabel = iCodeTop
-                    addGotoOp(Icode_IF_NULL_UNDEF)
-                    stackChange(-1)
+                    optionalChainGuard()
                     addStringOp(type, child.string!!)
-                    val afterLabel = iCodeTop
-                    addGotoOp(Token.GOTO)
-                    resolveForwardGoto(putUndefinedLabel)
-                    addIcode(Icode_POP)
-                    addIcode(Icode_UNDEF)
-                    resolveForwardGoto(afterLabel)
                 } else if (node.getIntProp(Node.SUPER_PROPERTY_ACCESS, 0) == 1) {
                     addStringOp(if (type == Token.GETPROP) Token.GETPROP_SUPER else Token.GETPROPNOWARN_SUPER, child.string!!)
                 } else {
@@ -592,6 +578,7 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
             Token.DELPROP -> {
                 val isName = child!!.type == Token.BINDNAME
                 visitExpression(child, 0)
+                if (node.getIntProp(Node.OPTIONAL_CHAINING, 0) == 1) optionalChainGuard()
                 child = child.next!!
                 visitExpression(child, 0)
                 when {
@@ -605,18 +592,8 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
                 visitExpression(child!!, 0)
                 child = child.next!!
                 if (node.getIntProp(Node.OPTIONAL_CHAINING, 0) == 1) {
-                    addIcode(Icode_DUP)
-                    stackChange(1)
-                    val putUndefinedLabel = iCodeTop
-                    addGotoOp(Icode_IF_NULL_UNDEF)
-                    stackChange(-1)
+                    optionalChainGuard()
                     finishGetElemGeneration(child)
-                    val afterLabel = iCodeTop
-                    addGotoOp(Token.GOTO)
-                    resolveForwardGoto(putUndefinedLabel)
-                    addIcode(Icode_POP)
-                    addIcode(Icode_UNDEF)
-                    resolveForwardGoto(afterLabel)
                 } else if (node.getIntProp(Node.SUPER_PROPERTY_ACCESS, 0) == 1) {
                     visitExpression(child, 0)
                     addToken(Token.GETELEM_SUPER)
@@ -782,22 +759,8 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
             Token.ARRAYCOMP -> visitArrayComprehension(node, child!!, child.next!!)
             Token.REF_SPECIAL -> {
                 visitExpression(child!!, 0)
-                if (node.getIntProp(Node.OPTIONAL_CHAINING, 0) == 1) {
-                    addIcode(Icode_DUP)
-                    stackChange(1)
-                    val putUndefinedLabel = iCodeTop
-                    addGotoOp(Icode_IF_NULL_UNDEF)
-                    stackChange(-1)
-                    addStringOp(type, node.getProp(Node.NAME_PROP) as String)
-                    val afterLabel = iCodeTop
-                    addGotoOp(Token.GOTO)
-                    resolveForwardGoto(putUndefinedLabel)
-                    addIcode(Icode_POP)
-                    addIcode(Icode_UNDEF)
-                    resolveForwardGoto(afterLabel)
-                } else {
-                    addStringOp(type, node.getProp(Node.NAME_PROP) as String)
-                }
+                if (node.getIntProp(Node.OPTIONAL_CHAINING, 0) == 1) optionalChainGuard()
+                addStringOp(type, node.getProp(Node.NAME_PROP) as String)
             }
             Token.REF_MEMBER, Token.REF_NS_MEMBER, Token.REF_NAME, Token.REF_NS_NAME -> {
                 val memberTypeFlags = node.getIntProp(Node.MEMBER_TYPE_PROP, 0)
@@ -897,65 +860,70 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
         stackChange(-1)
     }
 
-    private fun generateCallFunAndThis(left: Node, isOptionalChainingCall: Boolean): CompleteOptionalCallJump? {
+    private fun generateCallFunAndThis(left: Node, isOptionalChainingCall: Boolean) {
         when (val type = left.type) {
+            Token.QUESTION_DOT -> {
+                visitOptionalChain(left.firstChild!!, 0, true)
+            }
             Token.NAME -> {
                 val name = left.string!!
-                if (isOptionalChainingCall) {
-                    addStringOp(Icode_NAME_AND_THIS_OPTIONAL, name)
-                    stackChange(2)
-                    return completeOptionalCallJump()
-                }
                 addStringOp(Icode_NAME_AND_THIS, name)
                 stackChange(2)
             }
             Token.GETPROP, Token.GETELEM -> {
                 val target = left.firstChild!!
                 visitExpression(target, 0)
+                if (left.getIntProp(Node.OPTIONAL_CHAINING, 0) == 1) optionalChainGuard()
                 val id = target.next!!
                 if (type == Token.GETPROP) {
                     val property = id.string!!
-                    if (isOptionalChainingCall) {
-                        addStringOp(Icode_PROP_AND_THIS_OPTIONAL, property)
-                        stackChange(1)
-                        return completeOptionalCallJump()
-                    }
                     addStringOp(Icode_PROP_AND_THIS, property)
                     stackChange(1)
                 } else {
                     visitExpression(id, 0)
-                    if (isOptionalChainingCall) {
-                        addIcode(Icode_ELEM_AND_THIS_OPTIONAL)
-                        return completeOptionalCallJump()
-                    }
                     addIcode(Icode_ELEM_AND_THIS)
                 }
             }
             else -> {
                 visitExpression(left, 0)
-                if (isOptionalChainingCall) {
-                    addIcode(Icode_VALUE_AND_THIS_OPTIONAL)
-                    stackChange(1)
-                    return completeOptionalCallJump()
-                }
                 addIcode(Icode_VALUE_AND_THIS)
                 stackChange(1)
             }
         }
-        return null
+        if (isOptionalChainingCall) {
+            addIcode(Icode_OPTIONAL_CALL_LOOKUP)
+            optionalChainGuard()
+        }
     }
 
-    private fun completeOptionalCallJump(): CompleteOptionalCallJump {
+    private fun optionalChainGuard() {
         addIcode(Icode_DUP)
         stackChange(1)
-        val putArgsAndDoCallLabel = iCodeTop
-        addGotoOp(Icode_IF_NOT_NULL_UNDEF)
+        val jump = iCodeTop
+        addGotoOp(Icode_IF_NULL_UNDEF)
         stackChange(-1)
-        addIcode(Icode_POP)
-        addIcode(Icode_UNDEF)
-        val afterLabel = iCodeTop
+        (optionalChainJumps ?: throw Kit.codeBug()).add(jump)
+    }
+
+    /** All explicit optional links exit together; nested chains keep their own jump lists. */
+    private fun visitOptionalChain(expression: Node, contextFlags: Int, asCallTarget: Boolean, deleteResult: Boolean = false) {
+        val outerJumps = optionalChainJumps
+        val jumps = mutableListOf<Int>()
+        optionalChainJumps = jumps
+        try {
+            if (asCallTarget) generateCallFunAndThis(expression, false) else visitExpression(expression, contextFlags)
+        } finally {
+            optionalChainJumps = outerJumps
+        }
+        val done = iCodeTop
         addGotoOp(Token.GOTO)
-        return CompleteOptionalCallJump(putArgsAndDoCallLabel, afterLabel)
+        for (jump in jumps) resolveForwardGoto(jump)
+        // Both a value and a call reference occupy one interpreter stack slot.
+        addIcode(Icode_POP)
+        if (deleteResult) addToken(Token.TRUE) else addIcode(Icode_UNDEF)
+        // An outer call still evaluates its arguments before rejecting this undefined callee.
+        if (asCallTarget) addIcode(Icode_VALUE_AND_THIS)
+        resolveForwardGoto(done)
     }
 
     private fun visitIncDec(node: Node, child: Node) {
@@ -1174,12 +1142,10 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
      */
     private fun visitCallWithSpread(node: Node, target: Node, type: Int, isOptionalChainingCall: Boolean) {
         val savedStackDepth = stackDepth
-        var completeOptionalCallJump: CompleteOptionalCallJump? = null
         if (type == Token.NEW) {
             visitExpression(target, 0)
         } else {
-            completeOptionalCallJump = generateCallFunAndThis(target, isOptionalChainingCall)
-            if (completeOptionalCallJump != null) resolveForwardGoto(completeOptionalCallJump.putArgsAndDoCallLabel)
+            generateCallFunAndThis(target, isOptionalChainingCall)
         }
         visitArgumentArray(target.next)
         if (type == Token.NEW) {
@@ -1189,7 +1155,6 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
             addIcode(Icode_CALL_SPREAD)
             stackChange(-2)
         }
-        if (completeOptionalCallJump != null) resolveForwardGoto(completeOptionalCallJump.afterLabel)
         if (savedStackDepth + 1 != stackDepth) throw Kit.codeBug()
     }
 
@@ -1636,9 +1601,6 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
         --localTop
         if (localSlot != localTop) throw Kit.codeBug()
     }
-
-    private class CompleteOptionalCallJump(val putArgsAndDoCallLabel: Int, val afterLabel: Int)
-
     private companion object {
         const val MIN_LABEL_TABLE_SIZE = 32
         const val MIN_FIXUP_TABLE_SIZE = 40
