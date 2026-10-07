@@ -77,6 +77,7 @@ internal class NativeMath private constructor() : ScriptableObject() {
             math.defineProperty("SQRT1_2", 0.7071067811865476, DONTENUM or READONLY or PERMANENT)
             math.defineProperty("SQRT2", 1.4142135623730951, DONTENUM or READONLY or PERMANENT)
             math.defineProperty(SymbolKey.TO_STRING_TAG, MATH_TAG, DONTENUM or READONLY)
+            TopLevel.cacheMathFunctions(scope, math)
             if (sealed) math.sealObject()
             return math
         }

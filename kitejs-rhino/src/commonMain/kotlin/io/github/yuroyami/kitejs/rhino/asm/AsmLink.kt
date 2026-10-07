@@ -6,10 +6,19 @@ package io.github.yuroyami.kitejs.rhino.asm
 
 import io.github.yuroyami.kitejs.rhino.BaseFunction
 import io.github.yuroyami.kitejs.rhino.Callable
+import io.github.yuroyami.kitejs.rhino.ConsString
 import io.github.yuroyami.kitejs.rhino.Context
+import io.github.yuroyami.kitejs.rhino.LazilyLoadedCtor
+import io.github.yuroyami.kitejs.rhino.LazyLoadSlot
+import io.github.yuroyami.kitejs.rhino.NativeArray
+import io.github.yuroyami.kitejs.rhino.NativeMath
+import io.github.yuroyami.kitejs.rhino.NativeObject
 import io.github.yuroyami.kitejs.rhino.ScriptRuntime
 import io.github.yuroyami.kitejs.rhino.Scriptable
 import io.github.yuroyami.kitejs.rhino.ScriptableObject
+import io.github.yuroyami.kitejs.rhino.Slot
+import io.github.yuroyami.kitejs.rhino.TopLevel
+import io.github.yuroyami.kitejs.rhino.Undefined
 import io.github.yuroyami.kitejs.rhino.typedarrays.NativeArrayBuffer
 
 /**
@@ -68,15 +77,18 @@ internal object AsmLink {
                 is AsmGlobal.IntVar -> globalInts[global.slot] = global.init
                 is AsmGlobal.DblVar -> globalDbls[global.slot] = global.init
                 is AsmGlobal.View -> {
-                    val wanted = viewConstructorName(global.view)
+                    val builtin = viewBuiltin(global.view)
+                    val wanted = builtin.name
                     val given = readProperty(stdlib ?: reject("the module was given no standard library"), wanted)
-                    if (given !== readProperty(top, wanted)) reject("$wanted is not the engine's own")
+                    val original = TopLevel.cachedBuiltinCtor(top, builtin) ?: reject("$wanted has no retained intrinsic")
+                    if (given !== original) reject("$wanted is not the engine's own")
                 }
                 is AsmGlobal.MathFn -> {
                     val math = readProperty(stdlib ?: reject("the module was given no standard library"), "Math")
                         as? Scriptable ?: reject("the standard library has no Math")
-                    val realMath = readProperty(top, "Math") as? Scriptable ?: reject("the engine has no Math")
-                    if (readProperty(math, global.field) !== readProperty(realMath, global.field)) {
+                    val original = TopLevel.cachedMathFunction(top, global.field)
+                        ?: reject("Math.${global.field} has no retained intrinsic")
+                    if (readProperty(math, global.field) !== original) {
                         reject("Math.${global.field} is not the engine's own")
                     }
                 }
@@ -91,12 +103,12 @@ internal object AsmLink {
                     ffiThis[global.index] = value as? Scriptable
                 }
                 is AsmGlobal.ImportedInt -> {
-                    val value = readProperty(foreign ?: reject("the module was given no imports"), global.field)
+                    val value = numericImport(foreign ?: reject("the module was given no imports"), global.field)
                     globalInts[global.slot] = ScriptRuntime.toInt32(value)
                 }
                 is AsmGlobal.ImportedDbl -> {
                     val value = ScriptRuntime.toNumber(
-                        readProperty(foreign ?: reject("the module was given no imports"), global.field),
+                        numericImport(foreign ?: reject("the module was given no imports"), global.field),
                     )
                     globalDbls[global.slot] = if (global.isFloat) froundOf(value) else value
                 }
@@ -119,28 +131,64 @@ internal object AsmLink {
 
     private fun reject(reason: String): Nothing = throw AsmReject(reason)
 
+    /** Read only stored values whose lookup cannot execute a getter, proxy or host callback. */
     private fun readProperty(owner: Scriptable, name: String): Any? {
-        val value = ScriptableObject.getProperty(owner, name)
-        return if (value === Scriptable.NOT_FOUND) null else value
+        var current: Scriptable? = owner
+        val visited = HashSet<Scriptable>()
+        while (current != null) {
+            val ordinary = current as? ScriptableObject ?: reject("$name has a host-backed owner")
+            val type = ordinary::class
+            if (type != NativeObject::class && type != NativeArray::class &&
+                type != NativeMath::class && type != TopLevel::class
+            ) reject("$name has an observable property lookup")
+            if (!visited.add(ordinary)) reject("$name has a cyclic prototype chain")
+            val slot = ordinary.map.query(name, 0)
+            if (slot != null) {
+                if (slot::class != Slot::class &&
+                    !(slot is LazyLoadSlot && slot.value !is LazilyLoadedCtor)
+                ) reject("$name is not a stored data property")
+                return slot.value
+            }
+            current = ordinary.prototype
+        }
+        return Undefined.instance
+    }
+
+    /** Only primitive conversions are safe to perform before declining a later dependency. */
+    private fun numericImport(owner: Scriptable, name: String): Any? {
+        val value = readProperty(owner, name)
+        if (value == null || Undefined.isUndefined(value) || value is String || value is ConsString ||
+            value is Boolean || value is Double || value is Float || value is Int || value is Long ||
+            value is Short || value is Byte
+        ) return value
+        reject("$name requires an observable numeric conversion")
     }
 
     private fun readMathConstant(stdlib: Scriptable, field: String): Double {
-        if (field == "Infinity" || field == "NaN") {
-            return ScriptRuntime.toNumber(readProperty(stdlib, field) ?: reject("the standard library has no $field"))
+        val value = if (field == "Infinity" || field == "NaN") readProperty(stdlib, field) else {
+            val math = readProperty(stdlib, "Math") as? Scriptable ?: reject("the standard library has no Math")
+            readProperty(math, field)
         }
-        val math = readProperty(stdlib, "Math") as? Scriptable ?: reject("the standard library has no Math")
-        return ScriptRuntime.toNumber(readProperty(math, field) ?: reject("Math has no $field"))
+        return when (value) {
+            is Double -> value
+            is Float -> value.toDouble()
+            is Int -> value.toDouble()
+            is Long -> value.toDouble()
+            is Short -> value.toDouble()
+            is Byte -> value.toDouble()
+            else -> reject("$field is not a numeric constant")
+        }
     }
 
-    private fun viewConstructorName(view: Int): String = when (view) {
-        AsmView.I8 -> "Int8Array"
-        AsmView.U8 -> "Uint8Array"
-        AsmView.I16 -> "Int16Array"
-        AsmView.U16 -> "Uint16Array"
-        AsmView.I32 -> "Int32Array"
-        AsmView.U32 -> "Uint32Array"
-        AsmView.F32 -> "Float32Array"
-        else -> "Float64Array"
+    private fun viewBuiltin(view: Int): TopLevel.Builtins = when (view) {
+        AsmView.I8 -> TopLevel.Builtins.Int8Array
+        AsmView.U8 -> TopLevel.Builtins.Uint8Array
+        AsmView.I16 -> TopLevel.Builtins.Int16Array
+        AsmView.U16 -> TopLevel.Builtins.Uint16Array
+        AsmView.I32 -> TopLevel.Builtins.Int32Array
+        AsmView.U32 -> TopLevel.Builtins.Uint32Array
+        AsmView.F32 -> TopLevel.Builtins.Float32Array
+        else -> TopLevel.Builtins.Float64Array
     }
 }
 

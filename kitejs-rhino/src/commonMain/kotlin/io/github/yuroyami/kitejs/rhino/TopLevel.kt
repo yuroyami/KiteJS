@@ -103,6 +103,19 @@ public open class TopLevel : ScriptableObject() {
             private set
         var errors: Map<NativeErrors, BaseFunction>? = null
             private set
+        var mathFunctions: Map<String, Callable>? = null
+            private set
+
+        /** Called while the native Math object is being built, before scripts can replace fields. */
+        fun fillMath(math: NativeMath) {
+            val functions = mutableMapOf<String, Callable>()
+            for (slot in math.map) {
+                val name = slot.name as? String ?: continue
+                val function = slot.value as? Callable ?: continue
+                functions[name] = function
+            }
+            mathFunctions = functions
+        }
 
         fun fill(global: Scriptable, scope: Scriptable, sealed: Boolean) {
             val c = mutableMapOf<Builtins, BaseFunction>()
@@ -131,6 +144,7 @@ public open class TopLevel : ScriptableObject() {
         fun clear() {
             ctors = null
             errors = null
+            mathFunctions = null
         }
     }
 
@@ -148,6 +162,14 @@ public open class TopLevel : ScriptableObject() {
             if (global is TopLevel) return global.cacheBuiltins(global, sealed)
             val holder = global.associateValue(INTRINSICS_KEY, Intrinsics()) as Intrinsics
             holder.fill(global, global, sealed)
+        }
+
+        /** Retains native Math identities without forcing its lazy initialization. */
+        internal fun cacheMathFunctions(global: Scriptable, math: NativeMath) {
+            val owner = global as? ScriptableObject ?: return
+            val holder = if (owner is TopLevel) owner.intrinsics
+                else owner.associateValue(INTRINSICS_KEY, Intrinsics()) as Intrinsics
+            holder.fillMath(math)
         }
 
         /** Drops [global]'s intrinsics, which rebuilding its standard objects requires. */
@@ -172,6 +194,10 @@ public open class TopLevel : ScriptableObject() {
 
         /** The cached constructor for [type] of [scope]'s realm, or null when it has none. */
         internal fun cachedBuiltinCtor(scope: Scriptable, type: Builtins): BaseFunction? = intrinsicsOf(scope)?.ctors?.get(type)
+
+        /** The original Math function, even if its global object or field was replaced later. */
+        internal fun cachedMathFunction(scope: Scriptable, name: String): Callable? =
+            intrinsicsOf(scope)?.mathFunctions?.get(name)
 
         /**
          * The built-in constructor for [type]. Falls back to an ordinary property lookup when the

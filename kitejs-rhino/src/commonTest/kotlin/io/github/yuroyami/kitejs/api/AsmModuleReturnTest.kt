@@ -16,6 +16,7 @@ class AsmModuleReturnTest {
         expected: String, body: String, call: String,
         setup: String = "var stdlib = { Math: Math }, foreign = {}, heap = new ArrayBuffer(64);",
         compiled: Boolean = false,
+        linked: Boolean = compiled,
     ) {
         for (budget in listOf(0, 1_000_000)) for (enabled in listOf(false, true)) {
             KiteJs(Rhino) { asmJs = enabled; instructionBudget = budget }.use { js ->
@@ -31,8 +32,8 @@ class AsmModuleReturnTest {
                 if (enabled) {
                     val report = js.asmReports.single()
                     assertEquals(compiled, report.compiled, "$report")
-                    if (compiled) assertTrue(report.linked, "$report")
-                    else assertTrue(report.reason.isNotEmpty(), "$report")
+                    assertEquals(linked, report.linked, "$report")
+                    if (!compiled || !linked) assertTrue(report.reason.isNotEmpty(), "$report")
                 }
                 assertEquals(2, js.evaluate("1 + 1").asInt())
             }
@@ -118,6 +119,7 @@ class AsmModuleReturnTest {
             } });
         """.trimIndent(),
         compiled = true,
+        linked = false,
     )
 
     @Test

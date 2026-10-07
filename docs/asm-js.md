@@ -57,6 +57,11 @@ name. A module given anything else is run as ordinary JavaScript instead.
 The heap length must be a multiple of every declared view's element width. A length that cannot
 construct those views runs ordinarily and keeps its original construction error.
 
+Linking accepts stored data properties on plain objects and their ordinary prototypes, and checks
+built-ins against their original identities. Getters, proxies, host-backed property lookups and
+numeric imports requiring object conversion use ordinary initialization. This keeps their effects
+and errors in their original order, exactly once, even when a later import would prevent linking.
+
 An imported function's result is discarded without conversion when the module uses a bare call.
 Explicit `+`, `| 0` and `fround` conversions still read that result, including their conversion
 hooks and errors, even when the final numeric value is discarded.
