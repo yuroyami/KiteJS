@@ -432,12 +432,12 @@ internal class AsmRunner(private val instance: AsmInstance) {
     }
 
     private fun loadI16(h: ByteArray, at: Int): Int {
-        if (at < 0 || at + 2 > h.size) return 0
+        if (at < 0 || at > h.size - 2) return 0
         return (h[at].toInt() and 0xFF) or (h[at + 1].toInt() shl 8)
     }
 
     private fun loadI32(h: ByteArray, at: Int): Int {
-        if (at < 0 || at + 4 > h.size) return 0
+        if (at < 0 || at > h.size - 4) return 0
         return (h[at].toInt() and 0xFF) or
             ((h[at + 1].toInt() and 0xFF) shl 8) or
             ((h[at + 2].toInt() and 0xFF) shl 16) or
@@ -445,7 +445,7 @@ internal class AsmRunner(private val instance: AsmInstance) {
     }
 
     private fun loadF64(h: ByteArray, at: Int): Double {
-        if (at < 0 || at + 8 > h.size) return Double.NaN
+        if (at < 0 || at > h.size - 8) return Double.NaN
         var bits = 0L
         for (i in 7 downTo 0) bits = (bits shl 8) or (h[at + i].toLong() and 0xFF)
         return Double.fromBits(bits)
@@ -457,13 +457,13 @@ internal class AsmRunner(private val instance: AsmInstance) {
     }
 
     private fun storeI16(h: ByteArray, at: Int, value: Int) {
-        if (at < 0 || at + 2 > h.size) return
+        if (at < 0 || at > h.size - 2) return
         h[at] = value.toByte()
         h[at + 1] = (value shr 8).toByte()
     }
 
     private fun storeI32(h: ByteArray, at: Int, value: Int) {
-        if (at < 0 || at + 4 > h.size) return
+        if (at < 0 || at > h.size - 4) return
         h[at] = value.toByte()
         h[at + 1] = (value shr 8).toByte()
         h[at + 2] = (value shr 16).toByte()
@@ -471,7 +471,7 @@ internal class AsmRunner(private val instance: AsmInstance) {
     }
 
     private fun storeF64(h: ByteArray, at: Int, value: Double) {
-        if (at < 0 || at + 8 > h.size) return
+        if (at < 0 || at > h.size - 8) return
         var bits = value.toRawBits()
         for (i in 0 until 8) {
             h[at + i] = bits.toByte()
