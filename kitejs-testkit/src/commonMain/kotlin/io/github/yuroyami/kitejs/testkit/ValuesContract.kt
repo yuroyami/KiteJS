@@ -172,6 +172,53 @@ public abstract class ValuesContract<C : KiteJsConfig>(engine: JsEngine<C>) : En
     }
 
     @Test
+    public fun numericObjectKeysSurviveBothKotlinMapConversions(): TestResult = withEngine { js ->
+        val value = js.evaluate(
+            """
+            var keyed = Object.create({ inherited: 'outside', 4: 'inherited-index' });
+            keyed.a = 'a';
+            keyed[4294967295] = 'ordinary-name';
+            keyed[4294967294] = 'last-index';
+            keyed[2147483648] = 'above-int';
+            keyed[2147483647] = 'int-max';
+            keyed[1] = 'one'; keyed[0] = 'zero';
+            keyed['01'] = 'leading-zero'; keyed['-0'] = 'negative-zero';
+            Object.defineProperty(keyed, '3', { value: 'hidden-index' });
+            keyed[Symbol('s')] = 'symbol';
+            keyed
+            """.trimIndent(),
+        )
+        val expected = linkedMapOf(
+            "0" to "zero", "1" to "one", "2147483647" to "int-max", "2147483648" to "above-int",
+            "4294967294" to "last-index", "a" to "a", "4294967295" to "ordinary-name",
+            "01" to "leading-zero", "-0" to "negative-zero",
+        )
+        val obj = value.asObject()
+        assertEquals(expected.keys.toList(), obj.keys)
+        assertEquals(expected, obj.toMap())
+        assertEquals(expected, value.toKotlin())
+        assertEquals(expected.keys.toList(), obj.toMap().keys.toList())
+        assertEquals(expected.keys.toList(), (value.toKotlin() as Map<*, *>).keys.toList())
+        assertEquals("zero", obj[0].asString())
+        assertEquals("int-max", obj[Int.MAX_VALUE].asString())
+    }
+
+    @Test
+    public fun kotlinMapsWithNumericNamesRoundTripWithoutLosingKeys(): TestResult = withEngine { js ->
+        val source = linkedMapOf(
+            "a" to "a", "2" to "two", "1" to "one", "0" to "zero", "2147483648" to "above-int",
+            "4294967294" to "last-index", "4294967295" to "ordinary-name", "01" to "leading-zero", "-0" to "negative-zero",
+        )
+        val obj = js.valueOf(source).asObject()
+        val expectedKeys = listOf("0", "1", "2", "2147483648", "4294967294", "a", "4294967295", "01", "-0")
+        assertEquals(expectedKeys, obj.keys)
+        assertEquals(source, obj.toMap())
+        assertEquals(source, obj.value.toKotlin())
+        assertEquals(expectedKeys, obj.toMap().keys.toList())
+        for ((key, value) in source) assertEquals(value, obj[key].asString(), key)
+    }
+
+    @Test
     public fun aLargeSparseArrayKeepsItsLengthAndRefusesIntMaterialization(): TestResult = withEngine { js ->
         for (length in listOf(Int.MAX_VALUE.toLong(), 2147483648L, 4294967295L)) {
             val array = js.evaluate("var sparse = new Array($length); sparse[${length - 1}] = 7; sparse").asArray()
