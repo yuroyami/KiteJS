@@ -104,20 +104,18 @@ internal class AsmFunctionCompiler(private val owner: AsmCompiler, private val f
     /** The one type every `return` in the function agrees on. */
     private fun readReturnType(statements: List<AstNode>): Int {
         var found = -1
-        fun visit(node: AstNode?) {
-            if (node == null || node is FunctionNode) return
-            if (node is ReturnStatement) {
-                val type = returnedType(node)
-                if (found >= 0 && found != type) reject("the function returns two different types")
-                found = type
-            }
-            var kid = node.firstChild
-            while (kid != null) {
-                visit(kid as? AstNode)
-                kid = kid.next
+        for (statement in statements) statement.visit { node ->
+            when (node) {
+                is FunctionNode -> false
+                is ReturnStatement -> {
+                    val type = returnedType(node)
+                    if (found >= 0 && found != type) reject("the function returns two different types")
+                    found = type
+                    false
+                }
+                else -> true
             }
         }
-        for (s in statements) visit(s)
         return if (found < 0) AsmType.VOID else found
     }
 
@@ -170,13 +168,12 @@ internal class AsmFunctionCompiler(private val owner: AsmCompiler, private val f
             statement(statements[index])
             index++
         }
-        // Falling off the end of a function that returns a value cannot happen in valid asm.js,
-        // but the code still needs an ending.
-        when (returnType) {
-            AsmType.VOID -> emit(AsmOp.RET_V)
-            AsmType.DOUBLE, AsmType.FLOAT -> { emitDConst(0.0); emit(AsmOp.RET_D) }
-            else -> { emitIConst(0); emit(AsmOp.RET_I) }
+        if (returnType != AsmType.VOID && canFallThrough()) {
+            reject("a function returning a value can fall off the end")
         }
+        // Void functions may reach this ending. For typed functions it is unreachable, even
+        // when dead jumps or statements follow a return; never synthesize a numeric result.
+        emit(AsmOp.RET_V)
 
         return AsmFunction(
             name = fn.name,
@@ -277,10 +274,14 @@ internal class AsmFunctionCompiler(private val owner: AsmCompiler, private val f
     private fun compileReturn(node: ReturnStatement) {
         val value = node.returnValue
         if (value == null) {
+            if (returnType != AsmType.VOID) reject("a typed function has a void return")
             emit(AsmOp.RET_V)
             return
         }
         val type = expr(unwrap(value))
+        if (type != returnType && !(returnType == AsmType.SIGNED && AsmType.isSigned(type))) {
+            reject("a return expression has type ${AsmType.name(type)}, expected ${AsmType.name(returnType)}")
+        }
         if (AsmType.isDbl(type)) {
             popDbl(1)
             emit(AsmOp.RET_D)
@@ -288,6 +289,36 @@ internal class AsmFunctionCompiler(private val owner: AsmCompiler, private val f
             popInt(1)
             emit(AsmOp.RET_I)
         }
+    }
+
+    /** Whether any emitted path reaches the end rather than a return or an endless cycle. */
+    private fun canFallThrough(): Boolean {
+        val visited = BooleanArray(top + 1)
+        val pending = ArrayDeque<Int>()
+        fun reach(position: Int) {
+            if (!visited[position]) {
+                visited[position] = true
+                pending.addLast(position)
+            }
+        }
+        reach(0)
+        while (pending.isNotEmpty()) {
+            val at = pending.removeLast()
+            if (at == top) return true
+            val op = code[at]
+            val next = at + 1 + AsmOp.operandCount(op, code, at)
+            when (op) {
+                AsmOp.RET_I, AsmOp.RET_D, AsmOp.RET_V -> Unit
+                AsmOp.JMP -> reach(code[at + 1])
+                AsmOp.JZ, AsmOp.JNZ -> { reach(code[at + 1]); reach(next) }
+                AsmOp.SWITCH -> {
+                    reach(code[at + 1])
+                    for (i in 0 until code[at + 2]) reach(code[at + 4 + i * 2])
+                }
+                else -> reach(next)
+            }
+        }
+        return false
     }
 
     private fun compileIf(node: IfStatement) {

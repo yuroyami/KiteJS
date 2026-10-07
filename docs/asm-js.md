@@ -77,6 +77,9 @@ nothing, the same as through a typed array view.
   not fixed.
 - Arithmetic on floats where the result is not passed to `Math.fround`, since that is how asm.js
   says a float result is rounded back to a float.
+- Functions whose returns do not agree on a type, or whose typed result can be missing on some
+  path. They run as ordinary JavaScript, including its `undefined` result on a path that reaches
+  the end.
 - An engine set to big-endian byte order through `KiteJsConfig.littleEndian`, because the compiled
   code reads and writes the heap in little-endian order and the views around it have to agree.
 
