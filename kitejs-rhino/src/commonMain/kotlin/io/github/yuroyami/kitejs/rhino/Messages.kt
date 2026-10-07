@@ -390,7 +390,6 @@ internal object Messages {
         "msg.unterm.paren" to "Unterminated parenthetical {0}",
         "msg.invalid.date" to "Date is invalid.",
         "msg.invalid.toprimitive.hint" to "[Symbol.toPrimitive]: expected \"string\", \"number\", or \"default\", but got \"{0}\"",
-        "msg.toisostring.must.return.primitive" to "toISOString must return a primitive value, but instead returned \"{0}\"",
         "msg.arraybuf.detached" to "Expected ArrayBuffer to not be detached",
         "msg.arraybuf.same" to "Expected different ArrayBuffer",
         "msg.arraybuf.smaller.len" to "Expected ArrayBuffer with at least {0} bytes, but got {1} bytes instead",

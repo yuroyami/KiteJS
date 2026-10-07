@@ -123,11 +123,7 @@ internal class NativeDate private constructor() : IdScriptableObject() {
                 if (toISO !is Callable) {
                     throw ScriptRuntime.typeErrorById("msg.isnt.function.in", "toISOString", ScriptRuntime.toString(o), ScriptRuntime.toString(toISO))
                 }
-                val result = toISO.call(cx, scope, o, ScriptRuntime.emptyArgs)
-                if (!ScriptRuntime.isPrimitive(result)) {
-                    throw ScriptRuntime.typeErrorById("msg.toisostring.must.return.primitive", ScriptRuntime.toString(result))
-                }
-                return result
+                return toISO.call(cx, scope, o, ScriptRuntime.emptyArgs)
             }
             SymbolId_toPrimitive -> {
                 val o = ScriptRuntime.toObject(cx, scope, thisObj)
