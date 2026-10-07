@@ -78,6 +78,87 @@ public abstract class ErrorsContract<C : KiteJsConfig>(engine: JsEngine<C>) : En
     }
 
     @Test
+    public fun everyFacadeEntryTranslatesScriptErrorsAndKeepsTheirFrames(): TestResult = withEngine { js ->
+        js.evaluate(
+            """
+            function failEntry() {
+                var e = new TypeError('facade failure'); globalThis.lastThrown = e; throw e;
+            }
+            var objectEntry = { method: failEntry, get read() { return failEntry(); }, set write(v) { failEntry(); } };
+            objectEntry[Symbol.toPrimitive] = failEntry;
+            function ConstructorEntry() { failEntry(); }
+            var proxyEntry = new Proxy({}, {
+                get: failEntry, set: failEntry, has: failEntry, deleteProperty: failEntry, ownKeys: failEntry
+            });
+            """.trimIndent(), "facade-errors.js",
+        )
+        val function = js.global["failEntry"].asFunction()
+        val bound = function.bind(null)
+        val obj = js.global["objectEntry"].asObject()
+        val constructor = js.global["ConstructorEntry"].asFunction()
+        val proxy = js.global["proxyEntry"].asObject()
+        val compiled = js.compile("failEntry()", "compiled-entry.js")
+        val entries: List<Pair<String, () -> Any?>> = listOf(
+            "evaluate" to { js.evaluate("failEntry()") },
+            "compiled script" to { compiled.run() },
+            "function" to { function() },
+            "bound function" to { bound() },
+            "method" to { obj.call("method") },
+            "constructor" to { constructor.construct() },
+            "getter" to { obj["read"] },
+            "setter" to { obj["write"] = 1 },
+            "number coercion" to { obj.value.asDouble() },
+            "string coercion" to { obj.value.asString() },
+            "proxy getter" to { proxy["field"] },
+            "proxy setter" to { proxy["field"] = 1 },
+            "proxy has" to { proxy.has("field") },
+            "proxy delete" to { proxy.delete("field") },
+            "proxy keys" to { proxy.keys },
+            "toMap" to { obj.toMap() },
+            "toKotlin" to { obj.value.toKotlin() },
+        )
+        for ((entry, invoke) in entries) {
+            val error = assertFailsWith<JsError>(entry) { invoke() }
+            assertEquals("TypeError", error.name, entry)
+            assertEquals("facade failure", error.errorMessage, entry)
+            assertEquals(js.global["lastThrown"], error.value, entry)
+            val top = error.scriptStack.firstOrNull()
+            assertEquals("failEntry", top?.functionName, "$entry: ${error.scriptStack}")
+            assertEquals("facade-errors.js", top?.fileName, entry)
+            assertEquals(2, top?.lineNumber, entry)
+            assertEquals(2, js.evaluate("1 + 1").asInt(), entry)
+        }
+    }
+
+    @Test
+    public fun facadeThrowsKeepTheOriginalNonErrorValue(): TestResult = withEngine { js ->
+        js.evaluate(
+            """
+            function throwAny() { throw thrownValue; }
+            var nonErrorEntry = { method: throwAny, get value() { throw thrownValue; } };
+            function NonErrorConstructor() { throw thrownValue; }
+            """.trimIndent(),
+        )
+        val function = js.global["throwAny"].asFunction()
+        val obj = js.global["nonErrorEntry"].asObject()
+        val constructor = js.global["NonErrorConstructor"].asFunction()
+        val entries: List<() -> Any?> = listOf(
+            { js.evaluate("throw thrownValue") }, { function() }, { obj.call("method") },
+            { constructor.construct() }, { obj["value"] },
+        )
+        for (source in listOf("42", "'plain'", "null", "undefined", "1n", "Symbol('s')", "({ code: 7 })", "[1, 2]")) {
+            val value = js.evaluate(source)
+            js.global["thrownValue"] = value
+            for (invoke in entries) {
+                val error = assertFailsWith<JsError>(source) { invoke() }
+                assertEquals(value.type, error.value.type, source)
+                assertEquals(value, error.value, source)
+                assertEquals(2, js.evaluate("1 + 1").asInt(), source)
+            }
+        }
+    }
+
+    @Test
     public fun badSourceArrivesAsJsSyntaxError(): TestResult = withEngine { js ->
         val e = assertFailsWith<JsSyntaxError> { js.evaluate("var ok = 1;\nfunction (", "broken.js") }
         assertEquals("broken.js", e.fileName)
