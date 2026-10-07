@@ -1009,6 +1009,10 @@ public class Parser(
             syntheticType = FunctionNode.FUNCTION_EXPRESSION
         }
 
+        if (syntheticType != FunctionNode.FUNCTION_EXPRESSION && name == null) {
+            reportError("msg.no.function.name")
+        }
+
         if (syntheticType != FunctionNode.FUNCTION_EXPRESSION &&
             name != null &&
             name.length() > 0

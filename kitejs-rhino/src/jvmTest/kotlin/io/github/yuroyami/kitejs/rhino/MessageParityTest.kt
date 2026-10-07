@@ -38,7 +38,7 @@ class MessageParityTest {
         "msg.uninitialized.binding",
         // D-95: early errors of plain functions that upstream lets through.
         "msg.getter.params", "msg.setter.params", "msg.keyword.escaped", "msg.rest.default",
-        "msg.use.strict.non.simple",
+        "msg.use.strict.non.simple", "msg.no.function.name",
         // D-97: async functions.
         "msg.async.decl.not.in.block", "msg.async.generator.unsupported", "msg.async.yield", "msg.await.params",
     )

@@ -176,6 +176,7 @@ internal object Messages {
         "msg.no.colon.cond" to "missing : in conditional expression",
         "msg.no.colon.prop" to "missing : after property id",
         "msg.no.curly.let" to "missing } after let statement",
+        "msg.no.function.name" to "Function statements require a function name",
         "msg.no.name.after.coloncolon" to "missing name after :: operator",
         "msg.no.name.after.dot" to "missing name after . operator",
         "msg.no.object.rest" to "object rest properties in destructuring are not supported",

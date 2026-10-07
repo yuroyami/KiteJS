@@ -7,6 +7,8 @@ package io.github.yuroyami.kitejs.rhino
 import io.github.yuroyami.kitejs.rhino.ast.ErrorCollector
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.mozilla.javascript.CompilerEnvirons as UCompilerEnvirons
 import org.mozilla.javascript.Context as UContext
@@ -17,6 +19,7 @@ import org.mozilla.javascript.ast.ErrorCollector as UErrorCollector
  * Malformed input has to fail the same way in both parsers: the same problems, in the same order,
  * with the same message text, offset and length.
  *
+ * Intentional standards corrections are asserted separately.
  * Everything runs in IDE mode, where the parser collects problems instead of throwing on the
  * first one. That reaches far more of the error-recovery paths than a throwing parse would.
  */
@@ -46,7 +49,6 @@ class ParserErrorParityTest {
         "throw\n1;",
         "with a {}",
         // Functions.
-        "function () {}",
         "function f( {}",
         "function f(1) {}",
         "function f() {",
@@ -105,6 +107,21 @@ class ParserErrorParityTest {
         val collector = env.errorReporter as ErrorCollector
         runCatching { Parser(env).parse(source, "err.js", 1) }
         return collector.errors.map { it.toString() }
+    }
+
+    @Test
+    fun anUnnamedDeclarationIsAStandardErrorThatUpstreamAccepts() {
+        val source = "function () {}"
+        assertEquals(emptyList(), upstreamProblems(source))
+        assertEquals(
+            listOf("err.js:offset=9,length=1,error: Function statements require a function name"),
+            portedProblems(source),
+        )
+        val uenv = UCompilerEnvirons().apply { languageVersion = UContext.VERSION_ES6 }
+        assertNull(runCatching { UParser(uenv).parse(source, "err.js", 1) }.exceptionOrNull())
+        val kenv = CompilerEnvirons().apply { languageVersion = Context.VERSION_ES6 }
+        val error = assertFailsWith<EvaluatorException> { Parser(kenv).parse(source, "err.js", 1) }
+        assertEquals("Function statements require a function name (err.js#1)", error.message)
     }
 
     @Test

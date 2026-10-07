@@ -80,6 +80,29 @@ public abstract class ErrorsContract<C : KiteJsConfig>(engine: JsEngine<C>) : En
     }
 
     @Test
+    public fun functionDeclarationsNeedNamesBeforeAnythingRuns(): TestResult = withEngine { js ->
+        js.global["declarationEffects"] = 0
+        for (source in listOf(
+            "function () {}", "if (true) function () {}", "{ function () {} }",
+            "function outer() { function () {} }", "function* () { yield 1 }", "async function () {}",
+            "var y = async\nfunction () {}", "'use strict'; function () {}",
+        )) {
+            val program = "declarationEffects++; $source"
+            assertFailsWith<JsSyntaxError>(source) { js.evaluate(program, "anonymous-declaration.js") }
+            assertFailsWith<JsSyntaxError>(source) { js.compile(program, "anonymous-declaration.js") }
+            js.global["invalidDeclaration"] = program
+            assertEquals("SyntaxError", js.evaluate("try { eval(invalidDeclaration); 'none' } catch (e) { e.name }").asString(), source)
+            assertEquals(0, js.global["declarationEffects"].asInt(), source)
+        }
+        assertEquals(7, js.evaluate("(function (a) { return a + 1 })(6)").asInt())
+        assertEquals(4, js.evaluate("(function* () { yield 4 })().next().value").asInt())
+        assertEquals("function", js.evaluate("typeof (async function () {})").asString())
+        assertEquals(9, js.evaluate("Function('a', 'return a + 2')(7)").asInt())
+        assertEquals(3, js.evaluate("({ method() { return 3 } }).method()").asInt())
+        assertEquals(2, js.evaluate("function namedDeclaration() { return 2 }; namedDeclaration()").asInt())
+    }
+
+    @Test
     public fun aRuntimeErrorCarriesItsFrames(): TestResult = withEngine { js ->
         val e = assertFailsWith<JsError> {
             js.evaluate("function inner() { null.x }\nfunction outer() { inner() }\nouter()", "boom.js")
