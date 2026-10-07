@@ -8,6 +8,7 @@ import io.github.yuroyami.kitejs.api.JsEngine
 import io.github.yuroyami.kitejs.api.JsEngineError
 import io.github.yuroyami.kitejs.api.JsError
 import io.github.yuroyami.kitejs.api.JsType
+import io.github.yuroyami.kitejs.api.JsValue
 import io.github.yuroyami.kitejs.api.KiteJsConfig
 import io.github.yuroyami.kitejs.api.function
 import kotlin.test.Test
@@ -110,6 +111,38 @@ public abstract class HandlesContract<C : KiteJsConfig>(engine: JsEngine<C>) : E
         // A primitive `this` reaches the function as `f.call(5)` hands it over in that engine.
         val kind = js.evaluate("var kind = function () { 'use strict'; return typeof this }; kind").asFunction()
         assertEquals(js.evaluate("kind.call(5)").asString(), kind.callOn(5).asString())
+    }
+
+    @Test
+    public fun nullAndUndefinedReceiversStayDistinctForStrictCallsAndBinds(): TestResult = withEngine { js ->
+        val strict = js.evaluate(
+            "var strictReceiver = function () { 'use strict'; return this === null ? 'null' : this === undefined ? 'undefined' : 'other' }; strictReceiver",
+        ).asFunction()
+        assertEquals("null", strict.callOn(JsValue.nullValue).asString())
+        assertEquals("undefined", strict.callOn(JsValue.undefined).asString())
+        assertEquals("null", strict.bind(JsValue.nullValue)().asString())
+        assertEquals("undefined", strict.bind(JsValue.undefined)().asString())
+        assertEquals("undefined", strict.bind(null)().asString())
+        assertEquals("null", strict.bind(JsValue.nullValue).bind(JsValue.undefined)().asString())
+        assertEquals("undefined", strict.bind(JsValue.undefined).bind(JsValue.nullValue)().asString())
+        val proxied = js.evaluate("new Proxy(strictReceiver, {})").asFunction()
+        assertEquals("null", proxied.bind(JsValue.nullValue)().asString())
+        assertEquals("undefined", proxied.bind(JsValue.undefined)().asString())
+        assertEquals("null,undefined,undefined,null", js.evaluate(
+            "[strictReceiver.bind(null)(), strictReceiver.bind(undefined)(), strictReceiver.bind()(), strictReceiver.bind(null).bind(undefined)()].join()",
+        ).asString())
+    }
+
+    @Test
+    public fun sloppyCallsAndBindsSubstituteTheGlobalForNullishReceivers(): TestResult = withEngine { js ->
+        val sloppy = js.evaluate("var sloppyReceiver = function () { return this === globalThis }; sloppyReceiver").asFunction()
+        for (receiver in listOf(JsValue.nullValue, JsValue.undefined)) {
+            assertTrue(sloppy.callOn(receiver).asBoolean())
+            assertTrue(sloppy.bind(receiver)().asBoolean())
+            assertTrue(sloppy.bind(receiver).bind(js.newObject())().asBoolean())
+        }
+        assertEquals("true,true,true", js.evaluate("[sloppyReceiver.bind(null)(), sloppyReceiver.bind(undefined)(), sloppyReceiver.bind()()].join()").asString())
+        assertTrue(js.evaluate("new Proxy(sloppyReceiver, {}).bind(undefined)()").asBoolean())
     }
 
     @Test

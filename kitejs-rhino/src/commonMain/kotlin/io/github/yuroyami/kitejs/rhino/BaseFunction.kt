@@ -498,10 +498,11 @@ public open class BaseFunction : ScriptableObject, Function {
             val boundThis: Scriptable?
             val boundArgs: Array<Any?>
             if (argc > 0) {
-                boundThis = ScriptRuntime.toObjectOrNull(cx, args[0], scope)
+                boundThis = if (Undefined.isUndefined(args[0])) Undefined.SCRIPTABLE_UNDEFINED
+                    else ScriptRuntime.toObjectOrNull(cx, args[0], scope)
                 boundArgs = args.copyOfRange(1, argc)
             } else {
-                boundThis = null
+                boundThis = Undefined.SCRIPTABLE_UNDEFINED
                 boundArgs = ScriptRuntime.emptyArgs
             }
             return BoundFunction(cx, scope, thisObj, boundThis, boundArgs)

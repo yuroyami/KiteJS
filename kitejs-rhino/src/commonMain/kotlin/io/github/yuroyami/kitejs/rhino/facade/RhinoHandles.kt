@@ -22,6 +22,7 @@ import io.github.yuroyami.kitejs.rhino.ScriptRuntime
 import io.github.yuroyami.kitejs.rhino.Scriptable
 import io.github.yuroyami.kitejs.rhino.ScriptableObject
 import io.github.yuroyami.kitejs.rhino.SymbolKey
+import io.github.yuroyami.kitejs.rhino.Undefined
 import io.github.yuroyami.kitejs.rhino.typedarrays.NativeArrayBuffer
 import io.github.yuroyami.kitejs.rhino.typedarrays.NativeDataView
 import io.github.yuroyami.kitejs.rhino.typedarrays.NativeTypedArrayView
@@ -194,7 +195,9 @@ internal class RhinoFunction(override val engine: RhinoKiteJs, override val targ
     override fun bind(thisArg: Any?, vararg args: Any?): JsFunction = engine.call(drain = false) {
         val cx = engine.cx
         val scope = engine.scope
-        val boundThis = ScriptRuntime.toObjectOrNull(cx, engine.toRhino(thisArg), scope)
+        val receiver = engine.toRhino(thisArg)
+        val boundThis = if (Undefined.isUndefined(receiver)) Undefined.SCRIPTABLE_UNDEFINED
+            else ScriptRuntime.toObjectOrNull(cx, receiver, scope)
         RhinoFunction(engine, BoundFunction(cx, scope, callable, boundThis, engine.toRhinoArgs(args)))
     }
 

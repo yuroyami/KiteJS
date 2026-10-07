@@ -51,11 +51,10 @@ public class BoundFunction(
     override val functionName: String
         get() = if (targetFunction is BaseFunction) "bound " + targetFunction.functionName else ""
 
-    internal fun getCallThis(cx: Context, scope: Scriptable): Scriptable {
-        var callThis = boundThis
-        if (callThis == null && ScriptRuntime.hasTopCall(cx)) callThis = ScriptRuntime.getTopCallScope(cx)
-        return callThis ?: getTopLevelScope(scope)
-    }
+    internal fun getCallThis(cx: Context, scope: Scriptable): Scriptable? =
+        ScriptRuntime.getApplyOrCallThis(
+            cx, scope, if (Undefined.isUndefined(boundThis)) Undefined.instance else boundThis, 1, targetFunction,
+        )
 
     private companion object {
         fun concat(first: Array<Any?>, second: Array<Any?>): Array<Any?> {

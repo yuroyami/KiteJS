@@ -120,8 +120,8 @@ println(handler(mapOf("type" to "click")).asString())   // "click:ok"
 
 | Call | What it does |
 |---|---|
-| `f(args)` | Calls it with `this` set to the global object |
-| `f.callOn(thisArg, args)` | Calls it with the `this` you name |
+| `f(args)` | Calls it with `this` set to `undefined` in strict functions, or the global object in sloppy functions |
+| `f.callOn(thisArg, args)` | Calls it with the `this` you name; sloppy functions replace null or undefined with the global object |
 | `f.construct(args)` | Calls it with `new` |
 | `f.bind(thisArg, args)` | A new function with `this` and the leading arguments fixed |
 | `obj.call("name", args)` | Calls a method on an object, as `obj.name(...)` does |
