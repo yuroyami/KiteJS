@@ -153,7 +153,10 @@ internal class AsmCompiler private constructor(
             when {
                 position == 0 -> Unit // the directive
                 s is FunctionNode -> Unit // already indexed
-                s is VariableDeclaration -> for (v in s.variables) declareGlobal(v)
+                s is VariableDeclaration -> {
+                    if (exports != null) reject("a module declaration follows its return")
+                    for (v in s.variables) declareGlobal(v)
+                }
                 s is ReturnStatement -> {
                     if (exports != null) reject("the module returns twice")
                     val returned = readExports(s.returnValue ?: reject("the module returns nothing"))

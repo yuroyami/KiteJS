@@ -82,6 +82,8 @@ view.
 - Functions whose returns do not agree on a type, or whose typed result can be missing on some
   path. They run as ordinary JavaScript, including its `undefined` result on a path that reaches
   the end.
+- Modules with variable declarations after the export return, since their initializers must
+  remain unreachable.
 - An engine set to big-endian byte order through `KiteJsConfig.littleEndian`, because the compiled
   code reads and writes the heap in little-endian order and the views around it have to agree.
 
