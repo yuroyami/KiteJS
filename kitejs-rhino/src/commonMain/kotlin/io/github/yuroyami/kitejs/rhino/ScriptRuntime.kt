@@ -1148,14 +1148,7 @@ public object ScriptRuntime {
     public fun isNaN(n: Any?): Boolean = (n is Double && n.isNaN()) || (n is Float && n.isNaN())
 
     /** SameValue: `Object.is`. NaN equals NaN, and +0 and -0 differ. */
-    public fun same(x: Any?, y: Any?): Boolean {
-        if (typeOf(x) != typeOf(y)) return false
-        if (x is Number) {
-            if (isNaN(x) && isNaN(y)) return true
-            return x == y
-        }
-        return eq(x, y)
-    }
+    public fun same(x: Any?, y: Any?): Boolean = AbstractEcmaObjectOperations.sameValue(x, y)
 
     /** SameValueZero: like [same], but +0 and -0 are equal. */
     public fun sameZero(x: Any?, y: Any?): Boolean {

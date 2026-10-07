@@ -66,6 +66,59 @@ public abstract class ValuesContract<C : KiteJsConfig>(engine: JsEngine<C>) : En
     }
 
     @Test
+    public fun objectIsComparesNumbersByValueAndTheSignOfZero(): TestResult = withEngine { js ->
+        val positiveZeros = listOf("0", "Math.abs(-0)", "new Float32Array([0])[0]", "new Float64Array([0])[0]", "new DataView(new ArrayBuffer(8)).getFloat64(0)")
+        val negativeZeros = listOf("-0", "-Math.abs(0)", "new Float32Array([-0])[0]", "new Float64Array([-0])[0]")
+        for (left in positiveZeros + negativeZeros) {
+            for (right in positiveZeros + negativeZeros) {
+                assertEquals((left in positiveZeros) == (right in positiveZeros), js.evaluate("Object.is($left, $right)").asBoolean(), "$left / $right")
+            }
+        }
+        for (source in listOf(
+            "Object.is(41, Math.sqrt(1681))", "Object.is(Math.sqrt(1681), 41)",
+            "Object.is(new Float64Array([41])[0], 41)", "Object.is(41, new Float32Array([41])[0])",
+            "Object.is(NaN, 0 / 0)", "Object.is(0 / 0, NaN)",
+            "Object.is(Infinity, 1 / 0)", "Object.is(-Infinity, -1 / 0)",
+            "!Object.is(Infinity, -Infinity)", "!Object.is(NaN, 0)", "!Object.is(0, NaN)",
+        )) assertTrue(js.evaluate(source).asBoolean(), source)
+    }
+
+    @Test
+    public fun typedArraySearchesCanDistinguishTheTwoZeros(): TestResult = withEngine { js ->
+        for (type in listOf("Float32Array", "Float64Array")) {
+            assertEquals("true,1,true,1", js.evaluate(
+                "var zeroes = new $type([-0, 0]); var positive = function (v) { return Object.is(v, 0) }; " +
+                    "[Object.is(zeroes.find(positive), 0), zeroes.findIndex(positive), " +
+                    "Object.is(zeroes.findLast(positive), 0), zeroes.findLastIndex(positive)].join()",
+            ).asString(), type)
+            assertEquals("true,true,1,true,true", js.evaluate(
+                "var zeroMap = new Map([[-0, 'value']]); " +
+                    "[zeroes.includes(0), zeroes.includes(-0), new Set([-0, 0]).size, " +
+                    "zeroMap.has(0), Object.is(zeroMap.keys().next().value, 0)].join()",
+            ).asString(), type)
+        }
+    }
+
+    @Test
+    public fun objectIsKeepsIdentityAndNeverCoercesItsOperands(): TestResult = withEngine { js ->
+        assertEquals("true", js.evaluate(
+            "var identity = { valueOf: function () { throw Error('coerced') }, toString: function () { throw Error('coerced') } }; " +
+                "var identitySymbol = Symbol('identity'); var identityFunction = function () {}; " +
+                "[Object.is(identity, identity), !Object.is(identity, {}), !Object.is(identity, 1), !Object.is(1, identity), " +
+                "Object.is(identitySymbol, identitySymbol), !Object.is(identitySymbol, Symbol('identity')), " +
+                "Object.is(identityFunction, identityFunction), !Object.is(identityFunction, function () {}), " +
+                "!Object.is(1, '1'), !Object.is(1, 1n), Object.is(1n, 1n), !Object.is(null, undefined), " +
+                "Object.is(), Object.is(undefined), !Object.is(new Number(1), new Number(1))].every(function (v) { return v })",
+        ).asString())
+        assertEquals("true,false,true", js.evaluate(
+            "var constantZero = {}; Object.defineProperty(constantZero, 'value', { value: 0 }); " +
+                "[Reflect.defineProperty(constantZero, 'value', { value: Math.abs(-0) }), " +
+                "Reflect.defineProperty(constantZero, 'value', { value: -0 }), " +
+                "Object.is(constantZero.value, Math.abs(-0))].join()",
+        ).asString())
+    }
+
+    @Test
     public fun readersCoerceTheWayJavaScriptDoes(): TestResult = withEngine { js ->
         assertEquals(4.0, js.evaluate("2 + 2").asDouble())
         assertEquals(4, js.evaluate("2 + 2").asInt())
