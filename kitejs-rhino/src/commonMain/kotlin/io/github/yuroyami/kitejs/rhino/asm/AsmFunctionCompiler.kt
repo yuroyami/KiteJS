@@ -241,7 +241,7 @@ internal class AsmFunctionCompiler(private val owner: AsmCompiler, private val f
     private fun statement(node: AstNode) {
         when (node) {
             is EmptyStatement -> Unit
-            is ExpressionStatement -> discard(expr(unwrap(node.expression!!)))
+            is ExpressionStatement -> discardExpression(node.expression!!)
             is ReturnStatement -> compileReturn(node)
             is IfStatement -> compileIf(node)
             is WhileLoop -> compileWhile(node)
@@ -261,11 +261,24 @@ internal class AsmFunctionCompiler(private val owner: AsmCompiler, private val f
         }
     }
 
-    /** Throws away whatever an expression statement left behind. */
+    /** Discard a bare call's original value, but preserve any explicit coercion around it. */
+    private fun discardExpression(node: AstNode) {
+        val value = unwrap(node)
+        when {
+            value is InfixExpression && value.operator == Token.COMMA -> {
+                discardExpression(value.left!!)
+                discardExpression(value.right!!)
+            }
+            value is FunctionCall -> discard(call(value, discarded = true))
+            else -> discard(expr(value))
+        }
+    }
+
+    /** Throws away the typed value an expression left behind. */
     private fun discard(type: Int) {
         when {
             type == AsmType.VOID -> Unit
-            // A foreign call leaves its answer on the double stack, coerced or not.
+            // An externally returned value reaches this path only after numeric conversion.
             AsmType.isDbl(type) || type == AsmType.EXTERN -> { popDbl(1); emit(AsmOp.D_DROP) }
             else -> { popInt(1); emit(AsmOp.I_DROP) }
         }
@@ -360,7 +373,7 @@ internal class AsmFunctionCompiler(private val owner: AsmCompiler, private val f
     private fun compileFor(node: ForLoop) {
         node.initializer?.let { init ->
             if (init is VariableDeclaration) reject("a for loop declares a local")
-            if (init.type != Token.EMPTY) discard(expr(unwrap(init)))
+            if (init.type != Token.EMPTY) discardExpression(init)
         }
         val frame = openJumps(emptyList(), isLoop = true)
         val start = top
@@ -374,7 +387,7 @@ internal class AsmFunctionCompiler(private val owner: AsmCompiler, private val f
         statement(node.body!!)
         val step = top
         node.increment?.let { inc ->
-            if (inc.type != Token.EMPTY) discard(expr(unwrap(inc)))
+            if (inc.type != Token.EMPTY) discardExpression(inc)
         }
         emitJumpTo(AsmOp.JMP, start)
         if (out >= 0) patch(out, top)
@@ -597,7 +610,7 @@ internal class AsmFunctionCompiler(private val owner: AsmCompiler, private val f
     private fun infix(node: InfixExpression): Int {
         val operator = node.operator
         if (operator == Token.COMMA) {
-            discard(expr(unwrap(node.left!!)))
+            discardExpression(node.left!!)
             return expr(unwrap(node.right!!))
         }
         val left = unwrap(node.left!!)
@@ -915,7 +928,7 @@ internal class AsmFunctionCompiler(private val owner: AsmCompiler, private val f
 
     // ---- Calls --------------------------------------------------------------------------------
 
-    private fun call(node: FunctionCall): Int {
+    private fun call(node: FunctionCall, discarded: Boolean = false): Int {
         val target = unwrap(node.target!!)
         if (target is ElementGet) return indirectCall(node, target)
         val name = (target as? Name)?.identifier ?: reject("a call is not to a name")
@@ -923,7 +936,7 @@ internal class AsmFunctionCompiler(private val owner: AsmCompiler, private val f
         return when (global) {
             is AsmGlobal.MathFn -> mathCall(global.field, node)
             is AsmGlobal.Fn -> directCall(global.index, node)
-            is AsmGlobal.Ffi -> foreignCall(global.index, node)
+            is AsmGlobal.Ffi -> foreignCall(global.index, node, discarded)
             else -> reject("$name is not a function")
         }
     }
@@ -979,7 +992,7 @@ internal class AsmFunctionCompiler(private val owner: AsmCompiler, private val f
         return finishCall(owner.returnTypeOf(first))
     }
 
-    private fun foreignCall(index: Int, node: FunctionCall): Int {
+    private fun foreignCall(index: Int, node: FunctionCall, discarded: Boolean): Int {
         val args = node.arguments
         val types = IntArray(args.size)
         for (i in args.indices) {
@@ -996,7 +1009,8 @@ internal class AsmFunctionCompiler(private val owner: AsmCompiler, private val f
         for (t in types) if (AsmType.isDbl(t)) dbls++ else ints++
         popInt(ints)
         popDbl(dbls)
-        emit(AsmOp.CALL_FFI, index, encodeArgs(types))
+        emit(if (discarded) AsmOp.CALL_FFI_VOID else AsmOp.CALL_FFI, index, encodeArgs(types))
+        if (discarded) return AsmType.VOID
         // What comes back is an ordinary JavaScript value, so it arrives as a double: `ToNumber`
         // of the answer. That is exactly what the coercion around the call would have read, since
         // `x | 0` is `ToInt32(ToNumber(x))`.

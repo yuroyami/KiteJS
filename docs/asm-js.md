@@ -55,6 +55,10 @@ outside, and an `ArrayBuffer` the module uses as its memory. All three are check
 is called: `stdlib.Math.imul` has to be the engine's own `Math.imul`, not something that shares the
 name. A module given anything else is run as ordinary JavaScript instead.
 
+An imported function's result is discarded without conversion when the module uses a bare call.
+Explicit `+`, `| 0` and `fround` conversions still read that result, including their conversion
+hooks and errors, even when the final numeric value is discarded.
+
 ## Compiling is a decision about types, not about speed
 
 Every rule asm.js has exists so that a value's type is known in advance. `x = x | 0` at the top of

@@ -33,7 +33,7 @@ internal object AsmMeter {
                     for (i in 0 until code[at + 2]) boundaries[code[at + 4 + i * 2]] = true
                     boundaries[next] = true
                 }
-                AsmOp.CALL_DIRECT, AsmOp.CALL_INDIRECT, AsmOp.CALL_FFI,
+                AsmOp.CALL_DIRECT, AsmOp.CALL_INDIRECT, AsmOp.CALL_FFI, AsmOp.CALL_FFI_VOID,
                 AsmOp.RET_I, AsmOp.RET_D, AsmOp.RET_V,
                 -> boundaries[next] = true
             }

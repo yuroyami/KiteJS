@@ -221,7 +221,7 @@ internal class AsmRunner(private val instance: AsmInstance) {
                     else -> iv[ip++] = retInt
                 }
             }
-            AsmOp.CALL_FFI -> {
+            AsmOp.CALL_FFI, AsmOp.CALL_FFI_VOID -> {
                 val index = code[pc++]
                 val packed = code[pc++]
                 val count = packed and 0xFF
@@ -237,11 +237,15 @@ internal class AsmRunner(private val instance: AsmInstance) {
                     }
                 }
                 val answer = callForeign(cx, index, args)
-                room(ip, dp + 1)
+                val numeric = op == AsmOp.CALL_FFI
+                val number = if (numeric) ScriptRuntime.toNumber(answer) else 0.0
+                // Both the callback and its result's conversion can replace or detach storage.
+                heap = instance.buffer.buffer ?: ByteArray(0)
+                room(ip, dp + if (numeric) 1 else 0)
                 iv = ints
                 dv = dbls
                 bytes = heap
-                dv[dp++] = answer
+                if (numeric) dv[dp++] = number
             }
 
             AsmOp.D_DROP -> dp--
@@ -415,15 +419,12 @@ internal class AsmRunner(private val instance: AsmInstance) {
         }
     }
 
-    private fun callForeign(cx: Context, index: Int, args: Array<Any?>): Double {
+    private fun callForeign(cx: Context, index: Int, args: Array<Any?>): Any? {
         val callable = instance.ffi[index] ?: throw ScriptRuntime.typeError(
             "${instance.module.ffiNames[index]} is not a function",
         )
         val thisObj = instance.ffiThis[index] ?: instance.scope
-        val answer = callable.call(cx, instance.scope, thisObj, args)
-        // Reading the heap again, because the call may have replaced the buffer's bytes.
-        heap = instance.buffer.buffer ?: ByteArray(0)
-        return ScriptRuntime.toNumber(answer)
+        return callable.call(cx, instance.scope, thisObj, args)
     }
 
     // ---- The heap -----------------------------------------------------------------------------
