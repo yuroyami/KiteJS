@@ -81,7 +81,7 @@ internal class AsmRunner(private val instance: AsmInstance) {
             var intArg = 0
             var dblArg = 0
             for (i in fn.paramTypes.indices) {
-                val given = args.getOrNull(i)
+                val given = args.getOrElse(i) { Undefined.instance }
                 if (AsmType.isDbl(fn.paramTypes[i])) {
                     val value = ScriptRuntime.toNumber(given)
                     pushArgDbl(dblArg++, if (fn.paramTypes[i] == AsmType.FLOAT) froundOf(value) else value)
