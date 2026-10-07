@@ -232,7 +232,7 @@ internal class AsmCompiler private constructor(
     }
 
     private fun declare(name: String, global: AsmGlobal) {
-        if (globals.containsKey(name) && globals[name] !is AsmGlobal.Fn) {
+        if (globals.containsKey(name)) {
             reject("the module declares $name twice")
         }
         globals[name] = global
@@ -373,7 +373,8 @@ internal class AsmCompiler private constructor(
     private fun readExports(returned: AstNode): Pair<Array<AsmExport>, Boolean> {
         val value = unwrap(returned)
         if (value is Name) {
-            val index = fnIndex[value.identifier] ?: reject("the module returns ${value.identifier}, which is not one of its functions")
+            val index = (globals[value.identifier] as? AsmGlobal.Fn)?.index
+                ?: reject("the module returns ${value.identifier}, which is not one of its functions")
             return arrayOf(AsmExport(value.identifier!!, index)) to true
         }
         val literal = value as? ObjectLiteral ?: reject("the module returns something other than a function or an object")
@@ -388,7 +389,8 @@ internal class AsmCompiler private constructor(
             } ?: reject("an export has no name")
             val fnName = (unwrap(property.value ?: reject("the export $key has no value")) as? Name)?.identifier
                 ?: reject("the export $key is not one of the module's functions")
-            val index = fnIndex[fnName] ?: reject("the export $key names $fnName, which is not a function of the module")
+            val index = (globals[fnName] as? AsmGlobal.Fn)?.index
+                ?: reject("the export $key names $fnName, which is not a function of the module")
             out.add(AsmExport(key, index))
         }
         return out.toTypedArray() to false
