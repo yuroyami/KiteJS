@@ -86,6 +86,8 @@ view.
   remain unreachable.
 - Modules that reuse a function's name for another binding. They run ordinarily so the exports
   retain the values assigned during initialization.
+- Conditions using uncoerced integer arithmetic, since its wider JavaScript result can have
+  different truthiness from a wrapped 32-bit value.
 - An engine set to big-endian byte order through `KiteJsConfig.littleEndian`, because the compiled
   code reads and writes the heap in little-endian order and the views around it have to agree.
 

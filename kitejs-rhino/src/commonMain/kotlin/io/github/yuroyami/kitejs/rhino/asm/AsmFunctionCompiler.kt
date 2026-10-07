@@ -468,10 +468,10 @@ internal class AsmFunctionCompiler(private val owner: AsmCompiler, private val f
         }
     }
 
-    /** An expression used as a test: it has to be an integer, and zero means false. */
+    /** A test must be a coerced integer, so its 32-bit wrap cannot change truthiness. */
     private fun condition(node: AstNode) {
         val type = expr(node)
-        if (!AsmType.isInt(type)) reject("a condition is not an integer")
+        if (!AsmType.isInt(type) || type == AsmType.INTISH) reject("a condition is not a coerced integer")
         popInt(1)
     }
 
