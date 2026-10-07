@@ -848,7 +848,10 @@ public open class Node : Iterable<Node> {
          * where the `async` starts, for an async arrow function to start there (D-97).
          */
         internal const val ASYNC_ARROW_PROP: Int = 37
-        public const val LAST_PROP: Int = ASYNC_ARROW_PROP
+
+        /** The port's own: a let that can run more than once, reset to undefined each time (D-98). */
+        internal const val RESET_LET_PROP: Int = 38
+        public const val LAST_PROP: Int = RESET_LET_PROP
 
         internal const val CLASS_HAS_HERITAGE: Int = 1
         internal const val CLASS_HAS_BINDING: Int = 2
@@ -948,6 +951,7 @@ public open class Node : Iterable<Node> {
             SUPER_CALL_PROP -> "super_call"
             PRIVATE_NAMES_PROP -> "private_names"
             ASYNC_ARROW_PROP -> "async_arrow"
+            RESET_LET_PROP -> "reset_let"
             else -> throw Kit.codeBug()
         }
 

@@ -257,9 +257,9 @@ public open class NodeTransformer {
                             var v = cursor
                             cursor = cursor.next
                             if (v.type == Token.NAME) {
-                                if (!v.hasChildren()) continue
-                                val init = v.firstChild!!
-                                v.removeChild(init)
+                                // A let without an initializer that can run again is reset to undefined (D-98).
+                                if (!v.hasChildren() && n.getIntProp(Node.RESET_LET_PROP, 0) == 0) continue
+                                val init = v.firstChild?.also { v.removeChild(it) } ?: Node(Token.UNDEFINED)
                                 v.type = Token.BINDNAME
                                 v = Node(
                                     if (type == Token.CONST) Token.SETCONST else Token.SETNAME,

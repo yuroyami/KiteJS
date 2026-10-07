@@ -2585,6 +2585,13 @@ public class Parser(
      *     of the first token of the first variable declaration.
      */
     private fun variables(declType: Int, pos: Int, isStatement: Boolean): VariableDeclaration {
+        // A let below the function or script body can run again, in a loop or a switch, and one
+        // without an initializer must then be reset to undefined (D-98).
+        if (declType == Token.LET && isStatement && currentScope !== currentScriptOrFn &&
+            compilerEnv.languageVersion >= Context.VERSION_ES6
+        ) {
+            return variablesIn(declType, pos, isStatement).also { it.putIntProp(Node.RESET_LET_PROP, 1) }
+        }
         // A const in a block belongs to the block, as a let does, and is bound afresh each time
         // its declaration runs, so one in a loop body takes the value of each pass (D-74).
         val blockConst = declType == Token.CONST && !blockScopedConst && isInBlockStatement()

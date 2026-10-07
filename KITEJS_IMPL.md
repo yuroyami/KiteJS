@@ -819,6 +819,13 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   `try { 7 } finally { 8 }` answered 8. JavaScript 1.8's expression closures stay plain
   functions' own: a generator or an async function without a braced body is a SyntaxError, as
   SpiderMonkey made it. `let` as a name in sloppy code is a gap upstream shares, filed as #92.
+- D-98: a `let` without an initializer binds `undefined` each time its declaration runs
+  (ECMAScript 2015, 13.3.1.4). Upstream skips a binding with no initializer when it lowers a
+  declaration, which is right for `var`, so a `let x;` in a loop body kept what the previous pass
+  left in it. A `let` below the function or script body, in a block, a loop body or a switch,
+  carries `RESET_LET_PROP` and lowers to an assignment of `undefined`; one directly in the body
+  runs once per call or script and keeps upstream's lowering, and the corpus with it.
+  `LetWithoutInitializerTest` pins it.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

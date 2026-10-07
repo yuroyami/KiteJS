@@ -59,6 +59,15 @@ loops, so every test that includes it fails upstream for this reason alone.
 - Where: `Parser.defineSymbol` and the const lowering in `NodeTransformer` and `CodeGenerator`.
 - Test: `BlockConstTest`; three test262 files.
 
+### A let without an initializer keeps the previous pass's value (D-98)
+
+`for (var i = 0; i < 2; ++i) { let x; out.push(x); x = 1 }` pushes `undefined` and then 1:
+the lowering skips a declared name with no initializer, as `var` needs, so a `let x;` that runs
+again does not reset it. ECMAScript 2015, 13.3.1.4 initializes it to `undefined` every time.
+
+- Where: `Parser.variables` and the declaration lowering in `NodeTransformer`.
+- Test: `LetWithoutInitializerTest`.
+
 ### A property descriptor of a lazily loaded global leaks the placeholder (D-75)
 
 `typeof Object.getOwnPropertyDescriptor(globalThis, 'JSON').value` throws "Invalid JavaScript
