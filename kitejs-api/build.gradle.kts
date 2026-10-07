@@ -1,3 +1,4 @@
+import com.android.build.api.withAndroid
 import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
 
 plugins {
@@ -15,6 +16,15 @@ plugins {
  */
 kotlin {
     explicitApi()
+
+    applyDefaultHierarchyTemplate {
+        common {
+            group("jni") {
+                withJvm()
+                withAndroid()
+            }
+        }
+    }
 
     // Records the public API in api/ so an accidental change to it shows up in review rather
     // than in someone's build. `./gradlew updateLegacyAbi` accepts a deliberate change.

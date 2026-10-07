@@ -559,7 +559,8 @@ void kite_array_push(KiteEngine *e, int32_t array, int32_t value)
 {
     int64_t length = 0;
     JS_GetLength(e->ctx, at(e, array), &length);
-    JS_SetPropertyInt64(e->ctx, at(e, array), length, JS_DupValue(e->ctx, at(e, value)));
+    JS_DefinePropertyValueUint32(e->ctx, at(e, array), (uint32_t)length,
+                                JS_DupValue(e->ctx, at(e, value)), JS_PROP_C_W_E);
 }
 
 void kite_object_put(KiteEngine *e, int32_t obj, const uint16_t *key, int32_t key_length, int32_t value)

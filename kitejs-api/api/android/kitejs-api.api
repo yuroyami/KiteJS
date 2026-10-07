@@ -47,6 +47,7 @@ public final class io/github/yuroyami/kitejs/api/Converters {
 	public final fun isCollection (Ljava/lang/Object;)Z
 	public final fun register (Lkotlin/jvm/functions/Function1;)V
 	public final fun toEngine (Ljava/lang/Object;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
+	public final fun toEngineGraph (Ljava/lang/Object;Lkotlin/jvm/functions/Function1;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function0;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function3;Lkotlin/jvm/functions/Function1;)Ljava/lang/Object;
 }
 
 public final class io/github/yuroyami/kitejs/api/HostBindingKt {

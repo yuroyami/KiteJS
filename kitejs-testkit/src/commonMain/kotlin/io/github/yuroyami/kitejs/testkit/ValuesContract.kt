@@ -24,6 +24,8 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.TestResult
 
+private class CollectionBox(var child: Any? = null)
+
 /** Values in both directions: what comes back from a script, and what a Kotlin value becomes. */
 public abstract class ValuesContract<C : KiteJsConfig>(engine: JsEngine<C>) : EngineContract<C>(engine) {
 
@@ -212,6 +214,109 @@ public abstract class ValuesContract<C : KiteJsConfig>(engine: JsEngine<C>) : En
         val map = js.evaluate("var a = { name: 'root' }; a.self = a; a").asObject().toMap()
         assertEquals("root", map["name"])
         assertTrue(map["self"] is JsObject)
+    }
+
+    @Test
+    public fun incomingCollectionsKeepTheirCycles(): TestResult = withEngine { js ->
+        val list = mutableListOf<Any?>()
+        list.add(list)
+        js.global["listCycle"] = list
+        assertTrue(js.evaluate("listCycle[0] === listCycle").asBoolean())
+        val map = mutableMapOf<String, Any?>()
+        map["self"] = map
+        js.global["mapCycle"] = map
+        assertTrue(js.evaluate("mapCycle.self === mapCycle").asBoolean())
+        val array = arrayOfNulls<Any?>(1)
+        array[0] = array
+        js.global["arrayCycle"] = array
+        assertTrue(js.evaluate("arrayCycle[0] === arrayCycle").asBoolean())
+        val mutual = mutableListOf<Any?>(map)
+        map["list"] = mutual
+        js.global["mutual"] = mutual
+        assertTrue(js.evaluate("mutual[0].list === mutual").asBoolean())
+        val set = mutableSetOf<Any?>()
+        val back = arrayOf<Any?>(set)
+        set.add(back)
+        js.global["setCycle"] = set
+        assertTrue(js.evaluate("setCycle[0][0] === setCycle").asBoolean())
+        js.global.function("cycleFromHost") { _ -> map }
+        assertTrue(js.evaluate("var result = cycleFromHost(); result.self === result && result.list[0] === result").asBoolean())
+        assertEquals(2, js.evaluate("1 + 1").asInt())
+    }
+
+    @Test
+    public fun incomingCollectionsKeepSharedReferencesWithoutMergingEqualChildren(): TestResult = withEngine { js ->
+        val child = mutableListOf(1)
+        val bytes = byteArrayOf(2)
+        val ints = intArrayOf(3)
+        js.global["shared"] = listOf(child, child, mutableListOf(1), bytes, bytes, ints, ints)
+        assertTrue(js.evaluate("shared[0] === shared[1] && shared[0] !== shared[2] && shared[3] === shared[4] && shared[5] === shared[6]").asBoolean())
+        js.global["separate"] = child
+        assertTrue(js.evaluate("separate !== shared[0]").asBoolean())
+    }
+
+    @Test
+    public fun incomingIdentityChecksRunNoCollectionHashCodeOrEquals(): TestResult = withEngine { js ->
+        class SelfList : AbstractList<Any?>() {
+            override val size: Int get() = 1
+            override fun get(index: Int): Any = this
+            override fun hashCode(): Int = error("structural hashCode ran")
+            override fun equals(other: Any?): Boolean = error("structural equals ran")
+        }
+        js.global["identityOnly"] = SelfList()
+        assertTrue(js.evaluate("identityOnly[0] === identityOnly").asBoolean())
+    }
+
+    @Test
+    public fun deepIncomingCollectionsUseNoRecursiveHostTraversal(): TestResult = withEngine { js ->
+        var source: Any? = 7
+        repeat(5000) { source = listOf(source) }
+        js.global["deep"] = source
+        assertEquals(7, js.evaluate("var node = deep; for (var i = 0; i < 5000; i++) node = node[0]; node").asInt())
+        // Break the chain explicitly so engine destruction does not measure recursive finalization.
+        js.evaluate("node = deep; for (var i = 0; i < 5000; i++) { var next = node[0]; node[0] = null; node = next; } deep = null;")
+    }
+
+    @Test
+    public fun customConvertersKeepCyclesAndRefuseNonTerminatingChains(): TestResult = withEngine { js ->
+        val box = CollectionBox()
+        box.child = box
+        var conversions = 0
+        Converters.register { if (it is CollectionBox) { conversions++; mapOf("child" to it.child) } else null }
+        try {
+            js.global["box"] = box
+            assertTrue(js.evaluate("box.child === box").asBoolean())
+            assertEquals(1, conversions, "a shared custom source is converted once")
+        } finally {
+            Converters.clearRegistrations()
+        }
+        Converters.register { if (it is CollectionBox) it else null }
+        try {
+            assertFailsWith<JsEngineError> { js.valueOf(CollectionBox()) }
+        } finally {
+            Converters.clearRegistrations()
+        }
+        Converters.register { if (it is CollectionBox) CollectionBox() else null }
+        try {
+            assertFailsWith<JsEngineError> { js.valueOf(CollectionBox()) }
+        } finally {
+            Converters.clearRegistrations()
+        }
+        assertEquals(2, js.evaluate("1 + 1").asInt())
+    }
+
+    @Test
+    public fun incomingCollectionsDefineOwnDataWithoutRunningPrototypeSetters(): TestResult = withEngine { js ->
+        js.evaluate(
+            "Object.defineProperty(Array.prototype, '0', { set: function () { throw Error('array setter') }, configurable: true });" +
+                "Object.defineProperty(Object.prototype, 'tag', { set: function () { throw Error('object setter') }, configurable: true });",
+        )
+        js.global["ownData"] = listOf(mapOf("tag" to "kept", "__proto__" to mapOf("marker" to 7), "0" to 9))
+        assertTrue(js.evaluate(
+            "ownData[0].tag === 'kept' && ownData[0][0] === 9 && " +
+                "Object.getPrototypeOf(ownData[0]) === Object.prototype && " +
+                "Object.prototype.hasOwnProperty.call(ownData[0], '__proto__') && ownData[0].__proto__.marker === 7",
+        ).asBoolean())
     }
 
     @Test

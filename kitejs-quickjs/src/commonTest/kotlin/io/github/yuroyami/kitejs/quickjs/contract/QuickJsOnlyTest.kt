@@ -55,6 +55,16 @@ class QuickJsOnlyTest : EngineContract<QuickJsConfig>(QuickJs) {
     }
 
     @Test
+    fun aFailedCollectionConversionReleasesItsTemporaryHandles() = withEngine({ memoryLimit = 4L * 1024 * 1024 }) { js ->
+        val refused = listOf("x".repeat(128 * 1024), object {})
+        repeat(80) {
+            val error = assertFailsWith<JsEngineError> { js.valueOf(refused) }
+            assertContains(error.message!!, "has no JavaScript form")
+        }
+        assertEquals(2, js.evaluate("1 + 1").asInt())
+    }
+
+    @Test
     fun deepRecursionIsARangeErrorTheScriptCanCatch() = withEngine({ maxStackSize = 256L * 1024 }) { js ->
         val caught = js.evaluate("try { (function f() { return f() + 1 })() } catch (e) { e instanceof RangeError }")
         assertEquals(true, caught.asBoolean())

@@ -85,6 +85,14 @@ JavaScript length before writing anything.
 `List`, a number becomes a `Double`, and `undefined` becomes null. A function has no Kotlin twin,
 so it stays a `JsFunction`.
 
+In the other direction, Kotlin collections keep their graph: a list containing itself becomes
+an array whose first element is that same array, and two references to one child collection
+become two references to the same JavaScript object. This includes primitive arrays, byte
+arrays and objects that registered converters turn into collections. Each call makes a separate
+copy. Traversal uses an explicit work stack, so deeply nested input uses no recursive host calls.
+Custom converter chains that cycle or take more than 256 transformations before reaching a
+built-in type throw `JsEngineError`.
+
 An `ArrayBuffer`, a typed array or a `DataView` becomes a `ByteArray` with a copy of the bytes it
 views. `JsObject.toByteArrayOrNull()` gives the same copy for one object, and null for any other
 object. Neither runs a getter that the script redefined. A detached buffer gives no bytes.

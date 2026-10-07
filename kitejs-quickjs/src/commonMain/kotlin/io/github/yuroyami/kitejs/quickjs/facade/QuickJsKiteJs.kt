@@ -469,27 +469,29 @@ internal class QuickJsKiteJs private constructor(
     fun register(owner: Any, handle: Int): Any? = cleaner.register(owner, handle)
 
     /** A handle the caller owns and has to release, for [value] built in this engine. */
-    fun toHandle(value: Any?): Int = Converters.toEngine(
-        value,
-        scalar = ::scalarHandle,
-        array = { elements ->
-            val array = bridge.newArray(ptr)
-            for (e in elements) {
-                bridge.arrayPush(ptr, array, e)
-                bridge.release(ptr, e)
+    fun toHandle(value: Any?): Int {
+        val allocated = ArrayList<Int>()
+        var result = -1
+        fun own(handle: Int): Int = check(handle).also { allocated.add(it) }
+        try {
+            result = Converters.toEngineGraph(
+                value,
+                scalar = { own(scalarHandle(it)) },
+                array = { own(bridge.newArray(ptr)) },
+                obj = { own(bridge.newObject(ptr)) },
+                append = { array, child -> bridge.arrayPush(ptr, array, child) },
+                put = { obj, key, child -> bridge.objectPut(ptr, obj, key, child) },
+                bytes = { own(bridge.newBytes(ptr, it)) },
+            )
+            return result
+        } finally {
+            // Children are kept by their containers. Only the returned root keeps its handle.
+            for (i in allocated.indices.reversed()) {
+                val handle = allocated[i]
+                if (handle != result) bridge.release(ptr, handle)
             }
-            array
-        },
-        obj = { entries ->
-            val obj = bridge.newObject(ptr)
-            for ((k, v) in entries) {
-                bridge.objectPut(ptr, obj, k, v)
-                bridge.release(ptr, v)
-            }
-            obj
-        },
-        bytes = { check(bridge.newBytes(ptr, it)) },
-    )
+        }
+    }
 
     /** A copy of the bytes [obj], an object of [QuickJsBridge.TYPE_BYTES], views. */
     fun bytesOf(obj: QuickJsHandle): ByteArray = call(drain = false) { bridge.viewBytes(ptr, ownHandle(obj)) ?: raise() }

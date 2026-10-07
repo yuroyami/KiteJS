@@ -237,14 +237,20 @@ internal class RhinoKiteJs private constructor(
     )
 
     /** A Kotlin value, a [JsValue] or a handle as the engine holds it, collections built in this engine. */
-    fun toRhino(value: Any?): Any? = Converters.toEngine(
+    fun toRhino(value: Any?): Any? = Converters.toEngineGraph(
         value,
         scalar = ::scalarToRhino,
-        array = { elements -> cx.newArray(scope, elements.toTypedArray()) },
-        obj = { entries ->
-            val obj = cx.newObject(scope)
-            for ((key, v) in entries) ScriptRuntime.setObjectElem(obj, key, v, cx)
-            obj
+        array = { cx.newArray(scope, 0) },
+        obj = { cx.newObject(scope) },
+        append = { obj, child ->
+            val array = obj as NativeArray
+            array.put(array.length.toInt(), array, child)
+        },
+        put = { obj, key, child ->
+            val target = obj as Scriptable
+            val id = ScriptRuntime.toStringIdOrIndex(key)
+            if (id.stringId == null) target.put(id.index, target, child)
+            else target.put(id.stringId, target, child)
         },
         bytes = { bytes ->
             // The realm's own constructor, so a script that replaced the global Uint8Array runs nothing.
