@@ -852,6 +852,21 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   one. Upstream takes the line of the condition's first child even when that child has none, and
   a property read never has one, so in `if (item.p === "x")` an error took the line of the
   statement before, in `lineNumber` and in the stack. `ConditionLineNumberTest` pins it.
+- D-102: `Date.prototype` and `RegExp.prototype` are ordinary objects (ECMAScript 2015, 20.3.4
+  and 21.2.5): `[object Object]` to `Object.prototype.toString`, and their methods throw a
+  TypeError on them, where upstream made them an invalid Date and a RegExp of the empty pattern.
+  Each stays the object the methods are defined on, marked `isPrototype`, so its `className` is
+  `Object`, a method's receiver check refuses it, and the RegExp one has no `lastIndex` and no
+  pattern; `NativeRegExp.isInstance` tells a RegExp with a pattern from it where the fast paths
+  and `RegExpImpl` used to ask `is NativeRegExp`. `source`, `flags`, `global`, `ignoreCase`,
+  `multiline`, `dotAll`, `sticky` and `unicode` move from data properties of every RegExp to the
+  spec's accessors on the prototype, which answer `(?:)` and undefined on the prototype itself;
+  `source` escapes line terminators and gives `(?:)` for the empty pattern, `flags` is generic and
+  reads each flag property in the spec's order (`/a/yu.flags` is `uy`), and `toString` is the
+  spec's generic `/source/flags`. The RegExp constructor follows IsRegExp: `RegExp(x)` with no
+  flags hands back an x whose `constructor` is RegExp, and a pattern IsRegExp counts but that is
+  no RegExp lends its `source` and `flags`. `startsWith`, `endsWith` and `includes` refuse what
+  IsRegExp counts, before converting it. `PrototypesAreOrdinaryTest` checks 36 cases against V8.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

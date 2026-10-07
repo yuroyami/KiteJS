@@ -402,16 +402,30 @@ copies correctly.
 - Where: `NativeArray.js_copyWithin`.
 - Test: `ReflectTest.copy_within_asks_has_property` (common).
 
-### RegExp.prototype flags and source are data properties (D-89)
+### RegExp.prototype flags and source are data properties (D-102)
 
 `source`, `flags`, `global`, `ignoreCase`, `multiline`, `sticky`, `unicode` and `dotAll` are own
 data properties of every RegExp instance and of `RegExp.prototype`, not accessors on the prototype
 as ECMAScript 2015, 21.2.5 defines them, so `Object.getOwnPropertyNames(/a/)` lists all of them
 where browsers list only `lastIndex`. `Object.getOwnPropertyDescriptor(RegExp.prototype,
 'source')` has a value instead of a `get`, and `Reflect.get(RegExp.prototype, 'source', /xy/)`
-reads `''` where every browser reads `'xy'`. KiteJS keeps upstream's structure for now.
+reads `''` where every browser reads `'xy'`. `flags` lists `y` before `u`, and the source of an
+empty pattern is `''` rather than `(?:)`.
 
-- Where: `NativeRegExp` (the instance ids `Id_source`, `Id_global` and the rest).
+- Where: `NativeRegExp` (the instance ids `Id_source`, `Id_global` and the rest), now
+  `NativeRegExp.defineAccessors`.
+- Test: `PrototypesAreOrdinaryTest` (common).
+
+### Date.prototype is a Date and RegExp.prototype is a RegExp (D-102)
+
+`Date.prototype` is an invalid Date and `RegExp.prototype` a RegExp of the empty pattern, so their
+methods work on them: `Date.prototype.getTime()` is NaN, `String(Date.prototype)` is
+`Invalid Date`, `Object.prototype.toString.call(Date.prototype)` is `[object Date]`, and
+`'abc'.replace(RegExp.prototype, 'x')` is `xabc`. ECMAScript 2015, 20.3.4 and 21.2.5 make both
+ordinary objects, so each of these throws a TypeError.
+
+- Where: `NativeDate.init`, `NativeRegExp.init`.
+- Test: `PrototypesAreOrdinaryTest` (common), `EvalOracleTest.ordinaryPrototypesDifferFromTheLegacyOracle`.
 
 ### The own keys of RegExp.prototype and Date.prototype are strings, not symbols (D-90)
 

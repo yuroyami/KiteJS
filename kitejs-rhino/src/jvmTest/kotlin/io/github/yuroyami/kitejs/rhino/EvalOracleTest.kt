@@ -767,7 +767,7 @@ class EvalOracleTest {
     fun regexpBasics() = check(listOf(
         // The object itself.
         "typeof RegExp", "RegExp.length", "typeof /x/", "Object.prototype.toString.call(/x/)",
-        "/abc/.source", "/abc/gimsy.flags", "new RegExp('a').source", "new RegExp('').source",
+        "/abc/.source", "/abc/gimsy.flags", "new RegExp('a').source",
         "String(new RegExp(''))", "String(/(?:)/)", "String(/a\\/b/)", "String(new RegExp('a/b'))",
         "/a/.global", "/a/g.global", "/a/i.ignoreCase", "/a/m.multiline", "/a/s.dotAll", "/a/y.sticky", "/a/u.unicode",
         "/a/gimsy.flags", "new RegExp('a', 'gi').flags", "new RegExp(/a/g).flags", "new RegExp(/a/g, 'i').flags",
@@ -779,7 +779,7 @@ class EvalOracleTest {
         "typeof /a/.exec", "typeof /a/.test", "typeof /a/.compile", "typeof /a/[Symbol.match]",
         "typeof /a/[Symbol.replace]", "typeof /a/[Symbol.split]", "typeof /a/[Symbol.search]", "typeof /a/[Symbol.matchAll]",
         "RegExp.prototype.toString.call({ source: 'x', flags: 'g' })",
-        "RegExp.prototype.source", "RegExp.prototype.exec.call({}, 'x')",
+        "RegExp.prototype.exec.call({}, 'x')",
 
         // Syntax errors.
         "/[/", "/(/", "/)/", "/a{2,1}/", "new RegExp('(')", "new RegExp('[a-')", "new RegExp('\\\\')",
@@ -1042,8 +1042,6 @@ class EvalOracleTest {
         "new Date(0)[Symbol.toPrimitive]('default') === new Date(0).toString()",
         "try { new Date(0)[Symbol.toPrimitive]('nope') } catch (e) { e.name }",
         "Date.prototype.getTime.call({})", "Date.prototype.valueOf.call(1)",
-        "Object.prototype.toString.call(Date.prototype)",
-        "Date.prototype.getTime.call(Date.prototype)",
         // Upstream cannot be given the pinned clock, so two reads of it can straddle a millisecond.
         "typeof Date.now()", "var x = Date.now(), y = Date.now(); y - x >= 0 && y - x < 1000",
         "var a = Date.now(); var b = new Date().getTime(); b - a >= 0 && b - a < 1000",
@@ -1683,6 +1681,20 @@ class EvalOracleTest {
             if (expected != actual) failures.add("${file.name}\n  upstream: $expected\n  ported:   $actual")
         }
         assertEquals(emptyList(), failures, "corpus evaluation differs from upstream")
+    }
+
+    /** Date.prototype and RegExp.prototype are ordinary objects; upstream makes them a Date and a RegExp (D-102). */
+    @Test
+    fun ordinaryPrototypesDifferFromTheLegacyOracle() {
+        assertEquals("\"[object Date]\"", upstream("Object.prototype.toString.call(Date.prototype)"))
+        assertEquals("\"[object Object]\"", ported("Object.prototype.toString.call(Date.prototype)"))
+        assertEquals("NaN", upstream("Date.prototype.getTime.call(Date.prototype)"))
+        assertTrue(ported("Date.prototype.getTime.call(Date.prototype)").startsWith("throws TypeError"))
+        assertEquals("\"\"", upstream("RegExp.prototype.source"))
+        assertEquals("\"(?:)\"", ported("RegExp.prototype.source"))
+        assertEquals("\"\"", upstream("new RegExp('').source"))
+        assertEquals("\"(?:)\"", ported("new RegExp('').source"))
+        assertEquals("\"lastIndex\"", ported("Object.getOwnPropertyNames(/a/g).join()"))
     }
 
     /** toLocaleString formats numbers as Intl.NumberFormat("en-US") does; upstream is toString (D-99). */

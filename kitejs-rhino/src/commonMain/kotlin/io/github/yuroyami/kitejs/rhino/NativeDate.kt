@@ -22,11 +22,17 @@ internal class NativeDate private constructor() : IdScriptableObject() {
 
     private var date: Double = 0.0
 
+    /**
+     * Whether this is `Date.prototype`, which carries the methods but is an ordinary object with
+     * no time value (ECMAScript 2015, 20.3.4), so they throw on it (D-102).
+     */
+    private var isPrototype = false
+
     override val className: String
-        get() = "Date"
+        get() = if (isPrototype) "Object" else "Date"
 
     override fun getDefaultValue(hint: KClass<*>?): Any? =
-        super.getDefaultValue(hint ?: ScriptRuntime.StringClass)
+        super.getDefaultValue(if (isPrototype) hint else hint ?: ScriptRuntime.StringClass)
 
     internal val jsTimeValue: Double get() = date
 
@@ -141,8 +147,11 @@ internal class NativeDate private constructor() : IdScriptableObject() {
             }
         }
 
-        // Everything below needs `this` to be a real Date.
+        // Everything below needs `this` to be a real Date, which the prototype is not.
         val realThis = ensureType<NativeDate>(thisObj, f.functionName)
+        if (realThis.isPrototype) {
+            throw ScriptRuntime.typeErrorById("msg.incompat.call.details", f.functionName, "Object", "NativeDate")
+        }
         var t = realThis.date
         val id = f.methodId()
 
@@ -331,9 +340,10 @@ internal class NativeDate private constructor() : IdScriptableObject() {
 
         internal fun init(scope: Scriptable, sealed: Boolean) {
             val obj = NativeDate()
-            // The prototype itself is an invalid date.
             obj.date = ScriptRuntime.NaN
             obj.exportAsJSClass(MAX_PROTOTYPE_ID, scope, sealed)
+            // Only now: exporting names the constructor after the class.
+            obj.isPrototype = true
         }
 
         // ---- The spec's own arithmetic -------------------------------------------------------
@@ -1045,7 +1055,7 @@ internal class NativeDate private constructor() : IdScriptableObject() {
 
             if (args.size == 1) {
                 val value = args[0]
-                if (value is NativeDate) {
+                if (value is NativeDate && !value.isPrototype) {
                     obj.date = value.date
                     return obj
                 }

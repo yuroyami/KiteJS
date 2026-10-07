@@ -47,7 +47,8 @@ public class RegExpImpl : RegExpProxy {
         LazilyLoadedCtor(scope, "RegExp", sealed, Initializable { cx, s, sld -> NativeRegExp.init(cx, s, sld) })
     }
 
-    override fun isRegExp(obj: Scriptable?): Boolean = obj is NativeRegExp
+    /** Whether [obj] has a pattern, as a RegExp has and RegExp.prototype has not (D-102). */
+    override fun isRegExp(obj: Scriptable?): Boolean = NativeRegExp.isInstance(obj)
 
     override fun compileRegExp(cx: Context, source: String, flags: String?): Any =
         NativeRegExp.compileRE(cx, source, flags, false)
@@ -75,7 +76,7 @@ public class RegExpImpl : RegExpProxy {
             }
 
             RegExpProxy.RA_REPLACE, RegExpProxy.RA_REPLACE_ALL -> {
-                var useRE = args.isNotEmpty() && args[0] is NativeRegExp
+                var useRE = args.isNotEmpty() && NativeRegExp.isInstance(args[0])
                 if (cx.languageVersion < Context.VERSION_1_6) useRE = useRE || args.size > 2
 
                 var re: NativeRegExp? = null
@@ -298,7 +299,7 @@ public class RegExpImpl : RegExpProxy {
                 val compiled = NativeRegExp.compileRE(cx, "", "", false)
                 return NativeRegExpInstantiator.withLanguageVersionScopeCompiled(cx.languageVersion, topScope, compiled)
             }
-            if (args[0] is NativeRegExp) return args[0] as NativeRegExp
+            if (NativeRegExp.isInstance(args[0])) return args[0] as NativeRegExp
 
             val src = ScriptRuntime.toString(args[0])
             val opt: String? = if (optarg < args.size) {

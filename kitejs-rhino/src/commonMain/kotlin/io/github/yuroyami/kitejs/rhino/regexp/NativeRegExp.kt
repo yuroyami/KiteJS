@@ -15,6 +15,7 @@ import io.github.yuroyami.kitejs.rhino.ScriptRuntime
 import io.github.yuroyami.kitejs.rhino.ScriptRuntimeES6
 import io.github.yuroyami.kitejs.rhino.Scriptable
 import io.github.yuroyami.kitejs.rhino.ScriptableObject
+import io.github.yuroyami.kitejs.rhino.ScriptableObject.LambdaGetterFunction
 import io.github.yuroyami.kitejs.rhino.Symbol
 import io.github.yuroyami.kitejs.rhino.SymbolKey
 import io.github.yuroyami.kitejs.rhino.TopLevel
@@ -32,6 +33,12 @@ public open class NativeRegExp : IdScriptableObject {
     internal var lastIndex: Any? = ScriptRuntime.zeroObj
     private var lastIndexAttr: Int = DONTENUM or PERMANENT
 
+    /**
+     * Whether this is `RegExp.prototype`: it carries the methods, but is an ordinary object with
+     * no pattern and no `lastIndex` (ECMAScript 2015, 21.2.5), so they throw on it (D-102).
+     */
+    internal var isPrototype: Boolean = false
+
     internal constructor() : super()
 
     internal constructor(scope: Scriptable, regexpCompiled: RECompiled) : super() {
@@ -41,27 +48,28 @@ public open class NativeRegExp : IdScriptableObject {
     }
 
     override val className: String
-        get() = "RegExp"
+        get() = if (isPrototype) "Object" else "RegExp"
 
     override val typeOf: String
         get() = "object"
 
     internal fun compile(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable {
         val first = if (args.isNotEmpty()) args[0] else null
-        if (args.isNotEmpty() && first is NativeRegExp && (args.size == 1 || args[1] === Undefined.instance)) {
+        if (args.isNotEmpty() && isInstance(first) && (args.size == 1 || args[1] === Undefined.instance)) {
+            first as NativeRegExp
             // Same pattern and no new flags, so there is nothing to compile.
             this.re = first.re
         } else {
             val pattern: String = when {
                 args.isEmpty() || first === Undefined.instance -> ""
-                first is NativeRegExp -> first.re!!.source.concatToString()
+                isInstance(first) -> (first as NativeRegExp).re!!.source.concatToString()
                 else -> escapeRegExp(first)
             }
 
             val flags = if (args.size > 1 && args[1] !== Undefined.instance) ScriptRuntime.toString(args[1]) else null
 
             // A regexp plus flags is allowed from ES6 on, and rejected before it.
-            if (args.isNotEmpty() && first is NativeRegExp && flags != null && cx.languageVersion < Context.VERSION_ES6) {
+            if (args.isNotEmpty() && isInstance(first) && flags != null && cx.languageVersion < Context.VERSION_ES6) {
                 throw ScriptRuntime.typeErrorById("msg.bad.regexp.compile")
             }
 
@@ -92,8 +100,8 @@ public open class NativeRegExp : IdScriptableObject {
         if ((flags and JSREG_FOLD) != 0) buf.append('i')
         if ((flags and JSREG_MULTILINE) != 0) buf.append('m')
         if ((flags and JSREG_DOTALL) != 0) buf.append('s')
-        if ((flags and JSREG_STICKY) != 0) buf.append('y')
         if ((flags and JSREG_UNICODE) != 0) buf.append('u')
+        if ((flags and JSREG_STICKY) != 0) buf.append('y')
     }
 
     internal val flags: Int get() = re!!.flags
@@ -260,60 +268,25 @@ public open class NativeRegExp : IdScriptableObject {
     override val maxInstanceId: Int get() = MAX_INSTANCE_ID
 
     override fun findInstanceIdInfo(s: String): Int {
-        val id = when (s) {
-            "lastIndex" -> Id_lastIndex
-            "source" -> Id_source
-            "flags" -> Id_flags
-            "global" -> Id_global
-            "ignoreCase" -> Id_ignoreCase
-            "multiline" -> Id_multiline
-            "dotAll" -> Id_dotAll
-            "sticky" -> Id_sticky
-            "unicode" -> Id_unicode
-            else -> 0
-        }
-        if (id == 0) return super.findInstanceIdInfo(s)
-
-        val attr = when (id) {
-            Id_lastIndex -> lastIndexAttr
-            else -> PERMANENT or READONLY or DONTENUM
-        }
-        return instanceIdInfo(attr, id)
+        // source, flags and the flag booleans are accessors on RegExp.prototype (D-102).
+        if (s == "lastIndex" && !isPrototype) return instanceIdInfo(lastIndexAttr, Id_lastIndex)
+        return super.findInstanceIdInfo(s)
     }
 
     override fun getInstanceIdName(id: Int): String = when (id) {
         Id_lastIndex -> "lastIndex"
-        Id_source -> "source"
-        Id_flags -> "flags"
-        Id_global -> "global"
-        Id_ignoreCase -> "ignoreCase"
-        Id_multiline -> "multiline"
-        Id_dotAll -> "dotAll"
-        Id_sticky -> "sticky"
-        Id_unicode -> "unicode"
         else -> super.getInstanceIdName(id)
     }
 
     override fun getInstanceIdValue(id: Int): Any? = when (id) {
         Id_lastIndex -> lastIndex
-        Id_source -> re!!.source.concatToString()
-        Id_flags -> StringBuilder().also { appendFlags(it) }.toString()
-        Id_global -> (re!!.flags and JSREG_GLOB) != 0
-        Id_ignoreCase -> (re!!.flags and JSREG_FOLD) != 0
-        Id_multiline -> (re!!.flags and JSREG_MULTILINE) != 0
-        Id_dotAll -> (re!!.flags and JSREG_DOTALL) != 0
-        Id_sticky -> (re!!.flags and JSREG_STICKY) != 0
-        Id_unicode -> (re!!.flags and JSREG_UNICODE) != 0
         else -> super.getInstanceIdValue(id)
     }
 
     override fun setInstanceIdValue(id: Int, value: Any?) {
-        when (id) {
-            Id_lastIndex -> {
-                setLastIndex(value)
-                return
-            }
-            Id_source, Id_flags, Id_global, Id_ignoreCase, Id_multiline, Id_dotAll, Id_sticky -> return
+        if (id == Id_lastIndex) {
+            setLastIndex(value)
+            return
         }
         super.setInstanceIdValue(id, value)
     }
@@ -370,17 +343,12 @@ public open class NativeRegExp : IdScriptableObject {
         return when (f.methodId()) {
             Id_compile -> realThis(thisObj, f).compile(cx, scope, args)
             Id_toString -> {
-                // A plain object with source and flags prints like a regexp, which is what
-                // RegExp.prototype.toString.call({source, flags}) is expected to do.
-                if (thisObj !== scope && thisObj is io.github.yuroyami.kitejs.rhino.NativeObject) {
-                    val sourceObj = thisObj.get("source", thisObj)
-                    val source = if (sourceObj == Scriptable.NOT_FOUND) "undefined" else escapeRegExp(sourceObj)
-                    val flagsObj = thisObj.get("flags", thisObj)
-                    val flags = if (flagsObj == Scriptable.NOT_FOUND) "undefined" else flagsObj.toString()
-                    "/$source/$flags"
-                } else {
-                    realThis(thisObj, f).toString()
-                }
+                // Generic: "/" + source + "/" + flags, read through the accessors or whatever
+                // the object has, so RegExp.prototype prints /(?:)/ and a plain object works too.
+                val r = requireObject(thisObj)
+                val source = ScriptRuntime.toString(ScriptRuntime.getObjectProp(r, "source", cx, scope))
+                val flags = ScriptRuntime.toString(ScriptRuntime.getObjectProp(r, "flags", cx, scope))
+                "/$source/$flags"
             }
             Id_toSource -> realThis(thisObj, f).toString()
             Id_exec -> js_exec(cx, scope, thisObj, args)
@@ -442,19 +410,11 @@ public open class NativeRegExp : IdScriptableObject {
         }
     }
 
-    /** The spec's "this must be an object" step, answering a value the rest of the body can use. */
-    private fun requireObject(value: Scriptable?): Scriptable {
-        if (!ScriptRuntime.isObject(value)) {
-            throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(value))
-        }
-        return value!!
-    }
-
     private fun js_test(cx: Context, scope: Scriptable, thisArg: Scriptable?, args: Array<Any?>): Boolean {
         val regexp = requireObject(thisArg)
         val string = ScriptRuntime.toString(if (args.isNotEmpty()) args[0] else Undefined.instance)
         val exec = ScriptRuntime.getObjectProp(regexp, "exec", cx, scope)
-        if (regexp is NativeRegExp && (exec !is io.github.yuroyami.kitejs.rhino.Callable || isBuiltinExec(exec))) {
+        if (regexp is NativeRegExp && !regexp.isPrototype && (exec !is io.github.yuroyami.kitejs.rhino.Callable || isBuiltinExec(exec))) {
             return regexp.execSub(cx, scope, arrayOf<Any?>(string), TEST) == true
         }
         return execWithMethod(regexp, string, cx, scope, exec) != null
@@ -482,7 +442,7 @@ public open class NativeRegExp : IdScriptableObject {
         val s = ScriptRuntime.toString(if (args.isNotEmpty()) args[0] else Undefined.instance)
 
         val topLevelScope = getTopLevelScope(scope)
-        val defaultConstructor = ScriptRuntime.getExistingCtor(cx, topLevelScope, className)
+        val defaultConstructor = ScriptRuntime.getExistingCtor(cx, topLevelScope, "RegExp")
         val c = io.github.yuroyami.kitejs.rhino.AbstractEcmaObjectOperations.speciesConstructor(cx, thisObj, defaultConstructor)
 
         val flags = ScriptRuntime.toString(ScriptRuntime.getObjectProp(thisObj, "flags", cx))
@@ -497,7 +457,7 @@ public open class NativeRegExp : IdScriptableObject {
 
     private fun js_SymbolReplace(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
         // The fast path only applies when nothing about this regexp has been replaced by a script.
-        if (thisObj is NativeRegExp) {
+        if (thisObj is NativeRegExp && !thisObj.isPrototype) {
             val exec = getProperty(thisObj, "exec")
             if ((thisObj.lastIndexAttr and READONLY) == 0 && isBuiltinExec(exec)) {
                 return thisObj.js_SymbolReplaceFast(cx, scope, thisObj, args)
@@ -715,7 +675,7 @@ public open class NativeRegExp : IdScriptableObject {
         val s = ScriptRuntime.toString(if (args.isNotEmpty()) args[0] else Undefined.instance)
 
         val topLevelScope = getTopLevelScope(scope)
-        val defaultConstructor = ScriptRuntime.getExistingCtor(cx, topLevelScope, className)
+        val defaultConstructor = ScriptRuntime.getExistingCtor(cx, topLevelScope, "RegExp")
         val c = io.github.yuroyami.kitejs.rhino.AbstractEcmaObjectOperations.speciesConstructor(cx, rx, defaultConstructor)
 
         val flags = ScriptRuntime.toString(ScriptRuntime.getObjectProp(rx, "flags", cx))
@@ -729,7 +689,7 @@ public open class NativeRegExp : IdScriptableObject {
         val lim = if (Undefined.isUndefined(limit)) Int.MAX_VALUE.toLong() else ScriptRuntime.toUint32(limit)
         if (lim == 0L) return a
 
-        if (splitter is NativeRegExp) {
+        if (splitter is NativeRegExp && !splitter.isPrototype) {
             val exec = getProperty(splitter, "exec")
             if ((splitter.lastIndexAttr and READONLY) == 0 && isBuiltinExec(exec)) {
                 return js_SymbolSplitFast(cx, scope, splitter, s, lim, unicodeMatching, a)
@@ -924,10 +884,11 @@ public open class NativeRegExp : IdScriptableObject {
 
         internal fun init(cx: Context, scope: Scriptable, sealed: Boolean): Any {
             val proto = NativeRegExpInstantiator.withLanguageVersion(cx.languageVersion)
-            proto.re = compileRE(cx, "", null, false)
+            proto.isPrototype = true
             proto.activatePrototypeMap(MAX_PROTOTYPE_ID)
             proto.parentScope = scope
             proto.prototype = getObjectPrototype(scope)
+            defineAccessors(cx, proto)
 
             val ctor = NativeRegExpCtor.init(cx, scope, sealed)
             // The spec pins RegExp.prototype.constructor to the built-in constructor.
@@ -944,6 +905,79 @@ public open class NativeRegExp : IdScriptableObject {
             defineProperty(scope, "RegExp", ctor, DONTENUM)
             ScriptRuntimeES6.addSymbolSpecies(cx, scope, ctor)
             return ctor
+        }
+
+        /**
+         * `source`, `flags` and the flag booleans, as the accessors ECMAScript 2015, 21.2.5 puts on
+         * the prototype. On the prototype itself `source` is "(?:)" and a flag is undefined; on
+         * any other object that is not a RegExp they throw.
+         */
+        private fun defineAccessors(cx: Context, proto: NativeRegExp) {
+            fun getter(name: String, read: (NativeRegExp) -> Any?, onPrototype: Any?) = LambdaGetterFunction { self ->
+                when {
+                    self is NativeRegExp && !self.isPrototype -> read(self)
+                    self === proto -> onPrototype
+                    else -> throw ScriptRuntime.typeErrorById(
+                        "msg.incompat.call.details",
+                        "get $name",
+                        if (self == null) "undefined" else self.className,
+                        "NativeRegExp",
+                    )
+                }
+            }
+            proto.defineProperty(cx, "dotAll", getter("dotAll", { (it.flags and JSREG_DOTALL) != 0 }, Undefined.instance), null, DONTENUM)
+            proto.defineProperty(cx, "flags", LambdaGetterFunction { self ->
+                // Generic: whatever the object answers for each flag, in ECMAScript's order.
+                val r = requireObject(self)
+                val out = StringBuilder()
+                for ((name, letter) in FLAG_PROPERTIES) {
+                    if (ScriptRuntime.toBoolean(ScriptableObject.getProperty(r, name).let { if (it === Scriptable.NOT_FOUND) Undefined.instance else it })) {
+                        out.append(letter)
+                    }
+                }
+                out.toString()
+            }, null, DONTENUM)
+            proto.defineProperty(cx, "global", getter("global", { (it.flags and JSREG_GLOB) != 0 }, Undefined.instance), null, DONTENUM)
+            proto.defineProperty(cx, "ignoreCase", getter("ignoreCase", { (it.flags and JSREG_FOLD) != 0 }, Undefined.instance), null, DONTENUM)
+            proto.defineProperty(cx, "multiline", getter("multiline", { (it.flags and JSREG_MULTILINE) != 0 }, Undefined.instance), null, DONTENUM)
+            proto.defineProperty(cx, "source", getter("source", { escapeRegExpPattern(it.re!!.source.concatToString()) }, "(?:)"), null, DONTENUM)
+            proto.defineProperty(cx, "sticky", getter("sticky", { (it.flags and JSREG_STICKY) != 0 }, Undefined.instance), null, DONTENUM)
+            proto.defineProperty(cx, "unicode", getter("unicode", { (it.flags and JSREG_UNICODE) != 0 }, Undefined.instance), null, DONTENUM)
+        }
+
+        /** The spec's "this must be an object" step, answering a value the rest of the body can use. */
+        private fun requireObject(value: Scriptable?): Scriptable {
+            if (!ScriptRuntime.isObject(value)) {
+                throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(value))
+            }
+            return value!!
+        }
+
+        /** The flag properties the `flags` getter reads, in ECMAScript 2024's order. */
+        private val FLAG_PROPERTIES = listOf(
+            "hasIndices" to 'd', "global" to 'g', "ignoreCase" to 'i', "multiline" to 'm',
+            "dotAll" to 's', "unicode" to 'u', "unicodeSets" to 'v', "sticky" to 'y',
+        )
+
+        /**
+         * EscapeRegExpPattern: text that reads back as the same pattern between two slashes. The
+         * slashes are escaped when the pattern is compiled; this adds the empty pattern and the
+         * line terminators.
+         */
+        private fun escapeRegExpPattern(source: String): String {
+            if (source.isEmpty()) return "(?:)"
+            if (source.none { it == '\n' || it == '\r' || it == '\u2028' || it == '\u2029' }) return source
+            val b = StringBuilder()
+            for (c in source) {
+                when (c) {
+                    '\n' -> b.append("\\n")
+                    '\r' -> b.append("\\r")
+                    '\u2028' -> b.append("\\u2028")
+                    '\u2029' -> b.append("\\u2029")
+                    else -> b.append(c)
+                }
+            }
+            return b.toString()
         }
 
         private fun getImpl(cx: Context): RegExpImpl = ScriptRuntime.getRegExpProxy(cx) as RegExpImpl
@@ -3168,8 +3202,16 @@ public open class NativeRegExp : IdScriptableObject {
         private fun realThis(thisObj: Scriptable?, f: IdFunctionObject): NativeRegExp =
             realThis(thisObj, f.functionName)
 
-        private fun realThis(thisObj: Scriptable?, functionName: String): NativeRegExp =
-            ensureType<NativeRegExp>(thisObj, functionName)
+        private fun realThis(thisObj: Scriptable?, functionName: String): NativeRegExp {
+            val r = ensureType<NativeRegExp>(thisObj, functionName)
+            if (r.isPrototype) {
+                throw ScriptRuntime.typeErrorById("msg.incompat.call.details", functionName, "Object", "NativeRegExp")
+            }
+            return r
+        }
+
+        /** A RegExp object with a pattern: any [NativeRegExp] but `RegExp.prototype` (D-102). */
+        internal fun isInstance(o: Any?): Boolean = o is NativeRegExp && !o.isPrototype
 
         /** The spec's RegExpExec: call the object's own `exec` when it has one. */
         public fun regExpExec(regexp: Scriptable, string: String, cx: Context, scope: Scriptable): Any? {
@@ -3199,15 +3241,7 @@ public open class NativeRegExp : IdScriptableObject {
 
         // Ids for the instance and prototype members.
         internal const val Id_lastIndex = 1
-        internal const val Id_source = 2
-        internal const val Id_flags = 3
-        internal const val Id_global = 4
-        internal const val Id_ignoreCase = 5
-        internal const val Id_multiline = 6
-        internal const val Id_dotAll = 7
-        internal const val Id_sticky = 8
-        internal const val Id_unicode = 9
-        internal const val MAX_INSTANCE_ID = 9
+        internal const val MAX_INSTANCE_ID = 1
 
         internal const val Id_compile = 1
         internal const val Id_toString = 2

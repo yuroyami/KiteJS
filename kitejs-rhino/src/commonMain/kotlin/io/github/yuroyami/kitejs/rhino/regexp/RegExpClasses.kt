@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.rhino.regexp
 
+import io.github.yuroyami.kitejs.rhino.AbstractEcmaObjectOperations
 import io.github.yuroyami.kitejs.rhino.Context
 import io.github.yuroyami.kitejs.rhino.ES6Iterator
 import io.github.yuroyami.kitejs.rhino.Function
@@ -115,15 +116,36 @@ internal object NativeRegExpCtor {
 
     private fun js_constructCall(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
         // RegExp(re) with no new flags hands back the same object.
-        if (args.isNotEmpty() && args[0] is NativeRegExp && (args.size == 1 || args[1] === Undefined.instance)) {
+        if (args.isNotEmpty() && NativeRegExp.isInstance(args[0]) && (args.size == 1 || args[1] === Undefined.instance)) {
             return args[0] as Scriptable
+        }
+        // So does RegExp(x) for any other x that IsRegExp counts, whose constructor is RegExp
+        // (ECMAScript 2015, 21.2.3.1 step 4), RegExp.prototype among them.
+        if (args.isNotEmpty() && (args.size == 1 || args[1] === Undefined.instance) &&
+            !NativeRegExp.isInstance(args[0]) && AbstractEcmaObjectOperations.isRegExp(cx, scope, args[0])
+        ) {
+            val pattern = args[0] as Scriptable
+            val ctor = ScriptRuntime.getObjectProp(pattern, "constructor", cx, scope)
+            if (ctor === ScriptableObject.getProperty(ScriptableObject.getTopLevelScope(scope), "RegExp")) return pattern
         }
         return js_construct(cx, scope, args)
     }
 
     private fun js_construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable {
         val re = NativeRegExpInstantiator.withLanguageVersion(cx.languageVersion)
-        re.compile(cx, scope, args)
+        var actual = args
+        // A pattern IsRegExp counts but that has no pattern of its own lends its source and flags.
+        if (args.isNotEmpty() && !NativeRegExp.isInstance(args[0]) && AbstractEcmaObjectOperations.isRegExp(cx, scope, args[0])) {
+            val pattern = args[0] as Scriptable
+            val source = ScriptRuntime.getObjectProp(pattern, "source", cx, scope)
+            val flags = if (args.size < 2 || args[1] === Undefined.instance) {
+                ScriptRuntime.getObjectProp(pattern, "flags", cx, scope)
+            } else {
+                args[1]
+            }
+            actual = arrayOf(source, flags)
+        }
+        re.compile(cx, scope, actual)
         ScriptRuntime.setBuiltinProtoAndParent(re, scope, TopLevel.Builtins.RegExp)
         return re
     }

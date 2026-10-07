@@ -292,7 +292,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
 
         private fun js_startsWith(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val target = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "startsWith"))
-            checkValidRegex(cx, args, 0, "startsWith")
+            checkValidRegex(cx, scope, args, 0, "startsWith")
             val searchStr = ScriptRuntime.toString(args, 0)
             var position = ScriptRuntime.toInteger(args, 1)
             if (position < 0) position = 0.0 else if (position > target.length) position = target.length.toDouble()
@@ -301,7 +301,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
 
         private fun js_endsWith(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val target = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "endsWith"))
-            checkValidRegex(cx, args, 0, "endsWith")
+            checkValidRegex(cx, scope, args, 0, "endsWith")
             val searchStr = ScriptRuntime.toString(args, 0)
             var position = ScriptRuntime.toInteger(args, 1)
             if (position < 0) position = 0.0 else if (position.isNaN() || position > target.length) position = target.length.toDouble()
@@ -311,8 +311,8 @@ internal class NativeString internal constructor(private val string: CharSequenc
 
         private fun js_includes(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val target = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "includes"))
+            checkValidRegex(cx, scope, args, 0, "includes")
             val searchStr = ScriptRuntime.toString(args, 0)
-            checkValidRegex(cx, args, 0, "includes")
             // The spec clamps the start to the string's own length, and that matters for an
             // empty search string: it is found at the end. The JVM clamps inside indexOf, so
             // leaving it out only shows up off the JVM.
@@ -321,17 +321,10 @@ internal class NativeString internal constructor(private val string: CharSequenc
             return target.indexOf(searchStr, start) != -1
         }
 
-        private fun checkValidRegex(cx: Context, args: Array<Any?>, pos: Int, functionName: String) {
-            if (args.size > pos && args[pos] is Scriptable) {
-                val reProxy = ScriptRuntime.getRegExpProxy(cx)
-                if (reProxy != null) {
-                    val arg = args[pos] as Scriptable
-                    if (reProxy.isRegExp(arg)) {
-                        if (isTrue(getProperty(arg, SymbolKey.MATCH))) {
-                            throw ScriptRuntime.typeErrorById("msg.first.arg.not.regexp", CLASS_NAME, functionName)
-                        }
-                    }
-                }
+        /** A RegExp, or anything IsRegExp counts as one, is refused as the search string. */
+        private fun checkValidRegex(cx: Context, scope: Scriptable, args: Array<Any?>, pos: Int, functionName: String) {
+            if (args.size > pos && AbstractEcmaObjectOperations.isRegExp(cx, scope, args[pos])) {
+                throw ScriptRuntime.typeErrorById("msg.first.arg.not.regexp", CLASS_NAME, functionName)
             }
         }
 
