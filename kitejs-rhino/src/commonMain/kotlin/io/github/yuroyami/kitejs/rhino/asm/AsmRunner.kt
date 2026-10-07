@@ -9,6 +9,7 @@ import io.github.yuroyami.kitejs.rhino.Context
 import io.github.yuroyami.kitejs.rhino.FdLibm
 import io.github.yuroyami.kitejs.rhino.ScriptRuntime
 import io.github.yuroyami.kitejs.rhino.Scriptable
+import io.github.yuroyami.kitejs.rhino.Undefined
 import io.github.yuroyami.kitejs.rhino.typedarrays.NativeArrayBuffer
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -30,10 +31,10 @@ internal class AsmInstance(
 /**
  * Runs the typed code of a linked module.
  *
- * There is one of these per instance, and it holds the two stacks every function of the module
- * shares. A call does not build a frame: it takes the slots above the caller's, and because the
- * caller pushed its arguments in the order the callee's parameters are numbered, the arguments
- * are already in the right slots and nothing is copied.
+ * An instance's exports share a runner, with another runner at each depth of synchronous reentry.
+ * Each runner owns its stacks and registers; all of them share the instance's globals and heap.
+ * Calls within typed code take slots above the caller's, with arguments already in parameter
+ * order, so they need no copying.
  *
  * Calls use the host's own call stack, so a runaway recursion in the module ends as a
  * `StackOverflowError`, which the export turns into the same error a script would have seen.
@@ -51,6 +52,8 @@ internal class AsmRunner(private val instance: AsmInstance) {
     var retDbl: Double = 0.0
 
     private var depth = 0
+    private var exportActive = false
+    private var reentrantRunner: AsmRunner? = null
 
     /** Counted on backward jumps, which is where a module that never returns has to be caught. */
     private var backJumps = 0
@@ -61,8 +64,46 @@ internal class AsmRunner(private val instance: AsmInstance) {
     private var coldDp = 0
     private var coldPc = 0
 
-    /** Re-reads the heap. Called whenever the module is entered from outside. */
-    fun enter() {
+    /**
+     * Owns one external entry, including argument conversion, until its answer is captured.
+     * A callback or conversion hook can enter any export of this instance again; it needs
+     * independent stacks and registers, while its writes to globals and heap remain shared.
+     */
+    fun callExport(cx: Context, fnIndex: Int, args: Array<Any?>): Any? {
+        if (exportActive) {
+            val nested = reentrantRunner ?: AsmRunner(instance).also { reentrantRunner = it }
+            return nested.callExport(cx, fnIndex, args)
+        }
+        exportActive = true
+        try {
+            refreshHeap()
+            val fn = instance.module.functions[fnIndex]
+            var intArg = 0
+            var dblArg = 0
+            for (i in fn.paramTypes.indices) {
+                val given = args.getOrNull(i)
+                if (AsmType.isDbl(fn.paramTypes[i])) {
+                    val value = ScriptRuntime.toNumber(given)
+                    pushArgDbl(dblArg++, if (fn.paramTypes[i] == AsmType.FLOAT) froundOf(value) else value)
+                } else {
+                    pushArgInt(intArg++, ScriptRuntime.toInt32(given))
+                }
+            }
+            // Converting an argument may have changed the buffer's backing storage.
+            refreshHeap()
+            run(cx, fnIndex, 0, 0)
+            return when {
+                fn.returnType == AsmType.VOID -> Undefined.instance
+                AsmType.isDbl(fn.returnType) -> retDbl
+                else -> retInt
+            }
+        } finally {
+            exportActive = false
+        }
+    }
+
+    /** Re-reads the heap whenever the module is entered from outside. */
+    private fun refreshHeap() {
         heap = instance.buffer.buffer ?: throw ScriptRuntime.typeError("the module's heap was detached")
     }
 

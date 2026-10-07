@@ -10,7 +10,6 @@ import io.github.yuroyami.kitejs.rhino.Context
 import io.github.yuroyami.kitejs.rhino.ScriptRuntime
 import io.github.yuroyami.kitejs.rhino.Scriptable
 import io.github.yuroyami.kitejs.rhino.ScriptableObject
-import io.github.yuroyami.kitejs.rhino.Undefined
 import io.github.yuroyami.kitejs.rhino.typedarrays.NativeArrayBuffer
 
 /**
@@ -146,7 +145,7 @@ internal object AsmLink {
  * inside it there are no JavaScript values at all.
  */
 internal class AsmExportFunction(
-    private val instance: AsmInstance,
+    instance: AsmInstance,
     private val runner: AsmRunner,
     private val index: Int,
     scope: Scriptable,
@@ -164,26 +163,8 @@ internal class AsmExportFunction(
 
     override val arity: Int get() = fn.paramTypes.size
 
-    override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-        runner.enter()
-        var ints = 0
-        var dbls = 0
-        for (i in fn.paramTypes.indices) {
-            val given = args.getOrNull(i)
-            if (AsmType.isDbl(fn.paramTypes[i])) {
-                val value = ScriptRuntime.toNumber(given)
-                runner.pushArgDbl(dbls++, if (fn.paramTypes[i] == AsmType.FLOAT) froundOf(value) else value)
-            } else {
-                runner.pushArgInt(ints++, ScriptRuntime.toInt32(given))
-            }
-        }
-        runner.run(cx, index, 0, 0)
-        return when {
-            fn.returnType == AsmType.VOID -> Undefined.instance
-            AsmType.isDbl(fn.returnType) -> runner.retDbl
-            else -> runner.retInt
-        }
-    }
+    override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
+        runner.callExport(cx, index, args)
 
     override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable =
         throw ScriptRuntime.typeError("${fn.name} is not a constructor")
