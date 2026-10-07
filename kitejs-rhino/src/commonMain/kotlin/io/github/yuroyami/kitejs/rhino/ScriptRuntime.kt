@@ -3075,6 +3075,17 @@ public object ScriptRuntime {
                     } else {
                         varScope.put(name, varScope, Undefined.instance)
                     }
+                } else if (desc.isVarDeclaration(i) && desc.hasFunctionNamed(name)) {
+                    // A readonly global property is still a valid var binding. Only an actual
+                    // const binding prevents this declaration; do not read an accessor value.
+                    val base = ScriptableObject.getBase(scope, name) ?: continue
+                    val holder = if (base is NativeWith) base.prototype else base
+                    val constBinding = when (holder) {
+                        is ScriptableObject -> holder.isConstBinding(name)
+                        is ConstProperties -> holder.isConst(name)
+                        else -> false
+                    }
+                    if (constBinding) throw typeErrorById("msg.const.redecl", name)
                 } else {
                     ScriptableObject.redefineProperty(scope, name, isConst)
                 }

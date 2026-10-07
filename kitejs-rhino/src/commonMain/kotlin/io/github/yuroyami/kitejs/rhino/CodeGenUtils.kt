@@ -76,6 +76,7 @@ public object CodeGenUtils {
         builder.paramAndVarNames = disambiguateNames(scriptOrFn.paramAndVarNames, scriptOrFn.paramCount)
         builder.paramCount = scriptOrFn.paramCount
         builder.paramIsConst = scriptOrFn.paramAndVarConst
+        builder.paramIsVar = BooleanArray(scriptOrFn.paramAndVarCount) { scriptOrFn.symbols[it].declType == Token.VAR }
         builder.paramAndVarCount = scriptOrFn.paramAndVarCount
         builder.hasRestArg = scriptOrFn.hasRestParameter
         builder.hasDefaultParameters = scriptOrFn.defaultParams != null

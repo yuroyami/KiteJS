@@ -18,6 +18,7 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
     public val parent: JSDescriptor<*>?,
     private val paramAndVarNames: Array<String>,
     private val paramIsConst: BooleanArray,
+    private val paramIsVar: BooleanArray,
     private val flags: Int,
     public val sourceName: String?,
     private val wholeSource: String?,
@@ -72,6 +73,8 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
 
     public fun getParamOrVarConst(index: Int): Boolean = paramIsConst[index]
 
+    internal fun isVarDeclaration(index: Int): Boolean = paramIsVar[index]
+
     public fun getParamOrVarName(index: Int): String = paramAndVarNames[index]
 
     /** False when a nested function declaration (not expression) is named [name]. */
@@ -103,6 +106,7 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
         public val nestedFunctions: ArrayList<Builder<JSFunction>> = ArrayList()
         public var paramAndVarNames: Array<String>? = null
         public var paramIsConst: BooleanArray? = null
+        internal var paramIsVar: BooleanArray? = null
         public var isStrict: Boolean = false
         public var isScript: Boolean = false
         public var isTopLevel: Boolean = false
@@ -183,6 +187,7 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
                 parent,
                 paramAndVarNames!!,
                 paramIsConst!!,
+                paramIsVar ?: BooleanArray(paramAndVarCount),
                 f,
                 sourceFile,
                 rawSource,
