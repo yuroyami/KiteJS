@@ -76,7 +76,8 @@ public abstract interface annotation class io/github/yuroyami/kitejs/api/Interna
 public abstract class io/github/yuroyami/kitejs/api/JsArray : io/github/yuroyami/kitejs/api/JsObject {
 	public fun <init> ()V
 	public final fun add (Ljava/lang/Object;)V
-	public abstract fun getSize ()I
+	public final fun getLength ()J
+	public fun getSize ()I
 	public final fun toList ()Ljava/util/List;
 	public final fun values ()Ljava/util/List;
 }

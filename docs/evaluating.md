@@ -72,6 +72,13 @@ println(list.size)      // 3
 println(list.toList())  // [1.0, 2.0, 3.0]
 ```
 
+`JsArray.length` is a Long and keeps the full JavaScript array length, up to 2^32 - 1. `size`
+keeps its Int type; if the length exceeds Int.MAX_VALUE, reading `size` or materializing the
+array with `values()`, `toList()` or `toKotlin()` throws `JsEngineError`. A large sparse array
+still supports individual reads and writes using a string index, such as `array["2147483648"]`.
+`add(value)` appends using the accurate length, and refuses an array already at the maximum
+JavaScript length before writing anything.
+
 ### Converting the whole thing
 
 `toKotlin()` walks the value all the way down. An object becomes a `Map`, an array becomes a

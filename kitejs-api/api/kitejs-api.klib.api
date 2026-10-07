@@ -74,8 +74,10 @@ abstract interface <#A: io.github.yuroyami.kitejs.api/KiteJsConfig> io.github.yu
 abstract class io.github.yuroyami.kitejs.api/JsArray : io.github.yuroyami.kitejs.api/JsObject { // io.github.yuroyami.kitejs.api/JsArray|null[0]
     constructor <init>() // io.github.yuroyami.kitejs.api/JsArray.<init>|<init>(){}[0]
 
-    abstract val size // io.github.yuroyami.kitejs.api/JsArray.size|{}size[0]
-        abstract fun <get-size>(): kotlin/Int // io.github.yuroyami.kitejs.api/JsArray.size.<get-size>|<get-size>(){}[0]
+    final val length // io.github.yuroyami.kitejs.api/JsArray.length|{}length[0]
+        final fun <get-length>(): kotlin/Long // io.github.yuroyami.kitejs.api/JsArray.length.<get-length>|<get-length>(){}[0]
+    open val size // io.github.yuroyami.kitejs.api/JsArray.size|{}size[0]
+        open fun <get-size>(): kotlin/Int // io.github.yuroyami.kitejs.api/JsArray.size.<get-size>|<get-size>(){}[0]
 
     final fun add(kotlin/Any?) // io.github.yuroyami.kitejs.api/JsArray.add|add(kotlin.Any?){}[0]
     final fun toList(): kotlin.collections/List<kotlin/Any?> // io.github.yuroyami.kitejs.api/JsArray.toList|toList(){}[0]

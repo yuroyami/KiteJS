@@ -155,7 +155,6 @@ internal class RhinoObject(override val engine: RhinoKiteJs, override val target
 }
 
 internal class RhinoArray(override val engine: RhinoKiteJs, override val target: NativeArray) : JsArray(), RhinoHandle {
-    override val size: Int get() = engine.call(drain = false) { target.length.toInt() }
     override fun get(name: String): JsValue = getAt(name)
     override fun get(index: Int): JsValue = getAt(index)
     override fun set(name: String, value: Any?) = setAt(name, value)

@@ -112,7 +112,6 @@ internal class QuickJsArray(override val engine: QuickJsKiteJs, adopted: QuickJs
     @Suppress("unused")
     private val cleanup = engine.register(this, handle)
 
-    override val size: Int get() = getAt("length").asInt()
     override fun get(name: String): JsValue = getAt(name)
     override fun get(index: Int): JsValue = getAt(index)
     override fun set(name: String, value: Any?) = setAt(name, value)

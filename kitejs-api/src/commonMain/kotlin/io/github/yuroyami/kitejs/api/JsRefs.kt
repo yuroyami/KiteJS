@@ -111,18 +111,31 @@ public abstract class JsObject @InternalKiteJsApi constructor() {
 /** A JavaScript array seen from Kotlin. */
 public abstract class JsArray @InternalKiteJsApi constructor() : JsObject() {
 
-    /** The array's `length`. */
-    public abstract val size: Int
+    /** The array's exact `length`, including lengths too large for a Kotlin collection. */
+    public val length: Long get() = this["length"].asLong()
 
+    /** The array's length as an Int, or [JsEngineError] when it exceeds [Int.MAX_VALUE]. */
+    public open val size: Int
+        get() {
+            val count = length
+            if (count > Int.MAX_VALUE) throw JsEngineError(
+                "an array of $count elements exceeds the Kotlin collection size limit; use length and individual indices",
+            )
+            return count.toInt()
+        }
+
+    /** Appends at [length], or refuses an array already at JavaScript's maximum length. */
     public fun add(value: Any?) {
-        this[size] = value
+        val next = length
+        if (next >= 4294967295L) throw JsEngineError("an array at the maximum JavaScript length cannot grow")
+        this[next.toString()] = value
     }
 
     /** A plain Kotlin list, all the way down. */
     @Suppress("UNCHECKED_CAST")
     public fun toList(): List<Any?> = Converters.toKotlin(value, HashSet()) as List<Any?>
 
-    /** Every element as a [JsValue], without converting anything. */
+    /** Every element as a [JsValue], or [JsEngineError] if [length] exceeds [Int.MAX_VALUE]. */
     public fun values(): List<JsValue> = (0 until size).map { this[it] }
 }
 

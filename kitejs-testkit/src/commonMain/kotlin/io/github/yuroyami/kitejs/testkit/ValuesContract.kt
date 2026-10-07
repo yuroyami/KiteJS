@@ -170,6 +170,44 @@ public abstract class ValuesContract<C : KiteJsConfig>(engine: JsEngine<C>) : En
     }
 
     @Test
+    public fun aLargeSparseArrayKeepsItsLengthAndRefusesIntMaterialization(): TestResult = withEngine { js ->
+        for (length in listOf(Int.MAX_VALUE.toLong(), 2147483648L, 4294967295L)) {
+            val array = js.evaluate("var sparse = new Array($length); sparse[${length - 1}] = 7; sparse").asArray()
+            assertEquals(length, array.length)
+            assertEquals(7, array[(length - 1).toString()].asInt())
+            if (length == Int.MAX_VALUE.toLong()) {
+                assertEquals(Int.MAX_VALUE, array.size)
+            } else {
+                assertFailsWith<JsEngineError> { array.size }
+                assertFailsWith<JsEngineError> { array.values() }
+                assertFailsWith<JsEngineError> { array.toList() }
+                assertFailsWith<JsEngineError> { array.value.toKotlin() }
+            }
+        }
+        assertEquals(2, js.evaluate("1 + 1").asInt())
+    }
+
+    @Test
+    public fun anAppendAboveTheIntRangeUsesTheNextIndex(): TestResult = withEngine { js ->
+        val array = js.evaluate("new Array(2147483648)").asArray()
+        array.add("tail")
+        assertEquals(2147483649L, array.length)
+        assertEquals("tail", array["2147483648"].asString())
+        assertEquals(false, array.has("-2147483648"))
+        assertFailsWith<JsEngineError> { array.size }
+    }
+
+    @Test
+    public fun anAppendAtTheMaximumArrayLengthIsRefused(): TestResult = withEngine { js ->
+        val array = js.evaluate("new Array(4294967295)").asArray()
+        assertFailsWith<JsEngineError> { array.add("too far") }
+        assertEquals(4294967295L, array.length)
+        assertEquals(false, array.has("4294967295"))
+        assertEquals(false, array.has("-1"))
+        assertEquals(2, js.evaluate("1 + 1").asInt())
+    }
+
+    @Test
     public fun aCycleStopsAtTheObjectThatClosedIt(): TestResult = withEngine { js ->
         val map = js.evaluate("var a = { name: 'root' }; a.self = a; a").asObject().toMap()
         assertEquals("root", map["name"])
