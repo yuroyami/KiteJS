@@ -14,7 +14,7 @@ function fizzbuzz(n) {
   return out;
 }
 function collatz(n) { var steps = 0; while (n !== 1) { n = n % 2 ? 3 * n + 1 : n / 2; steps++; } return steps; }
-function isPerfect(n) { var s = 0; for (var i = 1; i < n; i++) if (n % i === 0) s += i; return s === n; }
+function isPerfect(n) { var s = 1; for (var i = 2; i * i <= n; i++) if (n % i === 0) { s += i; var paired = n / i; if (paired !== i) s += paired; } return n > 1 && s === n; }
 function digitsReversed(n) { return Number(String(n).split('').reverse().join('')); }
 var perfect = [];
 for (var i = 2; i < 10000; i++) if (isPerfect(i)) perfect.push(i);
