@@ -8,7 +8,7 @@ package io.github.yuroyami.kitejs.rhino
 internal class NativeError : IdScriptableObject() {
 
     private var stackProvider: RhinoException? = null
-    private var stack: Any? = null
+    private var stack: Any? = Scriptable.NOT_FOUND
 
     override fun fillConstructorProperties(ctor: IdFunctionObject) {
         addIdFunctionProperty(ctor, ERROR_TAG, ConstructorId_captureStackTrace, "captureStackTrace", 2)
@@ -70,12 +70,15 @@ internal class NativeError : IdScriptableObject() {
     }
 
     public fun getStackDelegated(): Any? {
-        if (stack != null) return stack
+        if (stack !== Scriptable.NOT_FOUND) return stack
         val provider = stackProvider ?: return Scriptable.NOT_FOUND
         var limit = DEFAULT_STACK_LIMIT
         var prepare: Function? = null
-        val cons = prototype as NativeError
-        val pp = cons.getAssociatedValue(ProtoProps.KEY) as ProtoProps?
+        // Every error kind shares its realm's original Error settings. The instance's
+        // prototype may belong to a subclass, may have been replaced, or may be null.
+        val realm = getTopLevelScope(this)
+        val original = TopLevel.cachedBuiltinCtor(realm, TopLevel.Builtins.Error)?.prototypeProperty as? ScriptableObject
+        val pp = original?.getAssociatedValue(ProtoProps.KEY) as? ProtoProps
         if (pp != null) {
             limit = pp.limit
             prepare = pp.prepare
