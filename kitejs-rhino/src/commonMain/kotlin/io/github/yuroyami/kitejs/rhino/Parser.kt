@@ -1260,6 +1260,18 @@ public class Parser(
         destructuringDefault: MutableMap<String, AstNode>,
         paramNames: MutableSet<String>,
     ) {
+        if (params is Spread) {
+            // The rest parameter, which the parenthesized list only lets come last.
+            val rest = params.expression!!
+            if (rest is Assignment) reportError("msg.rest.default")
+            if (rest !is Name && rest !is ArrayLiteral && rest !is ObjectLiteral) {
+                reportError("msg.no.parm", params.position, params.length)
+                return
+            }
+            fnNode.hasRestParameter = true
+            arrowFunctionParams(fnNode, rest, destructuring, destructuringDefault, paramNames)
+            return
+        }
         if (params is ArrayLiteral || params is ObjectLiteral) {
             markDestructuring(params)
             arrowPatternNames(params, paramNames)
@@ -2903,8 +2915,8 @@ public class Parser(
         }
     }
 
-    private fun expr(allowTrailingComma: Boolean): AstNode {
-        var pn = assignExpr()
+    private fun expr(allowTrailingComma: Boolean, allowRest: Boolean = false): AstNode {
+        var pn = if (allowRest && peekToken() == Token.DOTDOTDOT) return restElement() else assignExpr()
         val pos = pn.position
         while (matchToken(Token.COMMA, true)) {
             val opPos = ts.tokenBeg
@@ -2920,10 +2932,34 @@ public class Parser(
                 pn.putIntProp(Node.TRAILING_COMMA, 1)
                 return pn
             }
+            if (allowRest && peekToken() == Token.DOTDOTDOT) {
+                return InfixExpression(Token.COMMA, pn, restElement(), opPos)
+            }
             pn = InfixExpression(Token.COMMA, pn, assignExpr(), opPos)
         }
         return pn
     }
+
+    /**
+     * `... BindingIdentifier` or `... BindingPattern` at the end of a parenthesized list, which
+     * only an arrow function's parameters may have (ECMAScript 2015, 12.2, the cover grammar
+     * CoverParenthesizedExpressionAndArrowParameterList). The list has to end right after it.
+     */
+    private fun restElement(): AstNode {
+        consumeToken()
+        val spreadPos = ts.tokenBeg
+        val spread = Spread(spreadPos, 0)
+        spread.setLineColumnNumber(lineNumber(), columnNumber())
+        val target = assignExpr()
+        spread.expression = target
+        spread.length = ts.tokenEnd - spreadPos
+        if (peekToken() != Token.RP) reportError("msg.parm.after.rest")
+        return spread
+    }
+
+    /** Whether [e], a parenthesized list, ends in a rest element. */
+    private fun endsInRest(e: AstNode): Boolean =
+        e is Spread || (e is InfixExpression && e.type == Token.COMMA && e.right is Spread)
 
     private fun assignExpr(): AstNode {
         var tt = peekToken()
@@ -3954,11 +3990,18 @@ public class Parser(
             val lineno = lineNumber()
             val column = columnNumber()
             val begin = ts.tokenBeg
-            val e = if (peekToken() == Token.RP) EmptyExpression(begin) else expr(true)
+            val es6 = compilerEnv.languageVersion >= Context.VERSION_ES6
+            val e = if (peekToken() == Token.RP) EmptyExpression(begin) else expr(true, allowRest = es6)
             if (peekToken() == Token.FOR) {
                 return generatorExpression(e, begin)
             }
             mustMatchToken(Token.RP, "msg.no.paren", true)
+            // A rest element makes the list arrow parameters, so an arrow has to follow, on the
+            // same line.
+            if (endsInRest(e) && peekTokenOrEOL() != Token.ARROW) {
+                reportError("msg.syntax")
+                return makeErrorNode()
+            }
 
             val length = ts.tokenEnd - begin
 

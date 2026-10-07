@@ -867,6 +867,14 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   flags hands back an x whose `constructor` is RegExp, and a pattern IsRegExp counts but that is
   no RegExp lends its `source` and `flags`. `startsWith`, `endsWith` and `includes` refuse what
   IsRegExp counts, before converting it. `PrototypesAreOrdinaryTest` checks 36 cases against V8.
+- D-103: an arrow function takes a rest parameter, a name or a pattern, after its other
+  parameters or alone (ECMAScript 2015, 14.2). The parser reads a parenthesized expression first
+  and makes it the parameter list once `=>` follows, so `...` there failed as an expression and
+  upstream rejected every such arrow. `parenExpr` now takes a trailing `... target`, the cover
+  grammar's form, which has to close the parentheses and be followed by `=>` on the same line,
+  and `arrowFunctionParams` turns it into the rest parameter. A default on it, a parameter or a
+  trailing comma after it, and a target that is not a name or a pattern are SyntaxErrors.
+  `ArrowRestParameterTest` checks 21 cases against V8.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

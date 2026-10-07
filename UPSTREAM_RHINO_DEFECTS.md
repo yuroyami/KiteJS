@@ -95,6 +95,15 @@ child, which is -1 for a property read, so no line marker is emitted for the con
 - Where: `IRFactory.createIf`.
 - Test: `ConditionLineNumberTest`.
 
+### An arrow function cannot take a rest parameter (D-103)
+
+`((...a) => a.length)(1, 2)` and `((x, ...a) => a)(1, 2)` are SyntaxErrors, while a function
+expression takes the same list. The parenthesized expression an arrow's parameters are first read
+as cannot hold `...`.
+
+- Where: `Parser.parenExpr` and `Parser.arrowFunctionParams`.
+- Test: `ArrowRestParameterTest`.
+
 ### A property descriptor of a lazily loaded global leaks the placeholder (D-75)
 
 `typeof Object.getOwnPropertyDescriptor(globalThis, 'JSON').value` throws "Invalid JavaScript
