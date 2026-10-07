@@ -346,7 +346,6 @@ internal object Messages {
         "msg.yield.closing" to "Yield from closing generator",
         "msg.compare.symbol" to "Symbol objects may not be compared",
         "msg.bad.destruct.op" to "Invalid destructuring assignment operator",
-        "msg.bad.esc.mask" to "invalid string escape mask",
         "msg.bad.for.in.destruct" to "Left hand side of for..in loop must be an array of length 2 to accept key/value pair.",
         "msg.bad.for.in.lhs" to "Invalid left-hand side of for..in loop.",
         "msg.bad.precision" to "Precision {0} out of range.",

@@ -1685,6 +1685,14 @@ class EvalOracleTest {
         assertEquals(emptyList(), failures, "corpus evaluation differs from upstream")
     }
 
+    /** Extra escape arguments follow the standard; the pinned oracle retains its mask extension. */
+    @Test
+    fun escapeExtraArgumentsDifferFromTheLegacyOracle() {
+        val source = "escape('x', 9)"
+        assertEquals("throws invalid string escape mask", upstream(source))
+        assertEquals("\"x\"", ported(source))
+    }
+
     @Test
     fun errorsThrownByTheEngineHaveTheSameText() = check(listOf(
         "undeclared",
@@ -1718,7 +1726,7 @@ class EvalOracleTest {
         "(1).toString(1)", "(1).toFixed(-1)", "(1).toFixed(101)", "(1).toExponential(101)", "(1).toPrecision(0)",
         "(1).toPrecision(101)", "Boolean.prototype.valueOf.call(1)",
         "Boolean.prototype.toString.call({})", "decodeURI('%')", "decodeURIComponent('%C3')", "encodeURIComponent('\\uD800')",
-        "encodeURI('\\uDC00')", "decodeURI('%ZZ')", "escape('x', 9)", "new Script()()", "Script.prototype.exec()",
+        "encodeURI('\\uDC00')", "decodeURI('%ZZ')", "new Script()()", "Script.prototype.exec()",
         "new AggregateError()", "eval('throw 1')", "eval('syntax error here')",
         "eval('var')", "new Function('return')", "new Function('a b', '')", "Function.prototype.call.call(1)",
         "Function.prototype.bind.call(1)", "(function () {}).bind.call(undefined)", "new (function () {}).bind()",

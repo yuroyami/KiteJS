@@ -242,34 +242,16 @@ public object NativeGlobal {
     }
 
     private fun js_escape(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-        val urlXalphas = 1
-        val urlXpalphas = 2
-        val urlPath = 4
         val s = ScriptRuntime.toString(args, 0)
-        var mask = urlXalphas or urlXpalphas or urlPath
-        if (args.size > 1) {
-            val d = ScriptRuntime.toNumber(args[1])
-            mask = d.toInt()
-            if (d.isNaN() || mask.toDouble() != d || 0 != (mask and (urlXalphas or urlXpalphas or urlPath).inv())) {
-                throw Context.reportRuntimeErrorById("msg.bad.esc.mask")
-            }
-        }
         var sb: StringBuilder? = null
         val l = s.length
         for (k in 0 until l) {
             val c = s[k].code
-            if (mask != 0 &&
-                (
-                    (c >= '0'.code && c <= '9'.code) ||
-                        (c >= 'A'.code && c <= 'Z'.code) ||
-                        (c >= 'a'.code && c <= 'z'.code) ||
-                        c == '@'.code ||
-                        c == '*'.code ||
-                        c == '_'.code ||
-                        c == '-'.code ||
-                        c == '.'.code ||
-                        (0 != (mask and urlPath) && (c == '/'.code || c == '+'.code))
-                    )
+            if ((c >= '0'.code && c <= '9'.code) ||
+                (c >= 'A'.code && c <= 'Z'.code) ||
+                (c >= 'a'.code && c <= 'z'.code) ||
+                c == '@'.code || c == '*'.code || c == '_'.code ||
+                c == '-'.code || c == '.'.code || c == '/'.code || c == '+'.code
             ) {
                 sb?.append(c.toChar())
             } else {
@@ -280,10 +262,6 @@ public object NativeGlobal {
                 }
                 val hexSize: Int
                 if (c < 256) {
-                    if (c == ' '.code && mask == urlXpalphas) {
-                        sb.append('+')
-                        continue
-                    }
                     sb.append('%')
                     hexSize = 2
                 } else {
