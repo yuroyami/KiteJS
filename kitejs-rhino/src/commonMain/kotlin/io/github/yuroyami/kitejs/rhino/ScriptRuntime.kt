@@ -981,7 +981,7 @@ public object ScriptRuntime {
     }
 
     public fun undefCallError(obj: Any?, id: Any?): RuntimeException =
-        typeErrorById("msg.undef.method.call", toString(obj), toString(id))
+        typeErrorById("msg.undef.method.call", propertyErrorValue(obj), propertyErrorValue(id))
 
     /**
      * The next index to try after an empty match. In unicode mode a surrogate pair counts as one
@@ -2012,13 +2012,26 @@ public object ScriptRuntime {
     }
 
     public fun undefReadError(obj: Any?, id: Any?): RuntimeException =
-        typeErrorById("msg.undef.prop.read", toString(obj), toString(id))
+        typeErrorById("msg.undef.prop.read", propertyErrorValue(obj), propertyErrorValue(id))
 
     public fun undefWriteError(obj: Any?, id: Any?, value: Any?): RuntimeException =
-        typeErrorById("msg.undef.prop.write", toString(obj), toString(id), toString(value))
+        typeErrorById("msg.undef.prop.write", propertyErrorValue(obj), propertyErrorValue(id), propertyErrorValue(value))
 
     private fun undefDeleteError(obj: Any?, id: Any?): RuntimeException =
-        typeErrorById("msg.undef.prop.delete", toString(obj), toString(id))
+        typeErrorById("msg.undef.prop.delete", propertyErrorValue(obj), propertyErrorValue(id))
+
+    /** Diagnostic text must not invoke object conversion hooks or inspect user properties. */
+    private fun propertyErrorValue(value: Any?): String = when (value) {
+        null -> "null"
+        is String -> value
+        is ConsString -> value.toString()
+        is KBigInt -> value.toString(10)
+        is SymbolKey -> value.toString()
+        is NativeSymbol -> value.toString()
+        is PrivateName -> value.description
+        is Boolean, is Byte, is Short, is Int, is Long, is Float, is Double -> toString(value)
+        else -> if (Undefined.isUndefined(value)) "undefined" else "[object]"
+    }
 
     public fun notFoundError(obj: Scriptable?, property: String): RuntimeException =
         constructError("ReferenceError", getMessageById("msg.is.not.defined", property))
@@ -2573,20 +2586,17 @@ public object ScriptRuntime {
     public fun getElemAndThisOptional(obj: Any?, elem: Any?, cx: Context, scope: Scriptable): LookupResult? = getElemAndThisInner(obj, elem, cx, scope, true)
 
     private fun getElemAndThisInner(obj: Any?, elem: Any?, cx: Context, scope: Scriptable, isOptionalChainingCall: Boolean): LookupResult? {
-        val thisObj: Scriptable
         val value: Any?
         // `o?.[k]()` with a nullish o, like `o?.k()`, short-circuits to undefined.
         if (isOptionalChainingCall && (obj == null || Undefined.isUndefined(obj))) return null
+        val thisObj = toObjectOrNull(cx, obj, scope) ?: throw undefCallError(obj, elem)
         if (elem is PrivateName) {
-            thisObj = toObjectOrNull(cx, obj, scope) ?: throw undefCallError(obj, elem.description)
             value = ClassRuntime.privateGet(cx, thisObj, elem)
         } else if (isSymbol(elem)) {
-            thisObj = toObjectOrNull(cx, obj, scope) ?: throw undefCallError(obj, elem.toString())
             value = ScriptableObject.getProperty(thisObj, elem as Symbol)
         } else {
             val s = toStringIdOrIndex(elem)
-            if (s.stringId != null) return getPropAndThisInner(obj, s.stringId, cx, scope, isOptionalChainingCall)
-            thisObj = toObjectOrNull(cx, obj, scope) ?: throw undefCallError(obj, elem.toString())
+            if (s.stringId != null) return getPropAndThisHelper(obj, s.stringId, cx, thisObj, isOptionalChainingCall)
             value = ScriptableObject.getProperty(thisObj, s.index)
         }
         if (value !is Callable && isOptionalChainingCall && (value === Scriptable.NOT_FOUND || value == null || Undefined.isUndefined(value))) {
@@ -2634,21 +2644,19 @@ public object ScriptRuntime {
     }
 
     public fun getElemFunctionAndThis(obj: Any?, elem: Any?, cx: Context, scope: Scriptable): Callable? {
-        val thisObj: Scriptable
+        val thisObj = toObjectOrNull(cx, obj, scope) ?: throw undefCallError(obj, elem)
         val value: Any?
         if (isSymbol(elem)) {
-            thisObj = toObjectOrNull(cx, obj, scope) ?: throw undefCallError(obj, elem.toString())
             value = ScriptableObject.getProperty(thisObj, elem as Symbol)
         } else {
             val s = toStringIdOrIndex(elem)
             if (s.stringId != null) {
-                val r = getPropAndThisHelper(obj, s.stringId, cx, toObjectOrNull(cx, obj, scope), false)!!
+                val r = getPropAndThisHelper(obj, s.stringId, cx, thisObj, false)!!
                 val f = r.result
                 if (f !is Callable) throw notFunctionError(r.thisObj, f, s.stringId)
                 storeScriptable(cx, r.thisObj)
                 return f
             }
-            thisObj = toObjectOrNull(cx, obj, scope) ?: throw undefCallError(obj, elem.toString())
             value = ScriptableObject.getProperty(thisObj, s.index)
         }
         if (value !is Callable) throw notFunctionError(value, elem)
