@@ -432,8 +432,8 @@ internal fun unwrap(node: AstNode): AstNode {
  * number zero. The source token says which.
  *
  * A literal counts as an integer when it has no decimal point and its value is a whole number
- * inside the 32 bit range. That includes `1e3`, which Emscripten writes for 1000, and it is what
- * a browser's own validator does. Anything else is a double.
+ * inside the 32 bit range, excluding negative zero whose sign an integer slot would erase.
+ * That includes `1e3`, which Emscripten writes for 1000. Anything else is a double.
  */
 internal fun intLiteralOf(node: AstNode): Long? {
     var inner = unwrap(node)
@@ -444,10 +444,7 @@ internal fun intLiteralOf(node: AstNode): Long? {
     }
     val literal = inner as? NumberLiteral ?: return null
     if (literal.value?.contains('.') != false) return null
-    val value = literal.number * sign
-    if (value != value.toLong().toDouble()) return null
-    if (value < -2147483648.0 || value >= 4294967296.0) return null
-    return value.toLong()
+    return wholeInRange(literal.number * sign)
 }
 
 /**
@@ -458,6 +455,7 @@ internal fun froundOf(value: Double): Double = NativeMath.froundToDouble(value)
 
 /** The value when it is a whole number a 32 bit slot can hold either way, and null otherwise. */
 internal fun wholeInRange(value: Double): Long? {
+    if (value.toRawBits() == Long.MIN_VALUE) return null // negative zero needs a floating slot
     if (value != value.toLong().toDouble()) return null
     if (value < -2147483648.0 || value >= 4294967296.0) return null
     return value.toLong()

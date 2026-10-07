@@ -60,6 +60,7 @@ name. A module given anything else is run as ordinary JavaScript instead.
 Every rule asm.js has exists so that a value's type is known in advance. `x = x | 0` at the top of
 a function says the parameter is a 32 bit integer. `0` declares an integer variable and `0.0`
 declares a double. `(a | 0) / (b | 0) | 0` is integer division and `a / b` on two doubles is not.
+The spelling `-0` also declares a floating value, since integer slots cannot retain its sign.
 
 The rule that matters most is the one about uncoerced values. The result of `+`, `-` or `*` on two
 integers may only be read where its overflow cannot be seen: under `|`, `&`, `^`, a shift, a byte
