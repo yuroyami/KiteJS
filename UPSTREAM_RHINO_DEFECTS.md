@@ -86,6 +86,15 @@ Schubfach algorithm of `Double.toString`, whose Java specification keeps at leas
 - Where: `DoubleFormatter.toDecimalFull`.
 - Test: `DoubleFormatterTest`, `EvalOracleTest.shortestSubnormalsDifferFromTheLegacyOracle`.
 
+### An error in a comparison under `if` takes the previous line (D-101)
+
+`var a = 1;` then `if (item.p === "x") {}` on the next line throws with the first line as its
+`lineNumber` and in its stack. `createIf` gives the statement the line of the condition's first
+child, which is -1 for a property read, so no line marker is emitted for the condition.
+
+- Where: `IRFactory.createIf`.
+- Test: `ConditionLineNumberTest`.
+
 ### A property descriptor of a lazily loaded global leaks the placeholder (D-75)
 
 `typeof Object.getOwnPropertyDescriptor(globalThis, 'JSON').value` throws "Invalid JavaScript

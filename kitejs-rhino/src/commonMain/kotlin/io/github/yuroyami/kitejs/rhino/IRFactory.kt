@@ -2178,7 +2178,11 @@ public class IRFactory(
                 result.addChildToBack(ifNotTarget)
             }
 
-            cond.firstChild?.let { result.setLineColumnNumber(it.lineno, it.column) }
+            // The condition runs under the line of its leftmost operand that has one. A property
+            // read has none, so `item.p === x` used to run under the previous statement's line.
+            var first = cond.firstChild
+            while (first != null && first.lineno < 0) first = first.firstChild
+            if (first != null) result.setLineColumnNumber(first.lineno, first.column)
 
             return result
         }

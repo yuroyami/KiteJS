@@ -848,6 +848,10 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   `JavaNumbers`, which prints a double the way Java does, keeps Java's digits through
   `toStringWithJavaDigits`. `DoubleFormatterTest` checks 900 doubles, every subnormal up to 300
   times MIN_VALUE among them, against what V8 prints (`tools/dtoa/generate-v8-number-strings.mjs`).
+- D-101: an `if` runs its condition under the line of the condition's leftmost operand that has
+  one. Upstream takes the line of the condition's first child even when that child has none, and
+  a property read never has one, so in `if (item.p === "x")` an error took the line of the
+  statement before, in `lineNumber` and in the stack. `ConditionLineNumberTest` pins it.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
