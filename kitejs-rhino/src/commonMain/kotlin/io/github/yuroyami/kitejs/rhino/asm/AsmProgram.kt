@@ -29,7 +29,13 @@ internal class AsmFunction(
     val dblFrame: Int,
     /** Functions with the same signature index take the same arguments and return the same type. */
     val signature: Int,
-)
+) {
+    private var observedCode: IntArray? = null
+
+    /** Built once on first observed entry; unobserved execution never allocates this form. */
+    val meteredCode: IntArray
+        get() = observedCode ?: AsmMeter.instrument(code).also { observedCode = it }
+}
 
 /** A module level name, and what it stands for. Resolved when the module is linked. */
 internal sealed class AsmGlobal {

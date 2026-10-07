@@ -161,6 +161,9 @@ internal object AsmOp {
     const val I_GT_UC = 118
     const val I_GE_UC = 119
 
+    // Present only in the observed form, before a bounded slice of typed instructions.
+    const val POLL = 120 // operand: the slice's instruction cost
+
     /** The fused form of [op] with a constant on its right, or -1 when there is none. */
     fun withConstant(op: Int): Int = when (op) {
         I_ADD -> I_ADDC
@@ -191,7 +194,7 @@ internal object AsmOp {
         SWITCH -> 2 + code[at + 2] * 2
         I_CONST, D_CONST, I_LOAD, I_STORE, I_STORE_KEEP, D_LOAD, D_STORE, D_STORE_KEEP,
         GI_LOAD, GI_STORE, GI_STORE_KEEP, GD_LOAD, GD_STORE, GD_STORE_KEEP,
-        JMP, JZ, JNZ, CALL_DIRECT, CALL_INDIRECT,
+        JMP, JZ, JNZ, CALL_DIRECT, CALL_INDIRECT, POLL,
         I_ADDC, I_SUBC, I_MULC, I_ANDC, I_ORC, I_XORC, I_SHLC, I_SHRC, I_USHRC,
         I_EQC, I_NEC, I_LT_SC, I_LE_SC, I_GT_SC, I_GE_SC, I_LT_UC, I_LE_UC, I_GT_UC, I_GE_UC,
         -> 1
@@ -216,6 +219,6 @@ internal object AsmOp {
         "M_MAX_I", "JMP", "JZ", "JNZ", "SWITCH", "RET_I", "RET_D", "RET_V", "CALL_DIRECT",
         "CALL_INDIRECT", "CALL_FFI", "I_DROP", "D_DROP", "I_ADDC", "I_SUBC", "I_MULC", "I_ANDC",
         "I_ORC", "I_XORC", "I_SHLC", "I_SHRC", "I_USHRC", "I_EQC", "I_NEC", "I_LT_SC", "I_LE_SC",
-        "I_GT_SC", "I_GE_SC", "I_LT_UC", "I_LE_UC", "I_GT_UC", "I_GE_UC",
+        "I_GT_SC", "I_GE_SC", "I_LT_UC", "I_LE_UC", "I_GT_UC", "I_GE_UC", "POLL",
     )
 }

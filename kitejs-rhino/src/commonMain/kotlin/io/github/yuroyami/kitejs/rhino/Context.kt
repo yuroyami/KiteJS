@@ -100,7 +100,7 @@ public open class Context internal constructor(public val factory: ContextFactor
     internal var maximumInterpreterInvocations: Int = 64
     internal var interpreterInvocationDepth: Int = 0
 
-    /** Refuses native interpreter reentry before creating or activating another frame. */
+    /** Refuses another native execution entry before creating or activating its frame. */
     internal fun checkInterpreterInvocation() {
         if (interpreterInvocationDepth >= maximumInterpreterInvocations) {
             throw ScriptRuntime.rangeError("Maximum call stack size exceeded")
@@ -361,20 +361,23 @@ public open class Context internal constructor(public val factory: ContextFactor
         factory.observeInstructionCount(this, instructionCount)
     }
 
-    internal fun observeInstructionCountInternal(instructionCount: Int) = observeInstructionCount(instructionCount)
-
     /**
-     * Charges [cost] instructions and asks the observer once the count passes the threshold, as
-     * the interpreter does at a branch. Calls and microtasks come through here, because code
+     * Charges [cost] instructions and asks the observer once the count reaches the threshold.
+     * Branches, calls, typed code and microtasks come through here, because code
      * without loops spends its time in them: a chain of Promise reactions that each queue the
      * next never branches, and upstream never asks its observer while one runs (D-77).
      */
     internal fun addInstructionCount(cost: Int) {
         if (instructionThreshold == 0) return
-        instructionCount += cost
-        if (instructionCount > instructionThreshold) {
-            observeInstructionCount(instructionCount)
-            instructionCount = 0
+        val pending = instructionCount.toLong() + cost
+        if (pending >= instructionThreshold) {
+            val charged = minOf(pending, Int.MAX_VALUE.toLong()).toInt()
+            // Clear the charge before calling out. Work done by observer reentry must remain
+            // counted, including a residual when a wide sum exceeds the observer's Int argument.
+            instructionCount = (pending - charged).toInt()
+            observeInstructionCount(charged)
+        } else {
+            instructionCount = pending.toInt()
         }
     }
 

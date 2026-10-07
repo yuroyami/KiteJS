@@ -55,7 +55,7 @@ These are the defaults. A script that exceeds either limit gets a `RangeError` w
 or interpreter-reentry error; a recursion through a Kotlin callback reaches the host as a
 `JsError`, following the host-exception rules.
 
-Getters and built-in callbacks can reenter the interpreter on the platform's native stack,
+Getters, built-in callbacks and compiled asm.js calls use the platform's native stack,
 so they count toward `maxHostCallDepth` too. Its practical maximum depends on the platform and
 the callbacks. Script frames remain counted across those reentries. Setting `maxCallDepth` to
 zero leaves the host-call limit in place.

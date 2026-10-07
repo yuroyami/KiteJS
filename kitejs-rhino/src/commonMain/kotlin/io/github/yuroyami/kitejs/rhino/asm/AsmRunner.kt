@@ -36,8 +36,8 @@ internal class AsmInstance(
  * Calls within typed code take slots above the caller's, with arguments already in parameter
  * order, so they need no copying.
  *
- * Calls use the host's own call stack, so a runaway recursion in the module ends as a
- * `StackOverflowError`, which the export turns into the same error a script would have seen.
+ * Calls use the host's own call stack, so every entry checks the context's native-depth limit
+ * before reserving another typed frame.
  */
 internal class AsmRunner(private val instance: AsmInstance) {
 
@@ -54,9 +54,6 @@ internal class AsmRunner(private val instance: AsmInstance) {
     private var depth = 0
     private var exportActive = false
     private var reentrantRunner: AsmRunner? = null
-
-    /** Counted on backward jumps, which is where a module that never returns has to be caught. */
-    private var backJumps = 0
 
     // Where the hot loop and the cold one hand their registers to each other. Fields rather than
     // arguments, because only the rare instructions pay for them.
@@ -109,8 +106,7 @@ internal class AsmRunner(private val instance: AsmInstance) {
 
     /** The instructions [execute] leaves out, so that the loop it runs stays small. */
     @Suppress("CyclomaticComplexMethod", "LongMethod")
-    private fun executeCold(cx: Context, fn: AsmFunction, op: Int, dbase: Int) {
-        val code = fn.code
+    private fun executeCold(cx: Context, fn: AsmFunction, code: IntArray, op: Int, dbase: Int) {
         val pool = fn.doubles
         val globalDbls = instance.globalDbls
         var bytes = heap
@@ -120,6 +116,11 @@ internal class AsmRunner(private val instance: AsmInstance) {
         var dp = coldDp
         var pc = coldPc
         when (op) {
+            AsmOp.POLL -> {
+                cx.addInstructionCount(code[pc++])
+                // The observer can reenter the module and replace its heap storage.
+                heap = instance.buffer.buffer ?: ByteArray(0)
+            }
             AsmOp.D_CONST -> dv[dp++] = pool[code[pc++]]
             AsmOp.D_LOAD -> dv[dp++] = dv[dbase + code[pc++]]
             AsmOp.D_STORE -> dv[dbase + code[pc++]] = dv[--dp]
@@ -280,13 +281,16 @@ internal class AsmRunner(private val instance: AsmInstance) {
      * [dbase]. The answer is left in [retInt] or [retDbl].
      */
     fun run(cx: Context, fnIndex: Int, ibase: Int, dbase: Int) {
+        cx.checkInterpreterInvocation()
         if (++depth > MAX_DEPTH) {
             depth--
             throw ScriptRuntime.rangeError("the module called too deeply")
         }
+        cx.interpreterInvocationDepth++
         try {
             execute(cx, instance.module.functions[fnIndex], ibase, dbase)
         } finally {
+            cx.interpreterInvocationDepth--
             depth--
         }
     }
@@ -294,7 +298,7 @@ internal class AsmRunner(private val instance: AsmInstance) {
     @Suppress("CyclomaticComplexMethod", "LongMethod", "NestedBlockDepth")
     private fun execute(cx: Context, fn: AsmFunction, ibase: Int, dbase: Int) {
         room(ibase + fn.intFrame, dbase + fn.dblFrame)
-        val code = fn.code
+        val code = if (cx.instructionThreshold > 0) fn.meteredCode else fn.code
         // Held in locals for the length of the call. An array's identity never changes while a
         // module runs, so reading the field once instead of on every instruction costs nothing
         // and saves a load each time.
@@ -341,24 +345,14 @@ internal class AsmRunner(private val instance: AsmInstance) {
                 AsmOp.H_STORE_I32 -> { ip -= 2; storeI32(bytes, iv[ip], iv[ip + 1]) }
                 AsmOp.M_IMUL -> { ip--; iv[ip - 1] = iv[ip - 1] * iv[ip] }
                 AsmOp.M_ABS_I -> iv[ip - 1] = if (iv[ip - 1] < 0) -iv[ip - 1] else iv[ip - 1]
-                AsmOp.JMP -> {
-                    val target = code[pc]
-                    if (target <= pc) poll(cx)
-                    pc = target
-                }
+                AsmOp.JMP -> pc = code[pc]
                 AsmOp.JZ -> {
                     val target = code[pc++]
-                    if (iv[--ip] == 0) {
-                        if (target <= pc) poll(cx)
-                        pc = target
-                    }
+                    if (iv[--ip] == 0) pc = target
                 }
                 AsmOp.JNZ -> {
                     val target = code[pc++]
-                    if (iv[--ip] != 0) {
-                        if (target <= pc) poll(cx)
-                        pc = target
-                    }
+                    if (iv[--ip] != 0) pc = target
                 }
                 AsmOp.RET_I -> { retInt = iv[ip - 1]; return }
                 AsmOp.RET_D -> { retDbl = dv[dp - 1]; return }
@@ -404,7 +398,7 @@ internal class AsmRunner(private val instance: AsmInstance) {
                     coldIp = ip
                     coldDp = dp
                     coldPc = pc
-                    executeCold(cx, fn, code[pc - 1], dbase)
+                    executeCold(cx, fn, code, code[pc - 1], dbase)
                     ip = coldIp
                     dp = coldDp
                     pc = coldPc
@@ -425,18 +419,6 @@ internal class AsmRunner(private val instance: AsmInstance) {
         // Reading the heap again, because the call may have replaced the buffer's bytes.
         heap = instance.buffer.buffer ?: ByteArray(0)
         return ScriptRuntime.toNumber(answer)
-    }
-
-    /** Asks the engine whether the module should keep running. */
-    private fun poll(cx: Context) {
-        if (++backJumps < POLL_EVERY) return
-        backJumps = 0
-        if (cx.instructionThreshold <= 0) return
-        cx.instructionCount += POLL_EVERY
-        if (cx.instructionCount > cx.instructionThreshold) {
-            cx.observeInstructionCountInternal(cx.instructionCount)
-            cx.instructionCount = 0
-        }
     }
 
     // ---- The heap -----------------------------------------------------------------------------
@@ -500,7 +482,6 @@ internal class AsmRunner(private val instance: AsmInstance) {
     private companion object {
         const val MAX_STACK = 1 shl 22
         const val MAX_DEPTH = 8192
-        const val POLL_EVERY = 4096
     }
 }
 

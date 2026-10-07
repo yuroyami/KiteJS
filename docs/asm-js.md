@@ -91,6 +91,16 @@ useful for comparing the two, or as a way around a problem in the compiler.
 
 ## Budgets and stopping
 
-An instruction budget and `interruptWhen` both still apply. The compiled code checks them at the
-top of every loop rather than on every instruction, so a module that never returns is still
-stopped, a little later than an ordinary script would be.
+An instruction budget and `interruptWhen` both apply to compiled code. The runner charges bounded
+groups of typed instructions at control-flow entries, after calls, and within long straight-line
+blocks. Recursive call trees and functions without loops therefore reach the observer too.
+
+The budget covers the whole outer call, including imports and reentrant calls into the module.
+A later call from Kotlin gets a fresh budget. The instruction units depend on the execution path,
+and a group is charged before it runs, so stopping need not occur at the same statement as in
+ordinary JavaScript. With neither a budget nor an interrupt hook, the runner uses its original
+code without accounting instructions.
+
+Compiled calls use the native stack and count toward `RhinoConfig.maxHostCallDepth`, including
+calls made while an import or observer has reentered the engine. Exceeding it throws `RangeError`
+and leaves the engine usable.

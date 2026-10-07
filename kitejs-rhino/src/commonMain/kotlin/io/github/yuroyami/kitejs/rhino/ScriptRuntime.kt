@@ -997,11 +997,7 @@ public object ScriptRuntime {
 
     /** Adds to the instruction budget and tells the context when the threshold is crossed. */
     public fun addInstructionCount(cx: Context, instructionsToAdd: Int) {
-        cx.instructionCount += instructionsToAdd
-        if (cx.instructionCount > cx.instructionThreshold) {
-            cx.observeInstructionCountInternal(cx.instructionCount)
-            cx.instructionCount = 0
-        }
+        cx.addInstructionCount(instructionsToAdd)
     }
 
     /**

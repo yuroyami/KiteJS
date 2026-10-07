@@ -61,7 +61,7 @@ public class RhinoConfig @InternalKiteJsApi constructor() : KiteJsConfig() {
 
     /**
      * Maximum nested host calls and interpreter reentries, 64 by default. Must be positive.
-     * Getters and built-in callbacks count too: these calls use the platform's native stack.
+     * Getters, built-in callbacks and compiled asm.js calls count too: they use the native stack.
      */
     public var maxHostCallDepth: Int = 64
 

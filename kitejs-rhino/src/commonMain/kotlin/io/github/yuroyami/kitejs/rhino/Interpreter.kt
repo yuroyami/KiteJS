@@ -2415,11 +2415,7 @@ public class Interpreter : Evaluator {
         }
 
         private fun addInstructionCount(cx: Context, frame: CallFrame, extra: Int) {
-            cx.instructionCount += frame.pc - frame.pcPrevBranch + extra
-            if (cx.instructionCount > cx.instructionThreshold) {
-                cx.observeInstructionCountInternal(cx.instructionCount)
-                cx.instructionCount = 0
-            }
+            cx.addInstructionCount(frame.pc - frame.pcPrevBranch + extra)
         }
 
         private fun createClosure(cx: Context, frame: CallFrame, index: Int): JSFunction {
