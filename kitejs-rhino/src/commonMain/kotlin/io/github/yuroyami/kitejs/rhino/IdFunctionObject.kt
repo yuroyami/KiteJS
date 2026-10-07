@@ -4,6 +4,8 @@
 
 package io.github.yuroyami.kitejs.rhino
 
+import kotlin.reflect.KClass
+
 /** A function identified by a number, which its [IdFunctionCall] master dispatches on. */
 public open class IdFunctionObject : BaseFunction {
 
@@ -40,6 +42,10 @@ public open class IdFunctionObject : BaseFunction {
     public fun hasTag(tag: Any?): Boolean = tag == this.tag
 
     public fun methodId(): Int = methodIdField
+
+    /** Metadata alone cannot prove that a host replacement runs the built-in implementation. */
+    internal fun hasBuiltinMaster(type: KClass<*>): Boolean =
+        this::class == IdFunctionObject::class && idcall::class == type
 
     public fun markAsConstructor(prototypeProperty: Scriptable?) {
         useCallAsConstructor = true

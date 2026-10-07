@@ -384,7 +384,7 @@ public open class NativeRegExp : IdScriptableObject {
             }
             Id_toSource -> realThis(thisObj, f).toString()
             Id_exec -> js_exec(cx, scope, thisObj, args)
-            Id_test -> realThis(thisObj, f).execSub(cx, scope, args, TEST) == true
+            Id_test -> js_test(cx, scope, thisObj, args)
             Id_prefix -> realThis(thisObj, f).execSub(cx, scope, args, PREFIX)
             SymbolId_match -> js_SymbolMatch(cx, scope, thisObj, args)
             SymbolId_matchAll -> js_SymbolMatchAll(cx, scope, thisObj, args)
@@ -450,6 +450,16 @@ public open class NativeRegExp : IdScriptableObject {
         return value!!
     }
 
+    private fun js_test(cx: Context, scope: Scriptable, thisArg: Scriptable?, args: Array<Any?>): Boolean {
+        val regexp = requireObject(thisArg)
+        val string = ScriptRuntime.toString(if (args.isNotEmpty()) args[0] else Undefined.instance)
+        val exec = ScriptRuntime.getObjectProp(regexp, "exec", cx, scope)
+        if (regexp is NativeRegExp && (exec !is io.github.yuroyami.kitejs.rhino.Callable || isBuiltinExec(exec))) {
+            return regexp.execSub(cx, scope, arrayOf<Any?>(string), TEST) == true
+        }
+        return execWithMethod(regexp, string, cx, scope, exec) != null
+    }
+
     private fun js_SymbolSearch(cx: Context, scope: Scriptable, thisArg: Scriptable?, args: Array<Any?>): Any? {
         val thisObj = requireObject(thisArg)
 
@@ -489,9 +499,7 @@ public open class NativeRegExp : IdScriptableObject {
         // The fast path only applies when nothing about this regexp has been replaced by a script.
         if (thisObj is NativeRegExp) {
             val exec = getProperty(thisObj, "exec")
-            if ((thisObj.lastIndexAttr and READONLY) == 0 && exec is IdFunctionObject &&
-                exec.methodId() == Id_exec && exec.tag === REGEXP_TAG
-            ) {
+            if ((thisObj.lastIndexAttr and READONLY) == 0 && isBuiltinExec(exec)) {
                 return thisObj.js_SymbolReplaceFast(cx, scope, thisObj, args)
             }
         }
@@ -723,9 +731,7 @@ public open class NativeRegExp : IdScriptableObject {
 
         if (splitter is NativeRegExp) {
             val exec = getProperty(splitter, "exec")
-            if ((splitter.lastIndexAttr and READONLY) == 0 && exec is IdFunctionObject &&
-                exec.methodId() == Id_exec && exec.tag === REGEXP_TAG
-            ) {
+            if ((splitter.lastIndexAttr and READONLY) == 0 && isBuiltinExec(exec)) {
                 return js_SymbolSplitFast(cx, scope, splitter, s, lim, unicodeMatching, a)
             }
         }
@@ -3168,8 +3174,22 @@ public open class NativeRegExp : IdScriptableObject {
         /** The spec's RegExpExec: call the object's own `exec` when it has one. */
         public fun regExpExec(regexp: Scriptable, string: String, cx: Context, scope: Scriptable): Any? {
             val execMethod = ScriptRuntime.getObjectProp(regexp, "exec", cx, scope)
+            return execWithMethod(regexp, string, cx, scope, execMethod)
+        }
+
+        private fun isBuiltinExec(exec: Any?): Boolean =
+            exec is IdFunctionObject && exec.tag === REGEXP_TAG && exec.methodId() == Id_exec &&
+                (exec.hasBuiltinMaster(NativeRegExp::class) || exec.hasBuiltinMaster(NativeRegExpCallable::class))
+
+        private fun execWithMethod(
+            regexp: Scriptable, string: String, cx: Context, scope: Scriptable, execMethod: Any?,
+        ): Any? {
             if (execMethod is io.github.yuroyami.kitejs.rhino.Callable) {
-                return execMethod.call(cx, scope, regexp, arrayOf<Any?>(string))
+                val result = execMethod.call(cx, scope, regexp, arrayOf<Any?>(string))
+                if (result != null && !ScriptRuntime.isObject(result)) {
+                    throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(result))
+                }
+                return result
             }
             return js_exec(cx, scope, regexp, arrayOf<Any?>(string))
         }
