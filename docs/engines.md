@@ -60,6 +60,10 @@ so they count toward `maxHostCallDepth` too. Its practical maximum depends on th
 the callbacks. Script frames remain counted across those reentries. Setting `maxCallDepth` to
 zero leaves the host-call limit in place.
 
+Windows also checks the remaining native stack space before execution entries. That check can
+stop a call before its configured depth limit, leaving room to construct and unwind the error
+even on a host thread with a smaller stack.
+
 ## QuickJS
 
 ### Loading it on JavaScript and Wasm

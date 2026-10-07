@@ -99,10 +99,13 @@ public open class Context internal constructor(public val factory: ContextFactor
     internal var lastInterpreterFrame: Any? = null
     internal var maximumInterpreterInvocations: Int = 64
     internal var interpreterInvocationDepth: Int = 0
+    private val stackProbe = nativeStackProbe()
+
+    internal fun hasNativeStackSpace(): Boolean = stackProbe?.invoke() != false
 
     /** Refuses another native execution entry before creating or activating its frame. */
     internal fun checkInterpreterInvocation() {
-        if (interpreterInvocationDepth >= maximumInterpreterInvocations) {
+        if (interpreterInvocationDepth >= maximumInterpreterInvocations || !hasNativeStackSpace()) {
             throw ScriptRuntime.rangeError("Maximum call stack size exceeded")
         }
     }

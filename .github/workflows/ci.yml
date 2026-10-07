@@ -60,5 +60,12 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
+      - name: Native stack limits
+        run: >
+          ./gradlew :kitejs-rhino:mingwX64Test
+          --tests "*WindowsStackGuardTest.*"
+          --tests "*RhinoErrorsTest.*"
+          --tests "*RhinoRecursionTest.*"
+          --tests "*AsmBudgetTest.*"
       - name: Windows target
         run: ./gradlew :kitejs-rhino:mingwX64Test :kitejs-coroutines:mingwX64Test

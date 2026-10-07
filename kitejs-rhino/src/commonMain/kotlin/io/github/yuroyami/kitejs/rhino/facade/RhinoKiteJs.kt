@@ -162,7 +162,7 @@ internal class RhinoKiteJs private constructor(
     fun <T> call(top: Boolean = true, drain: Boolean = true, body: () -> T): T {
         if (closed) throw JsEngineError("this engine is closed")
         if (Context.getCurrentContext() !== cx) throw wrongThread()
-        if (depth >= cx.maximumInterpreterInvocations) {
+        if (depth >= cx.maximumInterpreterInvocations || !cx.hasNativeStackSpace()) {
             throw translate(ScriptRuntime.rangeError("Maximum call stack size exceeded"))
         }
         val outermost = depth == 0
