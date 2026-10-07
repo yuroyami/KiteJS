@@ -44,6 +44,28 @@ internal const val PRELUDE: String = """
     var trunc = Math.trunc;
     var regexpExec = Function.prototype.call.bind(RegExp.prototype.exec);
 
+    // Keep the primitive itself, including BigInt, before the facade applies its reader.
+    var toPrimitiveKey = Symbol.toPrimitive;
+    function primitive(o, hint) {
+        function isPrimitive(v) { return v === null || (typeof v !== 'object' && typeof v !== 'function'); }
+        var exotic = o[toPrimitiveKey];
+        if (exotic !== undefined && exotic !== null) {
+            if (typeof exotic !== 'function') throw new TypeError_('Symbol.toPrimitive is not a function');
+            var v = apply(exotic, o, [hint]);
+            if (isPrimitive(v)) return v;
+            throw new TypeError_('Cannot convert object to primitive value');
+        }
+        var names = hint === 'string' ? ['toString', 'valueOf'] : ['valueOf', 'toString'];
+        for (var i = 0; i < names.length; i++) {
+            var method = o[names[i]];
+            if (typeof method === 'function') {
+                var value = apply(method, o, []);
+                if (isPrimitive(value)) return value;
+            }
+        }
+        throw new TypeError_('Cannot convert object to primitive value');
+    }
+
     var helpers = {
         get: function (o, k) { return o[k]; },
         set: function (o, k, v) { o[k] = v; },
@@ -56,8 +78,8 @@ internal const val PRELUDE: String = """
             return apply(f, o, slice(arguments, 2));
         },
         bind: function (f) { return apply(bindFn, f, slice(arguments, 1)); },
-        toStringPrimitive: function (o) { return `${'$'}{o}`; },
-        toNumberPrimitive: function (o) { return +o; },
+        toStringPrimitive: function (o) { return primitive(o, 'string'); },
+        toNumberPrimitive: function (o) { return primitive(o, 'number'); },
         defineValue: function (o, k, v, w, e, c) {
             defineProperty(o, k, { value: v, writable: w, enumerable: e, configurable: c });
         },

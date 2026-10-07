@@ -37,13 +37,28 @@ when you have missed one.
 
 ### Readers that coerce
 
-`asBoolean`, `asDouble`, `asInt`, `asLong` and `asString` convert the way JavaScript itself does.
+`asBoolean`, `asDouble`, `asInt` and `asString` convert the way JavaScript itself does.
 `asString()` on the number 5 gives `"5"`, the same answer `String(5)` gives in a script.
 
 ```kotlin
 js.evaluate("2 + 2").asString()    // "4"
 js.evaluate("''").asBoolean()      // false
 js.evaluate("[1, 2]").asString()   // "1,2"
+```
+
+`asLong()` preserves an integral Number or BigInt in Kotlin's signed 64-bit range. Other values
+are converted to a numeric primitive first, so a numeric string or an object's `valueOf` works
+too. Fractions, NaN, infinities and values outside that range throw `JsError` with the name
+`RangeError`; negative zero becomes zero. It never wraps, truncates or saturates. A Number can
+already have been rounded by JavaScript: use BigInt for an integer whose original digits must
+remain exact. Typed `Long` callback arguments use this same conversion, and Kotlin Long values
+outside the safe Number range cross into the script as BigInts.
+
+```kotlin
+js.evaluate("4294967296").asLong()            // 4294967296L
+js.evaluate("9223372036854775807n").asLong()  // Long.MAX_VALUE
+js.evaluate("4294967296").asInt()             // 0: ToInt32 still wraps
+js.evaluate("1.5").asLong()                    // throws RangeError
 ```
 
 ### Readers that do not

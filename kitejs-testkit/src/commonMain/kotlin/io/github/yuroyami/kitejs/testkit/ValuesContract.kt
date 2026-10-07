@@ -91,6 +91,69 @@ public abstract class ValuesContract<C : KiteJsConfig>(engine: JsEngine<C>) : En
     }
 
     @Test
+    public fun aLongKeepsAllItsBits(): TestResult = withEngine { js ->
+        val numbers = listOf(
+            2147483648L, -2147483649L, 4294967296L, -4294967296L,
+            9007199254740991L, -9007199254740991L, 9007199254740992L,
+            Long.MIN_VALUE, 9223372036854774784L,
+        )
+        for (number in numbers) assertEquals(number, js.evaluate(number.toString()).asLong(), number.toString())
+        for (number in numbers + Long.MAX_VALUE) {
+            assertEquals(number, js.evaluate("${number}n").asLong(), "BigInt $number")
+        }
+        assertEquals(0L, js.evaluate("-0").asLong())
+        assertEquals(4294967296L, js.evaluate("'4294967296'").asLong())
+        assertEquals(4294967296L, js.evaluate("({ valueOf: function () { return 4294967296 } })").asLong())
+        assertEquals(Long.MAX_VALUE, js.evaluate("({ valueOf: function () { return 9223372036854775807n } })").asLong())
+        assertEquals(Long.MIN_VALUE, js.evaluate("Object(-9223372036854775808n)").asLong())
+        assertEquals(Long.MAX_VALUE, js.evaluate("({ [Symbol.toPrimitive]: function (hint) { if (hint !== 'number') throw Error(hint); return 9223372036854775807n } })").asLong())
+        assertEquals(0L, JsValue.nullValue.asLong())
+        assertEquals(1L, JsValue.`true`.asLong())
+        assertEquals(0, js.evaluate("4294967296").asInt(), "Int still wraps")
+    }
+
+    @Test
+    public fun aLongRefusesValuesItCannotRepresent(): TestResult = withEngine { js ->
+        for (source in listOf(
+            "1.5", "-1.5", "NaN", "Infinity", "-Infinity", "undefined", "'not a number'",
+            "9223372036854775808", "-9223372036854777856", "9223372036854775808n", "-9223372036854775809n",
+        )) {
+            val error = assertFailsWith<JsError>(source) { js.evaluate(source).asLong() }
+            assertEquals("RangeError", error.name, source)
+        }
+        assertEquals("TypeError", assertFailsWith<JsError> { js.evaluate("Symbol()").asLong() }.name)
+        assertEquals(2, js.evaluate("1 + 1").asInt())
+    }
+
+    @Test
+    public fun numericPrimitiveConversionKeepsTheHookOrder(): TestResult = withEngine { js ->
+        val value = js.evaluate(
+            "var steps = []; ({ valueOf: function () { steps.push('valueOf'); return {} }, " +
+                "toString: function () { steps.push('toString'); return '4294967296' } })",
+        )
+        assertEquals(4294967296L, value.asLong())
+        assertEquals("valueOf,toString", js.evaluate("steps.join()").asString())
+        assertEquals("TypeError", assertFailsWith<JsError> { js.evaluate("({ [Symbol.toPrimitive]: 1 })").asLong() }.name)
+        assertEquals("TypeError", assertFailsWith<JsError> { js.evaluate("({ [Symbol.toPrimitive]: function () { return {} } })").asLong() }.name)
+        assertEquals("TypeError", assertFailsWith<JsError> { js.evaluate("({ valueOf: function () { return {} }, toString: function () { return {} } })").asLong() }.name)
+        assertEquals("hook", assertFailsWith<JsError> { js.evaluate("({ valueOf: function () { throw Error('hook') } })").asLong() }.errorMessage)
+    }
+
+    @Test
+    public fun typedLongCallbacksRoundTripNumbersAndBigInts(): TestResult = withEngine { js ->
+        var calls = 0
+        js.global.function<Long, Long>("echoLong") { calls++; it }
+        for (number in listOf(4294967296L, -4294967296L, 9007199254740991L, Long.MIN_VALUE, Long.MAX_VALUE)) {
+            js.global["longValue"] = number
+            assertEquals(number, js.evaluate("echoLong(longValue)").asLong())
+        }
+        assertEquals(5, calls)
+        assertFailsWith<JsError> { js.evaluate("echoLong(1.5)") }
+        assertEquals(5, calls, "an invalid argument must not reach the callback")
+        assertEquals(4294967296L, js.evaluate("echoLong(4294967296)").asLong())
+    }
+
+    @Test
     public fun toKotlinGoesAllTheWayDown(): TestResult = withEngine { js ->
         val v = js.evaluate("({ n: 1, s: 'x', b: true, big: 2n, list: [1, [2]], inner: { deep: null, gone: undefined } })").toKotlin()
         @Suppress("UNCHECKED_CAST")

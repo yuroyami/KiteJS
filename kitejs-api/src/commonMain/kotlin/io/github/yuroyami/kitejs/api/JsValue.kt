@@ -116,8 +116,30 @@ public value class JsValue @InternalKiteJsApi constructor(
     /** ToInt32: the number wrapped into a 32-bit integer, as the bitwise operators see it. */
     public fun asInt(): Int = JsNumbers.toInt32(asDouble())
 
-    /** The same 32-bit integer [asInt] gives, widened. */
-    public fun asLong(): Long = asInt().toLong()
+    /**
+     * An exact signed 64-bit integer. A BigInt is checked directly; other values undergo numeric
+     * primitive conversion first. Fractions, NaN, infinities and values outside the Long range
+     * throw a [JsError] named `RangeError`. Negative zero becomes zero. Unlike [asInt], this
+     * never wraps, truncates or saturates. A Number already rounded by JavaScript keeps that
+     * represented value; use BigInt when the original integer must retain all its digits.
+     */
+    public fun asLong(): Long {
+        val r = raw
+        if (r is JsObject) return r.toPrimitive(PrimitiveHint.NUMBER).asLong()
+        if (r is KBigInt) {
+            if (r.bitLength() > 63) throw longRangeError()
+            return r.toLong()
+        }
+        val number = asDouble()
+        // Long.MAX_VALUE rounds to 2^63 as a Double, so the upper bound is exclusive.
+        if (!number.isFinite() || number < Long.MIN_VALUE.toDouble() ||
+            number >= -Long.MIN_VALUE.toDouble() || number % 1.0 != 0.0
+        ) throw longRangeError()
+        return number.toLong()
+    }
+
+    private fun longRangeError(): JsError =
+        JsError(undefined, "RangeError", "value is not an exact integer in the Kotlin Long range", emptyList(), null)
 
     /** ToString. An object is turned into a primitive first, which can run its script. */
     public fun asString(): String = when (val r = raw) {
