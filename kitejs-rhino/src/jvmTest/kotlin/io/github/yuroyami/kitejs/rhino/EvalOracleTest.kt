@@ -418,7 +418,7 @@ class EvalOracleTest {
         "Math.sqrt(16)", "Math.sqrt(-1)", "Math.cbrt(27)", "Math.cbrt(-8)", "Math.hypot(3, 4)", "Math.hypot()",
         "Math.hypot(NaN, Infinity)", "Math.sign(-5)", "1 / Math.sign(-0)", "Math.sign('x')", "Math.trunc(-4.7)",
         "Math.log(Math.E)", "Math.log(-1)", "Math.log10(1000)", "Math.log1p(0)", "Math.expm1(0)",
-        "Math.exp(1) === Math.E", "Math.exp(-Infinity)", "Math.sin(0)", "Math.sin(Infinity)", "Math.cos(0)", "Math.tan(0)",
+        "Math.exp(-Infinity)", "Math.sin(0)", "Math.sin(Infinity)", "Math.cos(0)", "Math.tan(0)",
         "Math.atan2(1, 1)", "Math.atan(1)", "Math.asin(2)", "Math.asin(1)", "Math.acos(1)", "Math.sinh(0)", "Math.cosh(0)",
         "Math.tanh(Infinity)", "1 / Math.asinh(-0)", "Math.acosh(1)", "Math.acosh(0)", "Math.atanh(0)",
         "Math.clz32(1)", "Math.clz32(0)", "Math.clz32(-1)", "Math.clz32(0x10000)",
@@ -430,21 +430,21 @@ class EvalOracleTest {
 
     /**
      * The transcendental functions are fdlibm here, as V8 has them, on every target. Upstream
-     * hands `log`, `log2`, `asinh` and `atanh` to the JVM's `Math`, or to formulas on top of it,
-     * which is a unit off in the last place for these arguments (D-73). Both halves are pinned so
-     * a change on either side shows. Each ported answer is the one Node 22 gives.
+     * uses the host JVM's Math, whose last digit can vary with the JDK and processor. These
+     * results have independent, exact V8 expectations; arithmetic, coercion and special values
+     * retain the differential coverage in mathBuiltin.
      */
     @Test
     fun mathIsFdlibmAsV8HasIt() {
         val answers = linkedMapOf(
-            "Math.log2(8)" to ("2.9999999999999996" to "3"),
-            "Math.asinh(1)" to ("0.8813735870195429" to "0.881373587019543"),
-            "Math.atanh(0.5)" to ("0.5493061443340549" to "0.5493061443340548"),
-            "Math.acosh(1e300)" to ("Infinity" to "691.4686750787736"),
+            "Math.log2(8)" to "3",
+            "Math.asinh(1)" to "0.881373587019543",
+            "Math.atanh(0.5)" to "0.5493061443340548",
+            "Math.acosh(1e300)" to "691.4686750787736",
+            "Math.exp(1) === Math.E" to "true",
         )
-        for ((script, pair) in answers) {
-            assertEquals(pair.first, upstream(script), "upstream: $script")
-            assertEquals(pair.second, ported(script), "ported: $script")
+        for ((script, expected) in answers) {
+            assertEquals(expected, ported(script), "ported: $script")
         }
     }
 
