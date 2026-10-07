@@ -159,7 +159,7 @@ internal class AsmRunner(private val instance: AsmInstance) {
 
             AsmOp.H_LOAD_I16 -> iv[ip - 1] = loadI16(bytes, iv[ip - 1])
             AsmOp.H_LOAD_U16 -> iv[ip - 1] = loadI16(bytes, iv[ip - 1]) and 0xFFFF
-            AsmOp.H_LOAD_F32 -> dv[dp++] = Float.fromBits(loadI32(bytes, iv[--ip])).toDouble()
+            AsmOp.H_LOAD_F32 -> dv[dp++] = loadF32(bytes, iv[--ip])
             AsmOp.H_LOAD_F64 -> dv[dp++] = loadF64(bytes, iv[--ip])
             AsmOp.H_STORE_I16 -> { ip -= 2; storeI16(bytes, iv[ip], iv[ip + 1]) }
             AsmOp.H_STORE_F32 -> { ip--; dp--; storeI32(bytes, iv[ip], dv[dp].toFloat().toRawBits()) }
@@ -423,8 +423,9 @@ internal class AsmRunner(private val instance: AsmInstance) {
 
     // ---- The heap -----------------------------------------------------------------------------
     //
-    // Reading past the end answers zero and writing past it does nothing, which is what a typed
-    // array view does and so what the module would have seen through one.
+    // An invalid typed-array read yields undefined: integer coercion answers zero, floating
+    // coercion answers NaN. Invalid stores do nothing. Subtract widths from the nonnegative
+    // heap size so the highest positive addresses cannot overflow the bounds check.
 
     private fun loadI8(h: ByteArray, at: Int): Int {
         if (at < 0 || at >= h.size) return 0
@@ -438,10 +439,20 @@ internal class AsmRunner(private val instance: AsmInstance) {
 
     private fun loadI32(h: ByteArray, at: Int): Int {
         if (at < 0 || at > h.size - 4) return 0
+        return readI32(h, at)
+    }
+
+    /** Reads a raw word only after its caller has checked that all four bytes exist. */
+    private fun readI32(h: ByteArray, at: Int): Int {
         return (h[at].toInt() and 0xFF) or
             ((h[at + 1].toInt() and 0xFF) shl 8) or
             ((h[at + 2].toInt() and 0xFF) shl 16) or
             (h[at + 3].toInt() shl 24)
+    }
+
+    private fun loadF32(h: ByteArray, at: Int): Double {
+        if (at < 0 || at > h.size - 4) return Double.NaN
+        return Float.fromBits(readI32(h, at)).toDouble()
     }
 
     private fun loadF64(h: ByteArray, at: Int): Double {

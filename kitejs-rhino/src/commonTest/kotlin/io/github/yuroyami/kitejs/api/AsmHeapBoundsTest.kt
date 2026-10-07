@@ -62,12 +62,11 @@ class AsmHeapBoundsTest {
     }
 
     @Test
-    fun floatingReadsAtLargeAddressesDoNotThrowHostErrors() {
+    fun floatingReadsOutsideTheHeapStayNaN() {
         for (view in views.filter { it.floating }) withHeap(view) { js ->
             for (address in invalidAddresses(view, 64)) {
                 val answer = js.evaluate("m.read($address)").asDouble()
-                // Float32's NaN result is a separate regression; every view must first be safe.
-                if (view.shift == 3) assertTrue(answer.isNaN(), "${view.name} at $address: $answer")
+                assertTrue(answer.isNaN(), "${view.name} at $address: $answer")
             }
         }
     }
@@ -116,8 +115,7 @@ class AsmHeapBoundsTest {
                     val answer = js.evaluate("m.read($address)")
                     when {
                         !view.floating -> assertEquals(0, answer.asInt())
-                        view.shift == 3 -> assertTrue(answer.asDouble().isNaN())
-                        else -> answer.asDouble()
+                        else -> assertTrue(answer.asDouble().isNaN())
                     }
                     js.evaluate("m.write($address, 17)")
                     assertEquals(0, js.evaluate("bytes.length").asInt())
@@ -129,6 +127,55 @@ class AsmHeapBoundsTest {
                 js.evaluate("m.write(${1 shl view.shift}, 99)")
                 assertEquals(17.0, js.evaluate("m.read(0)").asDouble())
             }
+        }
+    }
+
+    @Test
+    fun floatingReadCoercionsAndLocalCallsKeepNaN() {
+        for (budget in listOf(0, 1_000_000)) for (enabled in listOf(false, true)) {
+            KiteJs(Rhino) { asmJs = enabled; instructionBudget = budget }.use { js ->
+                js.evaluate("""
+                    var m = (function (s, f, h) {
+                      "use asm";
+                      var F = new s.Float32Array(h);
+                      var round = s.Math.fround;
+                      function double(i) { i = i | 0; return +F[i >> 2]; }
+                      function float(i) { i = i | 0; return round(F[i >> 2]); }
+                      function direct(i) { i = i | 0; return +double(i | 0); }
+                      function indirect(i) { i = i | 0; return +D[i & 1](i | 0); }
+                      var D = [double, double];
+                      return { double: double, float: float, direct: direct, indirect: indirect };
+                    })({ Float32Array: Float32Array, Math: Math }, {}, new ArrayBuffer(64));
+                """.trimIndent())
+                if (enabled) {
+                    val report = js.asmReports.single()
+                    assertTrue(report.compiled && report.linked, "$report")
+                }
+                for (address in listOf(-1, 64, 68, Int.MAX_VALUE)) {
+                    for (name in listOf("double", "float", "direct", "indirect")) {
+                        assertTrue(js.evaluate("m.$name($address)").asDouble().isNaN(), "$name at $address")
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun validFloat32BitsKeepTheirValuesAndZeroSign() {
+        withHeap(views.first { it.name == "Float32Array" }) { js ->
+            assertTrue(js.evaluate("""
+                (function () {
+                  var bits = [0x80000000, 0, 0x3dcccccd, 1, 0x007fffff, 0x00800000,
+                              0x7f7fffff, 0x7f800000, 0xff800000, 0x7fc00001, 0x7fa00001];
+                  var words = new Uint32Array(heap);
+                  var reference = new Float32Array(heap);
+                  for (var i = 0; i < bits.length; i++) {
+                    words[i] = bits[i];
+                    if (!Object.is(reference[i], m.read(i * 4))) return false;
+                  }
+                  return Object.is(m.read(0), -0) && 1 / m.read(0) === -Infinity;
+                })()
+            """.trimIndent()).asBoolean())
         }
     }
 }

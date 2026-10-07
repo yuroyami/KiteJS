@@ -68,8 +68,9 @@ one machine instruction and let the result wrap at 32 bits, where plain JavaScri
 sum to a double and keep every bit of it.
 
 A heap read is written `H32[p >> 2]`, where the shift matches the width of the view. The engine
-reads the bytes directly. Reading past the end of the heap answers zero, and writing past it does
-nothing, the same as through a typed array view.
+reads the bytes directly. An out-of-range read answers zero after integer coercion and NaN after
+floating-point coercion. An out-of-range write does nothing, the same as through a typed array
+view.
 
 ## What the compiler does not take
 
