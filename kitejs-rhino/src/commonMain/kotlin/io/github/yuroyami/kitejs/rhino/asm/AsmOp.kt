@@ -132,7 +132,7 @@ internal object AsmOp {
     // Calls. A direct call names a function of this module; an indirect one reads a table.
     const val CALL_DIRECT = 96 // operand: function index
     const val CALL_INDIRECT = 97 // operands: table index, signature index; pops the table offset
-    const val CALL_FFI = 98 // operands: import index, signature index
+    const val CALL_FFI = 98 // operands: import index, packed argument shapes
 
     // Stack housekeeping.
     const val I_DROP = 99

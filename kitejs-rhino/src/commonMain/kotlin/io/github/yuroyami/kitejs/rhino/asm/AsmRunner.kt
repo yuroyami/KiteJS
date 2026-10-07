@@ -229,7 +229,12 @@ internal class AsmRunner(private val instance: AsmInstance) {
                 // The arguments were pushed in order onto whichever stack their type uses,
                 // so they come off in reverse.
                 for (i in count - 1 downTo 0) {
-                    args[i] = if ((packed and (1 shl (8 + i))) != 0) dv[--dp] else iv[--ip].toDouble()
+                    args[i] = if ((packed and (1 shl (8 + i))) != 0) dv[--dp] else {
+                        val value = iv[--ip]
+                        if ((packed and (1 shl (20 + i))) != 0) {
+                            (value.toLong() and 0xFFFFFFFFL).toDouble()
+                        } else value.toDouble()
+                    }
                 }
                 val answer = callForeign(cx, index, args)
                 room(ip, dp + 1)

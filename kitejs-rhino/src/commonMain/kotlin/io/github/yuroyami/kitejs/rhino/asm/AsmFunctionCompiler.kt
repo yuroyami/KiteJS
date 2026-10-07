@@ -985,7 +985,8 @@ internal class AsmFunctionCompiler(private val owner: AsmCompiler, private val f
         for (i in args.indices) {
             val type = expr(unwrap(args[i]))
             types[i] = when {
-                AsmType.isInt(type) && type != AsmType.INTISH -> AsmType.SIGNED
+                type == AsmType.UNSIGNED -> AsmType.UNSIGNED
+                AsmType.isSigned(type) -> AsmType.SIGNED
                 type == AsmType.DOUBLE || type == AsmType.FLOAT -> AsmType.DOUBLE
                 else -> reject("a foreign call is passed ${AsmType.name(type)}")
             }
@@ -1003,12 +1004,13 @@ internal class AsmFunctionCompiler(private val owner: AsmCompiler, private val f
         return AsmType.EXTERN
     }
 
-    /** Packs the argument shapes of a foreign call into one operand: two bits each. */
+    /** Packs a count byte, 12 floating flags and 12 unsigned flags into one operand. */
     private fun encodeArgs(types: IntArray): Int {
         if (types.size > 12) reject("a foreign call takes too many arguments")
         var packed = types.size
         for (i in types.indices) {
             if (AsmType.isDbl(types[i])) packed = packed or (1 shl (8 + i))
+            else if (types[i] == AsmType.UNSIGNED) packed = packed or (1 shl (20 + i))
         }
         return packed
     }
