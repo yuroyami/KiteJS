@@ -53,7 +53,7 @@ internal object JavaNumbers {
      * digits carry no leading or trailing zeros; zero is `"0"` with exponent 0.
      */
     fun shortestDigits(d: Double): Pair<String, Int> {
-        val s = DoubleFormatter.toString(abs(d))
+        val s = DoubleFormatter.toStringWithJavaDigits(abs(d))
         val e = s.indexOf('e')
         val mant = if (e >= 0) s.substring(0, e) else s
         val exp = if (e >= 0) s.substring(e + 1).toInt() else 0

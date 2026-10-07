@@ -2395,7 +2395,19 @@ class EvalOracleTest {
         )
         val scripts = mutableListOf<String>()
         for (radix in 2..36) for (v in values) scripts.add("($v).toString($radix)")
+        // Upstream prints MIN_VALUE in decimal with two digits; see shortestSubnormalsDifferFromTheLegacyOracle.
+        scripts.remove("(5e-324).toString(10)")
         check(scripts)
+    }
+
+    /** The tiny subnormals print with the fewest digits, as ECMAScript asks; upstream keeps two (D-100). */
+    @Test
+    fun shortestSubnormalsDifferFromTheLegacyOracle() {
+        assertEquals("\"4.9e-324\"", upstream("String(Number.MIN_VALUE)"))
+        assertEquals("\"5e-324\"", ported("String(Number.MIN_VALUE)"))
+        assertEquals("\"9.9e-324\"", upstream("String(2 * Number.MIN_VALUE)"))
+        assertEquals("\"1e-323\"", ported("String(2 * Number.MIN_VALUE)"))
+        assertEquals("\"1.5e-323\"", ported("String(3 * Number.MIN_VALUE)"))
     }
 
     @Test

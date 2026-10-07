@@ -48,7 +48,7 @@ class NumberFormatTest {
 
     @Test
     fun formatsExtremeValues() {
-        assertEquals("4.9e-324", str(Double.MIN_VALUE))
+        assertEquals("5e-324", str(Double.MIN_VALUE))
         assertEquals("1.7976931348623157e+308", str(Double.MAX_VALUE))
         assertEquals("1.5e+300", str(1.5e300))
         assertEquals("1.5e-300", str(1.5e-300))

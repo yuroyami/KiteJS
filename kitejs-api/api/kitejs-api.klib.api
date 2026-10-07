@@ -447,6 +447,7 @@ final object io.github.yuroyami.kitejs.api.dtoa/DecimalParser { // io.github.yur
 final object io.github.yuroyami.kitejs.api.dtoa/DoubleFormatter { // io.github.yuroyami.kitejs.api.dtoa/DoubleFormatter|null[0]
     final fun toDecimal(kotlin/Double): io.github.yuroyami.kitejs.api.dtoa/Decimal // io.github.yuroyami.kitejs.api.dtoa/DoubleFormatter.toDecimal|toDecimal(kotlin.Double){}[0]
     final fun toString(kotlin/Double): kotlin/String // io.github.yuroyami.kitejs.api.dtoa/DoubleFormatter.toString|toString(kotlin.Double){}[0]
+    final fun toStringWithJavaDigits(kotlin/Double): kotlin/String // io.github.yuroyami.kitejs.api.dtoa/DoubleFormatter.toStringWithJavaDigits|toStringWithJavaDigits(kotlin.Double){}[0]
 }
 
 final object io.github.yuroyami.kitejs.api.dtoa/RadixFormatter { // io.github.yuroyami.kitejs.api.dtoa/RadixFormatter|null[0]

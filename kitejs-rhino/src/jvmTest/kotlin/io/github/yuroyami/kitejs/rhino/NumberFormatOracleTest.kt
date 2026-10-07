@@ -21,7 +21,7 @@ class NumberFormatOracleTest {
         var checked = 0
         val failures = mutableListOf<String>()
         for (d in values) {
-            val expected = UpstreamScriptRuntime.numberToString(d, 10)
+            val expected = ShortestSubnormals.shortest(d) ?: UpstreamScriptRuntime.numberToString(d, 10)
             val actual = ScriptRuntime.numberToString(d, 10)
             if (expected != actual) {
                 failures.add("bits=${d.toRawBits()} expected=$expected actual=$actual")

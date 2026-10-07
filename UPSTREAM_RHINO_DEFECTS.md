@@ -77,6 +77,15 @@ again does not reset it. ECMAScript 2015, 13.3.1.4 initializes it to `undefined`
 - Where: `NativeNumber` and `NativeBigInt`, now `LocaleNumbers` over kitejs-api's `EnUsNumberFormat`.
 - Test: `LocaleNumbersContract`, `EnUsNumberFormatTest`, `EvalOracleTest.localeNumbersDifferFromTheLegacyOracle`.
 
+### The smallest subnormals print with two digits (D-100)
+
+`String(Number.MIN_VALUE)` is `4.9e-324` where ECMAScript asks for `5e-324`, and seven more of
+the twenty smallest subnormals print a second digit they do not need. The digits come from the
+Schubfach algorithm of `Double.toString`, whose Java specification keeps at least two.
+
+- Where: `DoubleFormatter.toDecimalFull`.
+- Test: `DoubleFormatterTest`, `EvalOracleTest.shortestSubnormalsDifferFromTheLegacyOracle`.
+
 ### A property descriptor of a lazily loaded global leaks the placeholder (D-75)
 
 `typeof Object.getOwnPropertyDescriptor(globalThis, 'JSON').value` throws "Invalid JavaScript

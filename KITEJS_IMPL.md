@@ -839,6 +839,15 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   reaches it from `LocaleNumbers`; QuickJS-ng, whose own `toLocaleString` is `toString`, from
   its prelude, through a proxy of a host function so the method still prints as native code
   and the errors stay catchable. `LocaleNumbersContract` holds both engines to it.
+- D-100: `Number::toString` prints the fewest digits that identify the double, as ECMAScript
+  2015, 7.1.12.1 step 5 asks, for the tiny subnormals too: `Number.MIN_VALUE` is `5e-324`.
+  `DoubleFormatter` is the Schubfach port OpenJDK's `Double.toString` uses, whose specification
+  keeps at least two digits, so for eight subnormals (1, 2, 10, 12, 14, 16, 18 and 20 times
+  MIN_VALUE) upstream printed two, `4.9e-324` among them. A two-digit result now gives way to a
+  one-digit neighbour in the rounding interval, the closer one, or the even one on a tie.
+  `JavaNumbers`, which prints a double the way Java does, keeps Java's digits through
+  `toStringWithJavaDigits`. `DoubleFormatterTest` checks 900 doubles, every subnormal up to 300
+  times MIN_VALUE among them, against what V8 prints (`tools/dtoa/generate-v8-number-strings.mjs`).
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

@@ -78,7 +78,15 @@ public object DoubleFormatter {
      * Converts a double to a String the way ECMAScript's `Number::toString` defines it. Handles
      * every double, including the non-finite ones.
      */
-    public fun toString(v: Double): String {
+    public fun toString(v: Double): String = toString(v, shortest = true)
+
+    /**
+     * [toString]'s layout with the digits `java.lang.Double.toString` picks, which keep two where
+     * one would do for a few tiny subnormals: 4.9e-324 rather than 5e-324 for MIN_VALUE.
+     */
+    public fun toStringWithJavaDigits(v: Double): String = toString(v, shortest = false)
+
+    private fun toString(v: Double, shortest: Boolean): String {
         val bits = v.toRawBits()
         val t = bits and T_MASK
         val bq = (bits ushr (P - 1)).toInt() and BQ_MASK
@@ -86,7 +94,7 @@ public object DoubleFormatter {
             if (bq == 0 && t == 0L) {
                 return "0"
             }
-            return toDecimalImpl(bits, t, bq).toString()
+            return toDecimalImpl(bits, t, bq, shortest).toString()
         }
         if (t != 0L) {
             return "NaN"
@@ -102,10 +110,10 @@ public object DoubleFormatter {
         val bits = v.toRawBits()
         val t = bits and T_MASK
         val bq = (bits ushr (P - 1)).toInt() and BQ_MASK
-        return toDecimalImpl(bits, t, bq)
+        return toDecimalImpl(bits, t, bq, true)
     }
 
-    private fun toDecimalImpl(bits: Long, t: Long, bq: Int): Decimal {
+    private fun toDecimalImpl(bits: Long, t: Long, bq: Int, shortest: Boolean): Decimal {
         /*
          * For the full details see references 2 and 1.
          *
@@ -125,20 +133,20 @@ public object DoubleFormatter {
                     return Decimal(f, 0, negative)
                 }
             }
-            return toDecimalFull(-mq, c, 0, negative)
+            return toDecimalFull(-mq, c, 0, negative, shortest)
         }
         if (t != 0L) {
             // Subnormal value.
             return if (t < C_TINY) {
-                toDecimalFull(Q_MIN, 10 * t, -1, negative)
+                toDecimalFull(Q_MIN, 10 * t, -1, negative, shortest)
             } else {
-                toDecimalFull(Q_MIN, t, 0, negative)
+                toDecimalFull(Q_MIN, t, 0, negative, shortest)
             }
         }
         return Decimal(0, 1, false)
     }
 
-    private fun toDecimalFull(q: Int, c: Long, dk: Int, negative: Boolean): Decimal {
+    private fun toDecimalFull(q: Int, c: Long, dk: Int, negative: Boolean, shortest: Boolean): Decimal {
         /*
          * The skeleton is figure 4 of reference 1, the efficient computations are figure 7.
          * Names map to reference 1 like this: cb is c-bar, cbr is c-bar-r, cbl is c-bar-l,
@@ -182,6 +190,21 @@ public object DoubleFormatter {
             val wpin = (tp10 shl 2) + out <= vbr
             if (upin != wpin) {
                 return Decimal(if (upin) sp10 else tp10, k, negative)
+            }
+        } else if (s >= 10 && shortest) {
+            /*
+             * Only a tiny subnormal gets here. Java prints at least two digits, but ECMAScript's
+             * Number::toString wants as few as identify v, so a one-digit neighbour in Rv wins,
+             * and of two the one closer to v, or the even one: MIN_VALUE is 5e-324, not 4.9e-324.
+             */
+            val sp10 = s / 10 * 10
+            val tp10 = sp10 + 10
+            val upin = vbl + out <= sp10 shl 2
+            val wpin = (tp10 shl 2) + out <= vbr
+            if (upin || wpin) {
+                val cmp = vb - ((sp10 + tp10) shl 1)
+                val lower = if (upin != wpin) upin else cmp < 0 || (cmp == 0L && (sp10 / 10) % 2 == 0L)
+                return Decimal(if (lower) sp10 else tp10, k + dk, negative)
             }
         }
 

@@ -408,6 +408,7 @@ public final class io/github/yuroyami/kitejs/api/dtoa/DoubleFormatter {
 	public static final field INSTANCE Lio/github/yuroyami/kitejs/api/dtoa/DoubleFormatter;
 	public final fun toDecimal (D)Lio/github/yuroyami/kitejs/api/dtoa/Decimal;
 	public final fun toString (D)Ljava/lang/String;
+	public final fun toStringWithJavaDigits (D)Ljava/lang/String;
 }
 
 public final class io/github/yuroyami/kitejs/api/dtoa/RadixFormatter {
