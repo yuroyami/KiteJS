@@ -54,6 +54,8 @@ The three arguments are the standard library, an object of functions the module 
 outside, and an `ArrayBuffer` the module uses as its memory. All three are checked when the module
 is called: `stdlib.Math.imul` has to be the engine's own `Math.imul`, not something that shares the
 name. A module given anything else is run as ordinary JavaScript instead.
+The heap length must be a multiple of every declared view's element width. A length that cannot
+construct those views runs ordinarily and keeps its original construction error.
 
 An imported function's result is discarded without conversion when the module uses a bare call.
 Explicit `+`, `| 0` and `fround` conversions still read that result, including their conversion

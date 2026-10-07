@@ -51,6 +51,13 @@ internal object AsmLink {
         }
         if (buffer.isDetached) reject("the heap has been detached")
 
+        // Check every whole-buffer view before an import getter or conversion can run. The
+        // ordinary module then owns any construction error, with its original effects and order.
+        for (global in module.globals.values) if (global is AsmGlobal.View) {
+            val width = 1 shl AsmView.shift(global.view)
+            if (buffer.length % width != 0) reject("the heap length is not a multiple of $width")
+        }
+
         val globalInts = IntArray(module.globalIntCount)
         val globalDbls = DoubleArray(module.globalDblCount)
         val ffi = arrayOfNulls<Callable>(module.ffiNames.size)
