@@ -569,7 +569,11 @@ internal class NativeDate private constructor() : IdScriptableObject() {
         private fun LocalTime(cx: Context, t: Double): Double = t + rawOffset(cx) + DaylightSavingTA(cx, t)
 
         private fun internalUTC(cx: Context, t: Double): Double {
+            if (!t.isFinite()) return ScriptRuntime.NaN
             val local = t - rawOffset(cx)
+            // DaylightSavingTA subtracts either zero or one hour. Reject only candidates
+            // that cannot enter TimeClip's range, before equivalent-year calendar work.
+            if (local < -HalfTimeDomain || local > HalfTimeDomain + msPerHour) return ScriptRuntime.NaN
             return local - DaylightSavingTA(cx, local)
         }
 
@@ -1055,9 +1059,7 @@ internal class NativeDate private constructor() : IdScriptableObject() {
                 return obj
             }
 
-            var time = date_msecFromArgs(args)
-            if (!time.isNaN() && !time.isInfinite()) time = TimeClip(internalUTC(cx, time))
-            obj.date = time
+            obj.date = TimeClip(internalUTC(cx, date_msecFromArgs(args)))
             return obj
         }
 
