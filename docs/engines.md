@@ -27,7 +27,7 @@ commonMain.dependencies {
 | Size it adds | Kotlin code only | About 1 MB of native code per platform, about 360 KB gzipped on the web |
 | Speed | An interpreter written in Kotlin | An interpreter written in C, between 3 and 12 times faster on the JVM on loops, strings, objects, recursion and sorting |
 | Engines per thread | One at a time | As many as you like |
-| Its own settings | `languageVersion`, `safeBuiltins` | `memoryLimit`, `maxStackSize` |
+| Its own settings | `languageVersion`, `safeBuiltins`, `maxCallDepth`, `maxHostCallDepth` | `memoryLimit`, `maxStackSize` |
 
 Pick **Rhino** when you want no native code anywhere in your app, when every byte of download
 matters more than speed, or when you rely on something only Rhino has, such as
@@ -40,6 +40,25 @@ work and speed matters, or when you want a hard cap on the memory a script can t
 same on both. One caveat: each engine counts the instruction budget in steps of its own, so the
 same number is not the same amount of work on Rhino and on QuickJS. Pick a budget by measuring the
 scripts you expect on the engine you ship.
+
+## Rhino recursion limits
+
+```kotlin
+KiteJs(Rhino) {
+    maxCallDepth = 10_000    // nested script frames; 0 disables this limit
+    maxHostCallDepth = 64    // nested host calls and interpreter reentry; must be positive
+}
+```
+
+These are the defaults. A script that exceeds either limit gets a `RangeError` with the message
+`Maximum call stack size exceeded`, and the engine remains usable. A script can catch a frame
+or interpreter-reentry error; a recursion through a Kotlin callback reaches the host as a
+`JsError`, following the host-exception rules.
+
+Getters and built-in callbacks can reenter the interpreter on the platform's native stack,
+so they count toward `maxHostCallDepth` too. Its practical maximum depends on the platform and
+the callbacks. Script frames remain counted across those reentries. Setting `maxCallDepth` to
+zero leaves the host-call limit in place.
 
 ## QuickJS
 

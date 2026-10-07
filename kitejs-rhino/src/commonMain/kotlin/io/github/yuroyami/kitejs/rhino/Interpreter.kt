@@ -211,6 +211,7 @@ public class Interpreter : Evaluator {
         var thisBinding: ThisBinding? = null
 
         constructor(cx: Context, thisObj: Scriptable?, fnOrScript: ScriptOrFn<*>, code: InterpreterData<*>, parentFrame: CallFrame?, previousInterpreterFrame: CallFrame?) {
+            frameIndex = nextFrameIndex(cx, parentFrame, previousInterpreterFrame)
             idata = code
             useActivation = fnOrScript.descriptor!!.requiresActivationFrame
             isStrict = fnOrScript.descriptor!!.isStrict
@@ -226,8 +227,6 @@ public class Interpreter : Evaluator {
             this.parentFrame = parentFrame
             this.parentPC = if (parentFrame == null) (previousInterpreterFrame?.pcSourceLineStart ?: -1) else parentFrame.pcSourceLineStart
             this.previousInterpreterFrame = previousInterpreterFrame
-            frameIndex = if (parentFrame == null) 0 else parentFrame.frameIndex + 1
-            if (frameIndex > cx.maximumInterpreterStackDepth) throw Context.reportRuntimeError("Exceeded maximum stack depth")
             pcSourceLineStart = idata.firstLinePC
             savedStackTop = emptyStackTop
         }
@@ -235,6 +234,7 @@ public class Interpreter : Evaluator {
         /** A copy of a frozen frame with its own stack, for resuming a generator. */
         constructor(original: CallFrame, parentFrame: CallFrame?, previousInterpreterFrame: CallFrame?) {
             if (!original.frozen) throw Kit.codeBug()
+            frameIndex = nextFrameIndex(Context.getContext(), parentFrame, previousInterpreterFrame)
             stack = original.stack.copyOf()
             stackAttributes = original.stackAttributes.copyOf()
             sDbl = original.sDbl.copyOf()
@@ -242,10 +242,8 @@ public class Interpreter : Evaluator {
             this.parentFrame = parentFrame
             this.previousInterpreterFrame = previousInterpreterFrame
             if (parentFrame == null) {
-                frameIndex = 0
                 parentPC = previousInterpreterFrame?.pcSourceLineStart ?: -1
             } else {
-                frameIndex = original.frameIndex
                 parentPC = parentFrame.pcSourceLineStart
             }
             fnOrScript = original.fnOrScript
@@ -272,6 +270,7 @@ public class Interpreter : Evaluator {
         /** A copy that shares the stack arrays, to keep the parent chain right for stack traces. */
         constructor(original: CallFrame, parentFrame: CallFrame?, previousInterpreterFrame: CallFrame?, keepFrozen: Boolean) {
             if (!original.frozen) throw Kit.codeBug()
+            frameIndex = nextFrameIndex(Context.getContext(), parentFrame, previousInterpreterFrame)
             stack = original.stack
             stackAttributes = original.stackAttributes
             sDbl = original.sDbl
@@ -279,10 +278,8 @@ public class Interpreter : Evaluator {
             this.parentFrame = parentFrame
             this.previousInterpreterFrame = previousInterpreterFrame
             if (parentFrame == null) {
-                frameIndex = 0
                 parentPC = previousInterpreterFrame?.pcSourceLineStart ?: -1
             } else {
-                frameIndex = original.frameIndex
                 parentPC = parentFrame.pcSourceLineStart
             }
             fnOrScript = original.fnOrScript
@@ -488,6 +485,15 @@ public class Interpreter : Evaluator {
             return best
         }
 
+        /** Counts active callers across native reentry before allocating another frame's arrays. */
+        private fun nextFrameIndex(cx: Context, parent: CallFrame?, previous: CallFrame?): Int {
+            val index = ((parent ?: previous)?.frameIndex ?: -1) + 1
+            if (index > cx.maximumInterpreterStackDepth) {
+                throw ScriptRuntime.rangeError("Maximum call stack size exceeded")
+            }
+            return index
+        }
+
         /** How many bytes an instruction takes, including its operands. */
         private fun bytecodeSpan(bytecode: Int): Int {
             when (bytecode) {
@@ -572,6 +578,7 @@ public class Interpreter : Evaluator {
 
         internal fun <T : ScriptOrFn<T>> interpret(ifun: T, idata: InterpreterData<T>, cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>, newTarget: Any?): Any? {
             if (!ScriptRuntime.hasTopCall(cx)) throw Kit.codeBug()
+            cx.checkInterpreterInvocation()
             // A call from native code, such as a forEach callback or a Promise reaction, is charged
             // like a call from script, before any frame exists to unwind (D-77).
             cx.addInstructionCount(INVOCATION_COST)
@@ -585,6 +592,7 @@ public class Interpreter : Evaluator {
         }
 
         internal fun resumeGenerator(cx: Context, scope: Scriptable, operation: Int, savedState: Any?, value: Any?): Any? {
+            cx.checkInterpreterInvocation()
             val frame = savedState as CallFrame
             val activeFrame = frame.shallowCloneFrozen(cx.lastInterpreterFrame as CallFrame?)
             try {
@@ -613,6 +621,7 @@ public class Interpreter : Evaluator {
          * reaches an `await`, or what the body returned; a throw comes out as one (D-97).
          */
         internal fun resumeAsync(cx: Context, operation: Int, savedState: Any?, value: Any?): Any? {
+            cx.checkInterpreterInvocation()
             val frame = savedState as CallFrame
             val activeFrame = frame.shallowCloneFrozen(cx.lastInterpreterFrame as CallFrame?)
             try {
@@ -628,6 +637,7 @@ public class Interpreter : Evaluator {
             val oldFrame = cx.lastInterpreterFrame
             var frame = frameIn!!
             var throwable = throwableIn
+            cx.interpreterInvocationDepth++
             try {
                 val instructionCounting = cx.instructionThreshold != 0
                 var indexReg = -1
@@ -723,6 +733,7 @@ public class Interpreter : Evaluator {
                 return if (interpreterResult !== DBL_MRK) interpreterResult else ScriptRuntime.wrapNumber(interpreterResultDbl)
             } finally {
                 cx.lastInterpreterFrame = oldFrame
+                cx.interpreterInvocationDepth--
             }
         }
 
@@ -2087,6 +2098,7 @@ public class Interpreter : Evaluator {
                 val calleeFrame = initFrame(
                     cx, calleeScope, ifun.getFunctionThis(funThisObj), funHomeObj, stack, sDbl, boundArgs,
                     state.stackTop + 1, state.indexReg, ifun, idata, callParentFrame, Undefined.instance,
+                    frame.previousInterpreterFrame,
                 )
                 if (op != Icode_TAIL_CALL) {
                     frame.savedStackTop = state.stackTop
@@ -2255,8 +2267,9 @@ public class Interpreter : Evaluator {
             cx: Context, callerScope: Scriptable, thisObj: Scriptable?, homeObj: Scriptable?, args: Array<Any?>, argsDbl: DoubleArray?,
             boundArgs: Array<Any?>?, argShift: Int, argCount: Int, fnOrScript: T, code: InterpreterData<T>, parentFrame: CallFrame?,
             newTarget: Any?,
+            previousInterpreterFrame: CallFrame? = if (parentFrame == null) cx.lastInterpreterFrame as CallFrame? else parentFrame.previousInterpreterFrame,
         ): CallFrame {
-            val frame = CallFrame(cx, thisObj, fnOrScript, code, parentFrame, if (parentFrame == null) cx.lastInterpreterFrame as CallFrame? else parentFrame.previousInterpreterFrame)
+            val frame = CallFrame(cx, thisObj, fnOrScript, code, parentFrame, previousInterpreterFrame)
             val desc = fnOrScript.descriptor!!
             when {
                 desc.functionType == FunctionNode.ARROW_FUNCTION -> {

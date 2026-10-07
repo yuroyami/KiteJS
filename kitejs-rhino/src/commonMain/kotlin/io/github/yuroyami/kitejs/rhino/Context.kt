@@ -97,6 +97,16 @@ public open class Context internal constructor(public val factory: ContextFactor
 
     /** The interpreter's current frame, when one is running. */
     internal var lastInterpreterFrame: Any? = null
+    internal var maximumInterpreterInvocations: Int = 64
+    internal var interpreterInvocationDepth: Int = 0
+
+    /** Refuses native interpreter reentry before creating or activating another frame. */
+    internal fun checkInterpreterInvocation() {
+        if (interpreterInvocationDepth >= maximumInterpreterInvocations) {
+            throw ScriptRuntime.rangeError("Maximum call stack size exceeded")
+        }
+    }
+
     internal var instructionCount: Int = 0
     internal var instructionThreshold: Int = 0
 

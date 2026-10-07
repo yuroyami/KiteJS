@@ -5,9 +5,7 @@
 package io.github.yuroyami.kitejs.quickjs.contract
 
 import io.github.yuroyami.kitejs.api.JsEngineError
-import io.github.yuroyami.kitejs.api.JsError
 import io.github.yuroyami.kitejs.api.KiteJs
-import io.github.yuroyami.kitejs.api.function
 import io.github.yuroyami.kitejs.quickjs.QuickJs
 import io.github.yuroyami.kitejs.quickjs.QuickJsConfig
 import io.github.yuroyami.kitejs.testkit.EngineContract
@@ -65,12 +63,6 @@ class QuickJsOnlyTest : EngineContract<QuickJsConfig>(QuickJs) {
     }
 
     @Test
-    fun deepRecursionIsARangeErrorTheScriptCanCatch() = withEngine({ maxStackSize = 256L * 1024 }) { js ->
-        val caught = js.evaluate("try { (function f() { return f() + 1 })() } catch (e) { e instanceof RangeError }")
-        assertEquals(true, caught.asBoolean())
-    }
-
-    @Test
     fun asyncIterationRuns() = withEngine { js ->
         js.evaluate(
             """
@@ -82,14 +74,5 @@ class QuickJsOnlyTest : EngineContract<QuickJsConfig>(QuickJs) {
             """.trimIndent(),
         )
         assertEquals("2,4,6", js.evaluate("out.join()").asString())
-    }
-
-    // This and the one above belong in ErrorsContract once Rhino keeps them (#120).
-    @Test
-    fun aRecursionThroughTheHostEndsInTheRangeError() = withEngine { js ->
-        js.global.function("viaHost", 1) { args -> args[0].asFunction()() }
-        val e = assertFailsWith<JsError> { js.evaluate("function f() { viaHost(f); } f()") }
-        assertEquals("RangeError", e.name)
-        assertEquals(2, js.evaluate("1 + 1").asInt())
     }
 }

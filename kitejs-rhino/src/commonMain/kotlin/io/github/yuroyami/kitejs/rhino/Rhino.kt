@@ -56,6 +56,15 @@ public class RhinoConfig @InternalKiteJsApi constructor() : KiteJsConfig() {
     /** Leaves out the built-ins a sandbox does not want. Today that is only the old `Packages` hooks. */
     public var safeBuiltins: Boolean = false
 
+    /** Maximum nested script-call depth, 10,000 by default; zero disables the frame limit. */
+    public var maxCallDepth: Int = 10_000
+
+    /**
+     * Maximum nested host calls and interpreter reentries, 64 by default. Must be positive.
+     * Getters and built-in callbacks count too: these calls use the platform's native stack.
+     */
+    public var maxHostCallDepth: Int = 64
+
     /**
      * The byte order a typed array view uses, for example `Int32Array` over an `ArrayBuffer`.
      * Little-endian is what every browser and Node answer, and what Emscripten output needs.

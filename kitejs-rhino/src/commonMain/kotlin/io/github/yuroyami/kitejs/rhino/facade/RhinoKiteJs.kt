@@ -162,6 +162,9 @@ internal class RhinoKiteJs private constructor(
     fun <T> call(top: Boolean = true, drain: Boolean = true, body: () -> T): T {
         if (closed) throw JsEngineError("this engine is closed")
         if (Context.getCurrentContext() !== cx) throw wrongThread()
+        if (depth >= cx.maximumInterpreterInvocations) {
+            throw translate(ScriptRuntime.rangeError("Maximum call stack size exceeded"))
+        }
         val outermost = depth == 0
         depth++
         try {
@@ -353,6 +356,10 @@ internal class RhinoKiteJs private constructor(
             val factory = EngineFactory(config)
             val cx = factory.enterContext()
             return try {
+                require(config.maxCallDepth >= 0) { "maxCallDepth must be nonnegative" }
+                require(config.maxHostCallDepth > 0) { "maxHostCallDepth must be positive" }
+                cx.maximumInterpreterStackDepth = if (config.maxCallDepth == 0) Int.MAX_VALUE else config.maxCallDepth
+                cx.maximumInterpreterInvocations = config.maxHostCallDepth
                 cx.languageVersion = config.languageVersion.code
                 cx.timeZone = config.timeZone
                 config.clock?.let { cx.clock = it }

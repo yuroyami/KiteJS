@@ -289,30 +289,37 @@ public class ES6Generator : ScriptableObject {
         private fun realThis(thisObj: Scriptable?): ES6Generator =
             LambdaConstructor.convertThisObject<ES6Generator>(thisObj)
 
-        private fun js_next(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
+        /** Delegation can recurse after the interpreter returns, so its native calls stay counted. */
+        private inline fun <T> withGeneratorCall(cx: Context, body: () -> T): T {
+            cx.checkInterpreterInvocation()
+            cx.interpreterInvocationDepth++
+            return try { body() } finally { cx.interpreterInvocationDepth-- }
+        }
+
+        private fun js_next(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? = withGeneratorCall(cx) {
             val generator = realThis(thisObj)
             val value = if (args.isNotEmpty()) args[0] else Undefined.instance
-            return if (generator.delegee == null) {
+            if (generator.delegee == null) {
                 generator.resumeLocal(cx, scope, value)
             } else {
                 generator.resumeDelegee(cx, scope, value)
             }
         }
 
-        private fun js_return(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
+        private fun js_return(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? = withGeneratorCall(cx) {
             val generator = realThis(thisObj)
             val value = if (args.isNotEmpty()) args[0] else Undefined.instance
-            return if (generator.delegee == null) {
+            if (generator.delegee == null) {
                 generator.resumeAbruptLocal(cx, scope, NativeGenerator.GENERATOR_CLOSE, value)
             } else {
                 generator.resumeDelegeeReturn(cx, scope, value)
             }
         }
 
-        private fun js_throw(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
+        private fun js_throw(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? = withGeneratorCall(cx) {
             val generator = realThis(thisObj)
             val value = if (args.isNotEmpty()) args[0] else Undefined.instance
-            return if (generator.delegee == null) {
+            if (generator.delegee == null) {
                 generator.resumeAbruptLocal(cx, scope, NativeGenerator.GENERATOR_THROW, value)
             } else {
                 generator.resumeDelegeeThrow(cx, scope, value)

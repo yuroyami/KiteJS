@@ -10,6 +10,7 @@ import io.github.yuroyami.kitejs.api.JsError
 import io.github.yuroyami.kitejs.api.JsSyntaxError
 import io.github.yuroyami.kitejs.api.JsType
 import io.github.yuroyami.kitejs.api.KiteJsConfig
+import io.github.yuroyami.kitejs.api.function
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -61,6 +62,21 @@ public abstract class ErrorsContract<C : KiteJsConfig>(engine: JsEngine<C>) : En
         val s = assertFailsWith<JsError> { js.evaluate("throw 'plain'") }
         assertEquals("plain", s.value.asString())
         assertContains(s.message ?: "", "plain")
+    }
+
+    @Test
+    public fun deepRecursionIsARangeErrorTheScriptCanCatch(): TestResult = withEngine({ instructionBudget = 2_000_000 }) { js ->
+        val caught = js.evaluate("try { (function f() { return f() + 1 })() } catch (e) { e instanceof RangeError }")
+        assertTrue(caught.asBoolean())
+        assertEquals(2, js.evaluate("1 + 1").asInt())
+    }
+
+    @Test
+    public fun aRecursionThroughTheHostEndsInTheRangeError(): TestResult = withEngine { js ->
+        js.global.function("viaHost", 1) { args -> args[0].asFunction()() }
+        val error = assertFailsWith<JsError> { js.evaluate("function f() { viaHost(f); } f()") }
+        assertEquals("RangeError", error.name)
+        assertEquals(2, js.evaluate("1 + 1").asInt())
     }
 
     @Test

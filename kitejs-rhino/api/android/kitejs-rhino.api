@@ -1592,10 +1592,14 @@ public final class io/github/yuroyami/kitejs/rhino/RhinoConfig : io/github/yuroy
 	public final fun getAsmJs ()Z
 	public final fun getLanguageVersion ()Lio/github/yuroyami/kitejs/rhino/LanguageVersion;
 	public final fun getLittleEndian ()Z
+	public final fun getMaxCallDepth ()I
+	public final fun getMaxHostCallDepth ()I
 	public final fun getSafeBuiltins ()Z
 	public final fun setAsmJs (Z)V
 	public final fun setLanguageVersion (Lio/github/yuroyami/kitejs/rhino/LanguageVersion;)V
 	public final fun setLittleEndian (Z)V
+	public final fun setMaxCallDepth (I)V
+	public final fun setMaxHostCallDepth (I)V
 	public final fun setSafeBuiltins (Z)V
 }
 
