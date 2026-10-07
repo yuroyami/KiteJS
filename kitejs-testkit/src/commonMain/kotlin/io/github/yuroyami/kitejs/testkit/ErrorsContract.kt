@@ -103,6 +103,34 @@ public abstract class ErrorsContract<C : KiteJsConfig>(engine: JsEngine<C>) : En
     }
 
     @Test
+    public fun constDeclarationsNeedInitializersBeforeAnythingRuns(): TestResult = withEngine { js ->
+        js.global["constEffects"] = 0
+        for (source in listOf(
+            "const a;", "const a", "{ const a; }", "(function () { 'use strict'; const b; })()",
+            "function outer() { const a; }", "const first = (constEffects++, 1), missing;",
+            "const missing, last = 2;", "for (const c; ;) break;", "for (const c = 1, missing; ;) break;",
+            "const [a];", "const {a};", "for (const [a]; ;) break;", "for (const {a}; ;) break;",
+            "for (const a = 1 in {}) {}", "for (const a = 1 of []) {}",
+        )) {
+            val program = "constEffects++; $source"
+            assertFailsWith<JsSyntaxError>(source) { js.evaluate(program, "const-declaration.js") }
+            assertFailsWith<JsSyntaxError>(source) { js.compile(program, "const-declaration.js") }
+            js.global["invalidConst"] = program
+            for (parse in listOf("eval(invalidConst)", "Function(invalidConst)")) {
+                assertEquals("SyntaxError", js.evaluate("try { $parse; 'none' } catch (e) { e.name }").asString(), source)
+            }
+            assertEquals(0, js.global["constEffects"].asInt(), source)
+        }
+        assertTrue(js.evaluate("let blank; var other; blank === undefined && other === undefined").asBoolean())
+        assertTrue(js.evaluate("const initialized = undefined; initialized === undefined").asBoolean())
+        assertEquals(15, js.evaluate("const first = 7, second = 8; first + second").asInt())
+        assertEquals("ab", js.evaluate("var keys = ''; for (const key in {a: 1, b: 2}) keys += key; keys").asString())
+        assertEquals(6, js.evaluate("var sum = 0; for (const value of [1, 2, 3]) sum += value; sum").asInt())
+        assertEquals(14, js.evaluate("var sum = 0; for (const [a, b] of [[1, 2], [3, 4]]) sum += a * b; sum").asInt())
+        assertEquals(10, js.evaluate("var sum = 0; for (const value = 5; sum < 10;) sum += value; sum").asInt())
+    }
+
+    @Test
     public fun aRuntimeErrorCarriesItsFrames(): TestResult = withEngine { js ->
         val e = assertFailsWith<JsError> {
             js.evaluate("function inner() { null.x }\nfunction outer() { inner() }\nouter()", "boom.js")

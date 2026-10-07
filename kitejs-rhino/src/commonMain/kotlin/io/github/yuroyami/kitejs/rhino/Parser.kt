@@ -1877,11 +1877,13 @@ public class Parser(
                 markDestructuring(init)
                 cond = expr(false) // object being iterated
             } else { // ordinary for loop
-                // In an ordinary for loop a destructuring declaration must have an initializer.
+                // Ordinary for declarations require destructuring and const initializers;
+                // for-in and for-of declarations take their values from iteration instead.
                 if (init is VariableDeclaration) {
                     for (vi in init.variables) {
-                        if (vi.isDestructuring && vi.initializer == null) {
-                            reportError("msg.destruct.assign.no.init")
+                        if (vi.initializer == null) {
+                            if (vi.isDestructuring) reportError("msg.destruct.assign.no.init")
+                            else if (init.isConst) reportError("msg.const.no.init")
                         }
                     }
                 }
@@ -2664,6 +2666,12 @@ public class Parser(
             if (matchToken(Token.ASSIGN, true)) {
                 init = assignExpr()
                 end = getNodeEnd(init)
+            }
+
+            if (init == null && !inForInit && declType == Token.CONST &&
+                (tt == Token.NAME || tt == Token.UNDEFINED)
+            ) {
+                reportError("msg.const.no.init")
             }
 
             val vi = VariableInitializer(kidPos, end - kidPos)

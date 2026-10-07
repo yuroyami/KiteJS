@@ -39,6 +39,8 @@ class MessageParityTest {
         // D-95: early errors of plain functions that upstream lets through.
         "msg.getter.params", "msg.setter.params", "msg.keyword.escaped", "msg.rest.default",
         "msg.use.strict.non.simple", "msg.no.function.name",
+        // Const declarations need an initializer, except in for-in and for-of heads.
+        "msg.const.no.init",
         // D-97: async functions.
         "msg.async.decl.not.in.block", "msg.async.generator.unsupported", "msg.async.yield", "msg.await.params",
     )

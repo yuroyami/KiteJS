@@ -135,6 +135,7 @@ internal object Messages {
         "msg.catch.destructuring.requires.es6" to "Destructuring in catch blocks requires ES6 or later",
         "msg.catch.unreachable" to "any catch clauses following an unqualified catch are unreachable",
         "msg.const.redecl" to "redeclaration of const {0}.",
+        "msg.const.no.init" to "Missing initializer in const declaration",
         "msg.continue.nonloop" to "continue can only use labeles of iteration statements",
         "msg.continue.outside" to "continue must be inside loop",
         "msg.default.args" to "Default values are only supported in version >= 200",

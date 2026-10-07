@@ -125,6 +125,21 @@ class ParserErrorParityTest {
     }
 
     @Test
+    fun anUninitializedConstIsAStandardErrorThatUpstreamAccepts() {
+        val source = "const a;"
+        assertEquals(emptyList(), upstreamProblems(source))
+        assertEquals(
+            listOf("err.js:offset=7,length=1,error: Missing initializer in const declaration"),
+            portedProblems(source),
+        )
+        val uenv = UCompilerEnvirons().apply { languageVersion = UContext.VERSION_ES6 }
+        assertNull(runCatching { UParser(uenv).parse(source, "err.js", 1) }.exceptionOrNull())
+        val kenv = CompilerEnvirons().apply { languageVersion = Context.VERSION_ES6 }
+        val error = assertFailsWith<EvaluatorException> { Parser(kenv).parse(source, "err.js", 1) }
+        assertEquals("Missing initializer in const declaration (err.js#1)", error.message)
+    }
+
+    @Test
     fun collectedProblemsMatchUpstream() {
         val failures = mutableListOf<String>()
         for (source in malformed) {
