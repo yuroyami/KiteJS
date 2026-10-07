@@ -19,6 +19,7 @@ import io.github.yuroyami.kitejs.rhino.LambdaConstructor
 import io.github.yuroyami.kitejs.rhino.Messages
 import io.github.yuroyami.kitejs.rhino.NativeArray
 import io.github.yuroyami.kitejs.rhino.NativeArrayIterator
+import io.github.yuroyami.kitejs.rhino.NativeNumber
 import io.github.yuroyami.kitejs.rhino.ScriptRuntime
 import io.github.yuroyami.kitejs.rhino.Scriptable
 import io.github.yuroyami.kitejs.rhino.ScriptableObject
@@ -431,6 +432,15 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
             Intrinsics.constructor(cx, scope, NativeArrayBuffer.CLASS_NAME)
                 .construct(cx, scope, arrayOf<Any?>(length.toDouble() * bytesPerElement)) as NativeArrayBuffer
 
+        /** ToIndex stays wide until the caller has checked the backing-store bounds. */
+        private fun toIndex(value: Any?): Double {
+            val index = ScriptRuntime.toIntegerOrInfinity(value)
+            if (index < 0 || index > NativeNumber.MAX_SAFE_INTEGER) {
+                throw ScriptRuntime.rangeErrorById("msg.out.of.range.index", index)
+            }
+            return index
+        }
+
         /** The shared constructor body: every concrete view calls this with its own factory. */
         internal fun js_constructor(
             cx: Context,
@@ -443,9 +453,11 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
 
             val arg0 = args[0] ?: return constructable.construct(NativeArrayBuffer(), 0, 0)
 
-            if (arg0 is Number || arg0 is String) {
+            if (arg0 !is Scriptable || ScriptRuntime.isSymbol(arg0)) {
                 // A length, so the array starts out zeroed.
-                val length = ScriptRuntime.toInt32(arg0)
+                val index = toIndex(arg0)
+                if (index >= Int.MAX_VALUE.toDouble()) throw ScriptRuntime.rangeErrorById("msg.typed.array.bad.length", index)
+                val length = index.toInt()
                 return constructable.construct(makeArrayBuffer(cx, scope, length, bytesPerElement), 0, length)
             }
 
@@ -459,35 +471,36 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
 
             if (arg0 is NativeArrayBuffer) {
                 // A window onto an existing buffer, sharing its bytes.
-                val byteOff = if (NativeArrayBuffer.isArg(args, 1)) ScriptRuntime.toIndex(args[1]) else 0
-                if ((byteOff % bytesPerElement) != 0) {
+                val byteOff = if (NativeArrayBuffer.isArg(args, 1)) toIndex(args[1]) else 0.0
+                if ((byteOff % bytesPerElement) != 0.0) {
                     throw ScriptRuntime.rangeErrorById("msg.typed.array.bad.offset.byte.size", byteOff, bytesPerElement)
                 }
 
-                var newLength = 0
-                if (NativeArrayBuffer.isArg(args, 2)) newLength = ScriptRuntime.toIndex(args[2])
+                val newLength = if (NativeArrayBuffer.isArg(args, 2)) toIndex(args[2]) else 0.0
 
                 if (arg0.isDetached) throw ScriptRuntime.typeErrorById("msg.arraybuf.detached")
                 val bufferByteLength = arg0.length
 
                 val newByteLength: Int
                 if (!NativeArrayBuffer.isArg(args, 2)) {
-                    newByteLength = bufferByteLength - byteOff
+                    val remaining = bufferByteLength.toDouble() - byteOff
                     if ((bufferByteLength % bytesPerElement) != 0) {
-                        throw ScriptRuntime.rangeErrorById("msg.typed.array.bad.buffer.length.byte.size", newByteLength, bytesPerElement)
+                        throw ScriptRuntime.rangeErrorById("msg.typed.array.bad.buffer.length.byte.size", remaining, bytesPerElement)
                     }
-                    if (newByteLength < 0) throw ScriptRuntime.rangeErrorById("msg.typed.array.bad.offset", byteOff)
+                    if (remaining < 0) throw ScriptRuntime.rangeErrorById("msg.typed.array.bad.offset", byteOff)
+                    newByteLength = remaining.toInt()
                 } else {
-                    newByteLength = newLength * bytesPerElement
-                    if (byteOff + newByteLength > bufferByteLength) {
-                        throw ScriptRuntime.rangeErrorById("msg.typed.array.bad.length", newByteLength)
+                    val remaining = bufferByteLength.toDouble() - byteOff
+                    if (newLength > remaining / bytesPerElement) {
+                        throw ScriptRuntime.rangeErrorById("msg.typed.array.bad.length", newLength * bytesPerElement)
                     }
+                    newByteLength = (newLength * bytesPerElement).toInt()
                 }
 
                 if (byteOff < 0 || byteOff > arg0.length) {
                     throw ScriptRuntime.rangeErrorById("msg.typed.array.bad.offset", byteOff)
                 }
-                return constructable.construct(arg0, byteOff, newByteLength / bytesPerElement)
+                return constructable.construct(arg0, byteOff.toInt(), newByteLength / bytesPerElement)
             }
 
             if (arg0 is NativeArray) {
@@ -507,7 +520,7 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
             }
 
             if (ScriptRuntime.isArrayObject(arg0)) {
-                val arrayElements = ScriptRuntime.getArrayElements(arg0 as Scriptable)
+                val arrayElements = ScriptRuntime.getArrayElements(arg0)
                 val na = makeArrayBuffer(cx, scope, arrayElements.size, bytesPerElement)
                 val v = constructable.construct(na, 0, arrayElements.size)
                 for (i in arrayElements.indices) v.js_set(i, arrayElements[i])
@@ -800,14 +813,12 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
             val self = realThis(thisObj)
             val srcLength = if (self.isTypedArrayOutOfBounds) 0 else self.length
 
-            var start = if (NativeArrayBuffer.isArg(args, 0)) ScriptRuntime.toInt32(args[0]) else 0
-            var end = if (NativeArrayBuffer.isArg(args, 1)) ScriptRuntime.toInt32(args[1]) else srcLength
-            start = if (start < 0) srcLength + start else start
-            end = if (end < 0) srcLength + end else end
-
-            start = maxOf(0, start)
-            start = minOf(start, srcLength)
-            end = minOf(srcLength, end)
+            val relativeStart = ScriptRuntime.toIntegerOrInfinity(args.getOrElse(0) { Undefined.instance })
+            val start = (if (relativeStart < 0) srcLength + relativeStart else relativeStart)
+                .coerceIn(0.0, srcLength.toDouble()).toInt()
+            val relativeEnd = if (NativeArrayBuffer.isArg(args, 1)) ScriptRuntime.toIntegerOrInfinity(args[1]) else srcLength.toDouble()
+            val end = (if (relativeEnd < 0) srcLength + relativeEnd else relativeEnd)
+                .coerceIn(0.0, srcLength.toDouble()).toInt()
             val len = maxOf(0, end - start)
             val byteOff = self.offset + start * self.bytesPerElement
 

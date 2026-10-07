@@ -1160,7 +1160,7 @@ class EvalOracleTest {
         "new Int8Array([NaN, undefined, null]).join()", "new Float64Array([NaN, undefined, null]).join()",
         "new Int8Array(new Int16Array([300, -300])).join()",
         "new Float64Array(new Int8Array([1, 2])).join()",
-        "new Int8Array('3').length", "new Int8Array(true)",
+        "new Int8Array('3').length",
         "var b = new ArrayBuffer(8); new Int16Array(b).length",
         "var b = new ArrayBuffer(8); new Int16Array(b, 2).length",
         "var b = new ArrayBuffer(8); new Int16Array(b, 2, 2).length",
@@ -1691,6 +1691,13 @@ class EvalOracleTest {
         val source = "escape('x', 9)"
         assertEquals("throws invalid string escape mask", upstream(source))
         assertEquals("\"x\"", ported(source))
+    }
+
+    @Test
+    fun booleanTypedArrayLengthsDifferFromTheLegacyOracle() {
+        val source = "new Int8Array(true).length"
+        assertEquals("throws Error: invalid argument", upstream(source))
+        assertEquals("1", ported(source))
     }
 
     @Test
