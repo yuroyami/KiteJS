@@ -196,6 +196,13 @@ internal object ByteIo {
         }
     }
 
+    fun readFloat16(buf: ByteArray, offset: Int, littleEndian: Boolean): Any =
+        Float16.fromBits(doReadInt16(buf, offset, littleEndian).toInt() and 0xFFFF)
+
+    fun writeFloat16(buf: ByteArray, offset: Int, value: Double, littleEndian: Boolean) {
+        doWriteInt16(buf, offset, Float16.toBits(value), littleEndian)
+    }
+
     fun readFloat32(buf: ByteArray, offset: Int, littleEndian: Boolean): Any {
         val base = readUint32Primitive(buf, offset, littleEndian)
         return Float.fromBits(base.toInt()).toDouble()

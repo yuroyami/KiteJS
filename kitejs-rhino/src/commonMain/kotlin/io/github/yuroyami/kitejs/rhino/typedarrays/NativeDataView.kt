@@ -60,6 +60,7 @@ public class NativeDataView : NativeArrayBufferView {
 
         val buf = arrayBuffer.buffer!!
         return when (bytes) {
+            2 -> ByteIo.readFloat16(buf, offset + pos, littleEndian)
             4 -> ByteIo.readFloat32(buf, offset + pos, littleEndian)
             8 -> ByteIo.readFloat64(buf, offset + pos, littleEndian)
             else -> throw AssertionError()
@@ -105,6 +106,7 @@ public class NativeDataView : NativeArrayBufferView {
 
         val buf = arrayBuffer.buffer!!
         when (bytes) {
+            2 -> ByteIo.writeFloat16(buf, offset + pos, value, littleEndian)
             4 -> ByteIo.writeFloat32(buf, offset + pos, value, littleEndian)
             8 -> ByteIo.writeFloat64(buf, offset + pos, value, littleEndian)
             else -> throw AssertionError()
@@ -143,6 +145,7 @@ public class NativeDataView : NativeArrayBufferView {
             defineGet(constructor, scope, "getUint8", 1, false)
             defineGet(constructor, scope, "getUint16", 2, false)
             defineGet(constructor, scope, "getUint32", 4, false)
+            constructor.definePrototypeMethod(scope, "getFloat16", 1, SerializableCallable { _, _, t, a -> realThis(t).js_getFloat(2, a) })
             constructor.definePrototypeMethod(scope, "getFloat32", 1, SerializableCallable { _, _, t, a -> realThis(t).js_getFloat(4, a) })
             constructor.definePrototypeMethod(scope, "getFloat64", 1, SerializableCallable { _, _, t, a -> realThis(t).js_getFloat(8, a) })
 
@@ -152,6 +155,10 @@ public class NativeDataView : NativeArrayBufferView {
             defineSet(constructor, scope, "setUint8", 1, false)
             defineSet(constructor, scope, "setUint16", 2, false)
             defineSet(constructor, scope, "setUint32", 4, false)
+            constructor.definePrototypeMethod(scope, "setFloat16", 2, SerializableCallable { _, _, t, a ->
+                realThis(t).js_setFloat(2, a)
+                Undefined.instance
+            })
             constructor.definePrototypeMethod(scope, "setFloat32", 2, SerializableCallable { _, _, t, a ->
                 realThis(t).js_setFloat(4, a)
                 Undefined.instance

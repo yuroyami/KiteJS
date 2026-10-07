@@ -42,6 +42,7 @@ public open class TopLevel : ScriptableObject() {
         Uint32Array,
         BigInt64Array,
         BigUint64Array,
+        Float16Array,
         Float32Array,
         Float64Array,
         DataView,

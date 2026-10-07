@@ -875,6 +875,14 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   and `arrowFunctionParams` turns it into the rest parameter. A default on it, a parameter or a
   trailing comma after it, and a target that is not a name or a pattern are SyntaxErrors.
   `ArrowRestParameterTest` checks 21 cases against V8.
+- D-104: `Float16Array`, and `getFloat16` and `setFloat16` on `DataView.prototype`
+  (ECMAScript 2025), which upstream has none of. The element is IEEE 754 binary16, encoded by
+  `typedarrays/Float16`, which rounds a double to the nearest half, ties to even, in one step:
+  through a float it would round twice and miss some ties. `Math.f16round` uses the same code in
+  place of upstream's port. `Float16Test` reads every one of the 65,536 halves back to its bits
+  and rounds 2,259 doubles, the midpoints between halves and a double either side of each among
+  them, as V8 does; `Float16ArrayTest` checks the API against V8, except for one sort that Node
+  22's experimental Float16Array gets wrong, where the spec's order is pinned.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

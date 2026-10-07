@@ -47,7 +47,7 @@ Reading them gives `undefined`, so `typeof x === 'undefined'` is a safe check.
 | `setTimeout`, `setInterval` | There is no event loop. Bind a scheduler from Kotlin if you need one |
 | `fetch`, `XMLHttpRequest` | No network. Bind a function that does the request |
 | `document`, `window`, `navigator` | No DOM. Bind whatever object your host needs to expose |
-| `Intl` | Needs a full locale database. Format in Kotlin instead |
+| `Intl` | Needs a full locale database. `toLocaleString` formats numbers and dates for en-US; format other locales in Kotlin |
 | `structuredClone` | Use `JSON.parse(JSON.stringify(x))`, or bind your own |
 | `SharedArrayBuffer`, `Atomics` | One thread, so they would mean nothing |
 | `WeakRef`, `FinalizationRegistry` | Not exposed to scripts. `WeakMap` and `WeakSet` are |

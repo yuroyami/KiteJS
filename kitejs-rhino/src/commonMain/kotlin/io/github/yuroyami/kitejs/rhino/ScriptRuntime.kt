@@ -1397,6 +1397,7 @@ public object ScriptRuntime {
             LazilyLoadedCtor(scope, "Uint32Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.rhino.typedarrays.NativeUint32Array.init(icx, s, sld) })
             LazilyLoadedCtor(scope, "BigInt64Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.rhino.typedarrays.NativeBigInt64Array.init(icx, s, sld) })
             LazilyLoadedCtor(scope, "BigUint64Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.rhino.typedarrays.NativeBigUint64Array.init(icx, s, sld) })
+            LazilyLoadedCtor(scope, "Float16Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.rhino.typedarrays.NativeFloat16Array.init(icx, s, sld) })
             LazilyLoadedCtor(scope, "Float32Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.rhino.typedarrays.NativeFloat32Array.init(icx, s, sld) })
             LazilyLoadedCtor(scope, "Float64Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.rhino.typedarrays.NativeFloat64Array.init(icx, s, sld) })
             LazilyLoadedCtor(scope, "DataView", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.rhino.typedarrays.NativeDataView.init(icx, s, sld) })

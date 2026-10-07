@@ -13,7 +13,7 @@ import io.github.yuroyami.kitejs.rhino.ScriptableObject
 import io.github.yuroyami.kitejs.rhino.SerializableConstructable
 import io.github.yuroyami.kitejs.rhino.Undefined
 
-// The nine numeric views. They differ only in element width and in how a value is read and
+// The ten numeric views. They differ only in element width and in how a value is read and
 // written, so everything else lives in NativeTypedArrayView.
 
 /** The `Int8Array` view: 1 byte per element. */
@@ -397,6 +397,62 @@ public class NativeUint32Array : NativeTypedArrayView {
             NativeTypedArrayView.init(cx, scope, constructor)
             constructor.defineProperty("BYTES_PER_ELEMENT", 4, DONTENUM or READONLY or PERMANENT)
             constructor.definePrototypeProperty("BYTES_PER_ELEMENT", 4, DONTENUM or READONLY or PERMANENT)
+
+            ScriptRuntimeES6.addSymbolSpecies(cx, scope, constructor)
+            if (sealed) {
+                constructor.sealObject()
+                (constructor.prototypeProperty as ScriptableObject).sealObject()
+            }
+            return constructor
+        }
+    }
+}
+
+/** The `Float16Array` view: 2 bytes per element. */
+public class NativeFloat16Array : NativeTypedArrayView {
+
+    public constructor() : super()
+
+    public constructor(ab: NativeArrayBuffer, off: Int, len: Int) : super(ab, off, len, len * 2)
+
+    public constructor(len: Int) : this(NativeArrayBuffer(len * 2), 0, len)
+
+    override val className: String
+        get() = CLASS_NAME
+
+    override val bytesPerElement: Int get() = 2
+
+    override fun js_get(index: Int): Any? {
+        if (checkIndex(index)) return Undefined.instance
+        val buf = arrayBuffer.buffer!!
+        return ByteIo.readFloat16(buf, (index * 2) + offset, littleEndian)
+    }
+
+    override fun js_set(index: Int, c: Any?): Any? {
+        val v = ScriptRuntime.toNumber(c)
+        if (checkIndex(index)) return Undefined.instance
+        val buf = arrayBuffer.buffer!!
+        ByteIo.writeFloat16(buf, (index * 2) + offset, v, littleEndian)
+        return null
+    }
+
+    public companion object {
+        private const val CLASS_NAME = "Float16Array"
+
+        internal fun init(cx: Context, scope: Scriptable, sealed: Boolean): Any {
+            val constructor = LambdaConstructor(
+                scope,
+                CLASS_NAME,
+                3,
+                LambdaConstructor.CONSTRUCTOR_NEW,
+                SerializableConstructable { icx, s, args ->
+                    NativeTypedArrayView.js_constructor(icx, s, args, { ab, off, len -> NativeFloat16Array(ab, off, len) }, 2)
+                },
+            )
+            constructor.setPrototypePropertyAttributes(DONTENUM or READONLY or PERMANENT)
+            NativeTypedArrayView.init(cx, scope, constructor)
+            constructor.defineProperty("BYTES_PER_ELEMENT", 2, DONTENUM or READONLY or PERMANENT)
+            constructor.definePrototypeProperty("BYTES_PER_ELEMENT", 2, DONTENUM or READONLY or PERMANENT)
 
             ScriptRuntimeES6.addSymbolSpecies(cx, scope, constructor)
             if (sealed) {

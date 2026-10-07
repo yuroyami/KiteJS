@@ -4,11 +4,12 @@
 
 package io.github.yuroyami.kitejs.rhino
 
+import io.github.yuroyami.kitejs.rhino.typedarrays.Float16
+
 import kotlin.math.E
 import kotlin.math.PI
 import kotlin.math.ceil
 import kotlin.math.floor
-import kotlin.math.pow
 import kotlin.math.sign
 import kotlin.math.sqrt
 import kotlin.random.Random
@@ -173,84 +174,8 @@ internal class NativeMath private constructor() : ScriptableObject() {
         private fun floor(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
             ScriptRuntime.wrapNumber(floor(ScriptRuntime.toNumber(args, 0)))
 
-        private fun f16round(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            if (args.isEmpty()) return ScriptRuntime.NaNobj
-            val x = ScriptRuntime.toNumber(args[0])
-            if (x.isNaN()) return ScriptRuntime.NaNobj
-            if (x == 0.0) return ScriptRuntime.wrapNumber(x)
-            if (x.isInfinite()) return ScriptRuntime.wrapNumber(x)
-            val bits = x.toBits()
-            val sign = (bits ushr 63).toInt()
-            var exponent = ((bits ushr 52) and 0x7FF).toInt()
-            val mantissa = bits and 0x000FFFFFFFFFFFFFL
-            exponent = exponent - 1023 + 15
-            if (exponent >= 31) {
-                return ScriptRuntime.wrapNumber(if (sign != 0) Double.NEGATIVE_INFINITY else Double.POSITIVE_INFINITY)
-            }
-            if (exponent < 0) return handleSubnormalF16(sign, exponent, mantissa)
-            return handleNormalF16(sign, exponent, mantissa)
-        }
-
-        private fun handleSubnormalF16(sign: Int, exponent: Int, mantissaIn: Long): Any? {
-            var mantissa = mantissaIn
-            if (exponent < -10) return ScriptRuntime.wrapNumber(if (sign != 0) -0.0 else 0.0)
-            if (exponent == -10 && mantissa == 0L) return ScriptRuntime.wrapNumber(if (sign != 0) -0.0 else 0.0)
-            if (exponent == -10 && mantissa > 0) {
-                val smallestSubnormal = 2.0.pow(-24)
-                return ScriptRuntime.wrapNumber(if (sign != 0) -smallestSubnormal else smallestSubnormal)
-            }
-            val totalShift = 42 + (1 - exponent)
-            mantissa = mantissa or (1L shl 52)
-            val roundBit = (mantissa shr (totalShift - 1)) and 1
-            val stickyBits = mantissa and ((1L shl (totalShift - 1)) - 1)
-            mantissa = mantissa ushr totalShift
-            if (roundBit == 1L && (stickyBits != 0L || (mantissa and 1L) == 1L)) mantissa++
-            if (mantissa == 0L) return ScriptRuntime.wrapNumber(if (sign != 0) -0.0 else 0.0)
-            if (mantissa >= (1L shl 10)) {
-                return ScriptRuntime.wrapNumber(if (sign != 0) -6.103515625e-5 else 6.103515625e-5)
-            }
-            val value = scalb(mantissa.toDouble() / 1024.0, -14)
-            return ScriptRuntime.wrapNumber(if (sign != 0) -value else value)
-        }
-
-        private fun handleNormalF16(sign: Int, exponentIn: Int, mantissaIn: Long): Any? {
-            var exponent = exponentIn
-            var fullMantissa = mantissaIn or (1L shl 52)
-            val roundBit = (fullMantissa shr 41) and 1
-            val stickyBits = fullMantissa and ((1L shl 41) - 1)
-            fullMantissa = fullMantissa ushr 42
-            if (exponent == 0) {
-                if (fullMantissa == 2046L) {
-                    return reconstructSubnormalF16(sign, 1023)
-                } else if (fullMantissa == 2047L && roundBit == 0L && stickyBits == 0L) {
-                    return reconstructNormalF16(sign, 1, 0)
-                }
-            }
-            var mantissa = fullMantissa and 0x3FF
-            if (roundBit == 1L && (stickyBits != 0L || (mantissa and 1L) == 1L)) mantissa++
-            if (mantissa >= (1L shl 10)) {
-                mantissa = 0
-                exponent++
-                if (exponent >= 31) {
-                    return ScriptRuntime.wrapNumber(if (sign != 0) Double.NEGATIVE_INFINITY else Double.POSITIVE_INFINITY)
-                }
-            }
-            return if (exponent == 0) reconstructSubnormalF16(sign, mantissa) else reconstructNormalF16(sign, exponent, mantissa)
-        }
-
-        private fun reconstructSubnormalF16(sign: Int, mantissa: Long): Any? {
-            if (mantissa == 0L) return ScriptRuntime.wrapNumber(if (sign != 0) -0.0 else 0.0)
-            val value = scalb(mantissa.toDouble() / 1024.0, -14)
-            return ScriptRuntime.wrapNumber(if (sign != 0) -value else value)
-        }
-
-        private fun reconstructNormalF16(sign: Int, exponent: Int, mantissa: Long): Any? {
-            val resultBits = (sign.toLong() shl 63) or ((exponent + 1023 - 15).toLong() shl 52) or (mantissa shl 42)
-            return ScriptRuntime.wrapNumber(Double.fromBits(resultBits))
-        }
-
-        /** Math.scalb: an exact multiply by a power of two. */
-        private fun scalb(d: Double, scale: Int): Double = d * 2.0.pow(scale)
+        private fun f16round(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
+            ScriptRuntime.wrapNumber(Float16.nearest(ScriptRuntime.toNumber(args, 0)))
 
         private fun fround(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val x = ScriptRuntime.toNumber(args, 0)
