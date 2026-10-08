@@ -40,12 +40,12 @@ public class NativeArrayIterator : ES6Iterator {
             return index++
         }
         val array = arrayLike!!
-        var value = array.get(index, array)
+        val position = index++
+        var value = ScriptableObject.getProperty(array, position)
         if (value === Scriptable.NOT_FOUND) value = Undefined.instance
         if (type == ARRAY_ITERATOR_TYPE.ENTRIES) {
-            value = cx.newArray(scope, arrayOf(index, value))
+            value = cx.newArray(scope, arrayOf(position, value))
         }
-        index++
         return value
     }
 

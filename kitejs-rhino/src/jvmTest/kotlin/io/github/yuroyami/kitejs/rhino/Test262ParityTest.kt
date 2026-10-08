@@ -62,6 +62,53 @@ class Test262ParityTest {
     private val knownDifferences = buildMap {
         put("built-ins/ThrowTypeError/unique-per-realm-function-proto.js",
             "D-109: Function.prototype restrictions share the realm intrinsic here")
+        // D-111: iterable/array-like dispatch and validation follow ECMAScript here.
+        for (path in listOf(
+            "built-ins/TypedArrayConstructors/ctors-bigint/length-arg/is-infinity-throws-rangeerror.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/length-arg/is-negative-integer-throws-rangeerror.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/length-arg/is-symbol-throws.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/length-arg/toindex-length.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/object-arg/as-generator-iterable-returns.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/object-arg/custom-proto-access-throws.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/object-arg/iterating-throws.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/object-arg/iterator-not-callable-throws.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/object-arg/iterator-throws.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/object-arg/length-excessive-throws.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/object-arg/length-is-symbol-throws.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/object-arg/length-throws.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/object-arg/new-instance-extensibility.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/object-arg/proto-from-ctor-realm.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/object-arg/throws-from-property.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/object-arg/throws-setting-property.js",
+            "built-ins/TypedArrayConstructors/ctors-bigint/object-arg/throws-setting-symbol-property.js",
+            "built-ins/TypedArrayConstructors/ctors/length-arg/is-infinity-throws-rangeerror.js",
+            "built-ins/TypedArrayConstructors/ctors/length-arg/is-negative-integer-throws-rangeerror.js",
+            "built-ins/TypedArrayConstructors/ctors/length-arg/is-symbol-throws.js",
+            "built-ins/TypedArrayConstructors/ctors/length-arg/toindex-length.js",
+            "built-ins/TypedArrayConstructors/ctors/object-arg/as-generator-iterable-returns.js",
+            "built-ins/TypedArrayConstructors/ctors/object-arg/custom-proto-access-throws.js",
+            "built-ins/TypedArrayConstructors/ctors/object-arg/iterated-array-changed-by-tonumber.js",
+            "built-ins/TypedArrayConstructors/ctors/object-arg/iterated-array-with-modified-array-iterator.js",
+            "built-ins/TypedArrayConstructors/ctors/object-arg/iterating-throws.js",
+            "built-ins/TypedArrayConstructors/ctors/object-arg/iterator-is-null-as-array-like.js",
+            "built-ins/TypedArrayConstructors/ctors/object-arg/iterator-not-callable-throws.js",
+            "built-ins/TypedArrayConstructors/ctors/object-arg/iterator-throws.js",
+            "built-ins/TypedArrayConstructors/ctors/object-arg/length-excessive-throws.js",
+            "built-ins/TypedArrayConstructors/ctors/object-arg/length-is-symbol-throws.js",
+            "built-ins/TypedArrayConstructors/ctors/object-arg/length-throws.js",
+            "built-ins/TypedArrayConstructors/ctors/object-arg/new-instance-extensibility.js",
+            "built-ins/TypedArrayConstructors/ctors/object-arg/proto-from-ctor-realm.js",
+            "built-ins/TypedArrayConstructors/ctors/object-arg/returns.js",
+            "built-ins/TypedArrayConstructors/ctors/object-arg/throws-from-property.js",
+            "built-ins/TypedArrayConstructors/ctors/object-arg/throws-setting-property.js",
+            "built-ins/TypedArrayConstructors/ctors/object-arg/throws-setting-symbol-property.js",
+            "built-ins/TypedArrayConstructors/ctors/typedarray-arg/throw-type-error-before-custom-proto-access.js",
+            "built-ins/TypedArrayConstructors/from/BigInt/mapfn-this-without-thisarg-non-strict.js",
+            "built-ins/TypedArrayConstructors/from/mapfn-this-without-thisarg-non-strict.js",
+        )) {
+            put(path, "D-111: typed array construction/from observe input contracts here; upstream fails")
+        }
+
         // ES6 for-in patterns destructure key strings instead of legacy key/value pairs (D-105).
         for (path in listOf("head-var-bound-names-dup.js", "scope-body-lex-close.js")) {
             put("language/statements/for-in/$path", "D-105: for-in destructures the key here")

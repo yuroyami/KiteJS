@@ -12,18 +12,16 @@ import io.github.yuroyami.kitejs.rhino.Constructable
 import io.github.yuroyami.kitejs.rhino.Context
 import io.github.yuroyami.kitejs.api.KBigInt
 import io.github.yuroyami.kitejs.rhino.ExternalArrayData
-import io.github.yuroyami.kitejs.rhino.Function
 import io.github.yuroyami.kitejs.rhino.Intrinsics
-import io.github.yuroyami.kitejs.rhino.IteratorLikeIterable
 import io.github.yuroyami.kitejs.rhino.LambdaConstructor
 import io.github.yuroyami.kitejs.rhino.Messages
-import io.github.yuroyami.kitejs.rhino.NativeArray
 import io.github.yuroyami.kitejs.rhino.NativeArrayIterator
 import io.github.yuroyami.kitejs.rhino.NativeNumber
 import io.github.yuroyami.kitejs.rhino.ScriptRuntime
 import io.github.yuroyami.kitejs.rhino.Scriptable
 import io.github.yuroyami.kitejs.rhino.ScriptableObject
 import io.github.yuroyami.kitejs.rhino.SerializableCallable
+import io.github.yuroyami.kitejs.rhino.SymbolScriptable
 import io.github.yuroyami.kitejs.rhino.SymbolKey
 import io.github.yuroyami.kitejs.rhino.Undefined
 import kotlin.math.truncate
@@ -462,10 +460,19 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
             }
 
             if (arg0 is NativeTypedArrayView) {
-                // Another view, converted element by element into this type.
-                val na = makeArrayBuffer(cx, scope, arg0.length, bytesPerElement)
-                val v = constructable.construct(na, 0, arg0.length)
-                for (i in 0 until arg0.length) v.js_set(i, arg0.js_get(i))
+                // A validated internal copy; a custom iterator on the source is irrelevant.
+                val length = arg0.validateAndGetLength().toInt()
+                val na = makeArrayBuffer(cx, scope, length, bytesPerElement)
+                val v = constructable.construct(na, 0, length)
+                if ((v is NativeBigIntArrayView) != (arg0 is NativeBigIntArrayView)) {
+                    throw ScriptRuntime.typeErrorById("msg.typed.array.type.mismatch")
+                }
+                if (v::class == arg0::class) {
+                    // Same-type copies preserve every bit, including floating-point NaN payloads.
+                    arg0.arrayBuffer.buffer!!.copyInto(na.buffer!!, 0, arg0.offset, arg0.offset + length * bytesPerElement)
+                } else {
+                    for (i in 0 until length) v.js_set(i, arg0.js_get(i))
+                }
                 return v
             }
 
@@ -503,31 +510,51 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
                 return constructable.construct(arg0, byteOff.toInt(), newByteLength / bytesPerElement)
             }
 
-            if (arg0 is NativeArray) {
-                val size = arg0.size()
-                val na = makeArrayBuffer(cx, scope, size, bytesPerElement)
-                val v = constructable.construct(na, 0, size)
-                for (i in 0 until size) {
-                    // Read raw so a hole stays a hole rather than becoming zero.
-                    val value = arg0.get(i, arg0)
-                    if (value === Scriptable.NOT_FOUND || value === Undefined.instance) {
-                        v.js_set(i, ScriptRuntime.NaNobj)
-                    } else {
-                        v.js_set(i, value)
-                    }
-                }
-                return v
+            val values = iterableToList(cx, scope, arg0)
+            val size = values?.size ?: arrayLikeSize(cx, arg0)
+            val v = constructable.construct(makeArrayBuffer(cx, scope, size, bytesPerElement), 0, size)
+            for (i in 0 until size) {
+                v.js_set(i, if (values != null) values[i] else ScriptRuntime.getObjectIndex(arg0, i.toDouble(), cx, scope))
             }
+            return v
+        }
 
-            if (ScriptRuntime.isArrayObject(arg0)) {
-                val arrayElements = ScriptRuntime.getArrayElements(arg0)
-                val na = makeArrayBuffer(cx, scope, arrayElements.size, bytesPerElement)
-                val v = constructable.construct(na, 0, arrayElements.size)
-                for (i in arrayElements.indices) v.js_set(i, arrayElements[i])
-                return v
+        private fun arrayLikeSize(cx: Context, source: Scriptable): Int {
+            val length = AbstractEcmaObjectOperations.lengthOfArrayLike(cx, source)
+            if (length >= Int.MAX_VALUE) throw ScriptRuntime.rangeErrorById("msg.typed.array.bad.length", length)
+            return length.toInt()
+        }
+
+        /** GetMethod(@@iterator), followed by IteratorToList. A missing method means array-like. */
+        private fun iterableToList(cx: Context, scope: Scriptable, source: Scriptable): List<Any?>? {
+            var objectWithMethod: Scriptable? = source
+            var method: Any? = Scriptable.NOT_FOUND
+            while (objectWithMethod != null) {
+                method = (objectWithMethod as? SymbolScriptable)?.get(SymbolKey.ITERATOR, source) ?: Scriptable.NOT_FOUND
+                if (method !== Scriptable.NOT_FOUND) break
+                objectWithMethod = objectWithMethod.prototype
             }
+            if (method === Scriptable.NOT_FOUND || method == null || Undefined.isUndefined(method)) return null
+            if (method !is Callable) throw ScriptRuntime.notFunctionError(method, SymbolKey.ITERATOR)
+            val iterator = iteratorObject(method.call(cx, scope, source, ScriptRuntime.emptyArgs))
+            val next = ScriptableObject.getProperty(iterator, "next") as? Callable
+                ?: throw ScriptRuntime.typeErrorById("msg.function.expected")
+            val values = ArrayList<Any?>()
+            while (true) {
+                val result = iteratorObject(next.call(cx, scope, iterator, ScriptRuntime.emptyArgs))
+                val done = ScriptableObject.getProperty(result, "done")
+                if (done !== Scriptable.NOT_FOUND && ScriptRuntime.toBoolean(done)) return values
+                val value = ScriptableObject.getProperty(result, "value")
+                if (values.size >= Int.MAX_VALUE - 1) throw ScriptRuntime.rangeErrorById("msg.arraylength.bad")
+                values.add(if (value === Scriptable.NOT_FOUND) Undefined.instance else value)
+            }
+        }
 
-            throw ScriptRuntime.constructError("Error", "invalid argument")
+        private fun iteratorObject(value: Any?): Scriptable {
+            if (value !is Scriptable || Undefined.isUndefined(value) || ScriptRuntime.isSymbol(value)) {
+                throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(value))
+            }
+            return value
         }
 
         // ---- The prototype methods ---------------------------------------------------------------
@@ -880,62 +907,27 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
         }
 
         private fun js_from(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            if (args.isEmpty()) throw ScriptRuntime.typeErrorById("msg.missing.argument")
-            val items = ScriptRuntime.toObject(scope, args[0])
             if (!AbstractEcmaObjectOperations.isConstructor(cx, thisObj)) {
                 throw ScriptRuntime.typeErrorById("msg.constructor.expected")
             }
             val constructable = thisObj as Constructable
-
-            var mapFn: Function? = null
-            val mapArg = if (args.size >= 2) args[1] else Undefined.instance
-            var mapFnThisArg: Scriptable = Undefined.SCRIPTABLE_UNDEFINED
-            if (!Undefined.isUndefined(mapArg)) {
-                if (mapArg !is Function) throw ScriptRuntime.typeErrorById("msg.map.function.not")
-                mapFn = mapArg
-                if (args.size >= 3) mapFnThisArg = ensureScriptable(args[2])
-            }
-
-            var listFromIterator: MutableList<Any?>? = null
-            val iteratorProp = getProperty(items, SymbolKey.ITERATOR)
-            // A typed array or a NativeArray is read by index instead, which avoids copying it.
-            if (iteratorProp !== Scriptable.NOT_FOUND &&
-                items !is NativeArray && items !is NativeTypedArrayView &&
-                !Undefined.isUndefined(iteratorProp)
-            ) {
-                val iterator = ScriptRuntime.callIterator(items, cx, scope)
-                if (!Undefined.isUndefined(iterator)) {
-                    IteratorLikeIterable(cx, scope, iterator).use { it ->
-                        val list = ArrayList<Any?>()
-                        for (temp in it) list.add(temp)
-                        listFromIterator = list
-                    }
-                }
-            }
-
-            val size: Int
-            if (listFromIterator != null) {
-                size = listFromIterator.size
-            } else {
-                val sizeLong = AbstractEcmaObjectOperations.lengthOfArrayLike(cx, items)
-                if (sizeLong > Int.MAX_VALUE) throw ScriptRuntime.rangeErrorById("msg.arraylength.bad")
-                size = sizeLong.toInt()
-            }
-
+            val mapArg = args.getOrElse(1) { Undefined.instance }
+            val mapFn = if (Undefined.isUndefined(mapArg)) null else mapArg as? Callable
+                ?: throw ScriptRuntime.typeErrorById("msg.map.function.not")
+            val mapThis = if (mapFn == null) null else ScriptRuntime.getApplyOrCallThis(
+                cx, scope, args.getOrElse(2) { Undefined.instance }, 1, mapFn,
+            )
+            val items = ScriptRuntime.toObject(cx, scope, args.getOrElse(0) { Undefined.instance })
+            val values = iterableToList(cx, scope, items)
+            val size = values?.size ?: arrayLikeSize(cx, items)
             val result = constructable.construct(cx, scope, arrayOf<Any?>(size))
             if (result !is NativeTypedArrayView) throw ScriptRuntime.typeErrorById("msg.typed.array.receiver.incompatible", "from")
-            if (result.length < size) throw ScriptRuntime.typeErrorById("msg.typed.array.length.too.small")
+            if (result.validateAndGetLength() < size) throw ScriptRuntime.typeErrorById("msg.typed.array.length.too.small")
 
             for (k in 0 until size) {
-                var temp: Any? = if (listFromIterator != null) {
-                    listFromIterator[k]
-                } else if (items is NativeTypedArrayView) {
-                    items.js_get(k)
-                } else {
-                    ScriptRuntime.getObjectIndex(items, k.toDouble(), cx, scope)
-                }
-                if (mapFn != null) temp = mapFn.call(cx, scope, mapFnThisArg, arrayOf(temp, k))
-                result.setArrayElement(k, temp)
+                var value = if (values != null) values[k] else ScriptRuntime.getObjectIndex(items, k.toDouble(), cx, scope)
+                if (mapFn != null) value = mapFn.call(cx, scope, mapThis, arrayOf(value, k))
+                result.setArrayElement(k, value)
             }
             return result
         }

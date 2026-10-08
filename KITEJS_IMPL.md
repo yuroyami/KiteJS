@@ -935,6 +935,17 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   exact positive/negative range boundaries and extreme-field checks. Both web engines share
   @js-joda/timezone 2.23.0, the newest version compatible with kotlinx-datetime's core 3.2.0;
   this replaces the 2020 database that still predicted Apia daylight time after its abolition.
+- D-111: Typed array constructors dispatch ordinary objects through a single GetMethod of
+  Symbol.iterator and IteratorToList, or through ToLength/indexed reads when that method is absent,
+  null or undefined (#43). TypedArray.from uses the same path for arrays and typed arrays, honors
+  overridden iterators, and exhausts iteration before construction/mapping/conversion. It validates
+  the constructor and mapper before inspecting the source and validates the resulting live typed
+  array and its length. Iterator objects/results and next are checked, without eagerly reading
+  return or closing an exhausted iterator. Typed-array copy constructors bypass custom iterators,
+  reject detached sources and mixed content types even at length zero, and preserve same-type raw
+  bits (including NaN payloads). Standard array iterators read inherited elements and advance before
+  a getter may throw. TypedArrayInputTest pins 27 Node controls for these effects and exceptions;
+  the parity ledger records the exact observed constructor/from improvements over upstream.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
