@@ -20,10 +20,14 @@ public class BoundFunction(
             if (targetFunction is BaseFunction) maxOf(0, targetFunction.length - boundArgs.size)
             else 0
         ScriptRuntime.setFunctionProtoAndParent(this, cx, scope, false)
-        val thrower = ScriptRuntime.typeErrorThrower(cx)
-        val throwing = DescriptorInfo(false, Scriptable.NOT_FOUND, false, thrower, thrower, Scriptable.NOT_FOUND)
-        defineOwnProperty(cx, "caller", throwing, false)
-        defineOwnProperty(cx, "arguments", throwing, false)
+        if (cx.languageVersion >= Context.VERSION_ES6) {
+            if (targetFunction is Scriptable) prototype = targetFunction.prototype
+        } else {
+            val thrower = ScriptRuntime.typeErrorThrower(scope)
+            val throwing = DescriptorInfo(false, Scriptable.NOT_FOUND, false, thrower, thrower, Scriptable.NOT_FOUND)
+            defineOwnProperty(cx, "caller", throwing, false)
+            defineOwnProperty(cx, "arguments", throwing, false)
+        }
     }
 
     override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =

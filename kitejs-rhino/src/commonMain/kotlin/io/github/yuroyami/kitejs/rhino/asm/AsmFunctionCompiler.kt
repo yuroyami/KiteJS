@@ -177,6 +177,7 @@ internal class AsmFunctionCompiler(private val owner: AsmCompiler, private val f
 
         return AsmFunction(
             name = fn.name,
+            isStrict = fn.isInStrictMode,
             code = AsmFuse.fuse(code.copyOf(top)),
             doubles = doubles.toDoubleArray(),
             paramTypes = paramTypes,

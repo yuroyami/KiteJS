@@ -29,7 +29,6 @@ public open class Context internal constructor(public val factory: ContextFactor
     internal var topCallScope: Scriptable? = null
     internal var isContinuationsTopCall: Boolean = false
     internal var currentActivationCall: NativeCall? = null
-    internal var typeErrorThrower: BaseFunction? = null
     internal var iterating: MutableSet<Scriptable>? = null
     internal var interpreterSecurityDomain: Any? = null
 

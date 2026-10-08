@@ -60,6 +60,8 @@ class Test262ParityTest {
      * this test says so rather than quietly passing.
      */
     private val knownDifferences = buildMap {
+        put("built-ins/ThrowTypeError/unique-per-realm-function-proto.js",
+            "D-109: Function.prototype restrictions share the realm intrinsic here")
         // ES6 for-in patterns destructure key strings instead of legacy key/value pairs (D-105).
         for (path in listOf("head-var-bound-names-dup.js", "scope-body-lex-close.js")) {
             put("language/statements/for-in/$path", "D-105: for-in destructures the key here")
@@ -1046,6 +1048,8 @@ class Test262ParityTest {
      * strict mode they agree, so a file-wide entry would read as stale there.
      */
     private val knownSloppyDifferences = buildMap {
+        put("built-ins/ThrowTypeError/unique-per-realm-non-simple.js",
+            "D-109: non-simple parameters use unmapped arguments and the realm intrinsic here")
         // Assigning to a const throws a TypeError here in any mode. Upstream ignores the write
         // outside strict mode, so these destructuring assignments pass only here (D-71).
         for (path in listOf(

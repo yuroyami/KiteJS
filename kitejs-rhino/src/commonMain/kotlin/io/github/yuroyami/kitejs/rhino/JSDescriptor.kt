@@ -54,6 +54,7 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
     public val isEvalFunction: Boolean get() = (flags and IS_EVAL_FUNCTION_FLAG) != 0
     public val hasRestArg: Boolean get() = (flags and HAS_REST_ARG_FLAG) != 0
     public val hasDefaultParameters: Boolean get() = (flags and HAS_DEFAULT_PARAMETERS_FLAG) != 0
+    internal val hasSimpleParameters: Boolean get() = (flags and NON_SIMPLE_PARAMETERS_FLAG) == 0
     public val requiresActivationFrame: Boolean get() = (flags and REQUIRES_ACTIVATION_FRAME_FLAG) != 0
     public val requiresArgumentObject: Boolean get() = (flags and REQUIRES_ARGUMENT_OBJECT_FLAG) != 0
     public val declaredAsFunctionExpression: Boolean get() = (flags and DECLARED_AS_FUNCTION_EXPRESSION_FLAG) != 0
@@ -133,6 +134,7 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
         public var paramCount: Int = 0
         public var arity: Int = 0
         public var hasDefaultParameters: Boolean = false
+        internal var nonSimpleParameters: Boolean = false
         public var requiresActivationFrame: Boolean = false
         public var requiresArgumentObject: Boolean = false
         public var declaredAsFunctionExpression: Boolean = false
@@ -179,6 +181,7 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
             f = f or (if (isEvalFunction) IS_EVAL_FUNCTION_FLAG else 0)
             f = f or (if (hasRestArg) HAS_REST_ARG_FLAG else 0)
             f = f or (if (hasDefaultParameters) HAS_DEFAULT_PARAMETERS_FLAG else 0)
+            f = f or (if (nonSimpleParameters) NON_SIMPLE_PARAMETERS_FLAG else 0)
             f = f or (if (requiresActivationFrame) REQUIRES_ACTIVATION_FRAME_FLAG else 0)
             f = f or (if (requiresArgumentObject) REQUIRES_ARGUMENT_OBJECT_FLAG else 0)
             f = f or (if (declaredAsFunctionExpression) DECLARED_AS_FUNCTION_EXPRESSION_FLAG else 0)
@@ -233,5 +236,6 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
         const val IS_DEFAULT_CONSTRUCTOR_FLAG = 1 shl 15
         const val IS_CLASS_FIELD_INITIALIZER_FLAG = 1 shl 16
         const val IS_ASYNC_FLAG = 1 shl 17
+        const val NON_SIMPLE_PARAMETERS_FLAG = 1 shl 18
     }
 }

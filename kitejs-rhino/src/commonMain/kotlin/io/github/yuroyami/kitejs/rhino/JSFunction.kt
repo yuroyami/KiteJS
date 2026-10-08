@@ -22,9 +22,17 @@ public open class JSFunction(
         // A class constructor gets its read-only `prototype` from the class definition, and an
         // async function has none.
         if (!descriptor.isShorthand && !descriptor.isClassConstructor && !descriptor.isAsyncFunction) setupDefaultPrototype(scope)
-        // Strict functions, which every class constructor and method is, have no own `arguments`
-        // (ECMAScript 2015, 16.1), nor Rhino's `arity`, which upstream gave them all the same.
-        if (descriptor.isStrict) {
+        // Only sloppy ordinary functions retain the permitted legacy properties in ES6.
+        if (!descriptor.isStrict && (descriptor.languageVersion < Context.VERSION_ES6 ||
+                !descriptor.hasLexicalThis && homeObject == null && !descriptor.isES6Generator &&
+                !descriptor.isAsyncFunction && !descriptor.isClassConstructor)
+        ) {
+            if (!has("arity", this)) createLegacyProperties()
+            if (descriptor.languageVersion >= Context.VERSION_ES6) {
+                setStandardPropertyAttributes(READONLY or DONTENUM)
+                defineProperty("caller", null, DONTENUM or READONLY or PERMANENT)
+            }
+        } else {
             for (name in arrayOf("arity", "arguments")) {
                 if (has(name, this)) {
                     setAttributes(name, DONTENUM)

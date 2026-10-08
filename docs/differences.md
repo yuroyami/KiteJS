@@ -145,6 +145,12 @@ selecting the pre-ES6 language version preserves Rhino's implicit generators.
 
 ## Things that work here and not in a browser
 
+In ES6 and later, sloppy ordinary functions retain Rhino's legacy `arity` and `arguments`
+properties. Their `caller` property is always null; the engine does not expose the activation
+chain. Other modern function kinds inherit the standard throwing `caller` and `arguments`
+accessors from their realm's `Function.prototype`. Explicit pre-ES6 modes retain the older
+property layout.
+
 The engine keeps some behaviour a browser dropped, because a script written for it may rely on
 that:
 

@@ -750,8 +750,8 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   there is async code (#12), arrow rest parameters (#71) and gaps plain functions share, each
   filed as an issue of its own: rest elements, rest properties and computed keys in patterns
   (#81), iterator closing (#83), the parameter
-  scope (#84), block-scoped functions (#85), the restricted
-  `caller` and `arguments` (#87), errors made in the catching realm (#88) and WeakRef (#89). The
+  scope (#84), block-scoped functions (#85), errors made in the catching realm (#88) and
+  WeakRef (#89). The
   error messages the class syntax and these early errors need are the port's own, worded after
   V8's, and the one upstream key whose check widened (`msg.default.args.use.strict`) keeps its
   text beside a new `msg.use.strict.non.simple`.
@@ -912,6 +912,17 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   compatibility policy for implementation-defined formats, not a change to the ISO contract.
   `DateParseCompatibilityTest` checks 48 V8-controlled strings in three zones, parse/constructor
   agreement, standard round trips, invalid-date rejection and numeric-constructor year rules.
+- D-109: Function.prototype has the ES6 restricted caller/arguments accessors, whose getter
+  and setter share a non-extensible ThrowTypeError intrinsic per realm (#87). Strict and other
+  unmapped arguments objects reuse their function's realm intrinsic across contexts and foreign
+  calls. Non-simple parameters (defaults, rest or patterns) do not alias arguments elements.
+  Modern methods, arrows, generators, async functions, bound functions and native built-ins have
+  no own legacy arity/arguments properties; bound functions inherit their target's prototype.
+  Sloppy ordinary functions retain legacy arguments/arity and a null caller sentinel. Compiled
+  asm exports retain the source function's own and inherited strictness. Function descriptors
+  record the compiler language version, rather than leaving it at zero, so the layout follows
+  the code's version. Explicit pre-ES6 layouts remain available. RestrictedFunctionPropertiesTest
+  exercises descriptor attributes, realm identity, mutation, function kinds and asm parity.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

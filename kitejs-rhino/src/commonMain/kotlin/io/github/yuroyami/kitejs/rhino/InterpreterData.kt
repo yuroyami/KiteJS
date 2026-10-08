@@ -46,7 +46,7 @@ internal class InterpreterData<T : ScriptOrFn<T>>(
         // module needs falls through to the icode below, which is the same JavaScript.
         val asm = asmModule
         if (asm != null && newTarget == null) {
-            io.github.yuroyami.kitejs.rhino.asm.AsmLink.link(cx, scope, asm, args)?.let { return it }
+            io.github.yuroyami.kitejs.rhino.asm.AsmLink.link(cx, scope, asm, args, executableObject.descriptor?.isStrict == true)?.let { return it }
         }
         return Interpreter.interpret(executableObject, this, cx, scope, thisObj as Scriptable?, args, newTarget)
     }

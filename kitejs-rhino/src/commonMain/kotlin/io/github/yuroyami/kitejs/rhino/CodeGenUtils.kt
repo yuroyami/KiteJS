@@ -7,6 +7,7 @@ package io.github.yuroyami.kitejs.rhino
 import io.github.yuroyami.kitejs.rhino.ast.AstRoot
 import io.github.yuroyami.kitejs.rhino.ast.Block
 import io.github.yuroyami.kitejs.rhino.ast.FunctionNode
+import io.github.yuroyami.kitejs.rhino.ast.Name
 import io.github.yuroyami.kitejs.rhino.ast.Scope
 import io.github.yuroyami.kitejs.rhino.ast.ScriptNode
 
@@ -32,6 +33,8 @@ public object CodeGenUtils {
     private fun fillInForFunction(builder: JSDescriptor.Builder<*>, fn: FunctionNode) {
         builder.functionType = fn.functionType
         builder.parametersSourceStart = fn.parametersSourceStart
+        builder.nonSimpleParameters = fn.hasRestParameter || fn.defaultParams != null ||
+            fn.params.any { it !is Name }
         builder.requiresActivationFrame = fn.requiresActivation
         builder.requiresArgumentObject = fn.requiresArgumentObject
         if (fn.functionName != null) builder.name = fn.name
@@ -64,6 +67,7 @@ public object CodeGenUtils {
 
     private fun fillInTopLevelCommon(builder: JSDescriptor.Builder<*>, scriptOrFn: ScriptNode, rawSource: String?, compilerEnv: CompilerEnvirons) {
         builder.sourceFile = scriptOrFn.sourceName
+        builder.languageVersion = compilerEnv.languageVersion
         builder.rawSource = rawSource
         builder.isTopLevel = true
         builder.isScript = true

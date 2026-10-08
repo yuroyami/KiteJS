@@ -43,24 +43,29 @@ public open class BaseFunction : ScriptableObject, Function {
     protected open fun createProperties() {
         defineBuiltInProperty(this, "length", DONTENUM or READONLY, ::lengthGetter, ::lengthSetter)
         defineBuiltInProperty(this, "name", DONTENUM or READONLY, ::nameGetter, ::nameSetter)
-        if (includeNonStandardProps()) {
-            defineBuiltInProperty(
-                this,
-                "arity",
-                PERMANENT or DONTENUM or READONLY,
-                ::arityGetter,
-            )
-            defineBuiltInProperty(
-                this,
-                "arguments",
-                PERMANENT or DONTENUM,
-                ::argumentsGetter,
-                ::argumentsSetter,
-            )
-        }
+        if (includeNonStandardProps()) createLegacyProperties()
     }
 
-    protected open fun includeNonStandardProps(): Boolean = !Context.isCurrentContextStrict
+    /** Source functions decide from their own code, not from the context that creates them. */
+    internal fun createLegacyProperties() {
+        defineBuiltInProperty(
+            this,
+            "arity",
+            PERMANENT or DONTENUM or READONLY,
+            ::arityGetter,
+        )
+        defineBuiltInProperty(
+            this,
+            "arguments",
+            PERMANENT or DONTENUM,
+            ::argumentsGetter,
+            ::argumentsSetter,
+        )
+    }
+
+    protected open fun includeNonStandardProps(): Boolean =
+        (Context.getCurrentContext()?.languageVersion ?: Context.VERSION_ES6) < Context.VERSION_ES6 &&
+            !Context.isCurrentContextStrict
 
     /** Sets the name past every readonly check. */
     internal fun setFunctionName(name: String) {
@@ -219,7 +224,7 @@ public open class BaseFunction : ScriptableObject, Function {
     public fun setStandardPropertyAttributes(attributes: Int) {
         setAttributes("name", attributes)
         setAttributes("length", attributes)
-        setAttributes("arity", attributes)
+        if (has("arity", this)) setAttributes("arity", attributes)
     }
 
     public fun setPrototypePropertyAttributes(attributes: Int) {
@@ -418,6 +423,12 @@ public open class BaseFunction : ScriptableObject, Function {
             ctor.setPrototypePropertyAttributes(DONTENUM or READONLY or PERMANENT)
             if (cx.languageVersion >= Context.VERSION_ES6) ctor.setStandardPropertyAttributes(READONLY or DONTENUM)
             defineProperty(scope, FUNCTION_CLASS, ctor, DONTENUM)
+            if (cx.languageVersion >= Context.VERSION_ES6) {
+                val thrower = ScriptRuntime.typeErrorThrower(scope)
+                val restricted = DescriptorInfo(false, Scriptable.NOT_FOUND, true, thrower, thrower, Scriptable.NOT_FOUND)
+                proto.defineOwnProperty(cx, "caller", restricted)
+                proto.defineOwnProperty(cx, "arguments", restricted)
+            }
             if (sealed) {
                 ctor.sealObject()
                 (ctor.prototypeProperty as ScriptableObject).sealObject()

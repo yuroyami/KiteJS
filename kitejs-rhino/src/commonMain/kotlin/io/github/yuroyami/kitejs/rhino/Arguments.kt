@@ -13,6 +13,7 @@ internal open class Arguments(private val activation: NativeCall, cx: Context) :
     private var calleeObj: Any?
     private val lengthObj: Any
     private var args: Array<Any?>
+    private val mapped = !activation.isStrict && activation.function?.descriptor?.hasSimpleParameters != false
 
     init {
         val parent = activation.parentScope!!
@@ -27,8 +28,8 @@ internal open class Arguments(private val activation: NativeCall, cx: Context) :
         val arrayProto = TopLevel.getBuiltinPrototype(getTopLevelScope(parent), TopLevel.Builtins.Array)
         if (arrayProto != null) defineProperty(SymbolKey.ITERATOR, arrayProto.get("values", parent), DONTENUM)
         defineProperty("length", lengthObj, DONTENUM)
-        if (activation.isStrict) {
-            val typeErrorThrower = ScriptRuntime.typeErrorThrower(cx)
+        if (!mapped) {
+            val typeErrorThrower = ScriptRuntime.typeErrorThrower(parent)
             val version = cx.languageVersion
             if (version <= Context.VERSION_1_8) {
                 setGetterOrSetter("caller", 0, typeErrorThrower, true)
@@ -94,11 +95,11 @@ internal open class Arguments(private val activation: NativeCall, cx: Context) :
 
     /**
      * Whether slot [index] is the same variable as a named parameter. Only the arguments of a
-     * sloppy function are mapped, whoever reads them; upstream asked whether the reading code was
-     * strict (D-80).
+     * sloppy function with simple parameters are mapped, whoever reads them; upstream asked
+     * whether the reading code was strict (D-80).
      */
     private fun sharedWithActivation(index: Int): Boolean {
-        if (activation.isStrict) return false
+        if (!mapped) return false
         val f = activation.function
         if (f == null || f.hasDefaultParameters()) return false
         val definedCount = f.paramCount

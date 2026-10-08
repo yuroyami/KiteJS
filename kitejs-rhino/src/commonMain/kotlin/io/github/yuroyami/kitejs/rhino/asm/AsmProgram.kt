@@ -13,6 +13,7 @@ package io.github.yuroyami.kitejs.rhino.asm
  */
 internal class AsmFunction(
     val name: String,
+    val isStrict: Boolean,
     val code: IntArray,
     val doubles: DoubleArray,
     /** The type of each parameter, in source order. */

@@ -32,8 +32,8 @@ import io.github.yuroyami.kitejs.rhino.typedarrays.NativeArrayBuffer
 internal object AsmLink {
 
     /** The exports object, or null when this call cannot use the compiled code. */
-    fun link(cx: Context, scope: Scriptable, module: AsmModule, args: Array<Any?>): Any? = try {
-        val exports = bind(cx, scope, module, args)
+    fun link(cx: Context, scope: Scriptable, module: AsmModule, args: Array<Any?>, isStrict: Boolean): Any? = try {
+        val exports = bind(cx, scope, module, args, isStrict)
         module.diagnostic.linked = true
         module.diagnostic.linkReason = ""
         exports
@@ -43,7 +43,7 @@ internal object AsmLink {
         null
     }
 
-    private fun bind(cx: Context, scope: Scriptable, module: AsmModule, args: Array<Any?>): Any {
+    private fun bind(cx: Context, scope: Scriptable, module: AsmModule, args: Array<Any?>, isStrict: Boolean): Any {
         // The compiled heap access reads and writes bytes in little-endian order, which is what
         // asm.js means and what every browser does. An engine set the other way has to use the
         // general interpreter, so that the module and the views around it agree.
@@ -118,11 +118,11 @@ internal object AsmLink {
         val instance = AsmInstance(module, buffer, globalInts, globalDbls, ffi, scope)
         val runner = AsmRunner(instance)
         if (module.singleExport) {
-            return AsmExportFunction(instance, runner, module.exports[0].function, scope)
+            return AsmExportFunction(instance, runner, module.exports[0].function, scope, isStrict)
         }
         val exports = cx.newObject(scope)
         for (export in module.exports) {
-            ScriptableObject.putProperty(exports, export.name, AsmExportFunction(instance, runner, export.function, scope))
+            ScriptableObject.putProperty(exports, export.name, AsmExportFunction(instance, runner, export.function, scope, isStrict))
         }
         return exports
     }
@@ -202,12 +202,25 @@ internal class AsmExportFunction(
     private val runner: AsmRunner,
     private val index: Int,
     scope: Scriptable,
+    moduleIsStrict: Boolean,
 ) : BaseFunction() {
 
     private val fn: AsmFunction = instance.module.functions[index]
 
     init {
         ScriptRuntime.setFunctionProtoAndParent(this, Context.getCurrentContext(), scope)
+        if (!fn.isStrict && !moduleIsStrict) {
+            if (!has("arity", this)) createLegacyProperties()
+            if (Context.getContext().languageVersion >= Context.VERSION_ES6) {
+                setStandardPropertyAttributes(READONLY or DONTENUM)
+                defineProperty("caller", null, DONTENUM or READONLY or PERMANENT)
+            }
+        } else {
+            for (name in arrayOf("arity", "arguments")) if (has(name, this)) {
+                setAttributes(name, DONTENUM)
+                delete(name)
+            }
+        }
     }
 
     override val functionName: String get() = fn.name

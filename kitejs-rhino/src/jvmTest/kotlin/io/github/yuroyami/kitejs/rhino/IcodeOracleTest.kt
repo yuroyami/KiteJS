@@ -104,10 +104,13 @@ class IcodeOracleTest {
     private fun renderPorted(desc: JSDescriptor<*>, sb: StringBuilder, depth: Int) {
         val code = desc.code as InterpreterData<*>?
         val pad = "  ".repeat(depth)
+        // D-109 adds parameter-shape metadata for unmapped arguments; upstream has no such bit.
+        // Compare every shared flag and all generated instructions and pools below.
+        val sharedFlags = (field(desc, "flags") as Int) and (1 shl 18).inv()
         sb.append(pad).append("fn=").append(desc.name).append(" type=").append(desc.functionType)
             .append(" strict=").append(desc.isStrict).append(" params=").append(desc.paramCount)
             .append(" vars=").append(desc.paramAndVarCount).append(" arity=").append(desc.arity)
-            .append(" flags=").append(field(desc, "flags")).append('\n')
+            .append(" flags=").append(sharedFlags).append('\n')
         sb.append(pad).append("names=").append((field(desc, "paramAndVarNames") as Array<*>).joinToString(",")).append('\n')
         if (code != null) {
             sb.append(pad).append("icode=").append(code.itsICode.joinToString(",")).append('\n')

@@ -2090,7 +2090,7 @@ public class Interpreter : Evaluator {
                 val asm = idata.asmModule
                 if (asm != null) {
                     val moduleArgs = getArgsArray(stack, sDbl, boundArgs, blen, state.stackTop + 1, state.indexReg)
-                    val exports = io.github.yuroyami.kitejs.rhino.asm.AsmLink.link(cx, calleeScope, asm, moduleArgs)
+                    val exports = io.github.yuroyami.kitejs.rhino.asm.AsmLink.link(cx, calleeScope, asm, moduleArgs, ifun.isStrict)
                     if (exports != null) {
                         frame.savedCallOp = op
                         frame.savedStackTop = state.stackTop

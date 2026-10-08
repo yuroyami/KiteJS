@@ -844,6 +844,7 @@ public object ScriptRuntime {
     /** The function `caller` and `arguments` throw through in strict mode. */
     private class ThrowTypeError(scope: Scriptable) : BaseFunction() {
         init {
+            parentScope = ScriptableObject.getTopLevelScope(scope)
             prototype = ScriptableObject.getFunctionPrototype(scope)
             setAttributes("length", DONTENUM or PERMANENT or READONLY)
             setAttributes("name", DONTENUM or PERMANENT or READONLY)
@@ -859,13 +860,16 @@ public object ScriptRuntime {
         override val isConstructor: Boolean get() = false
     }
 
-    public fun typeErrorThrower(cx: Context): BaseFunction {
-        var t = cx.typeErrorThrower
-        if (t == null) {
-            t = ThrowTypeError(cx.topCallScope!!)
-            cx.typeErrorThrower = t
-        }
-        return t
+    private val THROW_TYPE_ERROR_KEY = Any()
+
+    public fun typeErrorThrower(cx: Context): BaseFunction = typeErrorThrower(getTopCallScope(cx))
+
+    internal fun typeErrorThrower(scope: Scriptable): BaseFunction {
+        val prototype = ScriptableObject.getFunctionPrototype(scope) as? ScriptableObject
+            ?: return ThrowTypeError(scope) // Scopes without standard objects have no realm intrinsic.
+        val existing = prototype.getAssociatedValue(THROW_TYPE_ERROR_KEY) as? BaseFunction
+        if (existing != null) return existing
+        return prototype.associateValue(THROW_TYPE_ERROR_KEY, ThrowTypeError(scope)) as BaseFunction
     }
 
     public fun hasTopCall(cx: Context): Boolean = cx.topCallScope != null
