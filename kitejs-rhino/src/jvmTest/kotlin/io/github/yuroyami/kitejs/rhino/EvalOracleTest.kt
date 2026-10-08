@@ -157,7 +157,6 @@ class EvalOracleTest {
         "var o = { v: 7, m() { return this.v } }; o.m()",
         "var o = { v: 7, m: () => typeof this }; o.m()",
         "function f() { return this === undefined } f()",
-        "function f() { 'use strict'; return this === undefined } f()",
         "var f = function named() { return typeof named }; f()",
         "function f() { return f.name } f()",
         "var f = function () {}; f.name",
@@ -1648,7 +1647,7 @@ class EvalOracleTest {
 
     /**
      * The corpus: whole programs under `src/jvmTest/resources/eval`, each ending in the expression
-     * that is its result. Both engines run every file and the results have to match.
+     * that is its result. Both engines run every file; documented corrections have exact controls.
      */
     @Test
     fun corpusMatchesUpstream() {
@@ -1678,9 +1677,21 @@ class EvalOracleTest {
             } catch (e: Throwable) {
                 "CRASH $e"
             }
-            if (expected != actual) failures.add("${file.name}\n  upstream: $expected\n  ported:   $actual")
+            if (file.name == "this_binding.js") {
+                // D-112: the extracted strict function gets undefined, independently of its caller.
+                val standard = "\"obj|global|lexical-global|inner-global,arrow-obj,inner-x|strict-obj|strict-undefined|called|applied|bound|first|first|object|true|true|undefined|child|other|1|4\""
+                assertEquals(standard.replace("strict-undefined", "strict-Kite"), expected)
+                assertEquals(standard, actual)
+            } else if (expected != actual) failures.add("${file.name}\n  upstream: $expected\n  ported:   $actual")
         }
         assertEquals(emptyList(), failures, "corpus evaluation differs from upstream")
+    }
+
+    @Test
+    fun strictBareCallsDifferFromTheLegacyOracle() {
+        val source = "function f() { 'use strict'; return this === undefined } f()"
+        assertEquals("false", upstream(source))
+        assertEquals("true", ported(source))
     }
 
     /** Date.prototype and RegExp.prototype are ordinary objects; upstream makes them a Date and a RegExp (D-102). */

@@ -54,7 +54,7 @@ internal class NativeError : IdScriptableObject() {
             }
             Id_toSource -> return js_toSource(cx, scope, thisObj!!)
             ConstructorId_captureStackTrace -> {
-                js_captureStackTrace(cx, scope, thisObj!!, args)
+                js_captureStackTrace(cx, f.parentScope!!, args)
                 return Undefined.instance
             }
             ConstructorId_isError -> return js_isError(args)
@@ -284,14 +284,14 @@ internal class NativeError : IdScriptableObject() {
             return sb.toString()
         }
 
-        private fun js_captureStackTrace(cx: Context, scope: Scriptable, thisObj: Scriptable, args: Array<Any?>) {
+        private fun js_captureStackTrace(cx: Context, scope: Scriptable, args: Array<Any?>) {
             val obj = ScriptRuntime.toObject(cx, scope, args[0]) as ScriptableObject
             var func: Function? = null
             if (args.size > 1) {
                 func = ScriptRuntime.toObjectOrNull(cx, args[1], scope) as Function?
             }
             // %Error%, never the global binding, which a script may have replaced (D-94).
-            val err = ScriptRuntime.newNativeError(cx, thisObj, TopLevel.NativeErrors.Error, null) as NativeError
+            val err = ScriptRuntime.newNativeError(cx, scope, TopLevel.NativeErrors.Error, null) as NativeError
             err.setStackProvider(EvaluatorException("[object Object]"))
             if (func != null) {
                 val funcName = func.get("name", func)

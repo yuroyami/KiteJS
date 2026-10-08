@@ -43,12 +43,8 @@ public class NativeMap : ScriptableObject() {
         if (arg1 !is Callable) {
             throw ScriptRuntime.typeErrorById("msg.isnt.function", arg1, ScriptRuntime.typeOf(arg1))
         }
-        val isStrict = cx.isStrictMode
         for (entry in entries) {
-            // The spec re-converts on every step, so a primitive `this` is rebuilt each time.
-            var thisObj = ScriptRuntime.toObjectOrNull(cx, arg2, scope)
-            if (thisObj == null && !isStrict) thisObj = scope
-            if (thisObj == null) thisObj = Undefined.SCRIPTABLE_UNDEFINED
+            val thisObj = ScriptRuntime.getApplyOrCallThis(cx, scope, arg2, 1, arg1)
             arg1.call(cx, scope, thisObj, arrayOf(entry.value(), entry.key(), this))
         }
         return Undefined.instance

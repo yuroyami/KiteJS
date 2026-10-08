@@ -959,10 +959,6 @@ public object ScriptRuntime {
                 } else {
                     Undefined.SCRIPTABLE_UNDEFINED
                 }
-            // Only a sloppy function gets the global object in place of a missing this.
-            val missingCallThis = callThis == null || callThis === Undefined.SCRIPTABLE_UNDEFINED
-            val isFunctionStrict = target !is JSFunction || target.isStrict
-            if (missingCallThis && !isFunctionStrict) callThis = getTopCallScope(cx)
         }
         return callThis
     }
@@ -2439,7 +2435,7 @@ public object ScriptRuntime {
         var parent: Scriptable? = parentScope
         var result: Any?
         // Only meaningful when asFunctionCall is true.
-        var thisObj: Scriptable = s
+        var thisObj: Scriptable = Undefined.SCRIPTABLE_UNDEFINED
         while (true) {
             if (s is NativeWith) {
                 val withObj = s.prototype!!
@@ -2451,13 +2447,11 @@ public object ScriptRuntime {
             } else if (s is NativeCall) {
                 result = s.get(name, s)
                 if (result !== Scriptable.NOT_FOUND) {
-                    if (asFunctionCall) thisObj = ScriptableObject.getTopLevelScope(parent!!)
                     break
                 }
             } else {
                 result = ScriptableObject.getProperty(s, name)
                 if (result !== Scriptable.NOT_FOUND) {
-                    thisObj = s
                     break
                 }
             }
@@ -2466,7 +2460,6 @@ public object ScriptRuntime {
             if (parent == null) {
                 result = topScopeName(cx, s, name)
                 if (result === Scriptable.NOT_FOUND) throw notFoundError(s, name)
-                thisObj = s
                 break
             }
         }
@@ -2487,7 +2480,7 @@ public object ScriptRuntime {
         var s = scope
         var parent: Scriptable? = parentScope
         var result: Any?
-        var thisObj: Scriptable = s
+        var thisObj: Scriptable = Undefined.SCRIPTABLE_UNDEFINED
         while (true) {
             if (s is NativeWith) {
                 val withObj = s.prototype!!
@@ -2499,13 +2492,11 @@ public object ScriptRuntime {
             } else if (s is NativeCall) {
                 result = s.get(name, s)
                 if (result !== Scriptable.NOT_FOUND) {
-                    thisObj = ScriptableObject.getTopLevelScope(parent!!)
                     break
                 }
             } else {
                 result = ScriptableObject.getProperty(s, name)
                 if (result !== Scriptable.NOT_FOUND) {
-                    thisObj = s
                     break
                 }
             }
@@ -2514,7 +2505,6 @@ public object ScriptRuntime {
             if (parent == null) {
                 result = topScopeName(cx, s, name)
                 if (result === Scriptable.NOT_FOUND) throw notFoundError(s, name)
-                thisObj = s
                 break
             }
         }
@@ -2625,7 +2615,7 @@ public object ScriptRuntime {
                 if (isOptionalChainingCall && (result === Scriptable.NOT_FOUND || result == null || Undefined.isUndefined(result))) return null
                 if (result === Scriptable.NOT_FOUND) throw notFoundError(scope, name)
             }
-            return LookupResult(result, scope, name)
+            return LookupResult(result, Undefined.SCRIPTABLE_UNDEFINED, name)
         }
         return nameOrFunction(cx, scope, parent, name, isOptionalChainingCall)
     }
@@ -2686,10 +2676,7 @@ public object ScriptRuntime {
             if (isOptionalChainingCall && (value === Scriptable.NOT_FOUND || value == null || Undefined.isUndefined(value))) return null
             return LookupResult(value, null, value)
         }
-        var thisObj: Scriptable? = if (value is Function) value.declarationScope else null
-        if (thisObj == null) thisObj = cx.topCallScope ?: throw IllegalStateException()
-        if (thisObj is NativeCall) thisObj = ScriptableObject.getTopLevelScope(thisObj)
-        return LookupResult(value, thisObj, value)
+        return LookupResult(value, Undefined.SCRIPTABLE_UNDEFINED, null)
     }
 
     public fun getElemFunctionAndThis(obj: Any?, elem: Any?, cx: Context, scope: Scriptable): Callable? {

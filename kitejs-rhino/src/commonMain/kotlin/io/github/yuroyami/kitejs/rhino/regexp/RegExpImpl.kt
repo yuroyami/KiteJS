@@ -384,7 +384,7 @@ public class RegExpImpl : RegExpProxy {
                 ScriptRuntime.setRegExpProxy(cx, re2)
                 try {
                     val parent = ScriptableObject.getTopLevelScope(scope)
-                    lambdaStr = ScriptRuntime.toString(lambda.call(cx, parent, parent, args))
+                    lambdaStr = ScriptRuntime.toString(lambda.call(cx, parent, Undefined.SCRIPTABLE_UNDEFINED, args))
                 } finally {
                     ScriptRuntime.setRegExpProxy(cx, reImpl)
                 }

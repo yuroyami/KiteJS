@@ -11,6 +11,7 @@ import io.github.yuroyami.kitejs.rhino.ContextFactory
 import io.github.yuroyami.kitejs.rhino.Rhino
 import io.github.yuroyami.kitejs.rhino.Scriptable
 import io.github.yuroyami.kitejs.rhino.ScriptableObject
+import io.github.yuroyami.kitejs.rhino.Undefined
 import io.github.yuroyami.kitejs.rhino.asmReports
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -104,7 +105,7 @@ class AsmImportReceiverTest {
                 ScriptableObject.putProperty(scope, "callback", callback)
                 cx.evaluateString(scope, "callback();\n" + module + "\nm.g();", "asm-host-receiver.js", 1)
                 assertEquals(2, receivers.size)
-                assertSame(scope, receivers[0])
+                assertSame(Undefined.SCRIPTABLE_UNDEFINED, receivers[0])
                 assertSame(receivers[0], receivers[1], "scriptable=$scriptable asmJs=$enabled")
                 if (enabled) assertTrue(cx.asmDiagnostics.single().linked)
             }

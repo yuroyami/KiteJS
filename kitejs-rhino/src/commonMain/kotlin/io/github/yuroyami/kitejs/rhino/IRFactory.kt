@@ -2190,11 +2190,19 @@ public class IRFactory(
         private fun createCondExpr(cond: Node, ifTrue: Node, ifFalse: Node): Node {
             val condStatus = isAlwaysDefinedBoolean(cond)
             if (condStatus == ALWAYS_TRUE_BOOLEAN) {
-                return ifTrue
+                return foldedValue(ifTrue)
             } else if (condStatus == ALWAYS_FALSE_BOOLEAN) {
-                return ifFalse
+                return foldedValue(ifFalse)
             }
             return Node(Token.HOOK, cond, ifTrue, ifFalse)
+        }
+
+        // Conditional/logical expressions perform GetValue. Folding one must not turn its
+        // result back into a reference (a method receiver, with binding, or direct eval).
+        private fun foldedValue(node: Node): Node = when (node.type) {
+            Token.NAME, Token.GETPROP, Token.GETELEM, Token.GET_REF, Token.QUESTION_DOT ->
+                Node(Token.COMMA, Node(Token.NULL), node)
+            else -> node
         }
 
         private fun createUnary(nodeType: Int, child: Node): Node {
@@ -2383,7 +2391,7 @@ public class IRFactory(
                     if (leftStatus == ALWAYS_FALSE_BOOLEAN) {
                         return left
                     } else if (leftStatus == ALWAYS_TRUE_BOOLEAN) {
-                        return right
+                        return foldedValue(right)
                     }
                 }
 
@@ -2393,7 +2401,7 @@ public class IRFactory(
                     if (leftStatus == ALWAYS_TRUE_BOOLEAN) {
                         return left
                     } else if (leftStatus == ALWAYS_FALSE_BOOLEAN) {
-                        return right
+                        return foldedValue(right)
                     }
                 }
             }

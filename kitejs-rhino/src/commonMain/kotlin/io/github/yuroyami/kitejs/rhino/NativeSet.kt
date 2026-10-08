@@ -46,12 +46,8 @@ public class NativeSet : ScriptableObject() {
 
     private fun js_forEach(cx: Context, scope: Scriptable, arg1: Any?, arg2: Any?): Any {
         if (arg1 !is Callable) throw ScriptRuntime.notFunctionError(arg1)
-        val isStrict = cx.isStrictMode
         for (entry in entries) {
-            // The spec re-converts on every step, so a primitive `this` is rebuilt each time.
-            var thisObj = ScriptRuntime.toObjectOrNull(cx, arg2, scope)
-            if (thisObj == null && !isStrict) thisObj = scope
-            if (thisObj == null) thisObj = Undefined.SCRIPTABLE_UNDEFINED
+            val thisObj = ScriptRuntime.getApplyOrCallThis(cx, scope, arg2, 1, arg1)
             arg1.call(cx, scope, thisObj, arrayOf(entry.value(), entry.value(), this))
         }
         return Undefined.instance

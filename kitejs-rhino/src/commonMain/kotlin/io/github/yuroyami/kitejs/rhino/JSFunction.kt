@@ -112,7 +112,7 @@ public open class JSFunction(
     override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
         if (descriptor.isClassConstructor) throw ScriptRuntime.typeErrorById("msg.class.not.new", functionName)
         if (!ScriptRuntime.hasTopCall(cx)) return ScriptRuntime.doTopCall(this, cx, scope, thisObj, args, isStrict)
-        val realThis = if (descriptor.hasLexicalThis) lexicalThis else thisObj
+        val realThis = getFunctionThis(thisObj)
         return descriptor.code!!.execute(cx, this, Undefined.instance, scope, realThis, args)
     }
 
@@ -178,9 +178,15 @@ public open class JSFunction(
     public fun resumeGenerator(cx: Context, scope: Scriptable, operation: Int, state: Any?, value: Any?): Any? =
         descriptor.code!!.resume(cx, this, state, scope, operation, value)
 
-    /** The `this` a call sees: the captured one for an arrow function, [functionThis] otherwise. */
-    public fun getFunctionThis(functionThis: Scriptable?): Scriptable? =
-        if (descriptor.hasLexicalThis) lexicalThis else functionThis
+    /** OrdinaryCallBindThis: lexical capture, or the callee's own strictness and realm. */
+    public fun getFunctionThis(functionThis: Scriptable?): Scriptable? {
+        if (descriptor.hasLexicalThis) return lexicalThis
+        if (functionThis == null || Undefined.isUndefined(functionThis)) {
+            val legacy = Context.getCurrentContext()?.hasFeature(Context.FEATURE_OLD_UNDEF_NULL_THIS) == true
+            if (!descriptor.isStrict || legacy) return ScriptableObject.getTopLevelScope(parentScope!!)
+        }
+        return functionThis
+    }
 
     public companion object {
         public fun createScript(desc: JSDescriptor<JSScript>, homeObject: Scriptable?, staticSecurityDomain: Any?): JSScript {

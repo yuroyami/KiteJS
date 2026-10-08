@@ -1615,11 +1615,8 @@ public class NativeArray : ScriptableObject {
             val callbackArg = if (args.isNotEmpty()) args[0] else Undefined.instance
             val f = ArrayLikeAbstractOperations.getCallbackArg(cx, callbackArg)
             val parent = ScriptableObject.getTopLevelScope(f)
-            val thisArg: Scriptable = if (args.size < 2 || args[1] == null || args[1] === Undefined.instance) {
-                parent
-            } else {
-                ScriptRuntime.toObject(cx, scope, args[1])
-            }
+            val thisArg = ScriptRuntime.getApplyOrCallThis(cx, scope,
+                if (args.size < 2) Undefined.instance else args[1], 1, f)
             val length = getLengthProperty(cx, o)
             val result = ArrayLikeAbstractOperations.arraySpeciesCreate(cx, scope, o, 0)
             var j = 0L

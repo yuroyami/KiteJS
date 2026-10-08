@@ -946,6 +946,18 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   bits (including NaN payloads). Standard array iterators read inherited elements and advance before
   a getter may throw. TypedArrayInputTest pins 27 Node controls for these effects and exceptions;
   the parity ledger records the exact observed constructor/from improvements over upstream.
+- D-112: Bare name/value calls carry undefined (#70), and OrdinaryCallBindThis uses the source
+  function's own strictness and realm in both JSFunction.call and the interpreter's fast path.
+  Strict functions retain null/undefined; sloppy functions substitute their own global, and
+  arrows retain lexical this. Property and with-environment calls retain their base receiver.
+  Array/typed-array iteration, reduction and flatMap, Map/Set forEach, Promise executors and
+  regexp replacement callbacks pass the specified receiver instead of the caller's global.
+  Error.captureStackTrace obtains its realm from its native function, so an extracted call still
+  uses the original Error intrinsic. Constant folding of conditional/logical expressions keeps
+  GetValue semantics, preventing accidental method receivers, with bindings or direct eval.
+  BareCallThisTest pins Node controls and exercises host calls, foreign realms, async/generator
+  functions, asm parity and the explicit old undefined/null compatibility feature. Primitive
+  receiver boxing (#78) and Reflect.apply's argument conversion (#47) remain separate issues.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

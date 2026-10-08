@@ -454,10 +454,7 @@ public class NativePromise : ScriptableObject() {
             val promise = NativePromise()
             val resolving = ResolvingFunctions(scope, promise)
 
-            var thisObj: Scriptable = Undefined.SCRIPTABLE_UNDEFINED
-            if (!cx.isStrictMode) {
-                cx.topCallScope?.let { thisObj = it }
-            }
+            val thisObj: Scriptable = Undefined.SCRIPTABLE_UNDEFINED
 
             try {
                 executor.call(cx, scope, thisObj, arrayOf(resolving.resolve, resolving.reject))

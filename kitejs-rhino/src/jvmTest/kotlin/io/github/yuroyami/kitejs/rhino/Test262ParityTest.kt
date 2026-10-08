@@ -60,6 +60,26 @@ class Test262ParityTest {
      * this test says so rather than quietly passing.
      */
     private val knownDifferences = buildMap {
+        put("built-ins/Array/prototype/methods-called-as-functions.js",
+            "D-112: extracted array methods receive undefined here")
+        for (path in listOf(
+            "built-ins/Promise/reject/capability-invocation.js",
+            "built-ins/Promise/resolve/resolve-from-promise-capability.js",
+        )) {
+            put(path, "D-112: Promise callbacks bind this using the callee's own strictness here")
+        }
+        for (path in listOf(
+            "built-ins/TypedArray/prototype/subarray/infinity.js",
+            "built-ins/TypedArray/prototype/subarray/BigInt/infinity.js",
+        )) {
+            put(path, "D-58: subarray clamps infinite indices here; upstream fails")
+        }
+        for (number in listOf(62, 63, 64, 65, 76, 77, 78)) {
+            for (suffix in listOf("-s", "gs")) {
+                put("language/function-code/10.4.3-1-$number$suffix.js",
+                    "D-112: bare calls preserve undefined for strict callees here")
+            }
+        }
         put("built-ins/ThrowTypeError/unique-per-realm-function-proto.js",
             "D-109: Function.prototype restrictions share the realm intrinsic here")
         // D-111: iterable/array-like dispatch and validation follow ECMAScript here.
@@ -1095,6 +1115,22 @@ class Test262ParityTest {
      * strict mode they agree, so a file-wide entry would read as stale there.
      */
     private val knownSloppyDifferences = buildMap {
+        for (state in listOf("fulfilled", "rejected")) {
+            put("built-ins/Promise/prototype/then/rxn-handler-$state-invoke-nonstrict.js",
+                "D-112: sloppy Promise handlers substitute their own global here")
+        }
+        for (path in listOf(
+            "built-ins/Array/prototype/every/15.4.4.16-5-1-s.js",
+            "built-ins/Array/prototype/filter/15.4.4.20-5-1-s.js",
+            "built-ins/Array/prototype/forEach/15.4.4.18-5-1-s.js",
+            "built-ins/Array/prototype/map/15.4.4.19-5-1-s.js",
+            "built-ins/Array/prototype/reduce/15.4.4.21-9-c-ii-4-s.js",
+            "built-ins/Array/prototype/reduceRight/15.4.4.22-9-c-ii-4-s.js",
+            "built-ins/Array/prototype/some/15.4.4.17-5-1-s.js",
+            "built-ins/Array/prototype/sort/S15.4.4.11_A8.js",
+        )) {
+            put(path, "D-112: callbacks use the callee's own strictness and realm here")
+        }
         put("built-ins/ThrowTypeError/unique-per-realm-non-simple.js",
             "D-109: non-simple parameters use unmapped arguments and the realm intrinsic here")
         // Assigning to a const throws a TypeError here in any mode. Upstream ignores the write
@@ -1144,6 +1180,16 @@ class Test262ParityTest {
      * entry would read as stale there.
      */
     private val knownStrictDifferences = buildMap {
+        for (method in listOf("find", "findIndex", "findLast", "findLastIndex")) {
+            put("built-ins/Array/prototype/$method/predicate-call-this-strict.js",
+                "D-112: callbacks use the callee's own strictness and realm here")
+            for (folder in listOf("", "BigInt/")) {
+                put("built-ins/TypedArray/prototype/$method/${folder}predicate-call-this-strict.js",
+                    "D-112: callbacks use the callee's own strictness and realm here")
+            }
+        }
+        put("language/function-code/S10.4.3_A1.js",
+            "D-112: bare calls preserve undefined for strict callees here")
         // An array whose length is read-only leaves dense mode, so push, unshift and splice reach
         // the length write that throws (D-88).
         for (path in listOf(
