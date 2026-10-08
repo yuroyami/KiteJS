@@ -70,7 +70,6 @@ internal object AsmLink {
         val globalInts = IntArray(module.globalIntCount)
         val globalDbls = DoubleArray(module.globalDblCount)
         val ffi = arrayOfNulls<Callable>(module.ffiNames.size)
-        val ffiThis = arrayOfNulls<Scriptable>(module.ffiNames.size)
 
         for ((name, global) in module.globals) {
             when (global) {
@@ -100,7 +99,6 @@ internal object AsmLink {
                 is AsmGlobal.Ffi -> {
                     val value = readProperty(foreign ?: reject("the module was given no imports"), global.field)
                     ffi[global.index] = value as? Callable ?: reject("${global.field} is not a function")
-                    ffiThis[global.index] = value as? Scriptable
                 }
                 is AsmGlobal.ImportedInt -> {
                     val value = numericImport(foreign ?: reject("the module was given no imports"), global.field)
@@ -117,7 +115,7 @@ internal object AsmLink {
             check(name.isNotEmpty())
         }
 
-        val instance = AsmInstance(module, buffer, globalInts, globalDbls, ffi, ffiThis, scope)
+        val instance = AsmInstance(module, buffer, globalInts, globalDbls, ffi, scope)
         val runner = AsmRunner(instance)
         if (module.singleExport) {
             return AsmExportFunction(instance, runner, module.exports[0].function, scope)

@@ -24,7 +24,6 @@ internal class AsmInstance(
     val globalInts: IntArray,
     val globalDbls: DoubleArray,
     val ffi: Array<Callable?>,
-    val ffiThis: Array<Scriptable?>,
     val scope: Scriptable,
 )
 
@@ -423,8 +422,9 @@ internal class AsmRunner(private val instance: AsmInstance) {
         val callable = instance.ffi[index] ?: throw ScriptRuntime.typeError(
             "${instance.module.ffiNames[index]} is not a function",
         )
-        val thisObj = instance.ffiThis[index] ?: instance.scope
-        return callable.call(cx, instance.scope, thisObj, args)
+        // The import is a local function value, not a method on the imports object or on itself.
+        // Resolve its receiver at the call site exactly as the ordinary interpreter does.
+        return ScriptRuntime.getValueAndThis(callable, cx)!!.call(cx, instance.scope, args)
     }
 
     // ---- The heap -----------------------------------------------------------------------------
