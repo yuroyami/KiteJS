@@ -11,6 +11,8 @@ public open class NativeWith : Scriptable, SymbolScriptable, IdFunctionCall {
 
     protected var prototypeField: Scriptable? = null
     protected var parentField: Scriptable? = null
+    internal var isObjectEnvironment: Boolean = true
+        private set
 
     private constructor()
 
@@ -117,7 +119,8 @@ public open class NativeWith : Scriptable, SymbolScriptable, IdFunctionCall {
         }
 
         /** Makes the scope object for `with (obj)`. */
-        internal fun create(parent: Scriptable?, prototype: Scriptable?): NativeWith = NativeWith(parent, prototype)
+        internal fun create(parent: Scriptable?, prototype: Scriptable?, isObjectEnvironment: Boolean = true): NativeWith =
+            NativeWith(parent, prototype).also { it.isObjectEnvironment = isObjectEnvironment }
 
         internal fun isWithFunction(functionObj: Any?): Boolean =
             functionObj is IdFunctionObject && functionObj.hasTag(FTAG) && functionObj.methodId() == Id_constructor

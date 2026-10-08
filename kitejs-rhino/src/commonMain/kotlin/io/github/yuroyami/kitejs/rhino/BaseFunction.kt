@@ -624,7 +624,9 @@ public open class BaseFunction : ScriptableObject, Function {
         if (argumentsObj !== Scriptable.NOT_FOUND) return argumentsObj
         val cx = Context.getContext()
         val activation = ScriptRuntime.findFunctionActivation(cx, this) ?: return null
-        val arguments = activation.get("arguments", activation)
+        val arguments = if (activation.function!!.descriptor.hasParameterInitialization) {
+            activation.parameterBindingValue("arguments")
+        } else activation.get("arguments", activation)
         if (arguments is Arguments && cx.languageVersion >= Context.VERSION_ES6) {
             return Arguments.ReadonlyArguments(arguments, cx)
         }

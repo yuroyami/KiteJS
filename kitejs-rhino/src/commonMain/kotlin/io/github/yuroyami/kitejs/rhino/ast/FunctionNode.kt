@@ -119,6 +119,14 @@ public open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(p
     /** IR block for default parameter init in generators. */
     public var generatorParamInitBlock: Node? = null
 
+    internal var parameterSlotNames: List<String> = emptyList()
+    internal var parameterBindingNames: List<String> = emptyList()
+    internal var parameterLocalNames: List<String> = emptyList()
+    internal val bodyVarNames: MutableSet<String> = mutableSetOf()
+    internal var parsingBody: Boolean = false
+    internal var hasParameterExpressions: Boolean = false
+    internal var hasParameterInitialization: Boolean = false
+
     /**
      * [NOT_CLASS_CONSTRUCTOR] for every function but a class constructor, which is
      * [BASE_CLASS_CONSTRUCTOR], or [DERIVED_CLASS_CONSTRUCTOR] when the class has `extends`.

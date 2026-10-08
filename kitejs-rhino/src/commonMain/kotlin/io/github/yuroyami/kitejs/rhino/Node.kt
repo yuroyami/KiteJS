@@ -851,7 +851,13 @@ public open class Node : Iterable<Node> {
 
         /** The port's own: a let that can run more than once, reset to undefined each time (D-98). */
         internal const val RESET_LET_PROP: Int = 38
-        public const val LAST_PROP: Int = RESET_LET_PROP
+        /** An ENTERWITH created for a declarative lexical scope, rather than a with object. */
+        internal const val LEXICAL_SCOPE_PROP: Int = 39
+        internal const val PARAMETER_NAME_PROP: Int = 40
+        internal const val PARAMETER_VALUE_PROP: Int = 41
+        internal const val INITIALIZE_PARAMETER_PROP: Int = 42
+        internal const val FUNCTION_BODY_START_PROP: Int = 43
+        public const val LAST_PROP: Int = FUNCTION_BODY_START_PROP
 
         internal const val CLASS_HAS_HERITAGE: Int = 1
         internal const val CLASS_HAS_BINDING: Int = 2
@@ -952,6 +958,11 @@ public open class Node : Iterable<Node> {
             PRIVATE_NAMES_PROP -> "private_names"
             ASYNC_ARROW_PROP -> "async_arrow"
             RESET_LET_PROP -> "reset_let"
+            LEXICAL_SCOPE_PROP -> "lexical_scope"
+            PARAMETER_NAME_PROP -> "parameter_name"
+            PARAMETER_VALUE_PROP -> "parameter_value"
+            INITIALIZE_PARAMETER_PROP -> "initialize_parameter"
+            FUNCTION_BODY_START_PROP -> "function_body_start"
             else -> throw Kit.codeBug()
         }
 

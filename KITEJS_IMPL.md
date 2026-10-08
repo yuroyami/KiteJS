@@ -986,6 +986,34 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   two corrected sloppy frozen/read-only push results explicitly.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
+- D-115: PerformEval creates a fresh declarative scope for every eval's lexical declarations
+  (#99). Strict eval uses it as its variable environment too; sloppy eval declares into the
+  caller's variable environment after validating every conflict and global descriptor. Eval
+  closures retain that scope. Block scopes lowered to NativeWith carry declarative-environment
+  metadata, so eval rejects intervening lexical conflicts without treating object `with` bindings
+  as declarations. Name lookup and assignment preserve `with` unscopables across eval scopes.
+  Direct eval preserves null/undefined this, arguments, new.target, super and private names;
+  optional eval is indirect, and only the caller realm's intrinsic eval is direct. Lexical-scope
+  metadata does not change shared bytecodes. EvalEnvironmentTest pins 125 fixed Node controls;
+  the eval_scoping.js oracle records the corrected strict-var isolation result explicitly.
+- D-116: Non-simple parameters initialize sequentially in a declarative parameter environment
+  before body declarations exist (#84). Later/self bindings enforce the temporal dead zone for
+  reads, writes and typeof. Ordinary functions create unmapped arguments before defaults, while
+  arrows retain lexical arguments. Sloppy parameter eval has a separate variable environment,
+  so var declarations cannot redeclare formal parameters but can retain other bindings for
+  closures. Where parameters contain expressions, body var/function bindings use a child
+  environment and copy like-named parameter values as FunctionDeclarationInstantiation requires.
+  Generator defaults run before the generator is returned; async initialization errors reject
+  the promise. Three appended icodes fetch raw argument values, initialize bindings without
+  bypassing temporal-dead-zone checks in user code, and enter the function body once. Generator
+  creation captures the stack after parameter calls rather than their last intermediate stack.
+  The exact destructuring.js/spread.js fixtures
+  and two handwritten parameter sources compare shared declaration metadata instead of asserting
+  the upstream parameter lowering; other bytecodes and enclosing scripts still compare normally.
+  ParameterEnvironmentTest pins 140 fixed Node controls across defaults, closures, eval, arguments,
+  patterns, rest, arrows, methods, constructors, generators and async functions. The parity
+  producer now runs default-arg feature tests instead of excluding them.
+
 ## Phases
 
 | Phase | Deliverable | Done when |

@@ -7,6 +7,9 @@ package io.github.yuroyami.kitejs.rhino
 import io.github.yuroyami.kitejs.api.KBigInt
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CALLSPECIAL
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CALLSPECIAL_OPTIONAL
+import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_PARAMETER_VALUE
+import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_INITIALIZE_PARAMETER
+import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_ENTER_FUNCTION_BODY
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_OPTIONAL_CALL_LOOKUP
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CALL_ON_SUPER
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CLOSURE_EXPR
@@ -333,7 +336,7 @@ public class Interpreter : Evaluator {
                 scope = callerScope
                 ScriptRuntime.initScript(fnOrScript, thisObj, cx, scope!!, desc.isEvalFunction)
             }
-            if (desc.functionCount != 0 && !desc.isES6Generator) {
+            if (desc.functionCount != 0 && !desc.isES6Generator && !desc.hasParameterInitialization) {
                 if (desc.functionType != 0 && !desc.requiresActivationFrame) throw Kit.codeBug()
                 for (i in 0 until desc.functionCount) {
                     if (desc.getFunction(i).functionType == FunctionNode.FUNCTION_STATEMENT) {
@@ -802,6 +805,9 @@ public class Interpreter : Evaluator {
             when (op) {
                 Icode_GENERATOR -> {
                     if (!frame.frozen) {
+                        // Calls in parameter initializers may have saved an intermediate stack.
+                        // The first resume starts with the stack at the generator's creation point.
+                        frame.savedStackTop = state.stackTop
                         generatorCreate(cx, frame)
                         return NewState.BreakLoop
                     }
@@ -1117,6 +1123,17 @@ public class Interpreter : Evaluator {
                 }
                 Token.BINDNAME -> {
                     stack[++state.stackTop] = ScriptRuntime.bind(cx, frame.scope!!, state.stringReg!!)
+                    return null
+                }
+                Icode_PARAMETER_VALUE -> {
+                    stack[++state.stackTop] = (frame.scope as NativeCall).parameterValue(state.indexReg)
+                    return null
+                }
+                Icode_INITIALIZE_PARAMETER -> {
+                    var value = stack[state.stackTop]
+                    if (value === DBL_MRK) value = ScriptRuntime.wrapNumber(sDbl[state.stackTop])
+                    (stack[state.stackTop - 1] as NativeCall).initializeParameter(state.stringReg!!, value)
+                    stack[--state.stackTop] = value
                     return null
                 }
                 Token.STRICT_SETNAME, Token.SETNAME -> {
@@ -1487,6 +1504,23 @@ public class Interpreter : Evaluator {
             val stack = frame.stack
             val sDbl = frame.sDbl
             when (op) {
+                Icode_ENTER_FUNCTION_BODY -> {
+                    val parameters = frame.scope as NativeCall
+                    val body = parameters.enterBody()
+                    frame.scope = body
+                    if (body !== parameters) {
+                        body.parentActivationCall = parameters.parentActivationCall
+                        parameters.parentActivationCall = null
+                        cx.currentActivationCall = body
+                    }
+                    val desc = frame.fnOrScript.descriptor!!
+                    for (i in 0 until desc.functionCount) {
+                        if (desc.getFunction(i).functionType == FunctionNode.FUNCTION_STATEMENT) {
+                            initFunction(cx, body, desc, i)
+                        }
+                    }
+                    return null
+                }
                 // Class definitions and super() calls run once per class or per construction, so
                 // they live here, out of the hot dispatch method (D-95).
                 Icode_CLASS_BEGIN -> {
@@ -1569,7 +1603,9 @@ public class Interpreter : Evaluator {
                 Token.ENTERWITH -> {
                     var lhs = stack[state.stackTop]
                     if (lhs === DBL_MRK) lhs = ScriptRuntime.wrapNumber(sDbl[state.stackTop])
-                    frame.scope = ScriptRuntime.enterWith(lhs, cx, frame.scope!!)
+                    frame.scope = if (frame.pc - 1 in frame.idata.lexicalScopePcs) {
+                        NativeWith.create(frame.scope, lhs as Scriptable, false)
+                    } else ScriptRuntime.enterWith(lhs, cx, frame.scope!!)
                     state.stackTop--
                     return null
                 }

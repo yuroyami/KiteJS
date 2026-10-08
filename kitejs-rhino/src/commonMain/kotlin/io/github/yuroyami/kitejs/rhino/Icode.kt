@@ -166,8 +166,11 @@ internal abstract class Icode {
 
         /** Preserve a call reference while testing only its callee for null/undefined. */
         const val Icode_OPTIONAL_CALL_LOOKUP = Icode_GENERATOR_RETURN_RESULT - 1
+        const val Icode_PARAMETER_VALUE = Icode_OPTIONAL_CALL_LOOKUP - 1
+        const val Icode_INITIALIZE_PARAMETER = Icode_PARAMETER_VALUE - 1
+        const val Icode_ENTER_FUNCTION_BODY = Icode_INITIALIZE_PARAMETER - 1
 
-        const val MIN_ICODE = Icode_OPTIONAL_CALL_LOOKUP
+        const val MIN_ICODE = Icode_ENTER_FUNCTION_BODY
 
         // The operand byte of CLASS_ELEMENT: the kind of element in the low bits, then flags.
         const val CLASS_ELEMENT_METHOD = 0
@@ -298,6 +301,9 @@ internal abstract class Icode {
             Icode_AWAIT -> "AWAIT"
             Icode_GENERATOR_RETURN_RESULT -> "GENERATOR_RETURN_RESULT"
             Icode_OPTIONAL_CALL_LOOKUP -> "OPTIONAL_CALL_LOOKUP"
+            Icode_PARAMETER_VALUE -> "PARAMETER_VALUE"
+            Icode_INITIALIZE_PARAMETER -> "INITIALIZE_PARAMETER"
+            Icode_ENTER_FUNCTION_BODY -> "ENTER_FUNCTION_BODY"
                 // An icode with no name.
                 else -> throw IllegalStateException(bytecode.toString())
             }

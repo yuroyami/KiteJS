@@ -26,6 +26,8 @@ internal class InterpreterData<T : ScriptOrFn<T>>(
     val firstLinePC: Int,
     /** The typed code this function compiled to, when it is an asm.js module. Null otherwise. */
     val asmModule: io.github.yuroyami.kitejs.rhino.asm.AsmModule?,
+    /** ENTERWITH instruction offsets belonging to declarative lexical environments. */
+    val lexicalScopePcs: Set<Int>,
 ) : JSCode<T>() {
 
     private var icodeHashCode = 0
@@ -73,6 +75,7 @@ internal class InterpreterData<T : ScriptOrFn<T>>(
         var built: InterpreterData<T>? = null
         var firstLinePC = -1
         var asmModule: io.github.yuroyami.kitejs.rhino.asm.AsmModule? = null
+        val lexicalScopePcs: MutableSet<Int> = mutableSetOf()
 
         override fun build(): JSCode<T> {
             var b = built
@@ -81,7 +84,7 @@ internal class InterpreterData<T : ScriptOrFn<T>>(
                     itsStringTable, itsDoubleTable, itsBigIntTable, itsNestedFunctions, itsRegExpLiterals,
                     itsTemplateLiterals, itsICode, itsExceptionTable, itsMaxVars, itsMaxLocals, itsMaxStack,
                     itsMaxFrameArray, itsMaxCalleeArgs, literalIds, longJumps?.toMap(), firstLinePC,
-                    asmModule,
+                    asmModule, lexicalScopePcs.toSet(),
                 )
                 built = b
             }

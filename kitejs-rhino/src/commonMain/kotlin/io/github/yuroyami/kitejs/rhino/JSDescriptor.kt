@@ -19,6 +19,13 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
     private val paramAndVarNames: Array<String>,
     private val paramIsConst: BooleanArray,
     private val paramIsVar: BooleanArray,
+    private val paramIsLexical: BooleanArray,
+    internal val parameterSlotNames: List<String>,
+    internal val parameterBindingNames: Set<String>,
+    internal val parameterLocalNames: List<String>,
+    internal val bodyVarNames: Set<String>,
+    internal val hasParameterExpressions: Boolean,
+    internal val hasParameterInitialization: Boolean,
     private val flags: Int,
     public val sourceName: String?,
     private val wholeSource: String?,
@@ -81,6 +88,11 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
 
     internal fun isVarDeclaration(index: Int): Boolean = paramIsVar[index]
 
+    internal fun isLexicalDeclaration(index: Int): Boolean = paramIsLexical[index]
+
+    internal fun hasLexicalDeclaration(name: String): Boolean =
+        paramAndVarNames.indices.any { paramIsLexical[it] && paramAndVarNames[it] == name }
+
     public fun getParamOrVarName(index: Int): String = paramAndVarNames[index]
 
     /** False when a nested function declaration (not expression) is named [name]. */
@@ -113,6 +125,13 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
         public var paramAndVarNames: Array<String>? = null
         public var paramIsConst: BooleanArray? = null
         internal var paramIsVar: BooleanArray? = null
+        internal var paramIsLexical: BooleanArray? = null
+        internal var parameterSlotNames: List<String> = emptyList()
+        internal var parameterBindingNames: Set<String> = emptySet()
+        internal var parameterLocalNames: List<String> = emptyList()
+        internal var bodyVarNames: Set<String> = emptySet()
+        internal var hasParameterExpressions: Boolean = false
+        internal var hasParameterInitialization: Boolean = false
         public var isStrict: Boolean = false
         public var isScript: Boolean = false
         public var isTopLevel: Boolean = false
@@ -197,6 +216,9 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
                 paramAndVarNames!!,
                 paramIsConst!!,
                 paramIsVar ?: BooleanArray(paramAndVarCount),
+                paramIsLexical ?: BooleanArray(paramAndVarCount),
+                parameterSlotNames, parameterBindingNames, parameterLocalNames, bodyVarNames,
+                hasParameterExpressions, hasParameterInitialization,
                 f,
                 sourceFile,
                 rawSource,

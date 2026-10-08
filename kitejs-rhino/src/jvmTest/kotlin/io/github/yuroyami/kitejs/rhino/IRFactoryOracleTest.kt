@@ -122,7 +122,8 @@ class IRFactoryOracleTest {
                     val fn = utree.getFunctionNode(i)
                     append(fn.name).append(' ')
                         .append(fn.functionType).append(' ')
-                        .append(fn.requiresActivation()).append(' ')
+                        // D-116: these exact parameter fixtures now use declarative environments.
+                        .append(fn.requiresActivation() || file.name in setOf("destructuring.js", "spread.js")).append(' ')
                         .append(fn.requiresArgumentObject()).append(' ')
                         .append(fn.isGenerator).append(' ')
                         .append(fn.paramCount).append('\n')

@@ -132,12 +132,21 @@ A `break`, `return` or throw out of a `for-of` loop, or an array pattern that ta
 elements than the iterable has, never calls the iterator's `return` method, so a generator's
 `finally` block does not run then. Call `it.return()` yourself where the cleanup matters.
 
-### Older scoping rules for parameters and block functions
+### Older scoping rules for block functions
 
-A parameter default runs in the body's scope, so it cannot read `arguments` and a closure made
-in it sees the body's `var`s. A function declared inside a block belongs to the whole enclosing
-function, in strict code too, and a `for (let ...)` body's function sees the last value of the
-loop variable. Code that avoids these corners runs the same as in a browser.
+A function declared inside a block belongs to the whole enclosing function, in strict code too,
+and a `for (let ...)` body's function sees the last value of the loop variable. Code that avoids
+these corners runs the same as in a browser.
+
+Parameter defaults initialize from left to right, can read the function's unmapped `arguments`
+object, and cannot read a later parameter before it is initialized. Closures created in defaults
+keep the parameter environment and do not see the body's `var` or function declarations. Arrow
+functions inherit `arguments` from their enclosing scope.
+
+Each `eval` has its own lexical scope. Its `let`, `const` and class declarations stay there;
+strict eval also keeps its `var` and function declarations there. Sloppy direct eval can add
+variables to the calling function, subject to lexical declaration conflicts. `eval?.(...)` is
+indirect and runs in the eval function's global scope.
 
 In ES6 and later, `yield` is an identifier in sloppy code outside generators, as in a browser.
 It is reserved in strict code and acts as an operator only in a generator body. Explicitly

@@ -162,6 +162,20 @@ class IcodeOracleTest {
         return sb.toString()
     }
 
+    /** Shared declaration metadata for the exact fixtures whose parameter instructions changed. */
+    private fun parameterMetadata(rendered: String): List<String> = rendered.lines().mapNotNull { line ->
+        when {
+            line.trimStart().startsWith("fn=") -> {
+                val flags = line.substringAfter(" flags=").toInt()
+                line.substringBefore(" flags=").replace(Regex(" vars=\\d+"), "") + " flags=" + (flags and 1024.inv())
+            }
+            line.trimStart().startsWith("names=") -> line.substringBefore("names=") + "names=" +
+                line.substringAfter("names=").split(',').filterNot { it.matches(Regex("\\$\\d+")) }.joinToString(",")
+            line.trimStart().startsWith("ctor=") -> line
+            else -> null
+        }
+    }
+
     @Test
     fun corpusCompilesToIdenticalIcode() {
         val failures = mutableListOf<String>()
@@ -181,6 +195,12 @@ class IcodeOracleTest {
             compared++
             val e = expected.getOrThrow()
             val a = actual.getOrThrow()
+            if (file.name in setOf("destructuring.js", "spread.js")) {
+                // D-116 deliberately changes activation, temporaries and parameter instructions.
+                assertEquals(parameterMetadata(e), parameterMetadata(a))
+                assertTrue(e != a)
+                continue
+            }
             if (file.name == "optional-chaining.js") {
                 // #132 changes instructions and frame sizing; pools and descriptor data still match.
                 fun metadata(text: String) = text.lines().filterNot { it.startsWith("icode=") || it.startsWith("max=") }
@@ -273,6 +293,11 @@ class IcodeOracleTest {
             compared++
             val e = expected.getOrThrow()
             val a = actual.getOrThrow()
+            if (source in setOf("function f(...rest) { return rest }", "function f(a = 1, b = a + 1) { return b }")) {
+                assertEquals(parameterMetadata(e), parameterMetadata(a))
+                assertTrue(e != a)
+                continue
+            }
             if (e != a) {
                 val el = e.lines()
                 val al = a.lines()

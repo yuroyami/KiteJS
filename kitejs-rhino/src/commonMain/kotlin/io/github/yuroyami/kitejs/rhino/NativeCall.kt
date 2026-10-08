@@ -14,6 +14,14 @@ public class NativeCall : IdScriptableObject {
     internal val originalArgs: Array<Any?>
     internal val isStrict: Boolean
     internal var parentActivationCall: NativeCall? = null
+    private val uninitializedParameters: MutableSet<String> = mutableSetOf()
+    private var rawParameterValues: Array<Any?> = ScriptRuntime.emptyArgs
+    internal var isParameterEnvironment: Boolean = false
+        private set
+    internal var isFormalParameterEnvironment: Boolean = false
+        private set
+    internal var parameterVariableScope: NativeCall? = null
+        private set
 
     /** The new.target of the call, for direct eval code to see; null outside every function. */
     internal var newTarget: Any? = null
@@ -42,6 +50,32 @@ public class NativeCall : IdScriptableObject {
         this.originalArgs = args ?: ScriptRuntime.emptyArgs
         this.isStrict = isStrict
         val a = this.originalArgs
+        val desc = function.descriptor
+        if (desc.hasParameterInitialization) {
+            isParameterEnvironment = true
+            isFormalParameterEnvironment = true
+            if (!isStrict && desc.hasParameterExpressions) {
+                val variables = NativeCall(this)
+                variables.parentScope = scope
+                variables.isParameterEnvironment = true
+                parameterVariableScope = variables
+                parentScope = variables
+            }
+            val names = desc.parameterBindingNames + desc.parameterSlotNames
+            for (name in names) defineProperty(name, Undefined.instance, PERMANENT)
+            for (name in desc.parameterLocalNames) defineProperty(name, Undefined.instance, PERMANENT)
+            uninitializedParameters.addAll(names)
+            rawParameterValues = Array(desc.parameterSlotNames.size) { i ->
+                if (argsHasRest && i == desc.parameterSlotNames.lastIndex) {
+                    cx.newArray(scope, if (i < a.size) a.copyOfRange(i, a.size) else ScriptRuntime.emptyArgs)
+                } else if (i < a.size) a[i] else Undefined.instance
+            }
+            if (!isArrow && !has("arguments", this)) {
+                val holder = parameterVariableScope ?: this
+                holder.defineProperty("arguments", Arguments(this, cx), PERMANENT)
+            }
+            return
+        }
 
         val paramAndVarCount = function.paramAndVarCount
         val paramCount = function.paramCount
@@ -78,6 +112,68 @@ public class NativeCall : IdScriptableObject {
                 }
             }
         }
+    }
+
+    private constructor(parameters: NativeCall) : super() {
+        function = parameters.function
+        originalArgs = parameters.originalArgs
+        isStrict = parameters.isStrict
+        parentScope = parameters
+        newTarget = parameters.newTarget
+        thisBinding = parameters.thisBinding
+    }
+
+    internal fun parameterValue(index: Int): Any? = rawParameterValues[index]
+
+    internal fun initializeParameter(name: String, value: Any?) {
+        uninitializedParameters.remove(name)
+        super.put(name, this, value)
+    }
+
+    internal fun enterBody(): NativeCall {
+        val desc = function!!.descriptor
+        val body = if (desc.hasParameterExpressions) NativeCall(this) else this
+        body.isParameterEnvironment = false
+        body.isFormalParameterEnvironment = false
+        val bodyVars = desc.bodyVarNames.toMutableSet()
+        for (i in 0 until desc.functionCount) {
+            val fn = desc.getFunction(i)
+            if (fn.functionType == io.github.yuroyami.kitejs.rhino.ast.FunctionNode.FUNCTION_STATEMENT) bodyVars.add(fn.functionName)
+        }
+        for (name in bodyVars) {
+            if (!body.has(name, body)) {
+                val value = if (name in desc.parameterBindingNames || name == "arguments") {
+                    parameterBindingValue(name)
+                } else Undefined.instance
+                body.defineProperty(name, value, PERMANENT)
+            }
+        }
+        for (i in desc.paramCount until desc.paramAndVarCount) {
+            val name = desc.getParamOrVarName(i)
+            if (name in desc.parameterBindingNames || name in desc.parameterSlotNames || body.has(name, body)) continue
+            if (desc.getParamOrVarConst(i)) body.defineProperty(name, Undefined.instance, CONST)
+            else body.defineProperty(name, Undefined.instance, PERMANENT)
+        }
+        return body
+    }
+
+    internal fun parameterBindingValue(name: String): Any? {
+        var holder: Scriptable? = this
+        while (holder != null) {
+            if (holder.has(name, holder)) return holder.get(name, holder)
+            holder = holder.parentScope
+        }
+        return Undefined.instance
+    }
+
+    override fun get(name: String, start: Scriptable): Any? {
+        if (name in uninitializedParameters) throw ScriptRuntime.constructError("ReferenceError", "Cannot access '$name' before initialization")
+        return super.get(name, start)
+    }
+
+    override fun put(name: String, start: Scriptable, value: Any?) {
+        if (name in uninitializedParameters) throw ScriptRuntime.constructError("ReferenceError", "Cannot access '$name' before initialization")
+        super.put(name, start, value)
     }
 
     override val className: String

@@ -55,6 +55,9 @@ public open class NodeTransformer {
 
         if (Token.printTrees) println(tree.toStringTree(tree))
         transformCompilationUnitR(tree, tree, tree, createScopeObjects, inStrictMode)
+        (tree as? FunctionNode)?.generatorParamInitBlock?.let {
+            transformCompilationUnitR(tree, it, tree, createScopeObjects, inStrictMode)
+        }
     }
 
     private fun transformCompilationUnitR(
@@ -456,6 +459,7 @@ public open class NodeTransformer {
             }
             objectLiteral.putProp(Node.OBJECT_IDS_PROP, list.toTypedArray())
             newVars = Node(Token.ENTERWITH, objectLiteral)
+            newVars.putIntProp(Node.LEXICAL_SCOPE_PROP, 1)
             result.addChildToBack(newVars)
             result.addChildToBack(Node(Token.WITH, body))
             result.addChildToBack(Node(Token.LEAVEWITH))

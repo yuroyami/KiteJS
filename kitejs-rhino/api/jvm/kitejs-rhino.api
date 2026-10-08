@@ -1105,8 +1105,10 @@ public final class io/github/yuroyami/kitejs/rhino/NativeArrayIterator$Companion
 public final class io/github/yuroyami/kitejs/rhino/NativeCall : io/github/yuroyami/kitejs/rhino/IdScriptableObject {
 	public static final field Companion Lio/github/yuroyami/kitejs/rhino/NativeCall$Companion;
 	public fun execIdCall (Lio/github/yuroyami/kitejs/rhino/IdFunctionObject;Lio/github/yuroyami/kitejs/rhino/Context;Lio/github/yuroyami/kitejs/rhino/Scriptable;Lio/github/yuroyami/kitejs/rhino/Scriptable;[Ljava/lang/Object;)Ljava/lang/Object;
+	public fun get (Ljava/lang/String;Lio/github/yuroyami/kitejs/rhino/Scriptable;)Ljava/lang/Object;
 	public fun getClassName ()Ljava/lang/String;
 	public final fun getHomeObject ()Lio/github/yuroyami/kitejs/rhino/Scriptable;
+	public fun put (Ljava/lang/String;Lio/github/yuroyami/kitejs/rhino/Scriptable;Ljava/lang/Object;)V
 }
 
 public final class io/github/yuroyami/kitejs/rhino/NativeCall$Companion {
@@ -2471,6 +2473,7 @@ public final class io/github/yuroyami/kitejs/rhino/TopLevel$Builtins : java/lang
 	public static final field Boolean Lio/github/yuroyami/kitejs/rhino/TopLevel$Builtins;
 	public static final field DataView Lio/github/yuroyami/kitejs/rhino/TopLevel$Builtins;
 	public static final field Error Lio/github/yuroyami/kitejs/rhino/TopLevel$Builtins;
+	public static final field Float16Array Lio/github/yuroyami/kitejs/rhino/TopLevel$Builtins;
 	public static final field Float32Array Lio/github/yuroyami/kitejs/rhino/TopLevel$Builtins;
 	public static final field Float64Array Lio/github/yuroyami/kitejs/rhino/TopLevel$Builtins;
 	public static final field Function Lio/github/yuroyami/kitejs/rhino/TopLevel$Builtins;
@@ -3888,6 +3891,18 @@ public final class io/github/yuroyami/kitejs/rhino/typedarrays/NativeDataView : 
 }
 
 public final class io/github/yuroyami/kitejs/rhino/typedarrays/NativeDataView$Companion {
+}
+
+public final class io/github/yuroyami/kitejs/rhino/typedarrays/NativeFloat16Array : io/github/yuroyami/kitejs/rhino/typedarrays/NativeTypedArrayView {
+	public static final field Companion Lio/github/yuroyami/kitejs/rhino/typedarrays/NativeFloat16Array$Companion;
+	public fun <init> ()V
+	public fun <init> (I)V
+	public fun <init> (Lio/github/yuroyami/kitejs/rhino/typedarrays/NativeArrayBuffer;II)V
+	public fun getBytesPerElement ()I
+	public fun getClassName ()Ljava/lang/String;
+}
+
+public final class io/github/yuroyami/kitejs/rhino/typedarrays/NativeFloat16Array$Companion {
 }
 
 public final class io/github/yuroyami/kitejs/rhino/typedarrays/NativeFloat32Array : io/github/yuroyami/kitejs/rhino/typedarrays/NativeTypedArrayView {

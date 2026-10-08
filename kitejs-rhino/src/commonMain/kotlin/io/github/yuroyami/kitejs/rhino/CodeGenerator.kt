@@ -6,6 +6,10 @@ package io.github.yuroyami.kitejs.rhino
 
 import io.github.yuroyami.kitejs.api.KBigInt
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CALLSPECIAL
+import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CALLSPECIAL_OPTIONAL
+import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_PARAMETER_VALUE
+import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_INITIALIZE_PARAMETER
+import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_ENTER_FUNCTION_BODY
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_OPTIONAL_CALL_LOOKUP
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CALL_ON_SUPER
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CLASS_BEGIN
@@ -158,7 +162,7 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
             }
             // An async function's frame starts the way a plain function's does, function
             // declarations included, and its body runs from the call on (D-97).
-            val functionCount = if (theFunction.isAsyncFunction) 0 else theFunction.functionCount
+            val functionCount = if (theFunction.isAsyncFunction || theFunction.hasParameterInitialization) 0 else theFunction.functionCount
             for (i in 0 until functionCount) {
                 val fn = theFunction.getFunctionNode(i)
                 if (fn.functionType == FunctionNode.FUNCTION_STATEMENT) addIndexOp(Icode_CLOSURE_STMT, i)
@@ -277,6 +281,10 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
     private fun badTree(node: Node): RuntimeException = RuntimeException(node.toString())
 
     private fun visitStatement(node: Node, initialStackDepth: Int) {
+        if (node.getIntProp(Node.FUNCTION_BODY_START_PROP, 0) != 0) {
+            addIcode(Icode_ENTER_FUNCTION_BODY)
+            return
+        }
         val type = node.type
         var child = node.firstChild
         when (type) {
@@ -304,6 +312,7 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
             }
             Token.ENTERWITH -> {
                 visitExpression(child!!, 0)
+                if (node.getIntProp(Node.LEXICAL_SCOPE_PROP, 0) != 0) itsData.lexicalScopePcs.add(iCodeTop)
                 addToken(Token.ENTERWITH)
                 stackChange(-1)
             }
@@ -517,7 +526,7 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
                 val callType = node.getIntProp(Node.SPECIALCALL_PROP, Node.NON_SPECIALCALL)
                 var opType = type
                 if (type != Token.REF_CALL && callType != Node.NON_SPECIALCALL) {
-                    addIndexOp(Icode_CALLSPECIAL, argCount)
+                    addIndexOp(if (isOptionalChainingCall) Icode_CALLSPECIAL_OPTIONAL else Icode_CALLSPECIAL, argCount)
                     addUint8(callType)
                     addUint8(if (type == Token.NEW) 1 else 0)
                     addUint16(lineNumber and 0xFFFF)
@@ -683,7 +692,7 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
                 visitExpression(child, 0)
                 child = child.next!!
                 visitExpression(child, 0)
-                addStringOp(type, name)
+                addStringOp(if (node.getIntProp(Node.INITIALIZE_PARAMETER_PROP, 0) != 0) Icode_INITIALIZE_PARAMETER else type, name)
                 stackChange(-1)
             }
             Token.SETCONST -> {
@@ -707,7 +716,9 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
                 }
             }
             Token.BINDNAME, Token.NAME, Token.STRING -> {
-                addStringOp(type, node.string!!)
+                val parameterIndex = node.getIntProp(Node.PARAMETER_VALUE_PROP, -1)
+                if (parameterIndex >= 0) addIndexOp(Icode_PARAMETER_VALUE, parameterIndex)
+                else addStringOp(type, node.string!!)
                 stackChange(1)
             }
             Token.INC, Token.DEC -> visitIncDec(node, child!!)
@@ -805,6 +816,7 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
                 val enterWith = node.firstChild!!
                 val with = enterWith.next!!
                 visitExpression(enterWith.firstChild!!, 0)
+                if (enterWith.getIntProp(Node.LEXICAL_SCOPE_PROP, 0) != 0) itsData.lexicalScopePcs.add(iCodeTop)
                 addToken(Token.ENTERWITH)
                 stackChange(-1)
                 visitExpression(with.firstChild!!, 0)

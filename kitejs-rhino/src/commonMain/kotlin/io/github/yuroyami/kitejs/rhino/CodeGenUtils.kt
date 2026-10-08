@@ -35,6 +35,12 @@ public object CodeGenUtils {
         builder.parametersSourceStart = fn.parametersSourceStart
         builder.nonSimpleParameters = fn.hasRestParameter || fn.defaultParams != null ||
             fn.params.any { it !is Name }
+        builder.parameterSlotNames = fn.parameterSlotNames
+        builder.parameterBindingNames = fn.parameterBindingNames.toSet()
+        builder.parameterLocalNames = fn.parameterLocalNames
+        builder.bodyVarNames = fn.bodyVarNames.toSet()
+        builder.hasParameterExpressions = fn.hasParameterExpressions
+        builder.hasParameterInitialization = fn.hasParameterInitialization
         builder.requiresActivationFrame = fn.requiresActivation
         builder.requiresArgumentObject = fn.requiresArgumentObject
         if (fn.functionName != null) builder.name = fn.name
@@ -82,6 +88,9 @@ public object CodeGenUtils {
         builder.paramCount = scriptOrFn.paramCount
         builder.paramIsConst = scriptOrFn.paramAndVarConst
         builder.paramIsVar = BooleanArray(scriptOrFn.paramAndVarCount) { scriptOrFn.symbols[it].declType == Token.VAR }
+        builder.paramIsLexical = BooleanArray(scriptOrFn.paramAndVarCount) {
+            scriptOrFn.symbols[it].declType == Token.LET || scriptOrFn.symbols[it].declType == Token.CONST
+        }
         builder.paramAndVarCount = scriptOrFn.paramAndVarCount
         builder.hasRestArg = scriptOrFn.hasRestParameter
         builder.hasDefaultParameters = scriptOrFn.defaultParams != null

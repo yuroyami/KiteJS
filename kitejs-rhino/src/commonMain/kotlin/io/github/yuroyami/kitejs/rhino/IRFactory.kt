@@ -560,56 +560,44 @@ public class IRFactory(
             ++parser.nestingOfFunction // only the body, not the params
             val body = transform(fn.body!!)
 
-            // Process the simple default parameters.
-            val defaultParams = fn.defaultParams
-            if (defaultParams != null) {
-                var paramInitBlock: Node? = null
-                var i = defaultParams.size - 1
-                while (i > 0) {
-                    val entry = defaultParams[i]
-                    val nameEntry = defaultParams[i - 1]
-                    if (entry is AstNode && nameEntry is String) {
-                        val defaultValue = transform(entry)
-                        // A parameter's default names an anonymous function or class after the
-                        // parameter (ECMAScript 2015, 13.3.3.7, SingleNameBinding).
-                        inferNameIfMissing(Name(entry.position, nameEntry), defaultValue, null)
-                        val paramInit = createIf(
-                            createBinary(
-                                Token.SHEQ,
-                                parser.createName(nameEntry),
-                                KeywordLiteral().apply { type = Token.UNDEFINED },
-                            ),
-                            Node(
-                                Token.EXPR_VOID,
-                                createAssignment(
-                                    Token.ASSIGN,
-                                    parser.createName(nameEntry),
-                                    defaultValue,
-                                ),
-                                body.lineno,
-                                body.column,
-                            ),
-                            null,
-                            body.lineno,
-                            body.column,
-                        )
-                        // A generator binds its parameters before it is made, and an async function
-                        // in its body, where a throw rejects the promise it returns
-                        // (ECMAScript 2017, 14.7.11, EvaluateAsyncFunctionBody).
-                        if (fn.isGenerator && !fn.isAsyncFunction) {
-                            val block = paramInitBlock ?: Node(Token.BLOCK).also {
-                                paramInitBlock = it
-                            }
-                            block.addChildToFront(paramInit)
-                        } else {
-                            body.addChildToFront(paramInit)
-                        }
+            // BindingInitialization runs left to right before body declarations exist.
+            val nonSimple = fn.defaultParams != null || fn.hasRestParameter || fn.params.any { it !is Name }
+            val parameterInit = if (nonSimple && fn.parameterSlotNames.isNotEmpty()) Node(Token.BLOCK) else null
+            if (parameterInit != null) {
+                fn.hasParameterInitialization = true
+                fn.requiresActivation = true
+                val defaultValues = mutableMapOf<String, AstNode>()
+                fn.defaultParams?.chunked(2)?.forEach { pair ->
+                    defaultValues[pair[0] as String] = pair[1] as AstNode
+                }
+                val patterns = mutableMapOf<String, Node>()
+                var pattern = destructuring?.firstChild
+                while (pattern != null) {
+                    val next = pattern.next
+                    patterns[pattern.getProp(Node.PARAMETER_NAME_PROP) as String] = pattern
+                    destructuring!!.removeChild(pattern)
+                    markParameterBindings(pattern, fn.parameterBindingNames.toSet())
+                    pattern = next
+                }
+                for ((i, name) in fn.parameterSlotNames.withIndex()) {
+                    val raw = parser.createName(name)
+                    raw.putIntProp(Node.PARAMETER_VALUE_PROP, i)
+                    val default = defaultValues[name]
+                    val value = if (default == null) raw else {
+                        val transformed = transform(default)
+                        inferNameIfMissing(Name(default.position, name), transformed, null)
+                        val testRaw = parser.createName(name)
+                        testRaw.putIntProp(Node.PARAMETER_VALUE_PROP, i)
+                        createCondExpr(createBinary(Token.SHEQ, testRaw, Node(Token.UNDEFINED)), transformed, raw)
                     }
-                    i -= 2
+                    val assignment = createAssignment(Token.ASSIGN, parser.createName(name), value)
+                    assignment.putIntProp(Node.INITIALIZE_PARAMETER_PROP, 1)
+                    parameterInit.addChildToBack(Node(Token.EXPR_VOID, assignment, lineno, column))
+                    patterns[name]?.let { parameterInit.addChildToBack(Node(Token.EXPR_VOID, it, lineno, column)) }
                 }
-                if (fn.isGenerator && !fn.isAsyncFunction && paramInitBlock != null) {
-                    fn.generatorParamInitBlock = paramInitBlock
-                }
+                val bodyStart = Node(Token.EMPTY)
+                bodyStart.putIntProp(Node.FUNCTION_BODY_START_PROP, 1)
+                parameterInit.addChildToBack(bodyStart)
             }
 
             // Transform the nodes used as default parameters.
@@ -624,7 +612,10 @@ public class IRFactory(
                 }
             }
 
-            if (destructuring != null) {
+            if (parameterInit != null) {
+                if (fn.isGenerator && !fn.isAsyncFunction) fn.generatorParamInitBlock = parameterInit
+                else body.addChildToFront(parameterInit)
+            } else if (destructuring != null) {
                 body.addChildToFront(Node(Token.EXPR_VOID, destructuring, lineno, column))
             }
 
@@ -646,6 +637,17 @@ public class IRFactory(
             --parser.nestingOfFunction
             savedVars.restore()
             outerScopeIsStrict = savedStrict
+        }
+    }
+
+    private fun markParameterBindings(node: Node, names: Set<String>) {
+        if (node.type == Token.SETNAME && node.firstChild?.string in names) {
+            node.putIntProp(Node.INITIALIZE_PARAMETER_PROP, 1)
+        }
+        var child = node.firstChild
+        while (child != null) {
+            markParameterBindings(child, names)
+            child = child.next
         }
     }
 

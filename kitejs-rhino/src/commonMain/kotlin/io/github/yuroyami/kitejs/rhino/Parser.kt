@@ -654,6 +654,12 @@ public class Parser(
     }
 
     private fun parseFunctionBody(type: Int, fnNode: FunctionNode): AstNode {
+        fnNode.parameterSlotNames = fnNode.symbolTable?.values?.filter { it.declType == Token.LP }?.map { it.name!! } ?: emptyList()
+        fnNode.parameterBindingNames = fnNode.symbolTable?.values?.filter { it.declType == Token.LP || it.declType == Token.VAR }
+            ?.map { it.name!! } ?: emptyList()
+        fnNode.parameterLocalNames = fnNode.symbolTable?.values?.filter { it.declType == Token.LET }?.map { it.name!! } ?: emptyList()
+        fnNode.hasParameterExpressions = fnNode.defaultParams != null || fnNode.destructuringRvalues != null || fnNode.hasParameterExpressions
+        fnNode.parsingBody = true
         var isExpressionClosure = false
         if (!matchToken(Token.LC, true)) {
             // An expression closure is JavaScript 1.8's, which SpiderMonkey never took for a
@@ -783,10 +789,11 @@ public class Parser(
 
                     val expr = destructuringAssignExpr()
                     if (destructuring == null) {
-                        destructuring = HashMap()
+                        destructuring = LinkedHashMap()
                     }
 
                     if (expr is Assignment) {
+                        fnNode.hasParameterExpressions = true
                         // Default arguments inside destructured function parameters, as in
                         // f([x = 1] = [2]) { ... }, become:
                         // f(x) {
@@ -854,7 +861,7 @@ public class Parser(
                             fnNode.addParam(pattern)
                             val pname = currentScriptOrFn!!.getNextTempName()
                             defineSymbol(Token.LP, pname, false)
-                            if (destructuring == null) destructuring = HashMap()
+                            if (destructuring == null) destructuring = LinkedHashMap()
                             destructuring[pname] = pattern
                             continue
                         }
@@ -924,6 +931,7 @@ public class Parser(
                             createName(key),
                             defaultValue,
                         )
+                    assign.putProp(Node.PARAMETER_NAME_PROP, key)
                     destructuringNode.addChildToBack(assign)
                 }
                 fnNode.putProp(Node.DESTRUCTURING_PARAMS, destructuringNode)
@@ -1155,7 +1163,7 @@ public class Parser(
 
         // Would prefer to defer createDestructuringAssignment to codegen, but the symbol
         // definitions have to happen now, before the body is parsed.
-        val destructuring = HashMap<String, Node>()
+        val destructuring = LinkedHashMap<String, Node>()
         val destructuringDefault = HashMap<String, AstNode>()
         val paramNames = HashSet<String>()
 
@@ -1197,6 +1205,7 @@ public class Parser(
                             createName(key),
                             defaultValue,
                         )
+                    assign.putProp(Node.PARAMETER_NAME_PROP, key)
                     destructuringNode.addChildToBack(assign)
                 }
                 fnNode.putProp(Node.DESTRUCTURING_PARAMS, destructuringNode)
@@ -1332,6 +1341,7 @@ public class Parser(
                 val lhs = params.left!!
 
                 // Copy the default values for use in the IR.
+                fnNode.hasParameterExpressions = true
                 if (lhs is Name) {
                     val paramName = lhs.identifier!!
                     fnNode.putDefaultParams(paramName, rhs)
@@ -2830,6 +2840,9 @@ public class Parser(
         }
         if (validateBindingName && name == "let" && compilerEnv.languageVersion >= Context.VERSION_ES6 &&
             (declType == Token.LET || declType == Token.CONST)) reportError("msg.reserved.id", name)
+        (currentScriptOrFn as? FunctionNode)?.let { fn ->
+            if (declType == Token.VAR && fn.parsingBody && name != null) fn.bodyVarNames.add(name)
+        }
         val scope = currentScope!!
         val definingScope = scope.getDefiningScope(name!!)
         val symbol = definingScope?.getSymbol(name)
@@ -5996,7 +6009,7 @@ public class Parser(
                 currentScriptOrFn!!.putDestructuringRvalues(condInner, right, nameNode)
             }
 
-            parent.addChildToBack(Node(setOp, createName(Token.BINDNAME, name, null), cond))
+            parent.addChildToBack(Node(setOp, createName(Token.BINDNAME, name, null), if (isFunctionParameter) condInner else cond))
             if (variableType != -1) {
                 defineSymbol(variableType, name, true)
                 destructuringNames.add(name)

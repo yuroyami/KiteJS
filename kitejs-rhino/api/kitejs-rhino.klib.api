@@ -2185,6 +2185,19 @@ final class io.github.yuroyami.kitejs.rhino.typedarrays/NativeDataView : io.gith
     }
 }
 
+final class io.github.yuroyami.kitejs.rhino.typedarrays/NativeFloat16Array : io.github.yuroyami.kitejs.rhino.typedarrays/NativeTypedArrayView { // io.github.yuroyami.kitejs.rhino.typedarrays/NativeFloat16Array|null[0]
+    constructor <init>() // io.github.yuroyami.kitejs.rhino.typedarrays/NativeFloat16Array.<init>|<init>(){}[0]
+    constructor <init>(io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer, kotlin/Int, kotlin/Int) // io.github.yuroyami.kitejs.rhino.typedarrays/NativeFloat16Array.<init>|<init>(io.github.yuroyami.kitejs.rhino.typedarrays.NativeArrayBuffer;kotlin.Int;kotlin.Int){}[0]
+    constructor <init>(kotlin/Int) // io.github.yuroyami.kitejs.rhino.typedarrays/NativeFloat16Array.<init>|<init>(kotlin.Int){}[0]
+
+    final val bytesPerElement // io.github.yuroyami.kitejs.rhino.typedarrays/NativeFloat16Array.bytesPerElement|{}bytesPerElement[0]
+        final fun <get-bytesPerElement>(): kotlin/Int // io.github.yuroyami.kitejs.rhino.typedarrays/NativeFloat16Array.bytesPerElement.<get-bytesPerElement>|<get-bytesPerElement>(){}[0]
+    final val className // io.github.yuroyami.kitejs.rhino.typedarrays/NativeFloat16Array.className|{}className[0]
+        final fun <get-className>(): kotlin/String // io.github.yuroyami.kitejs.rhino.typedarrays/NativeFloat16Array.className.<get-className>|<get-className>(){}[0]
+
+    final object Companion // io.github.yuroyami.kitejs.rhino.typedarrays/NativeFloat16Array.Companion|null[0]
+}
+
 final class io.github.yuroyami.kitejs.rhino.typedarrays/NativeFloat32Array : io.github.yuroyami.kitejs.rhino.typedarrays/NativeTypedArrayView { // io.github.yuroyami.kitejs.rhino.typedarrays/NativeFloat32Array|null[0]
     constructor <init>() // io.github.yuroyami.kitejs.rhino.typedarrays/NativeFloat32Array.<init>|<init>(){}[0]
     constructor <init>(io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer, kotlin/Int, kotlin/Int) // io.github.yuroyami.kitejs.rhino.typedarrays/NativeFloat32Array.<init>|<init>(io.github.yuroyami.kitejs.rhino.typedarrays.NativeArrayBuffer;kotlin.Int;kotlin.Int){}[0]
@@ -2656,6 +2669,8 @@ final class io.github.yuroyami.kitejs.rhino/NativeCall : io.github.yuroyami.kite
         final fun <get-homeObject>(): io.github.yuroyami.kitejs.rhino/Scriptable? // io.github.yuroyami.kitejs.rhino/NativeCall.homeObject.<get-homeObject>|<get-homeObject>(){}[0]
 
     final fun execIdCall(io.github.yuroyami.kitejs.rhino/IdFunctionObject, io.github.yuroyami.kitejs.rhino/Context, io.github.yuroyami.kitejs.rhino/Scriptable, io.github.yuroyami.kitejs.rhino/Scriptable?, kotlin/Array<kotlin/Any?>): kotlin/Any? // io.github.yuroyami.kitejs.rhino/NativeCall.execIdCall|execIdCall(io.github.yuroyami.kitejs.rhino.IdFunctionObject;io.github.yuroyami.kitejs.rhino.Context;io.github.yuroyami.kitejs.rhino.Scriptable;io.github.yuroyami.kitejs.rhino.Scriptable?;kotlin.Array<kotlin.Any?>){}[0]
+    final fun get(kotlin/String, io.github.yuroyami.kitejs.rhino/Scriptable): kotlin/Any? // io.github.yuroyami.kitejs.rhino/NativeCall.get|get(kotlin.String;io.github.yuroyami.kitejs.rhino.Scriptable){}[0]
+    final fun put(kotlin/String, io.github.yuroyami.kitejs.rhino/Scriptable, kotlin/Any?) // io.github.yuroyami.kitejs.rhino/NativeCall.put|put(kotlin.String;io.github.yuroyami.kitejs.rhino.Scriptable;kotlin.Any?){}[0]
 
     final object Companion // io.github.yuroyami.kitejs.rhino/NativeCall.Companion|null[0]
 }
@@ -4203,6 +4218,7 @@ open class io.github.yuroyami.kitejs.rhino/TopLevel : io.github.yuroyami.kitejs.
         enum entry Boolean // io.github.yuroyami.kitejs.rhino/TopLevel.Builtins.Boolean|null[0]
         enum entry DataView // io.github.yuroyami.kitejs.rhino/TopLevel.Builtins.DataView|null[0]
         enum entry Error // io.github.yuroyami.kitejs.rhino/TopLevel.Builtins.Error|null[0]
+        enum entry Float16Array // io.github.yuroyami.kitejs.rhino/TopLevel.Builtins.Float16Array|null[0]
         enum entry Float32Array // io.github.yuroyami.kitejs.rhino/TopLevel.Builtins.Float32Array|null[0]
         enum entry Float64Array // io.github.yuroyami.kitejs.rhino/TopLevel.Builtins.Float64Array|null[0]
         enum entry Function // io.github.yuroyami.kitejs.rhino/TopLevel.Builtins.Function|null[0]

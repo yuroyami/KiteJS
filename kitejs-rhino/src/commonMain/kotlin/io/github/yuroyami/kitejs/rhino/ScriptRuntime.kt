@@ -2339,23 +2339,14 @@ public object ScriptRuntime {
     /** Finds the object in the scope chain that holds [id], for an assignment. Null if none does. */
     public fun bind(cx: Context, scope: Scriptable, id: String): Scriptable? {
         var s = scope
-        var parent = s.parentScope
-        if (parent != null) {
-            while (s is NativeWith) {
+        while (true) {
+            val parent = s.parentScope ?: return bindTop(cx, s, id)
+            if (s is NativeWith) {
                 val withObj = s.prototype!!
-                if (withHasBinding(withObj, id)) return withObj
-                s = parent!!
-                parent = parent.parentScope
-                if (parent == null) return bindTop(cx, s, id)
-            }
-            while (true) {
-                if (ScriptableObject.hasProperty(s, id)) return s
-                s = parent!!
-                parent = parent.parentScope
-                if (parent == null) break
-            }
+                if (scopeHasBinding(s, id)) return withObj
+            } else if (ScriptableObject.hasProperty(s, id)) return s
+            s = parent
         }
-        return bindTop(cx, s, id)
     }
 
     private fun bindTop(cx: Context, scope: Scriptable, id: String): Scriptable? {
@@ -2439,9 +2430,9 @@ public object ScriptRuntime {
         while (true) {
             if (s is NativeWith) {
                 val withObj = s.prototype!!
-                if (withHasBinding(withObj, name)) {
+                if (scopeHasBinding(s, name)) {
                     result = withGetBindingValue(cx, withObj, name)
-                    thisObj = withObj
+                    if (s.isObjectEnvironment) thisObj = withObj
                     break
                 }
             } else if (s is NativeCall) {
@@ -2484,9 +2475,9 @@ public object ScriptRuntime {
         while (true) {
             if (s is NativeWith) {
                 val withObj = s.prototype!!
-                if (withHasBinding(withObj, name)) {
+                if (scopeHasBinding(s, name)) {
                     result = withGetBindingValue(cx, withObj, name)
-                    thisObj = withObj
+                    if (s.isObjectEnvironment) thisObj = withObj
                     break
                 }
             } else if (s is NativeCall) {
@@ -2535,6 +2526,11 @@ public object ScriptRuntime {
         if (!isObject(unscopables)) return true
         val blocked = ScriptableObject.getProperty(unscopables as Scriptable, name)
         return blocked === Scriptable.NOT_FOUND || !toBoolean(blocked)
+    }
+
+    private fun scopeHasBinding(scope: NativeWith, name: String): Boolean {
+        val holder = scope.prototype!!
+        return if (scope.isObjectEnvironment) withHasBinding(holder, name) else holder.has(name, holder)
     }
 
     /**
@@ -2719,7 +2715,8 @@ public object ScriptRuntime {
         if (fun_ == null && isOptionalChainingCall) return Undefined.instance
         when (callType) {
             Node.SPECIALCALL_EVAL -> {
-                if (thisObj!!.parentScope == null && NativeGlobal.isEvalFunction(fun_)) {
+                if (!isOptionalChainingCall && NativeGlobal.isEvalFunction(fun_) &&
+                    (fun_ as Function).declarationScope === ScriptableObject.getTopLevelScope(scope)) {
                     return evalSpecial(cx, scope, callerThis, args, filename, lineNumber)
                 }
             }
@@ -2787,8 +2784,10 @@ public object ScriptRuntime {
             compilerEnvs.inEval = true
             compilerEnvs.setHomeObject(homeObject)
         }
-        val thisObject = if (thisArg === Undefined.instance) Undefined.SCRIPTABLE_UNDEFINED else thisArg as Scriptable
-        return script.exec(cx, scope, thisObject)
+        val evalScript = script as JSScript
+        val evalScope = EvalScope(scope, evalScript.descriptor.isStrict)
+        val thisObject = if (thisArg === Undefined.instance) Undefined.SCRIPTABLE_UNDEFINED else thisArg as Scriptable?
+        return evalScript.execEval(cx, evalScope, thisObject)
     }
 
     // ---- Increment and decrement -----------------------------------------------------------------
@@ -2804,7 +2803,7 @@ public object ScriptRuntime {
             if (scopeChain is NativeWith) {
                 // A `with` object holds the name only when HasBinding says so (D-89).
                 val withObj = scopeChain.prototype!!
-                if (withHasBinding(withObj, id)) {
+                if (scopeHasBinding(scopeChain, id)) {
                     value = withGetBindingValue(cx, withObj, id)
                     if (isConstBinding(withObj, id)) {
                         if (value !is Number && value !is KBigInt) toNumeric(value)
@@ -3094,6 +3093,10 @@ public object ScriptRuntime {
     public fun initScript(execObj: ScriptOrFn<*>, thisObj: Scriptable?, cx: Context, scope: Scriptable, evalScript: Boolean) {
         if (cx.topCallScope == null) throw IllegalStateException()
         val desc = execObj.descriptor!!
+        if (evalScript && scope is EvalScope) {
+            scope.instantiate(cx, desc)
+            return
+        }
         val varCount = desc.paramAndVarCount
         if (varCount != 0) {
             var varScope = scope
@@ -3127,6 +3130,7 @@ public object ScriptRuntime {
                 }
             }
         }
+        EvalScope.recordGlobalLexicalNames(scope, desc)
     }
 
     public fun createFunctionActivation(funObj: JSFunction, cx: Context, scope: Scriptable, args: Array<Any?>?, isStrict: Boolean, argsHasRest: Boolean, requiresArgumentObject: Boolean = true): Scriptable =
@@ -3154,6 +3158,7 @@ public object ScriptRuntime {
             val name = function.functionName
             if (name.isNotEmpty()) {
                 if (!fromEvalCode) ScriptableObject.defineProperty(scope, name, function, ScriptableObject.PERMANENT)
+                else if (scope is EvalScope) scope.initializeFunction(cx, name, function)
                 else scope.put(name, scope, function)
             }
         } else if (type == FunctionNode.FUNCTION_EXPRESSION_STATEMENT) {
@@ -3161,7 +3166,8 @@ public object ScriptRuntime {
             if (name.isNotEmpty()) {
                 var s = scope
                 while (s is NativeWith) s = s.parentScope!!
-                s.put(name, s, function)
+                if (fromEvalCode && s is EvalScope) s.initializeFunction(cx, name, function)
+                else s.put(name, s, function)
             }
         } else {
             throw Kit.codeBug()

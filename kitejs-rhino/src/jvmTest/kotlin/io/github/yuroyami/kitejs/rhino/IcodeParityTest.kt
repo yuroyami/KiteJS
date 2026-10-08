@@ -91,8 +91,8 @@ class IcodeParityTest {
             // Testing a call reference's callee without losing its receiver (#132).
             listOf(
                 "Icode_AWAIT", "Icode_CALL_SPREAD", "Icode_CLASS_BEGIN", "Icode_CLASS_CTOR", "Icode_CLASS_ELEMENT",
-                "Icode_CLASS_END", "Icode_CLASS_PRIVATE_NAMES", "Icode_GENERATOR_RETURN_RESULT", "Icode_INITCONST", "Icode_INITCONSTVAR",
-                "Icode_NEW_SPREAD", "Icode_NEW_TARGET", "Icode_OPTIONAL_CALL_LOOKUP", "Icode_SUPER_CALL", "Icode_SUPER_CALL_SPREAD",
+                "Icode_CLASS_END", "Icode_CLASS_PRIVATE_NAMES", "Icode_ENTER_FUNCTION_BODY", "Icode_GENERATOR_RETURN_RESULT", "Icode_INITCONST", "Icode_INITCONSTVAR",
+                "Icode_INITIALIZE_PARAMETER", "Icode_NEW_SPREAD", "Icode_NEW_TARGET", "Icode_OPTIONAL_CALL_LOOKUP", "Icode_PARAMETER_VALUE", "Icode_SUPER_CALL", "Icode_SUPER_CALL_SPREAD",
                 "Icode_SUPER_CTOR",
             ),
             extras.keys.toList(),

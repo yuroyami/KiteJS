@@ -104,8 +104,8 @@ class ConstAssignmentTest {
     }
 
     @Test
-    fun reading_and_redeclaring_are_unchanged() {
+    fun reading_and_eval_redeclaration_checks() {
         assertEquals("1", eval("const c = 1; c + ''"))
-        assertEquals("TypeError", eval("const c = 1; try { eval('var c = 2') } catch (e) { e.name }"))
+        assertEquals("SyntaxError", eval("const c = 1; try { eval('var c = 2') } catch (e) { e.name }"))
     }
 }

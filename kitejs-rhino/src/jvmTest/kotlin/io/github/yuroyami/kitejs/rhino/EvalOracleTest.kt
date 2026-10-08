@@ -1691,6 +1691,11 @@ class EvalOracleTest {
                 val standard = "\"obj|global|lexical-global|inner-global,arrow-obj,inner-x|strict-obj|strict-undefined|called|applied|bound|first|first|object|true|true|undefined|child|other|1|4\""
                 assertEquals(standard.replace("strict-undefined", "strict-Kite"), expected)
                 assertEquals(standard, actual)
+            } else if (file.name == "eval_scoping.js") {
+                // D-115: strict eval's var declaration has its own variable environment.
+                val standard = "\"localglobal|ReferenceError|number|undefined|true|2|42|2|global||5|1|3|undefined|SyntaxError|RangeError:from eval|3|string|3|true\""
+                assertEquals(standard.replace("number|undefined", "number|number"), expected)
+                assertEquals(standard, actual)
             } else if (expected != actual) failures.add("${file.name}\n  upstream: $expected\n  ported:   $actual")
         }
         assertEquals(emptyList(), failures, "corpus evaluation differs from upstream")
