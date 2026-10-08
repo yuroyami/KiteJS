@@ -855,7 +855,7 @@ public object ScriptRuntime {
         }
 
         override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
-            throw typeErrorById("msg.op.not.allowed")
+            cx.withRealm(parentScope!!) { throw typeErrorById("msg.op.not.allowed") }
 
         override val isConstructor: Boolean get() = false
     }
@@ -955,7 +955,7 @@ public object ScriptRuntime {
         } else {
             callThis =
                 if (l != 0) {
-                    if (arg0 === Undefined.instance) Undefined.SCRIPTABLE_UNDEFINED else toObjectOrNull(cx, arg0, scope)
+                    if (Undefined.isUndefined(arg0)) Undefined.SCRIPTABLE_UNDEFINED else toObjectOrNull(cx, arg0, scope)
                 } else {
                     Undefined.SCRIPTABLE_UNDEFINED
                 }
@@ -1046,7 +1046,7 @@ public object ScriptRuntime {
     // ---- ToObject ------------------------------------------------------------------------------
 
     public fun toObject(scope: Scriptable, value: Any?): Scriptable {
-        if (value is Scriptable) return value
+        if (value is Scriptable && !Undefined.isUndefined(value)) return value
         return toObject(Context.getContext(), scope, value)
     }
 
@@ -1085,15 +1085,15 @@ public object ScriptRuntime {
     }
 
     public fun toObjectOrNull(cx: Context, obj: Any?): Scriptable? {
+        if (obj == null || Undefined.isUndefined(obj)) return null
         if (obj is Scriptable) return obj
-        if (obj != null && !Undefined.isUndefined(obj)) return toObject(cx, getTopCallScope(cx), obj)
-        return null
+        return toObject(cx, getTopCallScope(cx), obj)
     }
 
     public fun toObjectOrNull(cx: Context, obj: Any?, scope: Scriptable): Scriptable? {
+        if (obj == null || Undefined.isUndefined(obj)) return null
         if (obj is Scriptable) return obj
-        if (obj != null && !Undefined.isUndefined(obj)) return toObject(cx, scope, obj)
-        return null
+        return toObject(cx, scope, obj)
     }
 
     // ---- Small helpers the natives share ---------------------------------------------------------
@@ -3180,11 +3180,11 @@ public object ScriptRuntime {
      * `rhinoException` are LiveConnect properties and are not ported.
      */
     public fun wrapException(t: Throwable, scope: Scriptable, cx: Context): Scriptable {
+        if (t is EcmaError) return ecmaErrorObject(cx, scope, t)
         val re: RhinoException
         val errorName: String
         val errorMsg: String?
         when (t) {
-            is EcmaError -> { re = t; errorName = t.name; errorMsg = t.errorMessage }
             is WrappedException -> { re = t; errorName = "InternalError"; errorMsg = t.wrappedException.message }
             is EvaluatorException -> { re = t; errorName = "InternalError"; errorMsg = t.message }
             else -> throw Kit.codeBug()
@@ -3198,12 +3198,26 @@ public object ScriptRuntime {
         return errorObject
     }
 
+    private fun ecmaErrorObject(cx: Context, scope: Scriptable, error: EcmaError): Scriptable {
+        error.errorObject?.let { return it }
+        val sourceUri = error.sourceName ?: ""
+        val args: Array<Any?> = if (error.lineNumber > 0) arrayOf(error.errorMessage, sourceUri, error.lineNumber)
+            else arrayOf(error.errorMessage, sourceUri)
+        val obj = newNativeError(cx, error.errorRealm ?: scope, TopLevel.NativeErrors.valueOf(error.name), args)
+        if (obj is NativeError) obj.setStackProvider(error)
+        error.errorObject = obj
+        return obj
+    }
+
     public fun newCatchScope(t: Throwable, lastCatchScope: Scriptable?, exceptionName: String?, cx: Context, scope: Scriptable): Scriptable {
         val obj: Any?
         val cacheObj: Boolean
         if (t is JavaScriptException) {
             cacheObj = false
             obj = t.value
+        } else if (t is EcmaError) {
+            cacheObj = false
+            obj = ecmaErrorObject(cx, scope, t)
         } else {
             cacheObj = true
             if (lastCatchScope != null) {
@@ -3214,11 +3228,6 @@ public object ScriptRuntime {
                 val type: TopLevel.NativeErrors
                 val errorMsg: String?
                 when (t) {
-                    is EcmaError -> {
-                        re = t
-                        type = TopLevel.NativeErrors.valueOf(t.name)
-                        errorMsg = t.errorMessage
-                    }
                     is WrappedException -> {
                         re = t
                         type = TopLevel.NativeErrors.InternalError

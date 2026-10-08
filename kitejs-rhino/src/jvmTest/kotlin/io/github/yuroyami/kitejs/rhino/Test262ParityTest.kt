@@ -61,6 +61,25 @@ class Test262ParityTest {
      */
     private val knownDifferences = buildMap {
         for (path in listOf(
+            "built-ins/Function/prototype/arguments/prop-desc.js",
+            "built-ins/Function/prototype/bind/BoundFunction_restricted-properties.js",
+            "built-ins/Function/prototype/caller-arguments/accessor-properties.js",
+            "built-ins/Function/prototype/caller/prop-desc.js",
+        )) {
+            put(path, "D-109: modern restricted properties share the realm thrower here")
+        }
+        for (path in listOf(
+            "built-ins/Function/call-bind-this-realm-undef.js",
+        )) {
+            put(path, "D-112: sloppy calls use the callee's own global here")
+        }
+        for (path in listOf(
+            "built-ins/Function/prototype/apply/argarray-not-object-realm.js",
+            "built-ins/Function/prototype/apply/this-not-callable-realm.js",
+        )) {
+            put(path, "D-117: apply validation errors use the built-in execution realm here")
+        }
+        for (path in listOf(
             "language/expressions/arrow-function/ArrowFunction_restricted-properties.js",
             "language/expressions/arrow-function/forbidden-ext/b1/arrow-function-forbidden-ext-direct-access-prop-arguments.js",
             "language/expressions/generators/forbidden-ext/b1/gen-func-expr-forbidden-ext-direct-access-prop-arguments.js",
@@ -1510,6 +1529,36 @@ class Test262ParityTest {
      * entry would read as stale there.
      */
     private val knownStrictDifferences = buildMap {
+        for (path in listOf(
+            "built-ins/Function/15.3.5-1gs.js",
+            "built-ins/Function/15.3.5-2gs.js",
+            "built-ins/Function/15.3.5.4_2-11gs.js",
+            "built-ins/Function/15.3.5.4_2-13gs.js",
+            "built-ins/Function/15.3.5.4_2-15gs.js",
+            "built-ins/Function/15.3.5.4_2-17gs.js",
+            "built-ins/Function/15.3.5.4_2-19gs.js",
+            "built-ins/Function/15.3.5.4_2-1gs.js",
+            "built-ins/Function/15.3.5.4_2-21gs.js",
+            "built-ins/Function/15.3.5.4_2-22gs.js",
+            "built-ins/Function/15.3.5.4_2-23gs.js",
+            "built-ins/Function/15.3.5.4_2-24gs.js",
+            "built-ins/Function/15.3.5.4_2-25gs.js",
+            "built-ins/Function/15.3.5.4_2-26gs.js",
+            "built-ins/Function/15.3.5.4_2-27gs.js",
+            "built-ins/Function/15.3.5.4_2-28gs.js",
+            "built-ins/Function/15.3.5.4_2-29gs.js",
+            "built-ins/Function/15.3.5.4_2-3gs.js",
+            "built-ins/Function/15.3.5.4_2-48gs.js",
+            "built-ins/Function/15.3.5.4_2-50gs.js",
+            "built-ins/Function/15.3.5.4_2-52gs.js",
+            "built-ins/Function/15.3.5.4_2-54gs.js",
+            "built-ins/Function/15.3.5.4_2-5gs.js",
+            "built-ins/Function/15.3.5.4_2-7gs.js",
+            "built-ins/Function/15.3.5.4_2-9gs.js",
+            "built-ins/Function/StrictFunction_restricted-properties.js",
+        )) {
+            put(path, "D-109: strict functions inherit the realm restricted-property accessors here")
+        }
         put("language/statements/for-of/dstr/array-elem-target-simple-strict.js",
             "D-95: arguments is not a strict destructuring assignment target here")
         for (method in listOf("find", "findIndex", "findLast", "findLastIndex")) {

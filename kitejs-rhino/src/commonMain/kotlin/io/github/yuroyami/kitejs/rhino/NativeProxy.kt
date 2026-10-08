@@ -609,12 +609,13 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
                 null as SerializableCallable?, // and may not be called without new.
                 SerializableConstructable { icx, s, args -> constructorImpl(icx, s, args) },
             ) {
-                override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable {
-                    val obj = targetConstructor!!.construct(cx, scope, args) as NativeProxy
+                override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable = cx.withRealm(declarationScope!!) {
+                    val realm = declarationScope!!
+                    val obj = targetConstructor!!.construct(cx, realm, args) as NativeProxy
                     // Assigning through the property would hit the setPrototypeOf trap.
                     obj.setPrototypeDirect(classPrototype)
-                    obj.parentScope = scope
-                    return obj
+                    obj.parentScope = realm
+                    obj
                 }
 
                 /** ProxyCreate never reads newTarget: a proxy has no prototype of its own to give. */

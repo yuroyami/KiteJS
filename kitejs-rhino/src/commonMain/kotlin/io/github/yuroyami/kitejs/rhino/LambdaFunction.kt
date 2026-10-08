@@ -54,7 +54,7 @@ public open class LambdaFunction : BaseFunction {
     }
 
     override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
-        target!!.call(cx, declarationScope!!, thisObj, args)
+        cx.withRealm(declarationScope!!) { target!!.call(cx, declarationScope!!, thisObj, args) }
 
     override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable =
         throw ScriptRuntime.typeErrorById("msg.no.new", functionName)

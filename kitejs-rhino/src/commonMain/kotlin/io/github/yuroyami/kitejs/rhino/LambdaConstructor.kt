@@ -71,20 +71,20 @@ public open class LambdaConstructor : LambdaFunction {
                 (if (targetConstructor != null) CONSTRUCTOR_NEW else 0)
     }
 
-    override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
+    override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? = cx.withRealm(declarationScope!!) {
         if ((flags and CONSTRUCTOR_FUNCTION) == 0) {
             throw ScriptRuntime.typeErrorById("msg.constructor.no.function", functionName)
         }
         val declScope = declarationScope!!
         val t = target
-        return t?.call(cx, declScope, thisObj, args) ?: fireConstructor(cx, declScope, args)
+        return@withRealm t?.call(cx, declScope, thisObj, args) ?: fireConstructor(cx, declScope, args)
     }
 
-    override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable {
+    override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable = cx.withRealm(declarationScope!!) {
         if ((flags and CONSTRUCTOR_NEW) == 0) {
             throw ScriptRuntime.typeErrorById("msg.no.new", functionName)
         }
-        return fireConstructor(cx, declarationScope!!, args)
+        return@withRealm fireConstructor(cx, declarationScope!!, args)
     }
 
     /** A constructor that refuses `new` still has [[Construct]], the way `Symbol` and `BigInt` do. */

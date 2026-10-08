@@ -660,6 +660,7 @@ public class io/github/yuroyami/kitejs/rhino/IdFunctionObject : io/github/yuroya
 	public fun <init> (Lio/github/yuroyami/kitejs/rhino/IdFunctionCall;Ljava/lang/Object;ILjava/lang/String;ILio/github/yuroyami/kitejs/rhino/Scriptable;)V
 	public final fun addAsProperty (Lio/github/yuroyami/kitejs/rhino/Scriptable;)V
 	public fun call (Lio/github/yuroyami/kitejs/rhino/Context;Lio/github/yuroyami/kitejs/rhino/Scriptable;Lio/github/yuroyami/kitejs/rhino/Scriptable;[Ljava/lang/Object;)Ljava/lang/Object;
+	public fun construct (Lio/github/yuroyami/kitejs/rhino/Context;Lio/github/yuroyami/kitejs/rhino/Scriptable;[Ljava/lang/Object;)Lio/github/yuroyami/kitejs/rhino/Scriptable;
 	public fun createObject (Lio/github/yuroyami/kitejs/rhino/Context;Lio/github/yuroyami/kitejs/rhino/Scriptable;)Lio/github/yuroyami/kitejs/rhino/Scriptable;
 	public fun exportAsScopeProperty ()V
 	public fun getArity ()I

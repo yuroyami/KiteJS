@@ -50,7 +50,7 @@ internal class AsyncFunctionDriver(
      * throw, when reading the `constructor` of an awaited promise does, and that throw goes
      * straight back into the body at the same `await`.
      */
-    private fun step(cx: Context, operation: Int, value: Any?) {
+    private fun step(cx: Context, operation: Int, value: Any?) = cx.withRealm(scope) {
         var op = operation
         var v = value
         while (true) {
@@ -58,21 +58,21 @@ internal class AsyncFunctionDriver(
                 Interpreter.resumeAsync(cx, op, savedState, v)
             } catch (e: JavaScriptException) {
                 promise.rejectFromEngine(cx, scope, e.value)
-                return
+                return@withRealm
             } catch (e: EcmaError) {
                 promise.rejectFromEngine(cx, scope, ScriptRuntime.wrapException(e, scope, cx))
-                return
+                return@withRealm
             } catch (e: EvaluatorException) {
                 promise.rejectFromEngine(cx, scope, ScriptRuntime.wrapException(e, scope, cx))
-                return
+                return@withRealm
             }
             if (result !is AwaitRequest) {
                 promise.resolveFromEngine(cx, scope, result)
-                return
+                return@withRealm
             }
             try {
                 NativePromise.await(cx, scope, result.value, onFulfilled, onRejected)
-                return
+                return@withRealm
             } catch (e: JavaScriptException) {
                 v = e.value
             } catch (e: EcmaError) {

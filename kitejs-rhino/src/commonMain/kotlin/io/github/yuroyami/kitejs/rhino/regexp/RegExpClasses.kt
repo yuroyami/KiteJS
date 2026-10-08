@@ -28,10 +28,10 @@ internal class NativeRegExpCallable : NativeRegExp, Function {
     constructor() : super()
 
     override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
-        execSub(cx, scope, args, MATCH)
+        cx.withRealm(parentScope ?: scope) { execSub(cx, scope, args, MATCH) }
 
     override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable =
-        execSub(cx, scope, args, MATCH) as Scriptable
+        cx.withRealm(parentScope ?: scope) { execSub(cx, scope, args, MATCH) as Scriptable }
 }
 
 /** Picks the callable or the plain regexp object, depending on the language version. */

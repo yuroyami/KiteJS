@@ -14,6 +14,9 @@ public open class IdFunctionObject : BaseFunction {
     private val methodIdField: Int
     private val declaredArity: Int
     private var useCallAsConstructor = false
+    /** The current invocation kind; null remains a valid receiver of an ordinary call. */
+    internal var isConstructingCall: Boolean = false
+        private set
     private var name: String? = null
 
     public constructor(idcall: IdFunctionCall, tag: Any?, id: Int, arity: Int) : super() {
@@ -81,7 +84,27 @@ public open class IdFunctionObject : BaseFunction {
         }
 
     override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
-        idcall.execIdCall(this, cx, scope, thisObj, args)
+        invoke(cx, scope, thisObj, args, false)
+
+    override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable {
+        if (!useCallAsConstructor) return super.construct(cx, scope, args)
+        val value = invoke(cx, scope, null, args, true)
+        check(value is Scriptable) { "Bad implementation of call as constructor, name=$functionName" }
+        if (value.prototype == null && value !== classPrototype) value.prototype = classPrototype
+        if (value.parentScope == null && value !== parentScope) value.parentScope = parentScope
+        return value
+    }
+
+    private fun invoke(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>, constructing: Boolean): Any? =
+        cx.withRealm(declarationScope ?: scope) {
+            val previous = isConstructingCall
+            isConstructingCall = constructing
+            try {
+                idcall.execIdCall(this, cx, scope, thisObj, args)
+            } finally {
+                isConstructingCall = previous
+            }
+        }
 
     override fun createObject(cx: Context, scope: Scriptable): Scriptable? {
         if (useCallAsConstructor) return null

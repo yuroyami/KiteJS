@@ -27,6 +27,19 @@ public open class Context internal constructor(public val factory: ContextFactor
     private var sealKey: Any? = null
 
     internal var topCallScope: Scriptable? = null
+    /** Realm of the running script or built-in, independently of the outermost caller. */
+    internal var currentRealm: Scriptable? = null
+
+    internal inline fun <T> withRealm(scope: Scriptable, body: () -> T): T {
+        val previous = currentRealm
+        currentRealm = ScriptableObject.getTopLevelScope(scope)
+        try {
+            return body()
+        } finally {
+            currentRealm = previous
+        }
+    }
+
     internal var isContinuationsTopCall: Boolean = false
     internal var currentActivationCall: NativeCall? = null
     internal var iterating: MutableSet<Scriptable>? = null

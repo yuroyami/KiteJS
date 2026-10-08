@@ -91,7 +91,9 @@ public class LambdaAccessorSlot : Slot {
                 return true
             }
         } else {
-            s.accept(start, value)
+            val cx = Context.getCurrentContext()
+            if (cx == null) s.accept(start, value)
+            else cx.withRealm(setterFunction!!.declarationScope!!) { s.accept(start, value) }
             return true
         }
         // Upstream passes start twice here, not the owner.
@@ -104,7 +106,9 @@ public class LambdaAccessorSlot : Slot {
      */
     override fun getValue(start: Scriptable?): Any? {
         val g = getter ?: return if (setter != null) Undefined.instance else super.getValue(start)
-        return g.apply(start)
+        val cx = Context.getCurrentContext()
+        return if (cx == null) g.apply(start)
+            else cx.withRealm(getterFunction!!.declarationScope!!) { g.apply(start) }
     }
 
     public fun setGetter(scope: Scriptable, getter: ScriptableObject.LambdaGetterFunction?) {

@@ -190,7 +190,7 @@ public class NativeCall : IdScriptableObject {
         if (!f.hasTag(CALL_TAG)) return super.execIdCall(f, cx, scope, thisObj, args)
         val id = f.methodId()
         if (id == Id_constructor) {
-            if (thisObj != null) throw Context.reportRuntimeErrorById("msg.only.from.new", "Call")
+            if (!f.isConstructingCall) throw Context.reportRuntimeErrorById("msg.only.from.new", "Call")
             ScriptRuntime.checkDeprecated(cx, "Call")
             val result = NativeCall()
             result.prototype = getObjectPrototype(scope)

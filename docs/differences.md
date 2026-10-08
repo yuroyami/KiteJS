@@ -148,6 +148,10 @@ strict eval also keeps its `var` and function declarations there. Sloppy direct 
 variables to the calling function, subject to lexical declaration conflicts. `eval?.(...)` is
 indirect and runs in the eval function's global scope.
 
+Engine errors use the intrinsics of the realm whose code raises them. A function handed from
+one global to another can therefore throw an error that belongs to the first global's
+`TypeError`, including when a Promise carries it to the second global.
+
 In ES6 and later, `yield` is an identifier in sloppy code outside generators, as in a browser.
 It is reserved in strict code and acts as an operator only in a generator body. Explicitly
 selecting the pre-ES6 language version preserves Rhino's implicit generators.

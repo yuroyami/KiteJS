@@ -3808,6 +3808,7 @@ open class io.github.yuroyami.kitejs.rhino/IdFunctionObject : io.github.yuroyami
     final fun methodId(): kotlin/Int // io.github.yuroyami.kitejs.rhino/IdFunctionObject.methodId|methodId(){}[0]
     final fun unknown(): kotlin/RuntimeException // io.github.yuroyami.kitejs.rhino/IdFunctionObject.unknown|unknown(){}[0]
     open fun call(io.github.yuroyami.kitejs.rhino/Context, io.github.yuroyami.kitejs.rhino/Scriptable, io.github.yuroyami.kitejs.rhino/Scriptable?, kotlin/Array<kotlin/Any?>): kotlin/Any? // io.github.yuroyami.kitejs.rhino/IdFunctionObject.call|call(io.github.yuroyami.kitejs.rhino.Context;io.github.yuroyami.kitejs.rhino.Scriptable;io.github.yuroyami.kitejs.rhino.Scriptable?;kotlin.Array<kotlin.Any?>){}[0]
+    open fun construct(io.github.yuroyami.kitejs.rhino/Context, io.github.yuroyami.kitejs.rhino/Scriptable, kotlin/Array<kotlin/Any?>): io.github.yuroyami.kitejs.rhino/Scriptable // io.github.yuroyami.kitejs.rhino/IdFunctionObject.construct|construct(io.github.yuroyami.kitejs.rhino.Context;io.github.yuroyami.kitejs.rhino.Scriptable;kotlin.Array<kotlin.Any?>){}[0]
     open fun createObject(io.github.yuroyami.kitejs.rhino/Context, io.github.yuroyami.kitejs.rhino/Scriptable): io.github.yuroyami.kitejs.rhino/Scriptable? // io.github.yuroyami.kitejs.rhino/IdFunctionObject.createObject|createObject(io.github.yuroyami.kitejs.rhino.Context;io.github.yuroyami.kitejs.rhino.Scriptable){}[0]
     open fun exportAsScopeProperty() // io.github.yuroyami.kitejs.rhino/IdFunctionObject.exportAsScopeProperty|exportAsScopeProperty(){}[0]
 }

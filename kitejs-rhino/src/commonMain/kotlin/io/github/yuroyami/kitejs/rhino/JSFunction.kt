@@ -109,11 +109,11 @@ public open class JSFunction(
     internal val constructorCode: JSCode<JSFunction>?
         get() = descriptor.constructor
 
-    override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
+    override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? = cx.withRealm(declarationScope!!) {
         if (descriptor.isClassConstructor) throw ScriptRuntime.typeErrorById("msg.class.not.new", functionName)
-        if (!ScriptRuntime.hasTopCall(cx)) return ScriptRuntime.doTopCall(this, cx, scope, thisObj, args, isStrict)
+        if (!ScriptRuntime.hasTopCall(cx)) return@withRealm ScriptRuntime.doTopCall(this, cx, scope, thisObj, args, isStrict)
         val realThis = getFunctionThis(thisObj)
-        return descriptor.code!!.execute(cx, this, Undefined.instance, scope, realThis, args)
+        return@withRealm descriptor.code!!.execute(cx, this, Undefined.instance, scope, realThis, args)
     }
 
     override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable {
@@ -153,14 +153,16 @@ public open class JSFunction(
      */
     private fun constructClass(cx: Context, scope: Scriptable, args: Array<Any?>, newTarget: Scriptable): Scriptable {
         if (descriptor.isDerivedConstructor) {
-            if (descriptor.isDefaultConstructor) return ClassRuntime.defaultDerivedConstruct(cx, scope, this, args, newTarget)
+            if (descriptor.isDefaultConstructor) return cx.withRealm(declarationScope!!) {
+                ClassRuntime.defaultDerivedConstruct(cx, scope, this, args, newTarget)
+            }
             // The interpreter checks the result against the `this` binding super() filled.
             return descriptor.code!!.execute(cx, this, newTarget, scope, null, args) as Scriptable
         }
         val thisObj = NativeObject()
         thisObj.prototype = AbstractEcmaObjectOperations.getPrototypeFromConstructor(cx, newTarget) { getObjectPrototype(it) }
         thisObj.parentScope = parentScope
-        ClassRuntime.initializeInstanceElements(cx, thisObj, this)
+        cx.withRealm(declarationScope!!) { ClassRuntime.initializeInstanceElements(cx, thisObj, this) }
         if (descriptor.isDefaultConstructor) return thisObj
         val res = descriptor.code!!.execute(cx, this, newTarget, scope, thisObj, args)
         return if (res is Scriptable && ScriptRuntime.isObject(res)) res else thisObj

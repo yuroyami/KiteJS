@@ -230,7 +230,7 @@ internal class AsmExportFunction(
     override val arity: Int get() = fn.paramTypes.size
 
     override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
-        runner.callExport(cx, index, args)
+        cx.withRealm(declarationScope!!) { runner.callExport(cx, index, args) }
 
     override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable =
         throw ScriptRuntime.typeError("${fn.name} is not a constructor")

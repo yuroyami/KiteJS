@@ -214,7 +214,10 @@ public class Interpreter : Evaluator {
         /** The `this` binding of the derived class constructor this frame runs in, or null. */
         var thisBinding: ThisBinding? = null
 
-        constructor(cx: Context, thisObj: Scriptable?, fnOrScript: ScriptOrFn<*>, code: InterpreterData<*>, parentFrame: CallFrame?, previousInterpreterFrame: CallFrame?) {
+        val realm: Scriptable
+
+        constructor(cx: Context, thisObj: Scriptable?, fnOrScript: ScriptOrFn<*>, code: InterpreterData<*>, parentFrame: CallFrame?, previousInterpreterFrame: CallFrame?, realm: Scriptable) {
+            this.realm = realm
             frameIndex = nextFrameIndex(cx, parentFrame, previousInterpreterFrame)
             idata = code
             useActivation = fnOrScript.descriptor!!.requiresActivationFrame
@@ -237,6 +240,7 @@ public class Interpreter : Evaluator {
 
         /** A copy of a frozen frame with its own stack, for resuming a generator. */
         constructor(original: CallFrame, parentFrame: CallFrame?, previousInterpreterFrame: CallFrame?) {
+            realm = original.realm
             if (!original.frozen) throw Kit.codeBug()
             frameIndex = nextFrameIndex(Context.getContext(), parentFrame, previousInterpreterFrame)
             stack = original.stack.copyOf()
@@ -273,6 +277,7 @@ public class Interpreter : Evaluator {
 
         /** A copy that shares the stack arrays, to keep the parent chain right for stack traces. */
         constructor(original: CallFrame, parentFrame: CallFrame?, previousInterpreterFrame: CallFrame?, keepFrozen: Boolean) {
+            realm = original.realm
             if (!original.frozen) throw Kit.codeBug()
             frameIndex = nextFrameIndex(Context.getContext(), parentFrame, previousInterpreterFrame)
             stack = original.stack
@@ -582,11 +587,13 @@ public class Interpreter : Evaluator {
 
         internal fun <T : ScriptOrFn<T>> interpret(ifun: T, idata: InterpreterData<T>, cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>, newTarget: Any?): Any? {
             if (!ScriptRuntime.hasTopCall(cx)) throw Kit.codeBug()
-            cx.checkInterpreterInvocation()
-            // A call from native code, such as a forEach callback or a Promise reaction, is charged
-            // like a call from script, before any frame exists to unwind (D-77).
-            cx.addInstructionCount(INVOCATION_COST)
-            val frame = initFrame(cx, scope, thisObj, ifun.homeObject, args, null, null, 0, args.size, ifun, idata, null, newTarget)
+            val frame = cx.withRealm(ifun.declarationScope ?: scope) {
+                cx.checkInterpreterInvocation()
+                // A call from native code, such as a forEach callback or a Promise reaction, is
+                // charged before any frame exists to unwind (D-77).
+                cx.addInstructionCount(INVOCATION_COST)
+                initFrame(cx, scope, thisObj, ifun.homeObject, args, null, null, 0, args.size, ifun, idata, null, newTarget)
+            }
             frame.isContinuationsTopFrame = cx.isContinuationsTopCall
             cx.isContinuationsTopCall = false
             val result = interpretLoop(cx, frame, null)
@@ -639,7 +646,9 @@ public class Interpreter : Evaluator {
 
         private fun interpretLoop(cx: Context, frameIn: CallFrame?, throwableIn: Any?): Any? {
             val oldFrame = cx.lastInterpreterFrame
+            val oldRealm = cx.currentRealm
             var frame = frameIn!!
+            cx.currentRealm = frame.realm
             var throwable = throwableIn
             cx.interpreterInvocationDepth++
             try {
@@ -659,6 +668,7 @@ public class Interpreter : Evaluator {
                 var interpreterResultDbl = 0.0
 
                 stateLoop@ while (true) {
+                    cx.currentRealm = frame.realm
                     var jsThrowable: Any? = null
                     try {
                         if (throwable != null) {
@@ -737,6 +747,7 @@ public class Interpreter : Evaluator {
                 return if (interpreterResult !== DBL_MRK) interpreterResult else ScriptRuntime.wrapNumber(interpreterResultDbl)
             } finally {
                 cx.lastInterpreterFrame = oldFrame
+                cx.currentRealm = oldRealm
                 cx.interpreterInvocationDepth--
             }
         }
@@ -781,7 +792,9 @@ public class Interpreter : Evaluator {
                         // so a TypeError from the check is thrown where `new` was, and no catch
                         // in the constructor sees it.
                         try {
-                            result = ClassRuntime.derivedConstructResult(if (result === DBL_MRK) ScriptRuntime.wrapNumber(frame.resultDbl) else result, binding)
+                            result = cx.withRealm(newFrame.realm) {
+                                ClassRuntime.derivedConstructResult(if (result === DBL_MRK) ScriptRuntime.wrapNumber(frame.resultDbl) else result, binding)
+                            }
                         } catch (ex: Throwable) {
                             newFrame.savedCallOp = 0
                             return NewState.ThrowableResult(newFrame, ex)
@@ -2062,30 +2075,32 @@ public class Interpreter : Evaluator {
                 if (fun_ is KnownBuiltInFunction) {
                     val kfun = fun_
                     if (BaseFunction.isApplyOrCall(kfun)) {
-                        fun_ = ScriptRuntime.getCallable(funThisObj)
-                        funThisObj = getApplyThis(cx, stack, sDbl, boundArgs, state.stackTop + 1, state.indexReg, fun_ as Function)
-                        if (BaseFunction.isApply(kfun)) {
-                            val callArgs = when {
-                                blen > 1 -> ScriptRuntime.getApplyArguments(cx, boundArgs!![1])
-                                state.indexReg < 2 -> ScriptRuntime.emptyArgs
-                                else -> ScriptRuntime.getApplyArguments(cx, stack[state.stackTop - blen + 2])
+                        cx.withRealm(kfun.declarationScope!!) {
+                            fun_ = ScriptRuntime.getCallable(funThisObj)
+                            funThisObj = getApplyThis(cx, stack, sDbl, boundArgs, state.stackTop + 1, state.indexReg, fun_ as Function)
+                            if (BaseFunction.isApply(kfun)) {
+                                val callArgs = when {
+                                    blen > 1 -> ScriptRuntime.getApplyArguments(cx, boundArgs!![1])
+                                    state.indexReg < 2 -> ScriptRuntime.emptyArgs
+                                    else -> ScriptRuntime.getApplyArguments(cx, stack[state.stackTop - blen + 2])
+                                }
+                                boundArgs = callArgs
+                                blen = callArgs.size
+                                state.indexReg = callArgs.size
+                            } else if (state.indexReg > 0) {
+                                if (state.indexReg > 1 && blen == 0) {
+                                    stack.copyInto(stack, state.stackTop + 1, state.stackTop + 2, state.stackTop + 1 + state.indexReg)
+                                    sDbl.copyInto(sDbl, state.stackTop + 1, state.stackTop + 2, state.stackTop + 1 + state.indexReg)
+                                } else if (state.indexReg > 1) {
+                                    val newBArgs = boundArgs!!.copyOfRange(1, boundArgs.size)
+                                    boundArgs = newBArgs
+                                    blen = newBArgs.size
+                                } else {
+                                    boundArgs = arrayOfNulls(0)
+                                    blen = 0
+                                }
+                                state.indexReg--
                             }
-                            boundArgs = callArgs
-                            blen = callArgs.size
-                            state.indexReg = callArgs.size
-                        } else if (state.indexReg > 0) {
-                            if (state.indexReg > 1 && blen == 0) {
-                                stack.copyInto(stack, state.stackTop + 1, state.stackTop + 2, state.stackTop + 1 + state.indexReg)
-                                sDbl.copyInto(sDbl, state.stackTop + 1, state.stackTop + 2, state.stackTop + 1 + state.indexReg)
-                            } else if (state.indexReg > 1) {
-                                val newBArgs = boundArgs!!.copyOfRange(1, boundArgs.size)
-                                boundArgs = newBArgs
-                                blen = newBArgs.size
-                            } else {
-                                boundArgs = arrayOfNulls(0)
-                                blen = 0
-                            }
-                            state.indexReg--
                         }
                     } else {
                         break
@@ -2114,7 +2129,7 @@ public class Interpreter : Evaluator {
                 }
             }
             if (fun_ is JSFunction && fun_.descriptor.isClassConstructor) {
-                throw ScriptRuntime.typeErrorById("msg.class.not.new", fun_.functionName)
+                cx.withRealm(fun_.declarationScope!!) { throw ScriptRuntime.typeErrorById("msg.class.not.new", fun_.functionName) }
             }
             if (fun_ is JSFunction && fun_.descriptor.code is InterpreterData<*>) {
                 val ifun = fun_
@@ -2126,7 +2141,9 @@ public class Interpreter : Evaluator {
                 val asm = idata.asmModule
                 if (asm != null) {
                     val moduleArgs = getArgsArray(stack, sDbl, boundArgs, blen, state.stackTop + 1, state.indexReg)
-                    val exports = io.github.yuroyami.kitejs.rhino.asm.AsmLink.link(cx, calleeScope, asm, moduleArgs, ifun.isStrict)
+                    val exports = cx.withRealm(ifun.declarationScope!!) {
+                        io.github.yuroyami.kitejs.rhino.asm.AsmLink.link(cx, calleeScope, asm, moduleArgs, ifun.isStrict)
+                    }
                     if (exports != null) {
                         frame.savedCallOp = op
                         frame.savedStackTop = state.stackTop
@@ -2170,11 +2187,13 @@ public class Interpreter : Evaluator {
                 }
                 // A derived class constructor has no `this` until it calls super(); a base class
                 // puts its fields on the new object before the body runs.
-                val newInstance = when {
-                    isClass && f.descriptor.isDerivedConstructor -> null
-                    isClass -> f.createObject(cx, frame.scope!!)!!.also { ClassRuntime.initializeInstanceElements(cx, it, f) }
-                    f.homeObject == null -> f.createObject(cx, frame.scope!!)
-                    else -> null
+                val newInstance = cx.withRealm(f.declarationScope!!) {
+                    when {
+                        isClass && f.descriptor.isDerivedConstructor -> null
+                        isClass -> f.createObject(cx, frame.scope!!)!!.also { ClassRuntime.initializeInstanceElements(cx, it, f) }
+                        f.homeObject == null -> f.createObject(cx, frame.scope!!)
+                        else -> null
+                    }
                 }
                 val calleeFrame = initFrame(
                     cx, frame.scope!!, newInstance, newInstance, frame.stack, frame.sDbl, null,
@@ -2312,8 +2331,8 @@ public class Interpreter : Evaluator {
             boundArgs: Array<Any?>?, argShift: Int, argCount: Int, fnOrScript: T, code: InterpreterData<T>, parentFrame: CallFrame?,
             newTarget: Any?,
             previousInterpreterFrame: CallFrame? = if (parentFrame == null) cx.lastInterpreterFrame as CallFrame? else parentFrame.previousInterpreterFrame,
-        ): CallFrame {
-            val frame = CallFrame(cx, thisObj, fnOrScript, code, parentFrame, previousInterpreterFrame)
+        ): CallFrame = cx.withRealm(fnOrScript.declarationScope ?: callerScope) {
+            val frame = CallFrame(cx, thisObj, fnOrScript, code, parentFrame, previousInterpreterFrame, cx.currentRealm!!)
             val desc = fnOrScript.descriptor!!
             when {
                 desc.functionType == FunctionNode.ARROW_FUNCTION -> {
@@ -2345,7 +2364,7 @@ public class Interpreter : Evaluator {
                 }
             }
             enterFrame(cx, frame, args, false)
-            return frame
+            frame
         }
 
         /** GetThisBinding: in a derived class constructor, a ReferenceError until super() runs. */

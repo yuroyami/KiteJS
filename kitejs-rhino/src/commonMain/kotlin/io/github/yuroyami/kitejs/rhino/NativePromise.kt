@@ -42,7 +42,7 @@ public class NativePromise : ScriptableObject() {
         fulfillReactions = ArrayList()
         if (rejectReactions.isNotEmpty()) rejectReactions = ArrayList()
         state = State.FULFILLED
-        for (r in reactions) cx.enqueueMicrotask(Context.Runnable { r.invoke(cx, scope, value) })
+        for (r in reactions) enqueueReaction(cx, scope, r, value)
         return Undefined.instance
     }
 
@@ -54,7 +54,7 @@ public class NativePromise : ScriptableObject() {
         if (fulfillReactions.isNotEmpty()) fulfillReactions = ArrayList()
         state = State.REJECTED
         cx.unhandledPromiseTracker.promiseRejected(this)
-        for (r in reactions) cx.enqueueMicrotask(Context.Runnable { r.invoke(cx, scope, reason) })
+        for (r in reactions) enqueueReaction(cx, scope, r, reason)
         if (reactions.isNotEmpty()) markHandled(cx)
         return Undefined.instance
     }
@@ -88,14 +88,37 @@ public class NativePromise : ScriptableObject() {
             }
             State.FULFILLED -> {
                 val value = result
-                cx.enqueueMicrotask(Context.Runnable { fulfillReaction.invoke(cx, scope, value) })
+                enqueueReaction(cx, scope, fulfillReaction, value)
             }
             State.REJECTED -> {
                 markHandled(cx)
                 val value = result
-                cx.enqueueMicrotask(Context.Runnable { rejectReaction.invoke(cx, scope, value) })
+                enqueueReaction(cx, scope, rejectReaction, value)
             }
         }
+    }
+
+    /** Capture the job realm now: revoking a handler after enqueueing must not change it. */
+    private fun jobRealm(cx: Context, scope: Scriptable, handler: Callable?): Scriptable {
+        val fallback = cx.currentRealm ?: getTopLevelScope(scope)
+        if (handler !is Scriptable) return fallback
+        return try {
+            AbstractEcmaObjectOperations.getFunctionRealm(cx, handler)
+        } catch (_: EcmaError) {
+            // NewPromiseReactionJob and NewPromiseResolveThenableJob use the current realm
+            // when GetFunctionRealm throws, as it does for an already-revoked proxy.
+            fallback
+        }
+    }
+
+    private fun enqueueReaction(cx: Context, scope: Scriptable, reaction: Reaction, value: Any?) {
+        val realm = jobRealm(cx, scope, reaction.handler)
+        cx.enqueueMicrotask(Context.Runnable { cx.withRealm(realm) { reaction.invoke(cx, realm, value) } })
+    }
+
+    private fun enqueueThenable(cx: Context, scope: Scriptable, resolution: Any?, thenFunc: Callable) {
+        val realm = jobRealm(cx, scope, thenFunc)
+        cx.enqueueMicrotask(Context.Runnable { cx.withRealm(realm) { callThenable(cx, realm, resolution, thenFunc) } })
     }
 
     /** The Promise Resolve Thenable Job: hand our own resolvers to someone else's `then`. */
@@ -158,7 +181,7 @@ public class NativePromise : ScriptableObject() {
         if (thenObj !is Callable) return fulfillPromise(cx, scope, resolution)
 
         // A thenable is adopted through a microtask, never synchronously.
-        cx.enqueueMicrotask(Context.Runnable { callThenable(cx, scope, resolution, thenObj) })
+        enqueueThenable(cx, scope, resolution, thenObj)
         return Undefined.instance
     }
 
@@ -500,7 +523,7 @@ public class NativePromise : ScriptableObject() {
                 if (promise.state == State.PENDING) {
                     if (then !is Callable) return false
                     // NewPromiseResolveThenableJob, handed the `then` already read.
-                    cx.enqueueMicrotask(Context.Runnable { promise.callThenable(cx, top, value, then) })
+                    promise.enqueueThenable(cx, top, value, then)
                 }
             }
             promise.addReactions(
@@ -758,25 +781,11 @@ public class NativePromise : ScriptableObject() {
                 ScriptRuntime.getPropAndThis(promise, "then", cx, scope)!!.call(cx, scope, arrayOf<Any?>(reasonThrower))
             })
 
-        /** The value a rejection carries: the thrown value itself, or a fresh error object. */
+        /** The thrown value, or the intrinsic error object retained by an engine exception. */
         private fun getErrorObject(cx: Context, scope: Scriptable, re: RhinoException): Any? {
             if (re is JavaScriptException) return re.value
-
-            var constructor = TopLevel.NativeErrors.Error
-            if (re is EcmaError) {
-                constructor = when (re.name) {
-                    "EvalError" -> TopLevel.NativeErrors.EvalError
-                    "RangeError" -> TopLevel.NativeErrors.RangeError
-                    "ReferenceError" -> TopLevel.NativeErrors.ReferenceError
-                    "SyntaxError" -> TopLevel.NativeErrors.SyntaxError
-                    "TypeError" -> TopLevel.NativeErrors.TypeError
-                    "URIError" -> TopLevel.NativeErrors.URIError
-                    "InternalError" -> TopLevel.NativeErrors.InternalError
-                    "JavaException" -> TopLevel.NativeErrors.JavaException
-                    else -> constructor
-                }
-            }
-            return ScriptRuntime.newNativeError(cx, scope, constructor, arrayOf<Any?>(re.message))
+            if (re is EcmaError) return ScriptRuntime.wrapException(re, scope, cx)
+            return ScriptRuntime.newNativeError(cx, scope, TopLevel.NativeErrors.Error, arrayOf<Any?>(re.message))
         }
     }
 }

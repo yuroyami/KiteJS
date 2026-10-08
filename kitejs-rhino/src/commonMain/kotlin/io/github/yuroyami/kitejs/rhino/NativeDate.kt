@@ -115,7 +115,7 @@ internal class NativeDate private constructor() : IdScriptableObject() {
             ConstructorId_UTC -> return ScriptRuntime.wrapNumber(jsStaticFunction_UTC(args))
             Id_constructor -> {
                 // Called as a plain function, Date just prints the current time.
-                if (thisObj != null) return date_format(cx, now(cx), Id_toString)
+                if (!f.isConstructingCall) return date_format(cx, now(cx), Id_toString)
                 return jsConstructor(cx, args)
             }
             Id_toJSON -> {

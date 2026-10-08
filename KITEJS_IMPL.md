@@ -1014,6 +1014,31 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   patterns, rest, arrows, methods, constructors, generators and async functions. The parity
   producer now runs default-arg feature tests instead of excluding them.
 
+- D-117: Engine errors retain the realm of the execution context that raises them (#88).
+  Interpreter frames keep their realm through calls, unwinding, generators and async resumes;
+  built-in calls, optimized apply/call paths and native accessor callbacks temporarily enter
+  their own realm and restore the previous one. Bound/proxy target calls enter the target's
+  realm, while revoked-proxy and invariant errors use the context performing the operation.
+  Derived-constructor return checks run after removing the constructor context, in the caller's
+  realm. Promise reaction and thenable jobs capture GetFunctionRealm when queued, use the
+  current realm if it throws, and enter that saved realm when invoked. Resolving functions and
+  proxy argument arrays created in a job belong to its realm. Catch clauses, host conversion,
+  async rejection and Promise reactions share one
+  intrinsic error object per EcmaError, preserving its message, stack and throwing realm even
+  when global error bindings are replaced. ToObject rejects both undefined representations;
+  call receiver conversion still keeps undefined distinct from null. ErrorRealmTest pins 99
+  fixed Node/V8 controls, and ErrorRealmHostTest covers native accessors, host reentry and
+  retained error identity after unwinding.
+
+- D-118: IdFunctionObject tracks [[Call]] versus [[Construct]] explicitly, restoring that
+  invocation kind across reentry and throws (#134). Its constructor callback still receives
+  null for compatibility, while an ordinary call can also receive null without being treated
+  as construction. NativeDate uses the invocation kind: Date.call/apply/bind/Reflect.apply with
+  null return a current-time string and ignore argument coercion; construction creates the
+  Date from its arguments. The legacy Call extension also requires a construction invocation.
+  DateInvocationTest pins 70 fixed Node/V8 controls for receivers, binding, proxies, newTarget,
+  coercion and reentry; IdInvocationTest checks callback compatibility and kind restoration.
+
 ## Phases
 
 | Phase | Deliverable | Done when |

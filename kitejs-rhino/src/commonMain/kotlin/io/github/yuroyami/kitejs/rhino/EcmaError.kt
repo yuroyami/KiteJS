@@ -21,6 +21,10 @@ public class EcmaError internal constructor(
     columnNumber: Int,
 ) : RhinoException() {
 
+    /** Keep the throwing execution context even after its frame has unwound. */
+    internal val errorRealm: Scriptable? = Context.getCurrentContext()?.let { it.currentRealm ?: it.topCallScope }
+    internal var errorObject: Scriptable? = null
+
     init {
         recordErrorOrigin(sourceName, lineNumber, lineSource, columnNumber)
     }
