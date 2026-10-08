@@ -121,6 +121,7 @@ public class Parser(
     private var inDestructuringAssignment = false
 
     internal var inUseStrictDirective = false
+    private var inFunctionParameters = false
 
     // The following are per function variables, saved and restored around function parsing.
     // See PerFunctionVariables below.
@@ -969,8 +970,15 @@ public class Parser(
         var memberExprNode: AstNode? = null
 
         do {
-            if (matchToken(Token.NAME, true) || matchToken(Token.UNDEFINED, true)) {
-                name = rejectEscapedReservedWord(createNameNode(true, Token.NAME))
+            val yieldNameAllowed = type == FunctionNode.FUNCTION_EXPRESSION && !isGenerator &&
+                !inUseStrictDirective && compilerEnv.languageVersion >= Context.VERSION_ES6
+            if (matchToken(Token.NAME, true) || matchToken(Token.UNDEFINED, true) ||
+                yieldNameAllowed && matchToken(Token.YIELD, true)
+            ) {
+                name = createNameNode(true, Token.NAME)
+                // An ordinary function expression's own name uses Yield=false even when the
+                // enclosing function is a generator; declarations use the surrounding grammar.
+                if (!(yieldNameAllowed && name.identifier == "yield")) rejectEscapedReservedWord(name)
                 if (inUseStrictDirective) {
                     val id = name.identifier
                     if ("eval" == id || "arguments" == id) {
@@ -1026,6 +1034,11 @@ public class Parser(
         if (isAsync && type == FunctionNode.FUNCTION_EXPRESSION && "await" == name?.identifier) {
             reportError("msg.reserved.id", "await")
         }
+        // A generator expression's own name is in its generator grammar context. A
+        // declaration's name instead belongs to the surrounding context.
+        if (isGenerator && type == FunctionNode.FUNCTION_EXPRESSION && "yield" == name?.identifier) {
+            reportError("msg.reserved.id", "yield")
+        }
 
         val fnNode = FunctionNode(functionSourceStart, name)
         fnNode.isMethodDefinition = isMethodDefiniton
@@ -1058,7 +1071,9 @@ public class Parser(
         inStaticBlock = false
         try {
             awaitContext = if (isAsync) AWAIT_IN_PARAMS else AWAIT_NAME
+            inFunctionParameters = true
             parseFunctionParams(fnNode)
+            inFunctionParameters = false
             awaitContext = if (isAsync) AWAIT_OPERATOR else AWAIT_NAME
             val body = parseFunctionBody(type, fnNode)
             fnNode.body = body
@@ -2366,6 +2381,11 @@ public class Parser(
         // initializer is no generator (ECMAScript 2022, 15.7.1).
         if (tt == Token.RETURN && inStaticBlock) reportError("msg.bad.return")
         if (tt == Token.YIELD && inClassInitializer) reportError("msg.bad.yield")
+        if (tt == Token.YIELD && compilerEnv.languageVersion >= Context.VERSION_ES6 &&
+            (inFunctionParameters || (currentScriptOrFn as? FunctionNode)?.isES6Generator != true)
+        ) {
+            reportError("msg.bad.yield")
+        }
         // An async function is no generator, so it cannot yield (ECMAScript 2017, 14.7).
         if (tt == Token.YIELD && insideFunctionBody() && (currentScriptOrFn as FunctionNode).isAsyncFunction) {
             reportError("msg.async.yield")
@@ -5223,6 +5243,10 @@ public class Parser(
      * belongs (ECMAScript 2015, 11.6.2). It scans as a name so that it can still name a property.
      */
     private fun rejectEscapedReservedWord(pos: Int, word: String?) {
+        // A token after a directive may have been scanned before strict mode took effect.
+        if (word == "yield" && inUseStrictDirective && compilerEnv.languageVersion >= Context.VERSION_ES6) {
+            reportError("msg.reserved.id", word)
+        }
         if (ts.escapedReservedWords.contains(pos) ||
             ("yield" == word && ts.escapedNames.contains(pos) &&
                 (currentScriptOrFn as? FunctionNode)?.isES6Generator == true)
@@ -5510,6 +5534,7 @@ public class Parser(
         private val savedCurrentScope: Scope?
         private val savedEndFlags: Int
         private val savedInForInit: Boolean
+        private val savedInFunctionParameters: Boolean
         private val savedLabelSet: MutableMap<String, LabeledStatement>?
         private val savedLoopSet: MutableList<Loop>?
         private val savedLoopAndSwitchSet: MutableList<Jump>?
@@ -5537,6 +5562,9 @@ public class Parser(
             savedInForInit = this@Parser.inForInit
             this@Parser.inForInit = false
 
+            savedInFunctionParameters = this@Parser.inFunctionParameters
+            this@Parser.inFunctionParameters = false
+
             // The current value is inherited on purpose.
             savedHasUndefinedBeenRedefined = this@Parser.hasUndefinedBeenRedefined
         }
@@ -5549,6 +5577,7 @@ public class Parser(
             this@Parser.loopAndSwitchSet = savedLoopAndSwitchSet
             this@Parser.endFlags = savedEndFlags
             this@Parser.inForInit = savedInForInit
+            this@Parser.inFunctionParameters = savedInFunctionParameters
             this@Parser.hasUndefinedBeenRedefined = savedHasUndefinedBeenRedefined
         }
     }

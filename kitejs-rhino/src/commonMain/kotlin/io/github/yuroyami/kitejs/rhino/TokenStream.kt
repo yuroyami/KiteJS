@@ -6,6 +6,7 @@ package io.github.yuroyami.kitejs.rhino
 
 import io.github.yuroyami.kitejs.api.KBigInt
 import io.github.yuroyami.kitejs.api.dtoa.DecimalParser
+import io.github.yuroyami.kitejs.rhino.ast.FunctionNode
 
 /**
  * This class implements the JavaScript scanner.
@@ -440,6 +441,14 @@ internal class TokenStream(
                         parser.compilerEnv.languageVersion,
                         parser.inUseStrictDirective,
                     )
+                    // ES2015's Yield grammar parameter belongs to the current function. Only
+                    // legacy language versions infer a generator from yield in an ordinary body.
+                    if (result == Token.YIELD && parser.compilerEnv.languageVersion >= Context.VERSION_ES6 &&
+                        !parser.inUseStrictDirective &&
+                        (parser.currentScriptOrFn as? FunctionNode)?.isES6Generator != true
+                    ) {
+                        result = Token.EOF
+                    }
                     if (result != Token.EOF && containsEscape) {
                         // A keyword spelled with an escape is no keyword (ECMAScript 2015,
                         // 11.6.2): it is a name, fine as a property name and an error as an

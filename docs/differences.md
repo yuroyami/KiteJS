@@ -137,8 +137,11 @@ elements than the iterable has, never calls the iterator's `return` method, so a
 A parameter default runs in the body's scope, so it cannot read `arguments` and a closure made
 in it sees the body's `var`s. A function declared inside a block belongs to the whole enclosing
 function, in strict code too, and a `for (let ...)` body's function sees the last value of the
-loop variable. In sloppy code `yield` outside a generator is still a keyword. Code that avoids
-these corners runs the same as in a browser.
+loop variable. Code that avoids these corners runs the same as in a browser.
+
+In ES6 and later, `yield` is an identifier in sloppy code outside generators, as in a browser.
+It is reserved in strict code and acts as an operator only in a generator body. Explicitly
+selecting the pre-ES6 language version preserves Rhino's implicit generators.
 
 ## Things that work here and not in a browser
 

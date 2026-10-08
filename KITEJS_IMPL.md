@@ -750,7 +750,7 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   there is async code (#12), arrow rest parameters (#71) and gaps plain functions share, each
   filed as an issue of its own: rest elements, rest properties and computed keys in patterns
   (#81), iterator closing (#83), the parameter
-  scope (#84), block-scoped functions (#85), `yield` as an identifier (#86), the restricted
+  scope (#84), block-scoped functions (#85), the restricted
   `caller` and `arguments` (#87), errors made in the catching realm (#88) and WeakRef (#89). The
   error messages the class syntax and these early errors need are the port's own, worded after
   V8's, and the one upstream key whose check widened (`msg.default.args.use.strict`) keeps its
@@ -896,6 +896,13 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   key without replaying key expressions. Accessors requiring function expressions, including
   arrow getters, are restored through `Object.defineProperty`. Ordinary function and arrow data
   values keep expression syntax. `UnevalObjectTest` checks round trips and serialization effects.
+- D-107: in ES6 and later, `yield` is an identifier in sloppy code outside generator
+  functions (#86). The scanner uses the current function's grammar context; strict directives
+  are checked even when the next token was scanned before the directive took effect. Generator
+  expressions reserve their own name, ordinary function expressions reset that restriction,
+  and yield expressions are rejected in generator parameters. Explicit pre-ES6 versions retain
+  implicit generators. `YieldIdentifierTest` pins 52 modern cases against Node 26.10.0 and checks
+  the legacy boundary; the token-position oracle records the deliberate identifier token.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
