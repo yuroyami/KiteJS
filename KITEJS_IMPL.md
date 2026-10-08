@@ -958,6 +958,17 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   BareCallThisTest pins Node controls and exercises host calls, foreign realms, async/generator
   functions, asm parity and the explicit old undefined/null compatibility feature. Primitive
   receiver boxing (#78) and Reflect.apply's argument conversion (#47) remain separate issues.
+- D-113: In modern sloppy code, let is a contextual name rather than an unconditional keyword
+  (#92). Non-consuming lookahead recognizes lexical declarations only in declaration contexts
+  and for heads, across comments, line terminators, escapes and Unicode identifiers. Expression
+  statements retain the negative lookahead for let [, and unparenthesized/unescaped let heads
+  remain forbidden in for-of. Relational uses, for-in, ordinary bindings, parameters, labels,
+  shorthand properties and function names work as names. Lexical bindings cannot be named let;
+  strict code and a function's own strict directive reject identifier uses. Pre-ES6 modes retain
+  legacy let expressions/blocks. New let diagnostics validate only matched binding names, avoiding extra
+  diagnostics from a stale keyword string. LetIdentifierTest pins 135 Node evaluation/syntax
+  controls and checks the legacy extension; lexer position and diagnostic oracle tests document
+  the exact modern changes while retaining their other comparisons.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

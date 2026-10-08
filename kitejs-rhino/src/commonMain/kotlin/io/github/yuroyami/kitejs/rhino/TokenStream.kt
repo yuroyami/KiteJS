@@ -178,7 +178,7 @@ internal class TokenStream(
                 "true" -> Token.TRUE
                 // Non ReservedWord, but Non IdentifierName in strict mode code.
                 // 12.1.1 Static Semantics: Early Errors
-                "let" -> Token.LET
+                "let" -> if (isStrict) Token.LET else 0
                 "static" -> if (isStrict) Token.RESERVED else 0
                 else -> 0
             }
@@ -1785,6 +1785,53 @@ internal class TokenStream(
         if (after >= sourceEnd) return true
         val c = sourceString[after].code
         return !(c == '$'.code || c == '_'.code || c == '\\'.code || Characters.isUnicodeIdentifierPart(c))
+    }
+
+    /** Non-consuming lookahead for contextual `let`, including comments and line terminators. */
+    internal fun lexicalBindingFollows(from: Int, allowNameOrObject: Boolean): Boolean {
+        var i = from
+        var cleanLine = false // The `let` just scanned already dirtied its line.
+        while (i < sourceEnd) {
+            val c = sourceString[i].code
+            when {
+                ScriptRuntime.isJSLineTerminator(c) -> { cleanLine = true; i++ }
+                isJSSpace(c) || isJSFormatChar(c) -> i++
+                sourceString.startsWith("/*", i) -> {
+                    val close = sourceString.indexOf("*/", i + 2)
+                    if (close < 0) return false
+                    for (j in i + 2 until close) {
+                        if (ScriptRuntime.isJSLineTerminator(sourceString[j].code)) cleanLine = true
+                    }
+                    i = close + 2
+                }
+                sourceString.startsWith("//", i) || sourceString.startsWith("<!--", i) ||
+                    (cleanLine && sourceString.startsWith("-->", i)) -> {
+                    while (i < sourceEnd && !ScriptRuntime.isJSLineTerminator(sourceString[i].code)) i++
+                }
+                else -> break
+            }
+        }
+        if (i >= sourceEnd) return false
+        // `let [` cannot begin an ExpressionStatement, including in a Statement-only context.
+        if (sourceString[i] == '[') return true
+        if (!allowNameOrObject) return false
+        if (sourceString[i] == '{' || sourceString[i] == '\\') return true
+        val first = Characters.codePointAt(sourceString, i)
+        if (first != '$'.code && first != '_'.code && !Characters.isUnicodeIdentifierStart(first)) return false
+        val start = i
+        i += if (first > 0xffff) 2 else 1
+        while (i < sourceEnd) {
+            val c = Characters.codePointAt(sourceString, i)
+            if (c == '\\'.code) return true // Actual scanning validates the escaped identifier.
+            if (c != '$'.code && c != '_'.code && c != 0x200c && c != 0x200d &&
+                !Characters.isUnicodeIdentifierPart(c)) break
+            i += if (c > 0xffff) 2 else 1
+        }
+        return when (stringToKeyword(sourceString.substring(start, i), parser.compilerEnv.languageVersion,
+            parser.inUseStrictDirective)) {
+            Token.EOF, Token.LET, Token.YIELD, Token.UNDEFINED -> true
+            else -> false
+        }
     }
 
     private var lastLineEnd = 0

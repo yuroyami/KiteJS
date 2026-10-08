@@ -143,6 +143,10 @@ In ES6 and later, `yield` is an identifier in sloppy code outside generators, as
 It is reserved in strict code and acts as an operator only in a generator body. Explicitly
 selecting the pre-ES6 language version preserves Rhino's implicit generators.
 
+`let` is also an ordinary identifier in modern sloppy code wherever it does not begin a lexical
+declaration. Line breaks, comments and escaped names follow the browser grammar. Strict code
+reserves it; explicit pre-ES6 modes retain Rhino's older `let (...)` expressions and blocks.
+
 ## Things that work here and not in a browser
 
 In ES6 and later, sloppy ordinary functions retain Rhino's legacy `arity` and `arguments`

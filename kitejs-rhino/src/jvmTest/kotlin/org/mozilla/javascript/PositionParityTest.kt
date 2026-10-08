@@ -44,11 +44,14 @@ class PositionParityTest {
      * Tokens the port lexes differently on purpose, by source and token index: a keyword spelled
      * with an escape is a name (ECMAScript 2015, 11.6.2), `class` is a keyword of its own now
      * that the port parses classes (D-95), and `await` is a name the parser makes a keyword inside
-     * async functions (D-97). yield is a name in sloppy code outside a generator (D-107).
+     * async functions (D-97). yield is a name in sloppy code outside a generator (D-107), and
+     * let is contextual in sloppy code (D-113).
      */
     private val intended = mapOf(
         ("\\u0069f \\u0041bc" to 0) to io.github.yuroyami.kitejs.rhino.Token.NAME,
+        ("let x = 5" to 0) to io.github.yuroyami.kitejs.rhino.Token.NAME,
         ("if else class let await yield undefined" to 2) to io.github.yuroyami.kitejs.rhino.Token.CLASS,
+        ("if else class let await yield undefined" to 3) to io.github.yuroyami.kitejs.rhino.Token.NAME,
         ("if else class let await yield undefined" to 4) to io.github.yuroyami.kitejs.rhino.Token.NAME,
         ("if else class let await yield undefined" to 5) to io.github.yuroyami.kitejs.rhino.Token.NAME,
     )

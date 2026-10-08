@@ -219,8 +219,8 @@ class TokenStreamTest {
     @Test
     fun es6Keywords() {
         assertEquals(
-            // await and yield are names outside their async/generator grammar contexts.
-            listOf(Token.IF, Token.ELSE, Token.CLASS, Token.LET, Token.NAME, Token.NAME),
+            // let, await and yield are contextual names in ordinary sloppy code.
+            listOf(Token.IF, Token.ELSE, Token.CLASS, Token.NAME, Token.NAME, Token.NAME),
             tokens("if else class let await yield"),
         )
         assertEquals(listOf(Token.NAME, Token.NAME), tokens("letx ifx"))
@@ -234,6 +234,7 @@ class TokenStreamTest {
 
         val strict = lexer("static", strict = true)
         assertEquals(Token.RESERVED, strict.getToken())
+        assertEquals(Token.LET, lexer("let", strict = true).getToken())
     }
 
     @Test

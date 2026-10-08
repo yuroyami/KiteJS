@@ -60,6 +60,12 @@ class Test262ParityTest {
      * this test says so rather than quietly passing.
      */
     private val knownDifferences = buildMap {
+        for (initializers in listOf("with-initialisers", "without-initialisers")) {
+            for (position in listOf("if-expression-statement-else-statement", "if-expression-statement", "label-statement")) {
+                put("language/statements/let/syntax/$initializers-in-statement-positions-$position.js",
+                    "D-113: lexical declarations are rejected in Statement-only contexts here")
+            }
+        }
         put("built-ins/Array/prototype/methods-called-as-functions.js",
             "D-112: extracted array methods receive undefined here")
         for (path in listOf(
@@ -1115,6 +1121,10 @@ class Test262ParityTest {
      * strict mode they agree, so a file-wide entry would read as stale there.
      */
     private val knownSloppyDifferences = buildMap {
+        for (loop in listOf("for-in", "for-of")) {
+            put("language/statements/$loop/let-array-with-newline.js",
+                "D-113: let [ remains forbidden as an expression statement across a newline here")
+        }
         for (state in listOf("fulfilled", "rejected")) {
             put("built-ins/Promise/prototype/then/rxn-handler-$state-invoke-nonstrict.js",
                 "D-112: sloppy Promise handlers substitute their own global here")
@@ -1180,6 +1190,8 @@ class Test262ParityTest {
      * entry would read as stale there.
      */
     private val knownStrictDifferences = buildMap {
+        put("language/statements/for-of/dstr/array-elem-target-simple-strict.js",
+            "D-95: arguments is not a strict destructuring assignment target here")
         for (method in listOf("find", "findIndex", "findLast", "findLastIndex")) {
             put("built-ins/Array/prototype/$method/predicate-call-this-strict.js",
                 "D-112: callbacks use the callee's own strictness and realm here")

@@ -1571,15 +1571,17 @@ public class Parser(
             Token.DEFAULT -> pn = defaultXmlNamespace()
 
             Token.NAME -> {
-                if (asyncFunctionFollows()) {
-                    // A declaration, which no single-statement context takes, Annex B's `if`
-                    // clause and label included (ECMAScript 2017, 13.1).
-                    if (!inStatementListItem) reportError("msg.async.decl.not.in.block")
-                    return asyncFunction(FunctionNode.FUNCTION_EXPRESSION_STATEMENT)
-                }
-                pn = nameOrLabel()
-                if (pn !is ExpressionStatement) {
-                    return pn // LabeledStatement
+                if (letDeclarationFollows()) {
+                    pn = letStatement()
+                } else {
+                    if (asyncFunctionFollows()) {
+                        // A declaration, which no single-statement context takes, Annex B's `if`
+                        // clause and label included (ECMAScript 2017, 13.1).
+                        if (!inStatementListItem) reportError("msg.async.decl.not.in.block")
+                        return asyncFunction(FunctionNode.FUNCTION_EXPRESSION_STATEMENT)
+                    }
+                    pn = nameOrLabel()
+                    if (pn !is ExpressionStatement) return pn // LabeledStatement
                 }
             }
 
@@ -1889,7 +1891,8 @@ public class Parser(
 
             if (mustMatchToken(Token.LP, "msg.no.paren.for", true)) lp = ts.tokenBeg - forPos
             val tt = peekToken()
-
+            val startsWithLet = tt == Token.NAME && ts.string == "let" && !ts.identifierEscaped &&
+                compilerEnv.languageVersion >= Context.VERSION_ES6
             init = forLoopInit(tt)
             if (matchToken(Token.IN, true)) {
                 isForIn = true
@@ -1900,6 +1903,7 @@ public class Parser(
                 matchToken(Token.NAME, true) &&
                 "of" == ts.string && !ts.identifierEscaped
             ) {
+                if (startsWithLet && init !is VariableDeclaration) reportError("msg.bad.for.in.lhs")
                 isForOf = true
                 inPos = ts.tokenBeg - forPos
                 markDestructuring(init)
@@ -2014,9 +2018,10 @@ public class Parser(
                 init = EmptyExpression(ts.tokenBeg, 1)
                 // The token is not consumed, so use the CURRENT lexer position.
                 init.setLineColumnNumber(ts.lineno, ts.tokenColumn)
-            } else if (tt == Token.VAR || tt == Token.LET) {
+            } else if (tt == Token.VAR || tt == Token.LET || (tt == Token.NAME && letDeclarationFollows(true))) {
+                val declType = if (tt == Token.NAME) Token.LET else tt
                 consumeToken()
-                init = variables(tt, ts.tokenBeg, false)
+                init = variables(declType, ts.tokenBeg, false)
             } else if (tt == Token.CONST && compilerEnv.languageVersion >= Context.VERSION_ES6) {
                 consumeToken()
                 val saved = blockScopedConst
@@ -2359,12 +2364,15 @@ public class Parser(
     }
 
     private fun letStatement(): AstNode {
-        if (currentToken != Token.LET) codeBug()
+        if (currentToken != Token.LET && currentToken != Token.NAME) codeBug()
+        if (compilerEnv.languageVersion >= Context.VERSION_ES6 && !inStatementListItem) {
+            reportError("msg.let.decl.not.in.block")
+        }
         consumeToken()
         val lineno = lineNumber()
         val pos = ts.tokenBeg
         val column = columnNumber()
-        val pn: AstNode = if (peekToken() == Token.LP) {
+        val pn: AstNode = if (compilerEnv.languageVersion < Context.VERSION_ES6 && peekToken() == Token.LP) {
             let(true, pos)
         } else {
             variables(Token.LET, pos, true) // else, e.g.: let x=6, y=7;
@@ -2577,6 +2585,8 @@ public class Parser(
         while (peekToken() == Token.NAME) {
             // An async function declaration is no labelled statement; statementHelper says so.
             if (asyncFunctionFollows()) break
+            if (compilerEnv.languageVersion >= Context.VERSION_ES6 && ts.string == "let" &&
+                !ts.identifierEscaped && ts.lexicalBindingFollows(ts.tokenBeg + 3, false)) break
             currentFlaggedToken = currentFlaggedToken or TI_CHECK_LABEL
             expr = expr(false)
             if (expr.type != Token.LABEL) {
@@ -2692,12 +2702,14 @@ public class Parser(
                 markDestructuring(destructuring)
             } else {
                 // Simple variable name.
-                if (tt == Token.UNDEFINED) {
+                val matchedName = if (tt == Token.UNDEFINED) {
                     consumeToken()
+                    true
                 } else {
                     mustMatchToken(Token.NAME, "msg.bad.var", true)
                 }
-                name = rejectEscapedReservedWord(createNameNode())
+                name = createNameNode()
+                if (matchedName) rejectEscapedReservedWord(name)
                 name.setLineColumnNumber(lineNumber(), columnNumber())
                 if (inUseStrictDirective) {
                     val id = ts.string
@@ -2705,7 +2717,7 @@ public class Parser(
                         reportError("msg.bad.id.strict", id)
                     }
                 }
-                defineSymbol(declType, ts.string, inForInit)
+                defineSymbol(declType, ts.string, inForInit, validateBindingName = matchedName)
             }
 
             val lineno = lineNumber()
@@ -2802,6 +2814,7 @@ public class Parser(
         ignoreNotInBlock: Boolean,
         ifClause: Boolean = false,
         plainFunction: Boolean = true,
+        validateBindingName: Boolean = true,
     ) {
         if (name == null) {
             if (compilerEnv.ideMode) { // stay robust in IDE mode
@@ -2815,6 +2828,8 @@ public class Parser(
             // 12.1.1), whichever pattern or declaration it comes from.
             reportError("msg.reserved.id", name)
         }
+        if (validateBindingName && name == "let" && compilerEnv.languageVersion >= Context.VERSION_ES6 &&
+            (declType == Token.LET || declType == Token.CONST)) reportError("msg.reserved.id", name)
         val scope = currentScope!!
         val definingScope = scope.getDefiningScope(name!!)
         val symbol = definingScope?.getSymbol(name)
@@ -3876,6 +3891,7 @@ public class Parser(
             }
 
             Token.LET -> {
+                if (compilerEnv.languageVersion >= Context.VERSION_ES6) reportError("msg.reserved.id", "let")
                 consumeToken()
                 return let(false, ts.tokenBeg)
             }
@@ -5244,7 +5260,7 @@ public class Parser(
      */
     private fun rejectEscapedReservedWord(pos: Int, word: String?) {
         // A token after a directive may have been scanned before strict mode took effect.
-        if (word == "yield" && inUseStrictDirective && compilerEnv.languageVersion >= Context.VERSION_ES6) {
+        if ((word == "yield" || word == "let") && inUseStrictDirective && compilerEnv.languageVersion >= Context.VERSION_ES6) {
             reportError("msg.reserved.id", word)
         }
         if (ts.escapedReservedWords.contains(pos) ||
@@ -5270,6 +5286,10 @@ public class Parser(
     private fun asyncFunctionFollows(): Boolean =
         compilerEnv.languageVersion >= Context.VERSION_ES6 &&
             "async" == ts.string && !ts.identifierEscaped && ts.functionFollowsOnSameLine(ts.tokenBeg + "async".length)
+
+    private fun letDeclarationFollows(forHeader: Boolean = false): Boolean =
+        compilerEnv.languageVersion >= Context.VERSION_ES6 && ts.string == "let" && !ts.identifierEscaped &&
+            ts.lexicalBindingFollows(ts.tokenBeg + "let".length, forHeader || inStatementListItem)
 
     /** [rejectEscapedReservedWord] for a name node not yet placed in the tree, so still absolute. */
     private fun rejectEscapedReservedWord(name: Name): Name {

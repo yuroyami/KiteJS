@@ -39,8 +39,10 @@ class KeywordParityTest {
                 for (strict in listOf(false, true)) {
                     // `await` is a name the parser reads by context, the operator only inside an
                     // async function, where upstream's ES6 table reserves it everywhere (D-97).
+                    // `let` is a contextual name in modern sloppy code (D-113).
                     val upstream = TokenStream.isKeyword(word, version, strict) &&
-                        !(word == "await" && version >= Context.VERSION_ES6)
+                        !(word == "await" && version >= Context.VERSION_ES6) &&
+                        !(word == "let" && version >= Context.VERSION_ES6 && !strict)
                     assertEquals(
                         upstream,
                         io.github.yuroyami.kitejs.rhino.TokenStream.isKeyword(word, version, strict),

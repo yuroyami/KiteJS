@@ -30,7 +30,6 @@ class ParserErrorParityTest {
         "var = ;",
         "var 1 = 2;",
         "var a b;",
-        "let;",
         "const;",
         "if () {}",
         "if (a {}",
@@ -107,6 +106,19 @@ class ParserErrorParityTest {
         val collector = env.errorReporter as ErrorCollector
         runCatching { Parser(env).parse(source, "err.js", 1) }
         return collector.errors.map { it.toString() }
+    }
+
+    @Test
+    fun sloppyLetIsANameAndStrictIdeDiagnosticsStaySingular() {
+        val source = "let;"
+        // ideEnvirons enables strict mode; a missing binding still has one diagnostic.
+        val errors = listOf("err.js:offset=3,length=1,error: missing variable name")
+        assertEquals(errors, upstreamProblems(source))
+        assertEquals(errors, portedProblems(source))
+        val uenv = UCompilerEnvirons().apply { languageVersion = UContext.VERSION_ES6 }
+        assertFailsWith<org.mozilla.javascript.EvaluatorException> { UParser(uenv).parse(source, "err.js", 1) }
+        val kenv = CompilerEnvirons().apply { languageVersion = Context.VERSION_ES6 }
+        assertNull(runCatching { Parser(kenv).parse(source, "err.js", 1) }.exceptionOrNull())
     }
 
     @Test
