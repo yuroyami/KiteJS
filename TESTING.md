@@ -53,6 +53,22 @@ matrix entry is not proof of a successful run; inspect its result before claimin
 Android host tests are JVM tests, not Android device qualification; simulator tests do not qualify
 physical iOS devices. Ordinary pull-request CI remains independent of this corpus pipeline.
 
+### Recorded validation
+
+At engine revision `78e9f68bce319c6ad2ea5e820fd231609243e56d`,
+[run 37714893637](https://github.com/yuroyami/KiteJS/actions/runs/37714893637) completed all ten
+replay jobs from clean checkouts. Each target's result records the same 192 for-in cases
+(102 strict, 90 sloppy): 158 passing outcomes, 34 expected non-passing outcomes, and no unexpected
+or intentional platform differences. The corpus revision was
+`3fd4ec27f1798ebecafc73b354a45dcdda9bde29`, with Rhino 1.9.1 as oracle.
+
+The unfiltered local producer at that engine revision executed 67,212 cases and failed on 362
+unclassified differences. It reported 45,865 agreeing passes, 6,273 agreeing failures, and 13,120
+cases upstream could not parse (11,332 of those passed in the port). It also recorded host crashes.
+No completed full-corpus artifact was produced. These results validate the bounded transport and
+execution pipeline; full-corpus replay remains unqualified while the producer differences and
+crashes are investigated. Do not widen exclusions merely to make that producer pass.
+
 Artifact-validation regressions run with:
 
 ```sh
