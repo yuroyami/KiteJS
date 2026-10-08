@@ -1925,6 +1925,17 @@ public class Parser(
 
             if (isForIn || isForOf) {
                 val fis = ForInLoop(forPos)
+                if (inUseStrictDirective) {
+                    val names = ArrayList<String>()
+                    if (init is VariableDeclaration) {
+                        for (variable in init.variables) boundNames(variable.target, names)
+                    } else {
+                        boundNames(init, names)
+                    }
+                    for (name in names) {
+                        if (name == "eval" || name == "arguments") reportError("msg.bad.id.strict", name)
+                    }
+                }
                 if (init is VariableDeclaration) {
                     // Check that only one variable was given.
                     if (init.variables.size > 1) {

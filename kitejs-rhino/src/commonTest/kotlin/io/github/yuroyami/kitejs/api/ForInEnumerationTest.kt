@@ -109,4 +109,79 @@ class ForInEnumerationTest {
         assertEquals("a,__iterator__", eval(source))
         assertEquals("", eval(source, LanguageVersion.ES5))
     }
+
+    @Test
+    fun array_patterns_destructure_the_key_string() {
+        assertEquals("a|b", eval("var a, b; for ([a, b] in { ab: 1 }) {} a + '|' + b"))
+        assertEquals("xy", eval("for (var [a, b] in { xy: 1 }) {} a + b"))
+        assertEquals("a|undefined", eval("for (var [a, b] in { a: 9 }) {} a + '|' + b"))
+        assertEquals("b", eval("for (var [, b] in { abc: 9 }) {} b"))
+        assertEquals("x", eval("for (var [a] in { xy: 9 }) {} a"))
+        assertEquals("1", eval("var count = 0; for ([] in { xy: 9 }) count++; String(count)"))
+    }
+
+    @Test
+    fun object_patterns_read_properties_of_the_key_string() {
+        assertEquals("undefined", eval("var r = []; for ({ a: r[0] } in { q: 1 }) {} String(r[0])"))
+        assertEquals("3", eval("for (var { length: n } in { abc: 9 }) {} String(n)"))
+        assertEquals("a|3", eval("var r = {}; for ({ 0: r.first, length: r.size } in { abc: 9 }) {} r.first + '|' + r.size"))
+    }
+
+    @Test
+    fun destructuring_keys_does_not_read_property_values() {
+        assertEquals("ab|cd", eval("""
+            var result = [];
+            var o = { get ab() { throw 'value read'; }, get cd() { throw 'value read'; } };
+            for (var [a, b] in o) result.push(a + b);
+            result.join('|');
+        """))
+    }
+
+    @Test
+    fun lexical_patterns_get_a_fresh_binding_for_each_key() {
+        for (declaration in listOf("let", "const")) {
+            assertEquals("ab|cd", eval("""
+                var callbacks = [];
+                for ($declaration [a, b] in { ab: 1, cd: 2 }) callbacks.push(function () { return a + b; });
+                callbacks.map(function (f) { return f(); }).join('|');
+            """))
+            assertEquals("2|3", eval("""
+                var callbacks = [];
+                for ($declaration { length: n } in { ab: 1, cde: 2 }) callbacks.push(function () { return n; });
+                callbacks.map(function (f) { return f(); }).join('|');
+            """))
+        }
+    }
+
+    @Test
+    fun the_legacy_pair_form_stays_in_pre_es6_versions() {
+        assertEquals("ab|9", eval("for (var [a, b] in { ab: 9 }) {} a + '|' + b", LanguageVersion.ES5))
+        assertEquals("SyntaxError", eval("try { eval('for (var [a] in { ab: 9 }) {}'); } catch (e) { e.name }", LanguageVersion.ES5))
+    }
+
+    @Test
+    fun for_each_and_for_of_still_destructure_values() {
+        assertEquals("7|8", eval("for each (var [a, b] in { xy: [7, 8] }) {} a + '|' + b"))
+        assertEquals("7|8", eval("for (var [a, b] of [[7, 8]]) {} a + '|' + b"))
+    }
+
+    @Test
+    fun strict_patterns_reject_restricted_names_but_allow_property_names() {
+        for (pattern in listOf("[arguments]", "[{ x: eval }]", "{ x: arguments }", "[eval = 1]")) {
+            for (declaration in listOf("", "var ", "let ", "const ")) {
+                assertEquals("SyntaxError", eval("""
+                    try { eval('"use strict"; for ($declaration$pattern in {}) {}'); 'accepted'; }
+                    catch (e) { e.name; }
+                """), "$declaration$pattern")
+            }
+        }
+        assertEquals("2", eval("""
+            (function () {
+                'use strict'; var o = {};
+                for ({ length: o.arguments } in { ab: 9 }) {}
+                return String(o.arguments);
+            })();
+        """))
+        assertEquals("a", eval("for (var [eval] in { ab: 9 }) {} eval"))
+    }
 }

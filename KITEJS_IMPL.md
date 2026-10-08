@@ -749,7 +749,7 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   `language/expressions/new.target`, which upstream's properties file skips; what still fails
   there is async code (#12), arrow rest parameters (#71) and gaps plain functions share, each
   filed as an issue of its own: rest elements, rest properties and computed keys in patterns
-  (#81), JavaScript 1.7's for-in destructuring (#82), iterator closing (#83), the parameter
+  (#81), iterator closing (#83), the parameter
   scope (#84), block-scoped functions (#85), `yield` as an identifier (#86), the restricted
   `caller` and `arguments` (#87), errors made in the catching realm (#88) and WeakRef (#89). The
   error messages the class syntax and these early errors need are the port's own, worded after
@@ -883,6 +883,13 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   and rounds 2,259 doubles, the midpoints between halves and a double either side of each among
   them, as V8 does; `Float16ArrayTest` checks the API against V8, except for one sort that Node
   22's experimental Float16Array gets wrong, where the spec's order is pinned.
+- D-105: in ES6 and later, a for-in destructuring head receives the key string, using the same
+  pattern lowering as other destructuring statements. Upstream uses JavaScript 1.7's `[key,
+  value]` enumeration for every array pattern and rejects object patterns and arrays of any
+  other length (#82). `IRFactory.createForIn` keeps that pair form and its length restriction
+  only below ES6. `for each` and `for-of` still enumerate values. `ForInEnumerationTest` checks
+  assignment and binding patterns, per-iteration lexical scopes, and that enumerating keys
+  never reads property values.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

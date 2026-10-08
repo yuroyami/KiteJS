@@ -60,6 +60,11 @@ class Test262ParityTest {
      * this test says so rather than quietly passing.
      */
     private val knownDifferences = buildMap {
+        // ES6 for-in patterns destructure key strings instead of legacy key/value pairs (D-105).
+        for (path in listOf("head-var-bound-names-dup.js", "scope-body-lex-close.js")) {
+            put("language/statements/for-in/$path", "D-105: for-in destructures the key here")
+        }
+
         // The port accepts identifier characters upstream rejects. Upstream asks the JDK's
         // Character.isJavaIdentifierStart, which is Java's rule and not JavaScript's; the port
         // uses its own generated ID_Start tables (D-43, D-57). The port is the correct one.

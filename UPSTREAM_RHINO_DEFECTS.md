@@ -853,6 +853,18 @@ any of that asks the object for `__iterator__`, the iterator protocol of JavaScr
 - Test: `EvalOracleTest.forInFollowsEnumerateObjectProperties`; `ForInEnumerationTest` (common);
   `language/statements/for-in/12.6.4-2.js` and `order-enumerable-shadowed.js`.
 
+### A for-in pattern receives a key/value pair instead of the key (D-105)
+
+In ES6 and later, a for-in assignment or binding pattern destructures each enumerated key
+string. Rhino instead keeps JavaScript 1.7's pair form: `for (var [a, b] in { xy: 9 })` assigns
+`"xy"` and `9`, instead of `"x"` and `"y"`. It also rejects object patterns and array patterns
+whose length is not two, and reads property values, invoking getters that key enumeration must
+not call. The pair form belongs only to language versions below ES6.
+
+- Where: `IRFactory.createForIn`, which chooses `ENUM_INIT_ARRAY` whenever the head is a
+  pattern and enforces the pair's shape regardless of language version.
+- Test: `ForInEnumerationTest` (common).
+
 ### A generator's return value is computed after its finally blocks (D-97)
 
 `return expr` inside a `try` with a `finally` evaluates `expr` before the finally blocks run

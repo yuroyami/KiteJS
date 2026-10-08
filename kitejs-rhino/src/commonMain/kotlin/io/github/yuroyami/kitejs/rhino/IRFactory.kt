@@ -1466,11 +1466,15 @@ public class IRFactory(
                 }
             }
 
+            // ES6 applies the pattern to each key string. Only the older language versions
+            // interpret a destructuring for-in head as a [key, value] pair.
+            val legacyKeyValue = destructuring != -1 && !isForEach && !isForOf &&
+                parser.compilerEnv.languageVersion < Context.VERSION_ES6
             val localBlock = Node(Token.LOCAL_BLOCK)
             val initType = when {
                 isForEach -> Token.ENUM_INIT_VALUES
                 isForOf -> Token.ENUM_INIT_VALUES_IN_ORDER
-                destructuring != -1 -> Token.ENUM_INIT_ARRAY
+                legacyKeyValue -> Token.ENUM_INIT_ARRAY
                 else -> Token.ENUM_INIT_KEYS
             }
             val init = Node(initType, obj)
@@ -1499,12 +1503,8 @@ public class IRFactory(
                     parser.currentScope = savedScope
                     parser.blockScopedConst = savedBlockScopedConst
                 }
-                if (!isForEach &&
-                    !isForOf &&
-                    (destructuring == Token.OBJECTLIT || destructuringLen != 2)
-                ) {
-                    // Destructuring is only allowed in for..each, or with an array of length 2 so
-                    // it can hold the key and the value.
+                if (legacyKeyValue && (destructuring == Token.OBJECTLIT || destructuringLen != 2)) {
+                    // The legacy pair form needs exactly two elements for the key and value.
                     parser.reportError("msg.bad.for.in.destruct")
                 }
             } else if (declType == Token.CONST) {

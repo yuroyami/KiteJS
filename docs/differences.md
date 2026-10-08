@@ -137,9 +137,8 @@ elements than the iterable has, never calls the iterator's `return` method, so a
 A parameter default runs in the body's scope, so it cannot read `arguments` and a closure made
 in it sees the body's `var`s. A function declared inside a block belongs to the whole enclosing
 function, in strict code too, and a `for (let ...)` body's function sees the last value of the
-loop variable. In sloppy code `yield` outside a generator is still a keyword, and `for ([k, v]
-in obj)` reads keys and values the JavaScript 1.7 way. Code that avoids these corners runs the
-same as in a browser.
+loop variable. In sloppy code `yield` outside a generator is still a keyword. Code that avoids
+these corners runs the same as in a browser.
 
 ## Things that work here and not in a browser
 
