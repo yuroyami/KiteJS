@@ -256,7 +256,8 @@ static JSValue host_function(JSContext *ctx, JSValueConst this_val, int argc, JS
  * when the two differ. A libc may grow a live block: emmalloc, which zig 0.14 links on
  * wasm32-wasi, does so when it aligns the next one (#124). So every block keeps the size QuickJS
  * asked for in a header of its own, which also makes the count, and a memory limit, the same on
- * every platform. */
+ * every platform. Keep this workaround until #124's upstream blocker is resolved; the standalone
+ * reproducer and report are under tools/quickjs-emmalloc-repro. */
 #define KITE_BLOCK_HEADER _Alignof(max_align_t)
 
 static void *kite_block(void *raw, size_t size)
