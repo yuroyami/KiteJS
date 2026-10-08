@@ -827,10 +827,46 @@ internal class NativeDate private constructor() : IdScriptableObject() {
             return date
         }
 
+        private val looseYearFirstDate = Regex(
+            "^([0-9]{4})-([0-9]{1,2})-([0-9]{1,2})" +
+                "(?: +([0-9]{1,2}):([0-9]{2})(?::([0-9]{2})(?:\\.([0-9]+))?)?" +
+                " *(Z|[+-][0-9]{2}:?[0-9]{2})?)?$",
+        )
+
+        /** Browser-compatible non-ISO year-first dates. Null means this was not that format. */
+        private fun parseLooseYearFirstDate(cx: Context, source: String): Double? {
+            val match = looseYearFirstDate.matchEntire(source.trim()) ?: return null
+            val fields = match.groupValues
+            fun number(index: Int, default: Int = 0): Int = fields[index].toIntOrNull() ?: default
+            val year = number(1)
+            val month = number(2)
+            val day = number(3)
+            val hour = number(4)
+            val minute = number(5)
+            val second = number(6)
+            val millis = fields[7].take(3).padEnd(3, '0').toInt()
+            if (month !in 1..12 || day !in 1..DaysInMonth(year, month) || hour !in 0..24 ||
+                minute !in 0..59 || second !in 0..59 ||
+                hour == 24 && (minute != 0 || second != 0 || millis != 0)
+            ) return ScriptRuntime.NaN
+            val local = date_msecFromDate(year.toDouble(), (month - 1).toDouble(), day.toDouble(),
+                hour.toDouble(), minute.toDouble(), second.toDouble(), millis.toDouble())
+            val zone = fields[8]
+            if (zone.isEmpty()) return TimeClip(internalUTC(cx, local))
+            if (zone == "Z") return TimeClip(local)
+            val digits = zone.substring(1).replace(":", "")
+            val zoneHour = digits.substring(0, 2).toInt()
+            val zoneMinute = digits.substring(2).toInt()
+            if (zoneHour > 23 || zoneMinute > 59) return ScriptRuntime.NaN
+            val offset = (zoneHour * 60 + zoneMinute) * msPerMinute
+            return TimeClip(local + if (zone[0] == '+') -offset else offset)
+        }
+
         /** The loose formats, tried after ISO 8601 fails. Ported from jsdate.c, not from a locale. */
         private fun date_parseString(cx: Context, s: String): Double {
             val d = parseISOString(cx, s)
             if (!d.isNaN()) return d
+            parseLooseYearFirstDate(cx, s)?.let { return it }
 
             var year = -1
             var mon = -1
@@ -838,6 +874,8 @@ internal class NativeDate private constructor() : IdScriptableObject() {
             var hour = -1
             var min = -1
             var sec = -1
+            var millis = 0
+            var namedMonth = false
             var c: Char
             var si: Char
             var i = 0
@@ -878,18 +916,31 @@ internal class NativeDate private constructor() : IdScriptableObject() {
                         i++
                     }
 
-                    if (prevc == '+' || prevc == '-') {
+                    if (c == '.' && prevc == ':' && hour >= 0 && min >= 0 && sec < 0 && !seenplusminus) {
+                        if (n !in 0..59) return ScriptRuntime.NaN
+                        sec = n
+                        i++ // decimal point
+                        val start = i
+                        while (i < limit && s[i] in '0'..'9') {
+                            if (i - start < 3) millis = millis * 10 + (s[i] - '0')
+                            i++
+                        }
+                        val digits = i - start
+                        if (digits == 0) return ScriptRuntime.NaN
+                        if (digits < 3) millis *= if (digits == 1) 100 else 10
+                        // The next loop iteration reads the zone or separator, if present.
+                    } else if (prevc == '+' || prevc == '-') {
                         // A zone offset, which also lets a colon appear inside it.
                         seenplusminus = true
                         n = if (n < 24) n * 60 else n % 100 + n / 100 * 60
                         if (prevc == '+') n = -n // plus means east of GMT
                         if (tzoffset != 0.0 && tzoffset != -1.0) return ScriptRuntime.NaN
                         tzoffset = n.toDouble()
-                    } else if (n >= 70 || (prevc == '/' && mon >= 0 && mday >= 0 && year < 0)) {
+                    } else if (n >= 70 || (prevc != ':' && mon >= 0 && mday >= 0 && year < 0)) {
                         if (year >= 0) {
                             return ScriptRuntime.NaN
                         } else if (c <= ' ' || c == ',' || c == '/' || i >= limit) {
-                            year = if (n < 100) n + 1900 else n
+                            year = if (n < 50) n + 2000 else if (n < 100) n + 1900 else n
                         } else {
                             return ScriptRuntime.NaN
                         }
@@ -946,6 +997,7 @@ internal class NativeDate private constructor() : IdScriptableObject() {
                         // A weekday name, which carries no information.
                     } else if ((index - 7).also { index = it } < 12) {
                         if (mon < 0) mon = index else return ScriptRuntime.NaN
+                        namedMonth = true
                     } else {
                         index -= 12
                         tzoffset = when (index) {
@@ -963,6 +1015,7 @@ internal class NativeDate private constructor() : IdScriptableObject() {
                     }
                 }
             }
+            if (namedMonth && year >= 0 && mday < 0) mday = 1
             if (year < 0 || mon < 0 || mday < 0) return ScriptRuntime.NaN
             if (sec < 0) sec = 0
             if (min < 0) min = 0
@@ -970,7 +1023,7 @@ internal class NativeDate private constructor() : IdScriptableObject() {
 
             val msec = date_msecFromDate(
                 year.toDouble(), mon.toDouble(), mday.toDouble(),
-                hour.toDouble(), min.toDouble(), sec.toDouble(), 0.0,
+                hour.toDouble(), min.toDouble(), sec.toDouble(), millis.toDouble(),
             )
             if (tzoffset == -1.0) return internalUTC(cx, msec)
             return msec + tzoffset * msPerMinute

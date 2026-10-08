@@ -903,6 +903,15 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   and yield expressions are rejected in generator parameters. Explicit pre-ES6 versions retain
   implicit generators. `YieldIdentifierTest` pins 52 modern cases against Node 26.10.0 and checks
   the legacy boundary; the token-position oracle records the deliberate identifier token.
+- D-108: non-ISO Date parsing accepts year-first dates with a space before the time,
+  one-digit month/day fields, named-month fractional seconds, and month-plus-year strings
+  (#112). The fallback uses the browser two-digit-year pivot (00–49 become 2000–2049), without
+  changing numeric constructors or Date.UTC. Standard ISO parsing still runs first, preserving
+  UTC date-only versus local date-time rules. Year-first calendar and offset bounds remain
+  checked, and fractional digits are truncated to milliseconds without overflow. This is a
+  compatibility policy for implementation-defined formats, not a change to the ISO contract.
+  `DateParseCompatibilityTest` checks 48 V8-controlled strings in three zones, parse/constructor
+  agreement, standard round trips, invalid-date rejection and numeric-constructor year rules.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

@@ -38,6 +38,22 @@ KiteJs(Rhino) { clock = { now } }.use { js ->
 }
 ```
 
+## Parsing strings
+
+Rhino reads the standard ISO format first. An ISO date without a time, such as `2024-01-15`,
+means UTC; a date-time without an offset means the configured local zone. An explicit `Z` or
+numeric offset fixes the instant independently of that zone.
+
+The non-ISO fallback also accepts common browser formats: `2024-01-15 10:30:00`, `2024-1-5`,
+`Jan 2024` (day 1), and named-month dates with fractional seconds. These are local times unless
+they supply a zone. Fractional digits beyond milliseconds are discarded. Two-digit fallback
+years 00–49 mean 2000–2049, and 50–99 mean 1950–1999. This pivot does not affect `Date.UTC` or
+numeric Date constructors, whose years 0–99 still mean 1900–1999.
+
+Non-ISO parsing is implementation-defined. The year-first parser rejects invalid calendar dates
+such as February 30 and numeric offsets outside 00:00–23:59, even where a browser normalizes or
+accepts them. Prefer ISO strings with an explicit offset for interchange.
+
 ## The arithmetic is the engine's own
 
 Leap years, month lengths, the day of the week, the ISO week, `Date.UTC`, `Date.parse` and every
