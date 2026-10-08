@@ -969,6 +969,21 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   diagnostics from a stale keyword string. LetIdentifierTest pins 135 Node evaluation/syntax
   controls and checks the legacy extension; lexer position and diagnostic oracle tests document
   the exact modern changes while retaining their other comparisons.
+- D-114: ArraySetLength deletes own indices in descending order, including hidden and large
+  indices (#80). A non-configurable element stops deletion, restores length to that index plus
+  one, and still applies a requested writable:false. Reflect.set/defineProperty receive the
+  boolean refusal; Object.defineProperty and strict assignments throw. Length descriptors perform
+  ToUint32 then ToNumber on the original value and validate the descriptor after those coercions.
+  Array mutation methods use Set(..., true) and DeletePropertyOrThrow independently of caller
+  strictness, preserve partial mutations and exception identity, and observe HasProperty before
+  Get in sparse reverse/shift/unshift/splice/sort paths. Dense mutations check attributes and the
+  indexed prototype chain, and splice/copyWithin recheck after user code can reshape or freeze
+  the array. Splice constructs its species with the deletion count after argument coercion and
+  sets both lengths even for no arguments. Species works for proxy arrays, and definitions on
+  species results report refusal. Copy methods define their own elements rather than invoking
+  inherited setters. ArrayMutationTest pins 210 Node controls for rollback, coercion, generic
+  receivers, frozen arrays, prototypes, proxies, species and copying; the JVM oracle records the
+  two corrected sloppy frozen/read-only push results explicitly.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

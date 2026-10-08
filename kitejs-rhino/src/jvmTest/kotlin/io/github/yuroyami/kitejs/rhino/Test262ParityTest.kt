@@ -60,6 +60,52 @@ class Test262ParityTest {
      * this test says so rather than quietly passing.
      */
     private val knownDifferences = buildMap {
+        for (path in listOf(
+            "built-ins/Object/defineProperties/15.2.3.7-6-a-164.js",
+            "built-ins/Object/defineProperties/15.2.3.7-6-a-165.js",
+            "built-ins/Object/defineProperties/15.2.3.7-6-a-175.js",
+            "built-ins/Object/defineProperties/15.2.3.7-6-a-176.js",
+        )) {
+            put(path, "D-114: ArraySetLength restores length and read-only attributes after refusal here")
+        }
+        put("built-ins/Array/length/define-own-prop-length-coercion-order-set.js",
+            "D-114: array length converts through ToUint32 before ToNumber here")
+        for (path in listOf(
+            "built-ins/Object/defineProperty/15.2.3.6-4-168.js",
+            "built-ins/Object/defineProperty/15.2.3.6-4-169.js",
+        )) {
+            put(path, "D-114: ArraySetLength stops at a refused deletion and restores length here")
+        }
+        for (path in listOf(
+            "built-ins/Array/prototype/concat/create-proxy.js",
+            "built-ins/Array/prototype/copyWithin/coerced-values-start-change-start.js",
+            "built-ins/Array/prototype/copyWithin/coerced-values-start-change-target.js",
+            "built-ins/Array/prototype/filter/create-proxy.js",
+            "built-ins/Array/prototype/map/create-proxy.js",
+            "built-ins/Array/prototype/pop/set-length-array-is-frozen.js",
+            "built-ins/Array/prototype/pop/set-length-array-length-is-non-writable.js",
+            "built-ins/Array/prototype/push/S15.4.4.7_A2_T2.js",
+            "built-ins/Array/prototype/push/set-length-array-is-frozen.js",
+            "built-ins/Array/prototype/push/set-length-array-length-is-non-writable.js",
+            "built-ins/Array/prototype/push/set-length-zero-array-length-is-non-writable.js",
+            "built-ins/Array/prototype/push/throws-if-integer-limit-exceeded.js",
+            "built-ins/Array/prototype/reverse/length-exceeding-integer-limit-with-proxy.js",
+            "built-ins/Array/prototype/shift/set-length-array-is-frozen.js",
+            "built-ins/Array/prototype/shift/set-length-array-length-is-non-writable.js",
+            "built-ins/Array/prototype/slice/create-proxy.js",
+            "built-ins/Array/prototype/splice/S15.4.4.12_A6.1_T2.js",
+            "built-ins/Array/prototype/splice/clamps-length-to-integer-limit.js",
+            "built-ins/Array/prototype/splice/create-proto-from-ctor-realm-non-array.js",
+            "built-ins/Array/prototype/splice/create-proxy.js",
+            "built-ins/Array/prototype/splice/create-revoked-proxy.js",
+            "built-ins/Array/prototype/splice/create-species.js",
+            "built-ins/Array/prototype/splice/set_length_no_args.js",
+            "built-ins/Array/prototype/unshift/set-length-array-is-frozen.js",
+            "built-ins/Array/prototype/unshift/set-length-array-length-is-non-writable.js",
+            "built-ins/Array/prototype/unshift/set-length-zero-array-length-is-non-writable.js",
+        )) {
+            put(path, "D-114: array mutations and species definitions report refused writes and deletions here")
+        }
         for (initializers in listOf("with-initialisers", "without-initialisers")) {
             for (position in listOf("if-expression-statement-else-statement", "if-expression-statement", "label-statement")) {
                 put("language/statements/let/syntax/$initializers-in-statement-positions-$position.js",
@@ -1121,6 +1167,47 @@ class Test262ParityTest {
      * strict mode they agree, so a file-wide entry would read as stale there.
      */
     private val knownSloppyDifferences = buildMap {
+        for (path in listOf(
+            "built-ins/Object/defineProperties/15.2.3.7-6-a-112.js",
+            "built-ins/Object/defineProperties/15.2.3.7-6-a-113.js",
+            "built-ins/Object/defineProperties/15.2.3.7-6-a-166.js",
+            "built-ins/Object/defineProperties/15.2.3.7-6-a-168.js",
+            "built-ins/Object/defineProperties/15.2.3.7-6-a-169.js",
+            "built-ins/Object/defineProperties/15.2.3.7-6-a-170.js",
+            "built-ins/Object/defineProperties/15.2.3.7-6-a-172.js",
+            "built-ins/Object/defineProperties/15.2.3.7-6-a-173.js",
+        )) {
+            put(path, "D-114: ArraySetLength restores length and read-only attributes after refusal here")
+        }
+        for (path in listOf(
+            "built-ins/Object/defineProperty/15.2.3.6-4-116.js",
+            "built-ins/Object/defineProperty/15.2.3.6-4-117.js",
+            "built-ins/Object/defineProperty/15.2.3.6-4-170.js",
+            "built-ins/Object/defineProperty/15.2.3.6-4-172.js",
+            "built-ins/Object/defineProperty/15.2.3.6-4-173.js",
+            "built-ins/Object/defineProperty/15.2.3.6-4-174.js",
+            "built-ins/Object/defineProperty/15.2.3.6-4-176.js",
+            "built-ins/Object/defineProperty/15.2.3.6-4-177.js",
+        )) {
+            put(path, "D-114: ArraySetLength stops at a refused deletion and restores length here")
+        }
+        for (path in listOf(
+            "built-ins/Array/prototype/copyWithin/return-abrupt-from-delete-target.js",
+            "built-ins/Array/prototype/pop/set-length-zero-array-is-frozen.js",
+            "built-ins/Array/prototype/pop/set-length-zero-array-length-is-non-writable.js",
+            "built-ins/Array/prototype/pop/throws-with-string-receiver.js",
+            "built-ins/Array/prototype/push/length-near-integer-limit-set-failure.js",
+            "built-ins/Array/prototype/push/set-length-zero-array-is-frozen.js",
+            "built-ins/Array/prototype/push/throws-with-string-receiver.js",
+            "built-ins/Array/prototype/shift/set-length-zero-array-is-frozen.js",
+            "built-ins/Array/prototype/shift/set-length-zero-array-length-is-non-writable.js",
+            "built-ins/Array/prototype/shift/throws-when-this-value-length-is-writable-false.js",
+            "built-ins/Array/prototype/splice/S15.4.4.12_A6.1_T3.js",
+            "built-ins/Array/prototype/unshift/set-length-zero-array-is-frozen.js",
+            "built-ins/Array/prototype/unshift/throws-with-string-receiver.js",
+        )) {
+            put(path, "D-114: array mutation refusal throws independently of caller strictness here")
+        }
         for (loop in listOf("for-in", "for-of")) {
             put("language/statements/$loop/let-array-with-newline.js",
                 "D-113: let [ remains forbidden as an expression statement across a newline here")
@@ -1202,15 +1289,6 @@ class Test262ParityTest {
         }
         put("language/function-code/S10.4.3_A1.js",
             "D-112: bare calls preserve undefined for strict callees here")
-        // An array whose length is read-only leaves dense mode, so push, unshift and splice reach
-        // the length write that throws (D-88).
-        for (path in listOf(
-            "built-ins/Array/prototype/push/set-length-zero-array-length-is-non-writable.js",
-            "built-ins/Array/prototype/splice/S15.4.4.12_A6.1_T2.js",
-            "built-ins/Array/prototype/unshift/set-length-zero-array-length-is-non-writable.js",
-        )) {
-            put(path, "D-88: an array with a read-only length stops growing here")
-        }
         // A refused delete through Reflect or a trapless proxy answers false. Upstream throws a
         // TypeError instead when the calling code is strict; outside strict mode both answer
         // false (D-89).

@@ -175,7 +175,7 @@ public object AbstractEcmaObjectOperations {
         val existing = receiver.getOwnPropertyDescriptor(cx, key)
             ?: return createDataProperty(cx, receiver, key, value)
         if (existing.isAccessorDescriptor || !ScriptableObject.isTrue(existing.writable)) return false
-        if (receiver is NativeProxy) {
+        if (receiver is NativeProxy || (receiver is NativeArray && key == "length")) {
             val valueOnly = DescriptorInfo(Scriptable.NOT_FOUND, Scriptable.NOT_FOUND, Scriptable.NOT_FOUND, Scriptable.NOT_FOUND, Scriptable.NOT_FOUND, value)
             return receiver.defineOwnProperty(cx, key, valueOnly)
         }
@@ -198,6 +198,8 @@ public object AbstractEcmaObjectOperations {
      */
     internal fun defineOwnPropertyOrFalse(cx: Context, o: ScriptableObject, key: Any, desc: DescriptorInfo): Boolean {
         if (o is NativeProxy) return o.defineOwnProperty(cx, key, desc)
+        // ArraySetLength converts the value before validating the current descriptor.
+        if (o is NativeArray && key == "length") return o.defineOwnProperty(cx, key, desc)
         val current = o.getOwnPropertyDescriptor(cx, key)
         if (!isCompatiblePropertyDescriptor(cx, o.isExtensible, desc, current)) return false
         return o.defineOwnProperty(cx, key, desc)
@@ -219,6 +221,16 @@ public object AbstractEcmaObjectOperations {
     /** Set(O, P, V, true): [[Set]] with O as the receiver, and a refused write is a TypeError. */
     internal fun setOrThrow(cx: Context, o: Scriptable, key: Any, value: Any?) {
         if (!set(cx, o, key, value, o)) throw ScriptRuntime.typeErrorById("msg.modify.readonly", key.toString())
+    }
+
+    /** DeletePropertyOrThrow: refusal is an error even in a sloppy caller. */
+    internal fun deleteOrThrow(cx: Context, o: Scriptable, key: Any) {
+        val deleted = if (o is ScriptableObject) delete(cx, o, key) else when (key) {
+            is Int -> { o.delete(key); !o.has(key, o) }
+            is Symbol -> if (o is SymbolScriptable) { o.delete(key); !o.has(key, o) } else true
+            else -> { o.delete(key as String); !o.has(key, o) }
+        }
+        if (!deleted) throw ScriptRuntime.typeErrorById("msg.delete.property.with.configurable.false", key)
     }
 
     // ---- Walking enumerable own properties --------------------------------------------------------

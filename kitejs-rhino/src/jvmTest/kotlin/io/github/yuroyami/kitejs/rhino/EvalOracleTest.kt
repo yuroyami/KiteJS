@@ -1598,9 +1598,8 @@ class EvalOracleTest {
         "var a = [1, 2, 3]; a.length = 2.5", "Object.keys([1, 2, 3]).join()", "Object.keys([1, , 3]).join()",
         "Object.getOwnPropertyNames([1, 2]).join()", "Object.entries({ a: 1, b: 2 }).join(';')", "Object.values({ a: 1, b: 2 }).join()",
         "Object.fromEntries([['a', 1], ['b', 2]]).b", "Object.getOwnPropertySymbols({}).length",
-        "var a = [1, 2, 3]; Object.freeze(a); a.push(4)", "var a = [1, 2, 3]; Object.freeze(a); a[0] = 9; a[0]",
+        "var a = [1, 2, 3]; Object.freeze(a); a[0] = 9; a[0]",
         "var a = Object.freeze([1, 2]); a.length = 0; a.length", "Object.isFrozen(Object.freeze([1]))",
-        "var a = [1, 2, 3]; Object.defineProperty(a, 'length', { writable: false }); a.push(4)",
         "var a = [1, 2, 3]; Object.defineProperty(a, 'length', { value: 1 }); a.join()",
         "var a = [1, 2, 3]; Object.defineProperty(a, 1, { get: function () { return 'g' } }); a.join()",
         "var a = [1]; Object.defineProperty(a, 0, { value: 2, writable: false }); a[0] = 3; a[0]",
@@ -1635,6 +1634,16 @@ class EvalOracleTest {
         "[1].sort(1)", "Array.from()", "Array.from(null)", "new Array(1, 2).indexOf()", "[].at.call(null)",
         "Array.prototype.join.call(null)", "Array.from([1], 5)",
     ))
+
+    @Test
+    fun refusedArrayPushThrowsInSloppyCode() {
+        // D-114: mutation methods use Set(..., true), independently of caller strictness.
+        for (restriction in listOf("Object.freeze(a)", "Object.defineProperty(a, 'length', { writable: false })")) {
+            val source = "var a = [1, 2, 3]; $restriction; try { a.push(4) } catch (e) { e.name }"
+            assertEquals("4", upstream(source))
+            assertEquals("\"TypeError\"", ported(source))
+        }
+    }
 
     @Test
     fun scriptObject() = check(listOf(

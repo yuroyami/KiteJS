@@ -161,7 +161,7 @@ public object ArrayLikeAbstractOperations {
 
     /** ArraySpeciesCreate: a new array from `o.constructor[Symbol.species]`, or a plain one. */
     internal fun arraySpeciesCreate(cx: Context, scope: Scriptable, o: Scriptable, length: Int): Scriptable {
-        if (o is NativeArray) {
+        if (NativeArray.isArray(o)) {
             var c = ScriptableObject.getProperty(o, "constructor")
             if (c is Scriptable) {
                 c = ScriptableObject.getProperty(c, SymbolKey.SPECIES)
@@ -191,7 +191,9 @@ public object ArrayLikeAbstractOperations {
     internal fun defineElem(cx: Context, target: Scriptable, index: Long, value: Any?) {
         if (!(target is NativeArray && target.denseOnly) && target is ScriptableObject) {
             val desc = DescriptorInfo(true, true, true, value)
-            target.defineOwnProperty(cx, index, desc)
+            if (!target.defineOwnProperty(cx, index, desc)) {
+                throw ScriptRuntime.typeErrorById("msg.modify.readonly", index.toString())
+            }
             return
         }
         if (index > Int.MAX_VALUE) {

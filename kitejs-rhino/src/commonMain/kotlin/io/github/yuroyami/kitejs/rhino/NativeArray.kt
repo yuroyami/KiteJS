@@ -73,10 +73,14 @@ public class NativeArray : ScriptableObject {
     }
 
     override fun put(name: String, start: Scriptable, value: Any?) {
+        val index = toArrayIndex(name)
+        if (start === this && index >= length && (lengthAttr and READONLY) != 0) {
+            if (Context.isCurrentContextStrict) throw ScriptRuntime.typeErrorById("msg.modify.readonly", "length")
+            return
+        }
         super.put(name, start, value)
         if (start === this) {
-            val index = toArrayIndex(name)
-            if (index >= length) {
+            if (index >= length && super.has(name, this)) {
                 length = index + 1
                 modCount++
                 denseOnly = false
@@ -300,13 +304,28 @@ public class NativeArray : ScriptableObject {
         this.denseOnly = denseOnly
     }
 
+    /** Dense mutation may bypass only ordinary, empty indexed prototype chains. */
+    private fun canUseDenseMutation(): Boolean {
+        if (!denseOnly || !isExtensible || isSealed || (lengthAttr and READONLY) != 0) return false
+        var p = prototype
+        while (p != null) {
+            when (p) {
+                is NativeArray -> if (p.length != 0L) return false
+                is NativeObject -> if (p.allIds.any { toArrayIndex(it) >= 0 }) return false
+                else -> return false
+            }
+            p = p.prototype
+        }
+        return true
+    }
+
     private fun setLength(compoundOp: CompoundOperationMap, d: Double): Boolean {
         val longVal = ScriptRuntime.toUint32(d)
-        if ((lengthAttr and READONLY) != 0) return false
         if (longVal.toDouble() != d) {
             val msg = ScriptRuntime.getMessageById("msg.arraylength.bad")
             throw ScriptRuntime.rangeError(msg)
         }
+        if ((lengthAttr and READONLY) != 0) return longVal == length
         if (denseOnly) {
             val dense = this.dense!!
             if (longVal < length) {
@@ -324,24 +343,24 @@ public class NativeArray : ScriptableObject {
             }
         }
         if (longVal < length) {
-            // remove all properties between longVal and length
+            // ArraySetLength deletes own indices in descending order, including hidden ones.
             if (length - longVal > 0x1000) {
-                // assume that the representation is sparse
-                val e = getIds(compoundOp, false, false) // will only find in object itself
-                for (id in e) {
-                    if (id is String) {
-                        // > MAXINT will appear as string
-                        val index = toArrayIndex(id)
-                        if (index >= longVal) deleteInternal(compoundOp, id)
-                    } else {
-                        val index = id as Int
-                        if (index >= longVal) deleteInternal(compoundOp, index)
+                val indices = getIds(compoundOp, true, false).map { toArrayIndex(it) }
+                    .filter { it >= longVal }.sortedDescending()
+                for (index in indices) {
+                    if (!deleteElem(compoundOp, this, index)) {
+                        length = index + 1
+                        modCount++
+                        return false
                     }
                 }
             } else {
-                // assume a dense representation
-                for (i in longVal until length) {
-                    deleteElem(compoundOp, this, i)
+                for (i in length - 1 downTo longVal) {
+                    if (!deleteElem(compoundOp, this, i)) {
+                        length = i + 1
+                        modCount++
+                        return false
+                    }
                 }
             }
         }
@@ -557,25 +576,14 @@ public class NativeArray : ScriptableObject {
             ScriptRuntime.wrapNumber(array.length.toDouble())
 
         private fun lengthSetter(builtIn: NativeArray, value: Any?, owner: Scriptable, start: Scriptable, isThrow: Boolean): Boolean {
-            val d = ScriptRuntime.toNumber(value)
-            builtIn.startCompoundOp(true).use { builtIn.setLength(it, d) }
+            val d = checkLength(value).toDouble()
+            val changed = builtIn.startCompoundOp(true).use { builtIn.setLength(it, d) }
+            if (!changed && isThrow) throw ScriptRuntime.typeErrorById("msg.modify.readonly", "length")
             return true
         }
 
         private fun lengthAttrSetter(builtIn: NativeArray, attrs: Int) {
             builtIn.lengthAttr = attrs
-        }
-
-        private fun lengthDescSetValue(
-            owner: ScriptableObject,
-            info: DescriptorInfo,
-            key: Any?,
-            existing: Slot?,
-            map: CompoundOperationMap,
-            slot: Slot,
-        ): Slot {
-            (owner as NativeArray).setLength(map, info.value as Double)
-            return slot
         }
 
         internal fun arraySetLength(
@@ -587,16 +595,17 @@ public class NativeArray : ScriptableObject {
             key: Any?,
             index: Int,
         ): Boolean {
-            val descSetter = PropDescValueSetter { o, i, k, e, m, s -> lengthDescSetValue(o, i, k, e, m, s) }
             val value = info.value
             if (value === Scriptable.NOT_FOUND) {
+                if (checkValid && !AbstractEcmaObjectOperations.isCompatiblePropertyDescriptor(Context.getContext(),
+                    builtIn.isExtensible, info, builtIn.getOwnPropertyDescriptor(Context.getContext(), "length"))) return false
                 return builtIn.startCompoundOp(true).use { map ->
                     defineOrdinaryProperty(PropDescValueSetter { _, _, _, _, _, s -> s }, builtIn, map, id, info, checkValid, key, index)
                 }
             }
             val newLength = checkLength(value)
             info.value = newLength.toDouble()
-            if (checkValid && value is Scriptable) {
+            if (checkValid) {
                 // Converting an object ran user code, which may have made the length read-only
                 // in the meantime. ArraySetLength converts first (ECMAScript 2015, 9.4.2.4 steps
                 // 3 and 4) and only then lets OrdinaryDefineOwnProperty refuse, which answers
@@ -609,14 +618,19 @@ public class NativeArray : ScriptableObject {
                     return false
                 }
             }
+            var changed = true
+            val descSetter = PropDescValueSetter { o, i, _, _, m, s ->
+                changed = (o as NativeArray).setLength(m, i.value as Double)
+                s
+            }
             val writable = info.writable
             builtIn.startCompoundOp(true).use { map ->
                 if (newLength >= builtIn.length) {
-                    return defineOrdinaryProperty(descSetter, builtIn, map, id, info, checkValid, key, index)
+                    return defineOrdinaryProperty(descSetter, builtIn, map, id, info, checkValid, key, index) && changed
                 }
                 val currentWritable = (current.attributes and READONLY) == 0
                 if (!currentWritable) {
-                    throw ScriptRuntime.typeErrorById("msg.change.value.with.writable.false", id)
+                    return false
                 }
                 var newWritable = true
                 if (writable !== Scriptable.NOT_FOUND) {
@@ -627,7 +641,8 @@ public class NativeArray : ScriptableObject {
                     val currentAttrs = current.attributes
                     val newAttrs = if (newWritable) (currentAttrs and READONLY.inv()) else (currentAttrs or READONLY)
                     current.attributes = newAttrs
-                    return true
+                    if (!newWritable) builtIn.leaveDenseMode()
+                    return changed
                 }
             }
             return false
@@ -715,8 +730,8 @@ public class NativeArray : ScriptableObject {
             // Both conversions run on the value itself, as upstream does. Passing `d` to the
             // second would be one coercion, and the spec has two: a valueOf that watches is
             // entitled to be called twice.
-            val d = ScriptRuntime.toNumber(value)
             val longVal = ScriptRuntime.toUint32(value)
+            val d = ScriptRuntime.toNumber(value)
             if (longVal.toDouble() != d) {
                 val msg = ScriptRuntime.getMessageById("msg.arraylength.bad")
                 throw ScriptRuntime.rangeError(msg)
@@ -743,29 +758,28 @@ public class NativeArray : ScriptableObject {
 
         private fun setLengthProperty(cx: Context, target: Scriptable, length: Long): Any? {
             val len = ScriptRuntime.wrapNumber(length.toDouble())
-            ScriptableObject.putProperty(target, "length", len)
+            AbstractEcmaObjectOperations.setOrThrow(cx, target, "length", len)
             return len
         }
 
         private fun deleteElem(target: Scriptable, index: Long) {
-            val i = index.toInt()
-            if (i.toLong() == index) {
-                target.delete(i)
-            } else {
-                target.delete(index.toString())
-            }
+            AbstractEcmaObjectOperations.deleteOrThrow(Context.getContext(), target,
+                if (index <= Int.MAX_VALUE) index.toInt() else index.toString())
         }
 
-        private fun deleteElem(compoundOp: CompoundOperationMap, target: NativeArray, index: Long) {
+        private fun deleteElem(compoundOp: CompoundOperationMap, target: NativeArray, index: Long): Boolean {
             val i = index.toInt()
             if (i.toLong() == index) {
+                if (((compoundOp.query(null, i)?.attributes ?: 0) and PERMANENT) != 0) return false
                 checkNotSealed(target, null, i)
                 target.deleteInternal(compoundOp, i)
             } else {
                 val strIndex = index.toString()
+                if (((compoundOp.query(strIndex, 0)?.attributes ?: 0) and PERMANENT) != 0) return false
                 checkNotSealed(target, strIndex, 0)
                 compoundOp.compute(target, strIndex, 0, ::checkSlotRemoval)
             }
+            return true
         }
 
         internal fun getElem(cx: Context, target: Scriptable, index: Long): Any? {
@@ -781,12 +795,8 @@ public class NativeArray : ScriptableObject {
         }
 
         private fun setElem(cx: Context, target: Scriptable, index: Long, value: Any?) {
-            if (index > Int.MAX_VALUE) {
-                val id = index.toString()
-                ScriptableObject.putProperty(target, id, value)
-            } else {
-                ScriptableObject.putProperty(target, index.toInt(), value)
-            }
+            AbstractEcmaObjectOperations.setOrThrow(cx, target,
+                if (index <= Int.MAX_VALUE) index.toInt() else index.toString(), value)
         }
 
         // Similar as setElem(), but triggers deleteElem() if value is NOT_FOUND
@@ -922,7 +932,7 @@ public class NativeArray : ScriptableObject {
         private fun js_reverse(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val o = ScriptRuntime.toObject(cx, scope, thisObj)
             if (o is NativeArray) {
-                if (o.denseOnly) {
+                if (o.canUseDenseMutation()) {
                     val dense = o.dense!!
                     var i = 0
                     var j = o.length.toInt() - 1
@@ -940,10 +950,24 @@ public class NativeArray : ScriptableObject {
             val half = len / 2
             for (i in 0 until half) {
                 val j = len - i - 1
-                val temp1 = getRawElem(o, i)
-                val temp2 = getRawElem(o, j)
-                setRawElem(cx, o, i, temp2)
-                setRawElem(cx, o, j, temp1)
+                val lowerExists = ArrayLikeAbstractOperations.hasElem(o, i)
+                val lower = if (lowerExists) getElem(cx, o, i) else Undefined.instance
+                val upperExists = ArrayLikeAbstractOperations.hasElem(o, j)
+                val upper = if (upperExists) getElem(cx, o, j) else Undefined.instance
+                when {
+                    lowerExists && upperExists -> {
+                        setElem(cx, o, i, upper)
+                        setElem(cx, o, j, lower)
+                    }
+                    upperExists -> {
+                        setElem(cx, o, i, upper)
+                        deleteElem(o, j)
+                    }
+                    lowerExists -> {
+                        deleteElem(o, i)
+                        setElem(cx, o, j, lower)
+                    }
+                }
             }
             return o
         }
@@ -961,9 +985,9 @@ public class NativeArray : ScriptableObject {
                 throw Context.reportRuntimeErrorById("msg.arraylength.too.big", llength.toString())
             }
             // copy the JS array into a working array, so it can be sorted cheaply.
-            val working = arrayOfNulls<Any?>(length)
+            val working = ArrayList<Any?>(length)
             for (i in 0 until length) {
-                working[i] = getRawElem(o, i.toLong())
+                if (ArrayLikeAbstractOperations.hasElem(o, i.toLong())) working.add(getElem(cx, o, i.toLong()))
             }
             try {
                 working.sortWith(comparator)
@@ -972,16 +996,15 @@ public class NativeArray : ScriptableObject {
                 return o
             }
             // copy the working array back into thisObj
-            for (i in 0 until length) {
-                setRawElem(cx, o, i.toLong(), working[i])
-            }
+            for (i in working.indices) setElem(cx, o, i.toLong(), working[i])
+            for (i in working.size until length) deleteElem(o, i.toLong())
             return o
         }
 
         private fun js_push(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val o = ScriptRuntime.toObject(cx, scope, thisObj)
             if (o is NativeArray) {
-                if (o.denseOnly && o.ensureCapacity(o.length.toInt() + args.size)) {
+                if (o.canUseDenseMutation() && o.ensureCapacity(o.length.toInt() + args.size)) {
                     for (arg in args) {
                         o.dense!![o.length.toInt()] = arg
                         o.length++
@@ -991,6 +1014,9 @@ public class NativeArray : ScriptableObject {
                 }
             }
             var length = getLengthProperty(cx, o)
+            if (length + args.size > NativeNumber.MAX_SAFE_INTEGER) {
+                throw ScriptRuntime.typeErrorById("msg.arraylength.too.big", length + args.size)
+            }
             for (i in args.indices) {
                 setElem(cx, o, length + i, args[i])
             }
@@ -1011,13 +1037,13 @@ public class NativeArray : ScriptableObject {
             val o = ScriptRuntime.toObject(cx, scope, thisObj)
             val result: Any?
             if (o is NativeArray) {
-                if (o.denseOnly && o.length > 0) {
+                if (o.canUseDenseMutation() && o.length > 0) {
                     o.length--
                     o.modCount++
                     val dense = o.dense!!
                     result = dense[o.length.toInt()]
                     dense[o.length.toInt()] = Scriptable.NOT_FOUND
-                    return result
+                    return if (result === Scriptable.NOT_FOUND) Undefined.instance else result
                 }
             }
             var length = getLengthProperty(cx, o)
@@ -1040,7 +1066,7 @@ public class NativeArray : ScriptableObject {
         private fun js_shift(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val o = ScriptRuntime.toObject(cx, scope, thisObj)
             if (o is NativeArray) {
-                if (o.denseOnly && o.length > 0) {
+                if (o.canUseDenseMutation() && o.length > 0) {
                     o.length--
                     o.modCount++
                     val dense = o.dense!!
@@ -1064,8 +1090,8 @@ public class NativeArray : ScriptableObject {
                 if (length > 0) {
                     i = 1
                     while (i <= length) {
-                        val temp = getRawElem(o, i)
-                        setRawElem(cx, o, i - 1, temp)
+                        if (ArrayLikeAbstractOperations.hasElem(o, i)) setElem(cx, o, i - 1, getElem(cx, o, i))
+                        else deleteElem(o, i - 1)
                         i++
                     }
                 }
@@ -1082,7 +1108,7 @@ public class NativeArray : ScriptableObject {
         private fun js_unshift(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val o = ScriptRuntime.toObject(cx, scope, thisObj)
             if (o is NativeArray) {
-                if (o.denseOnly && o.ensureCapacity(o.length.toInt() + args.size)) {
+                if (o.canUseDenseMutation() && o.ensureCapacity(o.length.toInt() + args.size)) {
                     val dense = o.dense!!
                     dense.copyInto(dense, args.size, 0, o.length.toInt())
                     args.copyInto(dense, 0, 0, args.size)
@@ -1101,8 +1127,8 @@ public class NativeArray : ScriptableObject {
                 if (length > 0) {
                     var last = length - 1
                     while (last >= 0) {
-                        val temp = getRawElem(o, last)
-                        setRawElem(cx, o, last + argc, temp)
+                        if (ArrayLikeAbstractOperations.hasElem(o, last)) setElem(cx, o, last + argc, getElem(cx, o, last))
+                        else deleteElem(o, last + argc)
                         last--
                     }
                 }
@@ -1117,32 +1143,17 @@ public class NativeArray : ScriptableObject {
         }
 
         private fun js_splice(cx: Context, scopeIn: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            var scope = scopeIn
+            val scope = scopeIn
             val o = ScriptRuntime.toObject(cx, scope, thisObj)
-            var na: NativeArray? = null
-            var result: Any? = ArrayLikeAbstractOperations.arraySpeciesCreate(cx, scope, o, 0)
-            var nar: NativeArray? = null
-            var denseFrom = false
-            var denseRes = false
-            if (o is NativeArray) {
-                na = o
-                denseFrom = na.denseOnly
-            }
-            if (result is NativeArray) {
-                nar = result
-                denseRes = nar.denseOnly
-            }
-            /* create an empty Array to return. */
-            scope = getTopLevelScope(scope)
-            var argc = args.size
-            if (argc == 0) return cx.newArray(scope, 0)
             val length = getLengthProperty(cx, o)
             /* Convert the first argument into a starting index. */
-            val begin = ArrayLikeAbstractOperations.toSliceIndex(ScriptRuntime.toInteger(args[0]), length)
-            argc--
+            val begin = if (args.isEmpty()) 0 else ArrayLikeAbstractOperations.toSliceIndex(ScriptRuntime.toInteger(args[0]), length)
+            val argc = maxOf(0, args.size - 2)
             /* Convert the second argument into count */
             val actualDeleteCount: Long
-            if (args.size == 1) {
+            if (args.isEmpty()) {
+                actualDeleteCount = 0
+            } else if (args.size == 1) {
                 actualDeleteCount = length - begin
             } else {
                 val dcount = ScriptRuntime.toInteger(args[1])
@@ -1153,7 +1164,6 @@ public class NativeArray : ScriptableObject {
                 } else {
                     dcount.toLong()
                 }
-                argc--
             }
             val end = begin + actualDeleteCount
             val delta = argc - actualDeleteCount
@@ -1164,6 +1174,12 @@ public class NativeArray : ScriptableObject {
                 val msg = ScriptRuntime.getMessageById("msg.arraylength.bad")
                 throw ScriptRuntime.rangeError(msg)
             }
+            // Species construction follows argument coercion, which can freeze or reshape O.
+            var result: Any? = ArrayLikeAbstractOperations.arraySpeciesCreate(cx, scope, o, actualDeleteCount.toInt())
+            val na = o as? NativeArray
+            val nar = result as? NativeArray
+            val denseFrom = na?.canUseDenseMutation() == true && na.length == length
+            val denseRes = nar?.denseOnly == true && nar !== na
             /* If there are elements to remove, put them into the return value. */
             if (actualDeleteCount != 0L) {
                 if (actualDeleteCount == 1L && cx.languageVersion == Context.VERSION_1_2) {
@@ -1180,20 +1196,17 @@ public class NativeArray : ScriptableObject {
                      */
                     result = getElem(cx, o, begin)
                 } else {
-                    if (denseFrom && denseRes) {
+                    if (denseFrom && na.canUseDenseMutation() && na.length == length && denseRes && nar.denseOnly) {
                         val intLen = (end - begin).toInt()
                         val copy = arrayOfNulls<Any?>(intLen)
-                        na!!.dense!!.copyInto(copy, 0, begin.toInt(), begin.toInt() + intLen)
-                        nar!!.dense = copy
-                        nar.startCompoundOp(true).use { nar.setLength(it, intLen.toDouble()) }
+                        na.dense!!.copyInto(copy, 0, begin.toInt(), begin.toInt() + intLen)
+                        nar.dense = copy
                     } else {
                         for (last in begin until end) {
-                            val temp = getRawElem(o, last)
-                            if (temp !== Scriptable.NOT_FOUND) {
-                                ArrayLikeAbstractOperations.defineElem(cx, result as ScriptableObject, last - begin, temp)
+                            if (ArrayLikeAbstractOperations.hasElem(o, last)) {
+                                defineElemOrThrow(cx, result as Scriptable, last - begin, getElem(cx, o, last))
                             }
                         }
-                        setLengthProperty(cx, result as ScriptableObject, end - begin)
                     }
                 }
             } else { // (count == 0)
@@ -1202,8 +1215,9 @@ public class NativeArray : ScriptableObject {
                     result = Undefined.instance
                 }
             }
+            if (result is Scriptable) setLengthProperty(cx, result, actualDeleteCount)
             /* Find the direction (up or down) to copy and make way for argv. */
-            if (denseFrom && length + delta < Int.MAX_VALUE && na!!.ensureCapacity((length + delta).toInt())) {
+            if (denseFrom && na.canUseDenseMutation() && na.length == length && length + delta < Int.MAX_VALUE && na.ensureCapacity((length + delta).toInt())) {
                 val dense = na.dense!!
                 dense.copyInto(dense, (begin + argc).toInt(), end.toInt(), (end + (length - end)).toInt())
                 if (argc > 0) {
@@ -1219,14 +1233,14 @@ public class NativeArray : ScriptableObject {
             if (delta > 0) {
                 var last = length - 1
                 while (last >= end) {
-                    val temp = getRawElem(o, last)
-                    setRawElem(cx, o, last + delta, temp)
+                    if (ArrayLikeAbstractOperations.hasElem(o, last)) setElem(cx, o, last + delta, getElem(cx, o, last))
+                    else deleteElem(o, last + delta)
                     last--
                 }
             } else if (delta < 0) {
                 for (last in end until length) {
-                    val temp = getRawElem(o, last)
-                    setRawElem(cx, o, last + delta, temp)
+                    if (ArrayLikeAbstractOperations.hasElem(o, last)) setElem(cx, o, last + delta, getElem(cx, o, last))
+                    else deleteElem(o, last + delta)
                 }
                 // Do this backwards because some implementations might use a
                 // non-sparse array and delete from the end.
@@ -1542,7 +1556,7 @@ public class NativeArray : ScriptableObject {
             }
             // Optimize for a native array
             if (o is NativeArray && count <= Int.MAX_VALUE) {
-                if (o.denseOnly) {
+                if (o.canUseDenseMutation() && o.length == len) {
                     val dense = o.dense!!
                     while (count > 0) {
                         dense[to.toInt()] = dense[from.toInt()]
@@ -1712,7 +1726,7 @@ public class NativeArray : ScriptableObject {
             val result = cx.newArray(scope, len.toInt())
             for (k in 0 until len.toInt()) {
                 val fromValue = getElem(cx, source, k.toLong())
-                setElem(cx, result, k.toLong(), fromValue)
+                defineElemOrThrow(cx, result, k.toLong(), fromValue)
             }
             sort(cx, result, comparator)
             return result
@@ -1729,7 +1743,7 @@ public class NativeArray : ScriptableObject {
             for (k in 0 until len.toInt()) {
                 val from = len.toInt() - k - 1
                 val fromValue = getElem(cx, source, from.toLong())
-                setElem(cx, result, k.toLong(), fromValue)
+                defineElemOrThrow(cx, result, k.toLong(), fromValue)
             }
             return result
         }
@@ -1763,16 +1777,16 @@ public class NativeArray : ScriptableObject {
             var r = actualStart + actualSkipCount
             while (i < actualStart) {
                 val e = getElem(cx, source, i)
-                setElem(cx, result, i, e)
+                defineElemOrThrow(cx, result, i, e)
                 i++
             }
             for (j in 2 until args.size) {
-                setElem(cx, result, i, args[j])
+                defineElemOrThrow(cx, result, i, args[j])
                 i++
             }
             while (i < newLen) {
                 val e = getElem(cx, source, r)
-                setElem(cx, result, i, e)
+                defineElemOrThrow(cx, result, i, e)
                 i++
                 r++
             }
@@ -1798,7 +1812,7 @@ public class NativeArray : ScriptableObject {
                 } else {
                     getElem(cx, source, k)
                 }
-                setElem(cx, result, k, value)
+                defineElemOrThrow(cx, result, k, value)
             }
             return result
         }
