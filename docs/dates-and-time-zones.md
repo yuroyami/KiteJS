@@ -44,6 +44,13 @@ Rhino reads the standard ISO format first. An ISO date without a time, such as `
 means UTC; a date-time without an offset means the configured local zone. An explicit `Z` or
 numeric offset fixes the instant independently of that zone.
 
+Local getters and printed GMT offsets use the zone's rules at the represented instant,
+including historical changes and shifts of less than an hour. Constructors, offset-free parsing
+and local setters use ECMAScript's compatible rule: choose the earlier instant when a local time
+occurs twice, and move forward by the gap when a local time does not exist. For example, in
+America/New_York, `new Date(2024, 10, 3, 1, 30)` means `2024-11-03T05:30:00.000Z`, and
+`new Date(2024, 2, 10, 2, 30)` means `2024-03-10T07:30:00.000Z`.
+
 The non-ISO fallback also accepts common browser formats: `2024-01-15 10:30:00`, `2024-1-5`,
 `Jan 2024` (day 1), and named-month dates with fractional seconds. These are local times unless
 they supply a zone. Fractional digits beyond milliseconds are discarded. Two-digit fallback
@@ -56,13 +63,14 @@ accepts them. Prefer ISO strings with an explicit offset for interchange.
 
 ## The arithmetic is the engine's own
 
-Leap years, month lengths, the day of the week, the ISO week, `Date.UTC`, `Date.parse` and every
-getter and setter are computed inside the engine. They do not go through a platform date library,
-so they give the same answer everywhere.
+Leap years, month lengths, the day of the week, `Date.UTC`, and calendar field normalization are
+computed inside the engine. Local-to-instant conversion uses the configured zone through
+kotlinx-datetime; UTC arithmetic is independent of zone rules.
 
 The one thing the engine cannot compute is which offset a zone used on a given day. Those rules
 change by political decision and have to come from a database. KiteJS reads them through
-kotlinx-datetime.
+kotlinx-datetime. Different runtime timezone database versions can differ for rules that changed
+between releases.
 
 ### JavaScript and WebAssembly need one npm package
 

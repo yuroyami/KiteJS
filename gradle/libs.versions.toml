@@ -9,6 +9,8 @@ dokka = "2.3.0-Beta"
 # Time zone data for Date. It is the one piece the engine cannot compute for itself:
 # every platform ships its own IANA database and they have to agree.
 kotlinxDatetime = "0.8.0"
+# Newest timezone release compatible with kotlinx-datetime's js-joda/core 3.2.0.
+jsJodaTimezone = "2.23.0"
 
 # :kitejs-coroutines only. The engine module never sees it.
 kotlinxCoroutines = "1.11.0"

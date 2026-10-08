@@ -65,13 +65,6 @@ public open class Context internal constructor(public val factory: ContextFactor
      * zones; every other date calculation is its own arithmetic.
      */
     public var timeZone: kotlinx.datetime.TimeZone = kotlinx.datetime.TimeZone.currentSystemDefault()
-        set(value) {
-            field = value
-            rawTimeZoneOffsetMs = null
-        }
-
-    /** The zone's standard offset, worked out once per zone rather than per date calculation. */
-    internal var rawTimeZoneOffsetMs: Int? = null
 
     /**
      * Where `Date.now()` and `new Date()` get the time, as epoch milliseconds. Defaults to the

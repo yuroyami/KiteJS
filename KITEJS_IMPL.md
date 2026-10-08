@@ -923,6 +923,18 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   record the compiler language version, rather than leaving it at zero, so the layout follows
   the code's version. Explicit pre-ES6 layouts remain available. RestrictedFunctionPropertiesTest
   exercises descriptor attributes, realm identity, mutation, function kinds and asm parity.
+- D-110: Date reads the configured zone's actual offset at each instant (#49), rather than
+  combining a fixed 2024 base offset with synthetic one-hour daylight time or an equivalent year.
+  Local constructors, offset-free ISO and fallback parsing, and every local setter resolve civil
+  fields with kotlinx-datetime's compatible disambiguation (#50): the earlier overlap instant and
+  the pre-gap offset. GMT formatting reads the same actual offset. Calendar overflow is still
+  normalized by the engine, and extreme local values are rejected before zone conversion while
+  values just outside TimeClip may resolve inside it. DateTimeZoneRulesTest pins Node 26.10
+  controls for historical, half-hour and date-line changes, nine gaps/overlaps, parsing and every
+  local setter. DateZoneSliceTest now records the compatible overlap result; DateRangeTest retains
+  exact positive/negative range boundaries and extreme-field checks. Both web engines share
+  @js-joda/timezone 2.23.0, the newest version compatible with kotlinx-datetime's core 3.2.0;
+  this replaces the 2020 database that still predicted Apia daylight time after its abolition.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases
@@ -1678,10 +1690,9 @@ simple case mapping, which come from the generated tables (rule 3).
       supports wasmJs; on JS and Wasm it reads zone data from the host's `Intl`, on Apple from
       Foundation, on the JVM from `java.time`). `Context.timeZone: TimeZone`, default
       `TimeZone.currentSystemDefault()`, settable like upstream's `Context.setTimeZone`.
-      The three questions upstream asks `java.util.TimeZone` map onto it: the raw offset is
-      `offsetAt` in January and July taken as the smaller, daylight time is "the offset at this
-      instant differs from the raw offset", and the short zone name for the `zzz` pattern is the
-      zone id (kotlinx-datetime has no abbreviations; ledger entry, and the oracle runs with a
+      Local offsets now come directly from `offsetAt` at the represented instant and local civil
+      fields resolve through `LocalDateTime.toInstant` (D-110). The short zone name for the `zzz`
+      pattern is the zone id (kotlinx-datetime has no abbreviations; ledger entry, and the oracle runs with a
       zone whose id equals its abbreviation, such as `UTC`, for the formats that print it).
 - [x] `Context.clock`: a `() -> Double` of epoch milliseconds, default `Clock.System` from the
       stdlib (opt in if the API is still marked experimental at 2.4). `Date.now()`,

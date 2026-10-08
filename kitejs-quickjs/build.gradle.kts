@@ -448,11 +448,11 @@ kotlin {
         }
 
         jsMain.dependencies {
-            implementation(npm("@js-joda/timezone", "2.3.0"))
+            implementation(npm("@js-joda/timezone", libs.versions.jsJodaTimezone.get()))
         }
 
         wasmJsMain.dependencies {
-            implementation(npm("@js-joda/timezone", "2.3.0"))
+            implementation(npm("@js-joda/timezone", libs.versions.jsJodaTimezone.get()))
         }
 
         commonTest.dependencies {

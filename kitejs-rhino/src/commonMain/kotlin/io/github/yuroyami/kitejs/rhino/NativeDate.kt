@@ -9,7 +9,10 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.reflect.KClass
 import kotlin.time.Instant
+import kotlinx.datetime.TimeZone
 import kotlinx.datetime.offsetAt
+import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 
 /**
  * The `Date` builtin.
@@ -490,97 +493,24 @@ internal class NativeDate private constructor() : IdScriptableObject() {
 
         private fun now(cx: Context): Double = cx.clock()
 
-        // ---- The two questions the engine asks the platform ------------------------------------
+        // ---- The configured zone's rules -------------------------------------------------------
 
-        /** January and July of a recent year, which is what pins down the standard offset. */
-        private const val REFERENCE_JANUARY = 1704067200000L
-        private const val REFERENCE_JULY = 1719792000000L
+        private fun offsetMsAt(cx: Context, t: Double): Int =
+            cx.timeZone.offsetAt(Instant.fromEpochMilliseconds(t.toLong())).totalSeconds * 1000
 
-        /**
-         * The zone's offset outside daylight time, in milliseconds. Daylight saving only ever adds,
-         * so the smaller of the January and July offsets is the standard one in either hemisphere.
-         */
-        private fun rawOffset(cx: Context): Int {
-            val cached = cx.rawTimeZoneOffsetMs
-            if (cached != null) return cached
-            val tz = cx.timeZone
-            val jan = tz.offsetAt(Instant.fromEpochMilliseconds(REFERENCE_JANUARY)).totalSeconds
-            val jul = tz.offsetAt(Instant.fromEpochMilliseconds(REFERENCE_JULY)).totalSeconds
-            val raw = (if (jan <= jul) jan else jul) * 1000
-            cx.rawTimeZoneOffsetMs = raw
-            return raw
-        }
-
-        private fun offsetMsAt(cx: Context, t: Double): Int {
-            val millis = t.coerceIn(-8.64e15, 8.64e15).toLong()
-            return cx.timeZone.offsetAt(Instant.fromEpochMilliseconds(millis)).totalSeconds * 1000
-        }
-
-        /**
-         * Whether the zone is on daylight time at [t].
-         *
-         * Comparing against the zone's offset today would be wrong: a zone that has changed its
-         * standard offset since would then look permanently on daylight time. Africa/Algiers is the
-         * example that found this, being UTC+0 in 1970 and UTC+1 now. So the standard offset is
-         * taken from [t]'s own year, as the smaller of its January and July offsets, and daylight
-         * time is when [t] sits above it. That reads correctly in the southern hemisphere too,
-         * where the January offset is the larger one.
-         */
-        private fun inDaylightTime(cx: Context, t: Double): Boolean {
-            if (t.isNaN() || t.isInfinite()) return false
-            val year = YearFromTime(t).toDouble()
-            val january = offsetMsAt(cx, MakeDate(MakeDay(year, 0.0, 1.0), 0.0))
-            val july = offsetMsAt(cx, MakeDate(MakeDay(year, 6.0, 1.0), 0.0))
-            val standard = if (january <= july) january else july
-            return offsetMsAt(cx, t) > standard
-        }
-
-        /**
-         * Upstream answers a whole hour whenever the zone is in daylight time, even for the few
-         * zones that shift by half an hour. The port keeps that, since parity is the point.
-         */
-        private fun DaylightSavingTA(cx: Context, tIn: Double): Double {
-            var t = tIn
-            // Zone rules before 1970 are patchy, so upstream maps an early date onto a year whose
-            // weekdays line up and asks about that instead.
-            if (t < 0.0) {
-                val year = EquivalentYear(YearFromTime(t))
-                val day = MakeDay(year.toDouble(), MonthFromTime(t).toDouble(), DateFromTime(t).toDouble())
-                t = MakeDate(day, TimeWithinDay(t))
-            }
-            return if (inDaylightTime(cx, t)) msPerHour else 0.0
-        }
-
-        /**
-         * A year whose dates fall on the same weekdays. Only safe for working out daylight saving,
-         * and even then not near a year boundary.
-         */
-        private fun EquivalentYear(year: Int): Int {
-            var day = DayFromYear(year.toDouble()).toInt() + 4
-            day %= 7
-            if (day < 0) day += 7
-            return if (IsLeapYear(year)) {
-                when (day) {
-                    0 -> 1984; 1 -> 1996; 2 -> 1980; 3 -> 1992; 4 -> 1976; 5 -> 1988; 6 -> 1972
-                    else -> throw Kit.codeBug()
-                }
-            } else {
-                when (day) {
-                    0 -> 1978; 1 -> 1973; 2 -> 1985; 3 -> 1986; 4 -> 1981; 5 -> 1971; 6 -> 1977
-                    else -> throw Kit.codeBug()
-                }
-            }
-        }
-
-        private fun LocalTime(cx: Context, t: Double): Double = t + rawOffset(cx) + DaylightSavingTA(cx, t)
+        private fun LocalTime(cx: Context, t: Double): Double = t + offsetMsAt(cx, t)
 
         private fun internalUTC(cx: Context, t: Double): Double {
-            if (!t.isFinite()) return ScriptRuntime.NaN
-            val local = t - rawOffset(cx)
-            // DaylightSavingTA subtracts either zero or one hour. Reject only candidates
-            // that cannot enter TimeClip's range, before equivalent-year calendar work.
-            if (local < -HalfTimeDomain || local > HalfTimeDomain + msPerHour) return ScriptRuntime.NaN
-            return local - DaylightSavingTA(cx, local)
+            // A local value just outside TimeClip can still resolve inside it. No supported zone
+            // offset exceeds a day; reject extreme arithmetic before converting calendar fields.
+            if (!t.isFinite() || t < -HalfTimeDomain - msPerDay || t > HalfTimeDomain + msPerDay) {
+                return ScriptRuntime.NaN
+            }
+            val local = Instant.fromEpochMilliseconds(t.toLong()).toLocalDateTime(TimeZone.UTC)
+            // kotlinx-datetime chooses the earlier overlap instant and the pre-gap offset, as
+            // ECMAScript's compatible disambiguation requires. Calendar overflow is normalized
+            // by MakeDay/MakeTime before this resolver sees the civil fields.
+            return local.toInstant(cx.timeZone).toEpochMilliseconds().toDouble()
         }
 
         private fun HourFromTime(t: Double): Int {
@@ -817,8 +747,8 @@ internal class NativeDate private constructor() : IdScriptableObject() {
                 hour.toDouble(), min.toDouble(), sec.toDouble(), msec.toDouble(),
             )
             if (tzhour == -1) {
-                // The spec says UTC here, but every browser uses local time when a time was given.
-                if (timeSpecified) date -= rawOffset(cx) + DaylightSavingTA(cx, date)
+                // Date-only strings are UTC; offset-free date-times are local.
+                if (timeSpecified) date = internalUTC(cx, date)
             } else {
                 date -= (tzhour * 60 + tzmin) * msPerMinute * tzmod
             }
@@ -1039,7 +969,7 @@ internal class NativeDate private constructor() : IdScriptableObject() {
         // ---- Formatting -------------------------------------------------------------------------
 
         private fun date_format(cx: Context, tIn: Double, methodId: Int): String {
-            var t = tIn
+            val t = tIn
             val result = StringBuilder(60)
             val local = LocalTime(cx, t)
 
@@ -1068,7 +998,7 @@ internal class NativeDate private constructor() : IdScriptableObject() {
                 append0PaddedUint(result, SecFromTime(local), 2)
 
                 // Minutes from GMT, daylight saving included.
-                val minutes = floor((rawOffset(cx) + DaylightSavingTA(cx, t)) / msPerMinute).toInt()
+                val minutes = (offsetMsAt(cx, t) / msPerMinute).toInt()
                 // 510 minutes prints as 0830.
                 var offset = (minutes / 60) * 100 + minutes % 60
                 if (offset > 0) {
@@ -1079,12 +1009,6 @@ internal class NativeDate private constructor() : IdScriptableObject() {
                 }
                 append0PaddedUint(result, offset, 4)
 
-                // The equivalent year again, for the same reason DaylightSavingTA needs it.
-                if (t < 0.0) {
-                    val equiv = EquivalentYear(YearFromTime(local))
-                    val day = MakeDay(equiv.toDouble(), MonthFromTime(t).toDouble(), DateFromTime(t).toDouble())
-                    t = MakeDate(day, TimeWithinDay(t))
-                }
                 result.append(" (")
                 result.append(zoneName(cx))
                 result.append(')')

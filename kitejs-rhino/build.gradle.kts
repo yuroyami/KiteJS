@@ -47,11 +47,11 @@ kotlin {
         // kotlinx-datetime on Kotlin/JS and Kotlin/Wasm ships no zone database of its own. Without
         // this the engine only knows UTC and fixed offsets, which DateZoneSliceTest catches at once.
         jsMain.dependencies {
-            implementation(npm("@js-joda/timezone", "2.3.0"))
+            implementation(npm("@js-joda/timezone", libs.versions.jsJodaTimezone.get()))
         }
 
         wasmJsMain.dependencies {
-            implementation(npm("@js-joda/timezone", "2.3.0"))
+            implementation(npm("@js-joda/timezone", libs.versions.jsJodaTimezone.get()))
         }
 
         commonTest.dependencies {
