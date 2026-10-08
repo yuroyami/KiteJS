@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.abi.ExperimentalAbiValidation
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinJvmCompilation
 
 plugins {
     id("kitejs.multiplatform")
@@ -76,20 +77,27 @@ val test262Parity = tasks.register<Test>("test262Parity") {
     group = "verification"
     description = "Runs test262 through both engines and reports where they disagree."
 
-    val jvmTest = tasks.named<Test>("jvmTest")
-    dependsOn(jvmTest.map { it.dependsOn })
-    testClassesDirs = files(jvmTest.map { it.testClassesDirs })
-    classpath = files(jvmTest.map { it.classpath })
+    // Use compilation outputs directly. A task-provider-backed classpath also depends on the
+    // test task itself, which would replay stale expectations before we can regenerate them.
+    val compilation = kotlin.targets.getByName("jvm").compilations.getByName("test") as KotlinJvmCompilation
+    dependsOn(compilation.compileAllTaskName)
+    testClassesDirs = compilation.output.classesDirs
+    classpath = compilation.output.allOutputs + compilation.runtimeDependencyFiles
 
     filter { includeTestsMatching("io.github.yuroyami.kitejs.rhino.Test262ParityTest") }
     systemProperty("test262.filter", providers.systemProperty("test262.filter").getOrElse(""))
+    systemProperty("test262.root", providers.systemProperty("test262.root").getOrElse("../reference/test262"))
     maxHeapSize = "4g"
     // Tens of thousands of files through two engines produces a lot of output otherwise.
     testLogging { showStandardStreams = true }
     outputs.upToDateWhen { false }
 }
 
-// The normal suite stays quick: the parity run is opt in.
+// The normal suite stays quick: parity is a dedicated task and replay is an explicit mode.
+// No corpus test is reported as passing merely because a developer has not fetched the data.
+if (providers.gradleProperty("test262Replay").isPresent) {
+    kotlin.sourceSets.commonTest { kotlin.srcDir("src/test262Replay/kotlin") }
+}
 tasks.named<Test>("jvmTest") {
     exclude("**/Test262ParityTest.class")
 }
@@ -99,12 +107,14 @@ tasks.named<Test>("jvmTest") {
  * tools/fetch-test262.sh. Every target needs to find it, and only the JVM has a working directory
  * worth relying on, so the absolute path is generated into a constant the common tests read.
  */
-val test262Root = layout.projectDirectory.dir("../reference/test262").asFile
+val test262Root = file(providers.gradleProperty("test262ReplayRoot").getOrElse("../reference/test262"))
 val generateTest262Paths = tasks.register("generateTest262Paths") {
     val outputDir = layout.buildDirectory.dir("generated/test262/commonTest/kotlin")
     outputs.dir(outputDir)
     val rootPath = test262Root.absolutePath
     val expectationsPath = layout.buildDirectory.file("test262/expectations.txt").get().asFile.absolutePath
+    inputs.property("rootPath", rootPath)
+    inputs.property("expectationsPath", expectationsPath)
     doLast {
         val dir = outputDir.get().asFile
         dir.mkdirs()

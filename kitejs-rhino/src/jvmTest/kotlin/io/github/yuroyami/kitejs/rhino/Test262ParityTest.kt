@@ -19,16 +19,16 @@ import org.mozilla.javascript.Scriptable as UScriptable
  * when upstream passes. A test both engines fail is fine and expected: upstream has no classes and
  * no modules either. A test where they disagree is either a bug to fix or a ledger entry.
  *
- * The suite is fetched by `tools/fetch-test262.sh` at the commit upstream pins. This test reports
- * that it was skipped rather than failing when the tree is not there, so a checkout without it
- * still builds.
+ * The suite is fetched by `tools/fetch-test262.sh` at the commit upstream pins. This dedicated
+ * task fails if the corpus is missing; ordinary development tests do not run it.
  *
  * Run with `./gradlew test262Parity`. `-Dtest262.filter=built-ins/Array` narrows it while working.
  */
 class Test262ParityTest {
 
-    private val testRoot = File("../reference/test262/test")
-    private val harnessRoot = File("../reference/test262/harness")
+    private val corpusRoot = File(System.getProperty("test262.root", "../reference/test262"))
+    private val testRoot = File(corpusRoot, "test")
+    private val harnessRoot = File(corpusRoot, "harness")
     private val propertiesFile = File("src/jvmTest/resources/test262.properties")
 
     /** Upstream's list, copied. A test needing any of these is not run by either engine. */
@@ -1129,10 +1129,8 @@ class Test262ParityTest {
 
     @Test
     fun theSuiteBehavesTheSameOnBothEngines() {
-        if (!testRoot.isDirectory) {
-            println("test262 not fetched; run tools/fetch-test262.sh. Skipping parity run.")
-            return
-        }
+        assertTrue(testRoot.isDirectory && harnessRoot.isDirectory,
+            "test262 corpus missing at $corpusRoot; run tools/fetch-test262.sh")
 
         val properties = Test262Properties.load(propertiesFile, testRoot)
         val filter = System.getProperty("test262.filter") ?: ""

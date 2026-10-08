@@ -19,9 +19,8 @@ import kotlinx.io.readString
  * the same file reach the same verdict off the JVM? Every difference here is a platform bug, since
  * the code is identical and only the runtime underneath has changed.
  *
- * It needs `./gradlew test262Parity` to have run, which is what writes the expectations. Without
- * them it says so and returns, so a plain check still builds on a machine that has never fetched
- * the suite.
+ * Compile this suite explicitly with `-Ptest262Replay`. It needs `test262Parity` to have written
+ * the expectations. Missing inputs fail the requested replay instead of reporting a false pass.
  */
 class Test262SliceTest {
 
@@ -47,11 +46,7 @@ class Test262SliceTest {
 
     private fun read(path: String): String = fs.source(Path(path)).buffered().use { it.readString() }
 
-    /**
-     * A browser has no file system at all, and asking kotlinx-io for one there throws rather than
-     * answering false. The slice needs the suite on disk, so a target that cannot reach a disk
-     * skips it the same way a machine that has not fetched the suite does.
-     */
+    /** Unsupported storage is a missing prerequisite, never evidence that replay passed. */
     private fun exists(path: String): Boolean = try {
         fs.exists(Path(path))
     } catch (e: UnsupportedOperationException) {
@@ -60,14 +55,8 @@ class Test262SliceTest {
 
     @Test
     fun everyTargetReachesTheOutcomesTheJvmRecorded() {
-        if (!exists(TEST262_EXPECTATIONS)) {
-            println("test262 expectations not found; run ./gradlew test262Parity first. Skipping.")
-            return
-        }
-        if (!exists("$TEST262_ROOT/test")) {
-            println("test262 not reachable from here; run tools/fetch-test262.sh. Skipping.")
-            return
-        }
+        assertTrue(exists(TEST262_EXPECTATIONS), "test262 expectations missing; run test262Parity first")
+        assertTrue(exists("$TEST262_ROOT/test"), "test262 corpus missing or inaccessible; run tools/fetch-test262.sh")
 
         val harnessCache = HashMap<String, String>()
         fun harness(name: String): String = harnessCache.getOrPut(name) { read("$TEST262_ROOT/harness/$name") }

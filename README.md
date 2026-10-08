@@ -78,10 +78,14 @@ opens: call `QuickJs.load()` once and await it. Everywhere else it returns at on
 
 Both engines run one contract suite, on every target, that pins down how the API behaves.
 
-Rhino is also held to its upstream: every script runs through upstream Rhino as well, and the two
-answers have to match. On the last full test262 run, 52,802 cases went through upstream Rhino and
-the port and none of them disagreed. The same 52,802 cases then run on JavaScript, WebAssembly,
-iOS and macOS against the outcomes the JVM recorded, so no target can quietly behave differently.
+Rhino's dedicated `:kitejs-rhino:test262Parity` task compares a pinned test262 corpus with upstream
+Rhino, recording intentional differences separately. Agreement includes tests both engines fail;
+it is a compatibility check, not a claim that every case conforms to ECMAScript.
+
+Corpus replay is separate from the ordinary test suite and must be requested with
+`-Ptest262Replay`. Missing corpus data or expectations fail that requested run. Cross-platform
+test262 replay is being wired into CI in [#31](https://github.com/yuroyami/KiteJS/issues/31);
+the regular platform tests alone do not establish corpus coverage.
 
 ## Licence
 
