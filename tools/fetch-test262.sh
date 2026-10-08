@@ -5,7 +5,7 @@
 # makes the parity run meaningful, so it is checked rather than assumed.
 set -euo pipefail
 
-PIN="3fd4ec27f1798ebecafc73b354a45dcdda9bde29"
+PIN="$(cat "$(dirname "$0")/test262-revision.txt")"
 REPO="https://github.com/tc39/test262.git"
 DEST="$(cd "$(dirname "$0")/.." && pwd)/reference/test262"
 

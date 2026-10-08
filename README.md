@@ -83,9 +83,10 @@ Rhino, recording intentional differences separately. Agreement includes tests bo
 it is a compatibility check, not a claim that every case conforms to ECMAScript.
 
 Corpus replay is separate from the ordinary test suite and must be requested with
-`-Ptest262Replay`. Missing corpus data or expectations fail that requested run. Cross-platform
-test262 replay is being wired into CI in [#31](https://github.com/yuroyami/KiteJS/issues/31);
-the regular platform tests alone do not establish corpus coverage.
+`-Ptest262Replay`. Missing or mismatched inputs fail that requested run. The dedicated workflow
+replays one versioned artifact across its platform matrix and records executed counts and known
+differences per target. Coverage is established by those run results; the regular platform tests
+alone do not establish corpus coverage. See [Testing](TESTING.md) for commands and evidence.
 
 ## Licence
 

@@ -1,42 +1,116 @@
 name: test262 parity
 
-# The whole test262 suite, through upstream Rhino and through this port, comparing the two
-# outcomes file by file. It takes minutes and needs the suite fetched first, so it does not run
-# on every push. Nightly, plus on demand.
-
+# One producer, one immutable selection, and an explicit replay denominator on every target.
 on:
   schedule:
     - cron: '0 3 * * *'
   workflow_dispatch:
+    inputs:
+      filter:
+        description: 'Optional test262 path prefix; empty runs the full selected corpus'
+        type: string
+        default: ''
+
+permissions:
+  contents: read
 
 concurrency:
-  group: test262
+  group: test262-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   parity:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
       - uses: gradle/actions/setup-gradle@v4
-
+      - name: Check artifact validation regressions
+        run: python3 -B -m unittest discover -s tools -p 'test_test262_corpus.py'
       - name: Fetch test262 at the pinned commit
-        run: ./tools/fetch-test262.sh
-
-      - name: Run the parity check
-        run: ./gradlew :kitejs-rhino:test262Parity
-
-      - name: Upload the per-folder summary
+        run: bash tools/fetch-test262.sh
+      - name: Compare engines and package the selected corpus
+        env:
+          TEST262_FILTER: ${{ inputs.filter }}
+        run: ./gradlew :kitejs-rhino:bundleTest262 "-Dtest262.filter=$TEST262_FILTER"
+      - name: Upload the validated replay artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: test262-corpus
+          path: kitejs-rhino/build/test262/corpus/
+          if-no-files-found: error
+      - name: Upload producer evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test262-summary
+          name: test262-producer-results
           path: |
+            kitejs-rhino/build/test262/*.txt
+            kitejs-rhino/build/test262/*.tsv
+            kitejs-rhino/build/test262/*.json
             kitejs-rhino/build/test262/summary.md
-            kitejs-rhino/build/test262/expectations.txt
-          if-no-files-found: warn
+            kitejs-rhino/build/test-results/test262Parity/
+          if-no-files-found: error
+
+  replay:
+    needs: parity
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, task: jvmTest }
+          - { os: ubuntu-latest, task: testAndroidHostTest }
+          - { os: ubuntu-latest, task: jsNodeTest }
+          - { os: ubuntu-latest, task: wasmJsNodeTest }
+          - { os: ubuntu-latest, task: jsBrowserTest }
+          - { os: ubuntu-latest, task: wasmJsBrowserTest }
+          - { os: ubuntu-latest, task: linuxX64Test }
+          - { os: macos-latest, task: macosArm64Test }
+          - { os: macos-latest, task: iosSimulatorArm64Test }
+          - { os: windows-latest, task: mingwX64Test }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: test262-corpus
+          path: kitejs-rhino/build/test262/corpus
+      - name: Verify artifact provenance and integrity
+        run: python tools/test262-corpus.py validate
+      - name: Replay the exact selected cases
+        shell: bash
+        env:
+          REPLAY_TASK: ${{ matrix.task }}
+        run: ./gradlew ":kitejs-rhino:$REPLAY_TASK" -Ptest262Replay --tests '*Test262SliceTest*'
+      - name: Require a complete machine-readable result
+        shell: bash
+        env:
+          REPLAY_TASK: ${{ matrix.task }}
+        run: python tools/test262-corpus.py report --output "kitejs-rhino/build/test-results/$REPLAY_TASK"
+      - name: Upload target results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test262-${{ matrix.task }}-results
+          path: kitejs-rhino/build/test-results/${{ matrix.task }}/
+          if-no-files-found: error

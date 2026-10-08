@@ -4,34 +4,16 @@
 
 package io.github.yuroyami.kitejs.rhino
 
+import kotlin.io.encoding.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlinx.io.buffered
-import kotlinx.io.files.Path
-import kotlinx.io.files.SystemFileSystem
-import kotlinx.io.readString
 
-/**
- * test262 on every target, against the outcomes the JVM parity run recorded.
- *
- * The JVM run is what compares this engine with upstream. This one asks a narrower question: does
- * the same file reach the same verdict off the JVM? Every difference here is a platform bug, since
- * the code is identical and only the runtime underneath has changed.
- *
- * Compile this suite explicitly with `-Ptest262Replay`. It needs `test262Parity` to have written
- * the expectations. Missing inputs fail the requested replay instead of reporting a false pass.
- */
+/** Reads one validated artifact file, through Karma in browsers and the filesystem elsewhere. */
+internal expect fun readTest262Bundle(name: String): String
+
+/** Explicit corpus replay. Missing, stale, truncated or inaccessible inputs are failures. */
 class Test262SliceTest {
-
-    private val fs = SystemFileSystem
-
-    /**
-     * The one operation that is not the port's own, so the one place targets can disagree.
-     * `String.prototype.toLowerCase` calls Kotlin's `lowercase()`, which is the platform's: the
-     * JVM applies the conditional special casing for a Greek final sigma and JS and Native do not.
-     * The JVM answer is upstream's, so the parity run is clean and this one is not (D-60).
-     */
     private val knownPlatformDifferences = setOf(
         "built-ins/String/prototype/toLowerCase/special_casing_conditional.js",
         "built-ins/String/prototype/toLocaleLowerCase/special_casing_conditional.js",
@@ -44,60 +26,66 @@ class Test262SliceTest {
         "staging/sm/generators/delegating-yield-11.js",
     )
 
-    private fun read(path: String): String = fs.source(Path(path)).buffered().use { it.readString() }
+    private fun decode(text: String): String = Base64.decode(text).decodeToString()
 
-    /** Unsupported storage is a missing prerequisite, never evidence that replay passed. */
-    private fun exists(path: String): Boolean = try {
-        fs.exists(Path(path))
-    } catch (e: UnsupportedOperationException) {
-        false
+    private fun json(text: String): String = buildString {
+        append('"')
+        for (c in text) when (c) {
+            '\\' -> append("\\\\")
+            '"' -> append("\\\"")
+            else -> if (c < ' ') append("\\u").append(c.code.toString(16).padStart(4, '0')) else append(c)
+        }
+        append('"')
     }
 
     @Test
     fun everyTargetReachesTheOutcomesTheJvmRecorded() {
-        assertTrue(exists(TEST262_EXPECTATIONS), "test262 expectations missing; run test262Parity first")
-        assertTrue(exists("$TEST262_ROOT/test"), "test262 corpus missing or inaccessible; run tools/fetch-test262.sh")
-
-        val harnessCache = HashMap<String, String>()
-        fun harness(name: String): String = harnessCache.getOrPut(name) { read("$TEST262_ROOT/harness/$name") }
-
-        val differences = mutableListOf<String>()
-        var checked = 0
-
-        for (line in read(TEST262_EXPECTATIONS).lineSequence()) {
-            if (line.isBlank()) continue
+        assertEquals(TEST262_MANIFEST, readTest262Bundle("manifest.json"), "Replay manifest changed after validation")
+        val harness = readTest262Bundle("harness.tsv").lineSequence().filter { it.isNotEmpty() }.associate { line ->
             val parts = line.split('\t')
-            if (parts.size < 3) continue
-            val (relative, mode) = parts
-            val expected = parts[2]
-
-            val source = read("$TEST262_ROOT/test/$relative")
-            val meta = Test262FrontMatter.parse(source)
-            val actual = Test262Execution.run(
-                relative,
-                source,
-                meta,
-                strict = mode == "strict",
-                harness = meta.harnessFiles().map { harness(it) },
-            )
-            checked++
-            if (relative in knownPlatformDifferences) continue
-            if (actual != expected) {
-                differences.add("$relative [$mode]\n  jvm:  $expected\n  here: $actual")
+            assertEquals(2, parts.size, "Malformed harness record")
+            parts[0] to decode(parts[1])
+        }
+        val differences = mutableListOf<String>()
+        val intentional = mutableListOf<String>()
+        val seen = mutableSetOf<String>()
+        var checked = 0
+        var passed = 0
+        var strictCases = 0
+        for (shard in TEST262_SHARDS) {
+            val records = readTest262Bundle(shard).lineSequence().filter { it.isNotEmpty() }
+            for (line in records) {
+                val parts = line.split('\t')
+                assertEquals(4, parts.size, "Malformed replay record in $shard")
+                val (relative, mode, outcome, encodedSource) = parts
+                assertTrue(mode == "strict" || mode == "sloppy", "Invalid mode: $mode")
+                assertTrue(seen.add("$relative [$mode]"), "Duplicate replay case: $relative [$mode]")
+                val source = decode(encodedSource)
+                val expected = decode(outcome)
+                val meta = Test262FrontMatter.parse(source)
+                val actual = Test262Execution.run(relative, source, meta, strict = mode == "strict",
+                    harness = meta.harnessFiles().map { harness[it] ?: error("Missing harness: $it") })
+                checked++
+                if (mode == "strict") strictCases++
+                if (actual == Test262Execution.PASS) passed++
+                if (actual != expected) {
+                    val detail = "$relative [$mode]: expected $expected; actual $actual"
+                    if (relative in knownPlatformDifferences) intentional.add(detail) else differences.add(detail)
+                }
             }
         }
-
-        println("test262 on this target: $checked cases, ${differences.size} differ from the JVM")
-        assertTrue(checked > 0, "the expectations file was empty")
-        assertEquals(
-            emptyList(),
-            differences.take(REPORTED),
-            "${differences.size} cases behave differently here than on the JVM",
-        )
-    }
-
-    private companion object {
-        /** Enough to see the shape of a problem without an unreadable failure message. */
-        const val REPORTED = 30
+        // A machine-readable record survives in each runner's XML output, including on browsers.
+        // These are replay matches, not a claim that all selected cases conform to ECMAScript.
+        println("TEST262_RESULT={" +
+            "\"engineCommit\":" + json(TEST262_ENGINECOMMIT) +
+            ",\"engineSources\":" + json(TEST262_ENGINESOURCES) +
+            ",\"corpusCommit\":" + json(TEST262_CORPUSCOMMIT) +
+            ",\"oracleVersion\":" + json(TEST262_ORACLEVERSION) +
+            ",\"executed\":$checked,\"strict\":$strictCases,\"sloppy\":${checked - strictCases}" +
+            ",\"passed\":$passed,\"nonPassing\":${checked - passed},\"mismatches\":${differences.size}" +
+            ",\"intentionalDifferences\":[" + intentional.joinToString(",") { json(it) } + "]}")
+        assertTrue(TEST262_CASE_COUNT > 0, "Replay denominator must be positive")
+        assertEquals(TEST262_CASE_COUNT, checked, "Replay did not execute the exact selected denominator")
+        assertEquals(emptyList(), differences.take(30), "${differences.size} cases differ from the recorded JVM outcomes")
     }
 }

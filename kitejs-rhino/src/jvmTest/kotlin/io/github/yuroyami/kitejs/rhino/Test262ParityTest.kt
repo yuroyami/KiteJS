@@ -1134,8 +1134,13 @@ class Test262ParityTest {
 
         val properties = Test262Properties.load(propertiesFile, testRoot)
         val filter = System.getProperty("test262.filter") ?: ""
+        val begin = ProcessBuilder("python3", "../tools/test262-corpus.py", "begin",
+            "--corpus", corpusRoot.absolutePath, "--filter", filter).inheritIO().start()
+        assertEquals(0, begin.waitFor(), "Could not record test262 producer provenance")
 
         val expectations = StringBuilder()
+        val exclusions = StringBuilder()
+        val outcomes = StringBuilder()
         val differences = mutableListOf<String>()
         // Files upstream cannot parse. The port takes syntax upstream rejects, so there is
         // nothing to compare on these: they are counted and listed, not treated as a difference.
@@ -1154,15 +1159,32 @@ class Test262ParityTest {
             val relative = file.relativeTo(testRoot).path.replace('\\', '/')
             if (filter.isNotEmpty() && !relative.startsWith(filter)) continue
             // _FIXTURE files are imported by other tests, never run on their own.
-            if (relative.endsWith("_FIXTURE.js")) continue
-            if (properties.isSkipped(relative) && portOnlyFolders.none { relative.startsWith("$it/") }) { skipped++; continue }
+            if (relative.endsWith("_FIXTURE.js")) {
+                exclusions.append(relative).append("\tfixture\n")
+                skipped++
+                continue
+            }
+            if (properties.isSkipped(relative) && portOnlyFolders.none { relative.startsWith("$it/") }) {
+                exclusions.append(relative).append("\tupstream properties exclusion\n")
+                skipped++
+                continue
+            }
 
             val source = file.readText()
             val meta = Test262FrontMatter.parse(source)
-            if (meta.features.any { it in unsupportedFeatures }) { skipped++; continue }
+            if (meta.features.any { it in unsupportedFeatures }) {
+                exclusions.append(relative).append("\tunsupported features: ")
+                    .append(meta.features.filter { it in unsupportedFeatures }.joinToString(",")).append('\n')
+                skipped++
+                continue
+            }
             // Neither engine has modules. An async test runs to the end of its microtasks and
             // reports through $DONE on both (D-97).
-            if (meta.hasFlag("module")) { skipped++; continue }
+            if (meta.hasFlag("module")) {
+                exclusions.append(relative).append("\tmodule\n")
+                skipped++
+                continue
+            }
 
             val modes = buildList {
                 if (!meta.hasFlag("onlyStrict")) add(false)
@@ -1180,6 +1202,14 @@ class Test262ParityTest {
                 val known = relative in knownDifferences ||
                     (!strict && relative in knownSloppyDifferences) ||
                     (strict && relative in knownStrictDifferences)
+                val comparison = when {
+                    upstream == ported -> "agreement"
+                    known -> knownDifferences[relative] ?: (if (strict) knownStrictDifferences else knownSloppyDifferences)[relative]!!
+                    upstreamFailedToParse(upstream) -> "upstream cannot parse"
+                    else -> "unexpected difference"
+                }
+                outcomes.append(relative).append(if (strict) "\tstrict\t" else "\tsloppy\t")
+                    .append(upstream).append('\t').append(ported).append('\t').append(comparison).append('\n')
                 if (upstream != ported) {
                     val mode = if (strict) "strict" else "non-strict"
                     if (known) {
@@ -1259,6 +1289,8 @@ class Test262ParityTest {
         val expectationsFile = File("build/test262/expectations.txt")
         expectationsFile.parentFile.mkdirs()
         expectationsFile.writeText(expectations.toString())
+        File("build/test262/exclusions.tsv").writeText(exclusions.toString())
+        File("build/test262/outcomes.tsv").writeText(outcomes.toString())
         println("recorded $ran outcomes to ${expectationsFile.absolutePath}")
 
         // A summary PORTING_STATUS can quote, so the numbers there come from a run.
@@ -1291,6 +1323,8 @@ class Test262ParityTest {
             differences.take(MAX_REPORTED),
             "the port and upstream disagree on ${differences.size} cases",
         )
+        val complete = ProcessBuilder("python3", "../tools/test262-corpus.py", "complete").inheritIO().start()
+        assertEquals(0, complete.waitFor(), "Could not finalize test262 producer provenance")
     }
 
     // ---- Running one case on each engine --------------------------------------------------------
