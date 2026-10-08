@@ -1223,44 +1223,88 @@ public object ScriptRuntime {
             toplevel = false
             iterating = cxIterating.contains(thisObj)
         }
-        val result = StringBuilder(128)
-        if (toplevel) result.append("(")
-        result.append('{')
+        val properties = ArrayList<String>()
+        val descriptors = ArrayList<Pair<String, String>>()
         try {
             if (!iterating) {
                 cxIterating.add(thisObj!!) // stop recursion
-                val ids = thisObj.getIds()
-                for (i in ids.indices) {
-                    val id = ids[i]
-                    val value: Any?
-                    if (id is Int) {
-                        value = thisObj.get(id, thisObj)
-                        if (value === Scriptable.NOT_FOUND) continue // a property has been removed
-                        if (i > 0) result.append(", ")
-                        result.append(id)
-                    } else {
-                        val strId = id as String
-                        value = thisObj.get(strId, thisObj)
-                        if (value === Scriptable.NOT_FOUND) continue // a property has been removed
-                        if (i > 0) result.append(", ")
-                        if (isValidIdentifierName(strId, cx, cx.isStrictMode)) {
-                            result.append(strId)
+                for (id in thisObj.getIds()) {
+                    if (id !is Int && id !is String) continue
+                    val key = objectSourceKey(cx, id)
+                    val descriptor = (thisObj as? ScriptableObject)?.getOwnPropertyDescriptor(cx, id)
+                    if (descriptor?.isAccessorDescriptor == true) {
+                        val getter = descriptor.getter
+                        val setter = descriptor.setter
+                        val hasGetter = getter !== Scriptable.NOT_FOUND && !Undefined.isUndefined(getter)
+                        val hasSetter = setter !== Scriptable.NOT_FOUND && !Undefined.isUndefined(setter)
+                        if ((hasGetter || hasSetter) &&
+                            (!hasGetter || accessorHasLiteralSource(getter, 0)) &&
+                            (!hasSetter || accessorHasLiteralSource(setter, 1))
+                        ) {
+                            if (hasGetter) properties.add("get $key" + (getter as JSFunction).descriptor.parametersAndBodySource)
+                            if (hasSetter) properties.add("set $key" + (setter as JSFunction).descriptor.parametersAndBodySource)
                         } else {
-                            result.append('\'')
-                            result.append(escapeString(strId, '\''))
-                            result.append('\'')
+                            // Arrow accessors and arbitrary callable parameter lists cannot be
+                            // expressed with get/set syntax. Keep their slot in enumeration order.
+                            properties.add(if (id == "__proto__") "$key(){}" else "$key:undefined")
+                            val getSource = if (hasGetter) callableSource(cx, scope, getter) else "undefined"
+                            val setSource = if (hasSetter) callableSource(cx, scope, setter) else "undefined"
+                            descriptors.add(uneval(cx, scope, id.toString()) to
+                                "{get:$getSource,set:$setSource," +
+                                "enumerable:${descriptor.isEnumerable},configurable:${descriptor.isConfigurable}}")
                         }
+                        continue
                     }
-                    result.append(':')
-                    result.append(uneval(cx, scope, value))
+                    val value = if (thisObj is ScriptableObject) {
+                        if (descriptor == null) Scriptable.NOT_FOUND else descriptor.value
+                    } else if (id is Int) thisObj.get(id, thisObj) else thisObj.get(id as String, thisObj)
+                    if (value === Scriptable.NOT_FOUND) continue
+                    val method = (value as? JSFunction)?.let { methodSource(it, key) }
+                    if (id == "__proto__" && method == null) {
+                        // A method creates an own slot even for __proto__; replace it with the
+                        // data descriptor without changing its place in enumeration order.
+                        properties.add("$key(){}")
+                        descriptors.add("'__proto__'" to "{value:" + uneval(cx, scope, value) +
+                            ",writable:true,enumerable:true,configurable:true}")
+                    } else properties.add(method ?: "$key:" + uneval(cx, scope, value))
                 }
             }
         } finally {
             if (toplevel) cx.iterating = null
         }
-        result.append('}')
-        if (toplevel) result.append(')')
-        return result.toString()
+        var source = properties.joinToString(", ", "{", "}")
+        for ((key, descriptor) in descriptors) source = "Object.defineProperty($source,$key,$descriptor)"
+        return if (toplevel) "($source)" else source
+    }
+
+    private fun objectSourceKey(cx: Context, id: Any): String {
+        if (id is Int) return id.toString()
+        val name = id as String
+        val quoted = "'" + escapeString(name, '\'') + "'"
+        // A data property named __proto__ must not turn into the object-literal prototype setter.
+        return if (name == "__proto__") "[$quoted]" else
+            if (isValidIdentifierName(name, cx, cx.isStrictMode)) name else quoted
+    }
+
+    private fun methodSource(function: JSFunction, key: String): String? {
+        if (function.homeObject == null || function.descriptor.isClassConstructor || function.descriptor.hasLexicalThis) return null
+        val suffix = function.descriptor.parametersAndBodySource ?: return null
+        val prefix = if (function.descriptor.isAsyncFunction) "async " else
+            if (function.descriptor.isES6Generator) "*" else ""
+        return prefix + key + suffix
+    }
+
+    private fun accessorHasLiteralSource(value: Any?, parameterCount: Int): Boolean {
+        val function = value as? JSFunction ?: return false
+        val descriptor = function.descriptor
+        return function.homeObject != null && !descriptor.hasLexicalThis && !descriptor.isES6Generator && !descriptor.isAsyncFunction &&
+            !descriptor.hasRestArg && descriptor.paramCount == parameterCount &&
+            descriptor.parametersAndBodySource != null
+    }
+
+    private fun callableSource(cx: Context, scope: Scriptable, value: Any?): String {
+        val method = (value as? JSFunction)?.let { methodSource(it, "accessor") }
+        return if (method != null) "({$method}).accessor" else uneval(cx, scope, value)
     }
 
     /**

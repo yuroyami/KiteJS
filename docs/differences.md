@@ -164,3 +164,14 @@ expression syntax including named groups, lookbehind and `\p{...}`.
 
 Recent library methods are there too, among them `Array.prototype.at`, `flat`, `findLast`,
 `Object.hasOwn`, `Object.groupBy`, `String.prototype.at` and `replaceAll`.
+
+## Source serialization
+
+Rhino's `uneval` and `Object.prototype.toSource` extensions can reconstruct enumerable object
+properties, including methods and getter/setter pairs. Serialization reads accessor descriptors
+without running their getters, and writes resolved property names rather than reevaluating computed
+name expressions. Ordinary function and arrow values retain their expression syntax.
+
+This writes source, not a snapshot of captured lexical environments, object identity, prototypes,
+or every property attribute. Native functions have no JavaScript body to serialize. Use a data
+format such as JSON when a stable data interchange contract is required.

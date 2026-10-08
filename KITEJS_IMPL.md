@@ -890,6 +890,12 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   only below ES6. `for each` and `for-of` still enumerate values. `ForInEnumerationTest` checks
   assignment and binding patterns, per-iteration lexical scopes, and that enumerating keys
   never reads property values.
+- D-106: object `uneval`/`toSource` reads own descriptors instead of invoking getters, and
+  reconstructs methods and accessor pairs as source (#103). Parser-recorded parameter-list
+  offsets let it replace a computed or renamed method's original key with its current property
+  key without replaying key expressions. Accessors requiring function expressions, including
+  arrow getters, are restored through `Object.defineProperty`. Ordinary function and arrow data
+  values keep expression syntax. `UnevalObjectTest` checks round trips and serialization effects.
 - D-7: JavaBean accessors become Kotlin properties across the whole port (getString() becomes .string, and `Parser.CurrentPositionReporter` declares properties, not get-methods). Upstream's constructor overload trios collapse into constructors with default arguments. Call sites adapt mechanically at port time.
 
 ## Phases

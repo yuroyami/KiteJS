@@ -31,6 +31,7 @@ public object CodeGenUtils {
 
     private fun fillInForFunction(builder: JSDescriptor.Builder<*>, fn: FunctionNode) {
         builder.functionType = fn.functionType
+        builder.parametersSourceStart = fn.parametersSourceStart
         builder.requiresActivationFrame = fn.requiresActivation
         builder.requiresArgumentObject = fn.requiresArgumentObject
         if (fn.functionName != null) builder.name = fn.name

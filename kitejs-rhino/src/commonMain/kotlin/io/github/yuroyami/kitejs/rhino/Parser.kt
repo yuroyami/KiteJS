@@ -1040,6 +1040,7 @@ public class Parser(
             if (isAsync) reportError("msg.async.generator.unsupported")
         }
         if (lpPos != -1) fnNode.lp = lpPos - functionSourceStart
+        fnNode.parametersSourceStart = lpPos
 
         fnNode.jsDocNode = getAndResetJsDoc()
 

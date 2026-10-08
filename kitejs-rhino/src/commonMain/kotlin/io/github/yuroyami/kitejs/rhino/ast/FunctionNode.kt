@@ -20,6 +20,9 @@ import io.github.yuroyami.kitejs.rhino.Token
  */
 public open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(pos) {
 
+    /** Absolute source offset, kept independently of AST reparenting for source reconstruction. */
+    internal var parametersSourceStart: Int = -1
+
     /**
      * Sets the function name and reparents it to this node. Null means an anonymous function.
      */

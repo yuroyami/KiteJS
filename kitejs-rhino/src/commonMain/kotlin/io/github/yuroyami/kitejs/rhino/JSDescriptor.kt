@@ -24,6 +24,7 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
     private val wholeSource: String?,
     private val rawSourceStart: Int,
     private val rawSourceEnd: Int,
+    private val parametersSourceStart: Int,
     public val name: String,
     public val languageVersion: Int,
     public val paramAndVarCount: Int,
@@ -70,6 +71,10 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
     public val isClassFieldInitializer: Boolean get() = (flags and IS_CLASS_FIELD_INITIALIZER_FLAG) != 0
 
     public val rawSource: String get() = wholeSource!!.substring(rawSourceStart, rawSourceEnd)
+
+    /** The original parameter list and body, without a function or method's name. */
+    internal val parametersAndBodySource: String?
+        get() = if (parametersSourceStart < 0) null else wholeSource?.substring(parametersSourceStart, rawSourceEnd)
 
     public fun getParamOrVarConst(index: Int): Boolean = paramIsConst[index]
 
@@ -121,6 +126,7 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
         public var rawSource: String? = null
         public var rawSourceStart: Int = 0
         public var rawSourceEnd: Int = 0
+        internal var parametersSourceStart: Int = -1
         public var name: String? = null
         public var languageVersion: Int = 0
         public var paramAndVarCount: Int = 0
@@ -193,6 +199,7 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
                 rawSource,
                 rawSourceStart,
                 rawSourceEnd,
+                parametersSourceStart,
                 name ?: "",
                 languageVersion,
                 paramAndVarCount,
