@@ -61,6 +61,26 @@ class Test262ParityTest {
      */
     private val knownDifferences = buildMap {
         for (path in listOf(
+            "built-ins/Object/defineProperty/15.2.3.6-4-254.js",
+            "built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-4-250.js",
+        )) {
+            put(path, "D-119: setter-only own-property descriptors include get: undefined here")
+        }
+        for (path in listOf(
+            "built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-4-212.js",
+            "built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-4-213.js",
+            "built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-4-214.js",
+            "built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-4-215.js",
+        )) {
+            put(path, "D-102: RegExp prototype properties are configurable accessors here")
+        }
+        for (path in listOf(
+            "built-ins/Object/prototype/valueOf/S15.2.4.4_A14.js",
+            "built-ins/Object/prototype/valueOf/S15.2.4.4_A15.js",
+        )) {
+            put(path, "D-117: ToObject rejects an undefined call receiver here")
+        }
+        for (path in listOf(
             "built-ins/Function/prototype/arguments/prop-desc.js",
             "built-ins/Function/prototype/bind/BoundFunction_restricted-properties.js",
             "built-ins/Function/prototype/caller-arguments/accessor-properties.js",

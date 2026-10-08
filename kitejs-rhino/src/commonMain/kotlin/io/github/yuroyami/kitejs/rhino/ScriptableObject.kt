@@ -330,7 +330,7 @@ public abstract class ScriptableObject :
      * 10.4.7). Upstream threw from inside the check, walked through a proxy's getPrototypeOf trap,
      * and let Object.prototype take a new prototype (D-91).
      */
-    internal open fun setPrototypeOf(cx: Context, proto: Scriptable?): Boolean {
+    override fun setPrototypeOf(cx: Context, proto: Scriptable?): Boolean {
         val current = prototype
         if (proto === current) return true
         if (current == null && this is NativeObject && isObjectPrototypeOfItsRealm()) return false
@@ -370,6 +370,12 @@ public abstract class ScriptableObject :
         }
 
     override fun getIds(): Array<Any?> = startCompoundOp(false).use { getIds(it, false, false) }
+
+    override fun ownPropertyKeys(): Array<Any?> {
+        val ids = startCompoundOp(false).use { getIds(it, true, true) }
+        if (ids.none { it is Symbol }) return ids
+        return (ids.filter { it !is Symbol } + ids.filterIsInstance<Symbol>()).toTypedArray()
+    }
 
     /** Every property, enumerable or not. */
     public open val allIds: Array<Any?> get() = startCompoundOp(false).use { getIds(it, true, false) }
@@ -531,21 +537,7 @@ public abstract class ScriptableObject :
     // ---- Property descriptors -----------------------------------------------------------------
 
     public fun defineOwnProperties(cx: Context, props: ScriptableObject) {
-        val ids = props.startCompoundOp(false).use { props.getIds(it, false, true) }
-        val descs = arrayOfNulls<DescriptorInfo>(ids.size)
-        for (i in ids.indices) {
-            val descObj = ScriptRuntime.getObjectElem(props, ids[i], cx)
-            val desc = DescriptorInfo(ensureScriptableObject(descObj))
-            checkPropertyDefinition(desc)
-            descs[i] = desc
-        }
-        for (i in ids.indices) {
-            // DefinePropertyOrThrow: an object that refuses a definition, as a typed array or a
-            // proxy can, makes it a TypeError rather than a silent no-op (D-88).
-            if (!defineOwnProperty(cx, ids[i], descs[i]!!)) {
-                throw ScriptRuntime.typeErrorById("msg.define.refused", ids[i].let { if (it is Symbol) it.toString() else ScriptRuntime.toString(it) })
-            }
-        }
+        AbstractEcmaObjectOperations.defineOwnProperties(cx, this, props)
     }
 
     public fun defineOwnProperty(cx: Context, id: Any?, desc: ScriptableObject): Boolean {
@@ -557,6 +549,16 @@ public abstract class ScriptableObject :
 
     public open fun defineOwnProperty(cx: Context, id: Any?, desc: DescriptorInfo): Boolean =
         defineOwnProperty(cx, id, desc, true)
+
+    override fun defineOwnPropertyOrFalse(cx: Context, id: Any?, desc: DescriptorInfo): Boolean {
+        checkPropertyDefinition(desc)
+        val key = ScriptRuntime.toPropertyKey(id)
+        // ArraySetLength must convert its value before validating the current descriptor.
+        if (this !is NativeArray || key != "length") {
+            if (!AbstractEcmaObjectOperations.isCompatiblePropertyDescriptor(cx, isExtensible, desc, getOwnPropertyDescriptor(cx, key))) return false
+        }
+        return defineOwnProperty(cx, key, desc)
+    }
 
     internal open fun defineOwnProperty(
         cx: Context,
@@ -609,19 +611,27 @@ public abstract class ScriptableObject :
          * in its own order and kept the raw values, so a proxy descriptor answering undefined for
          * `get` looked like an accessor and `{enumerable: 1}` compared unequal to true (D-88).
          */
-        public constructor(desc: ScriptableObject) {
+        public constructor(desc: ScriptableObject) : this(desc as Scriptable)
+
+        public constructor(desc: Scriptable) {
+            if (!ScriptRuntime.isObject(desc)) throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(desc))
             enumerable = field(desc, "enumerable", true)
             configurable = field(desc, "configurable", true)
             value = field(desc, "value", false)
             writable = field(desc, "writable", true)
             getter = field(desc, "get", false)
+            if (Undefined.isUndefined(getter)) getter = Undefined.instance
+            if (getter !== Scriptable.NOT_FOUND && getter !== Undefined.instance && getter !is Callable) throw ScriptRuntime.notFunctionError(getter)
             setter = field(desc, "set", false)
+            if (Undefined.isUndefined(setter)) setter = Undefined.instance
+            if (setter !== Scriptable.NOT_FOUND && setter !== Undefined.instance && setter !is Callable) throw ScriptRuntime.notFunctionError(setter)
             accessorDescriptor = getter !== Scriptable.NOT_FOUND || setter !== Scriptable.NOT_FOUND
+            if (isDataDescriptor && isAccessorDescriptor) throw ScriptRuntime.typeErrorById("msg.both.data.and.accessor.desc")
         }
 
         private companion object {
             /** Field [name] of [desc], or [Scriptable.NOT_FOUND] when it has none. */
-            fun field(desc: ScriptableObject, name: String, flag: Boolean): Any? {
+            fun field(desc: Scriptable, name: String, flag: Boolean): Any? {
                 if (!hasProperty(desc, name)) return Scriptable.NOT_FOUND
                 val v = getProperty(desc, name).let { if (it === Scriptable.NOT_FOUND) Undefined.instance else it }
                 return if (flag) ScriptRuntime.toBoolean(v) else v
@@ -780,10 +790,10 @@ public abstract class ScriptableObject :
 
     // ---- Extensibility and sealing -------------------------------------------------------------
 
-    public open val isExtensible: Boolean
+    override val isExtensible: Boolean
         get() = isExtensibleField
 
-    public open fun preventExtensions(): Boolean {
+    override fun preventExtensions(): Boolean {
         isExtensibleField = false
         return true
     }
@@ -962,7 +972,7 @@ public abstract class ScriptableObject :
         }
     }
 
-    internal open fun getOwnPropertyDescriptor(cx: Context, id: Any?): DescriptorInfo? =
+    override fun getOwnPropertyDescriptor(cx: Context, id: Any?): DescriptorInfo? =
         querySlot(cx, id)?.getPropertyDescriptor(cx, this)
 
     /**
@@ -1343,9 +1353,9 @@ public abstract class ScriptableObject :
             var o: Scriptable? = obj
             var result: Any?
             do {
-                result = ensureSymbolScriptable(o!!).get(key, start)
+                result = if (o is SymbolScriptable) o.get(key, start) else Scriptable.NOT_FOUND
                 if (result !== Scriptable.NOT_FOUND) break
-                o = o.prototype
+                o = o!!.prototype
             } while (o != null)
             return result
         }
@@ -1511,9 +1521,9 @@ public abstract class ScriptableObject :
             var obj: Scriptable? = start
             do {
                 if (forWrite && obj is NativeProxy) return obj
-                if (ensureSymbolScriptable(obj!!).has(key, start)) break
+                if (obj is SymbolScriptable && obj.has(key, start)) break
                 if (obj is ScriptableObject && obj.endsLookup(key)) return if (forWrite) obj else null
-                obj = obj.prototype
+                obj = obj!!.prototype
             } while (obj != null)
             return obj
         }

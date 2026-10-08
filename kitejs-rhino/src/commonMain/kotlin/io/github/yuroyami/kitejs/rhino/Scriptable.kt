@@ -42,6 +42,37 @@ public interface Scriptable {
     /** Every property name of this object alone, ignoring the prototype chain. */
     public fun getIds(): Array<Any?>
 
+    /**
+     * [[OwnPropertyKeys]], including non-enumerable names and symbols. Keys use the engine's
+     * String, Int-index or Symbol representation. The legacy default lists [getIds].
+     */
+    public fun ownPropertyKeys(): Array<Any?> = getIds()
+
+    /**
+     * [[GetOwnProperty]]. The legacy default describes a mutable, enumerable, configurable
+     * data property. Hosts with accessors or other attributes override this operation.
+     */
+    public fun getOwnPropertyDescriptor(cx: Context, id: Any?): ScriptableObject.DescriptorInfo? =
+        AbstractEcmaObjectOperations.defaultGetOwnPropertyDescriptor(this, id)
+
+    /**
+     * [[DefineOwnProperty]], returning false when the host cannot make the requested definition.
+     * The legacy default supports its data-property attributes and refuses accessors or flags
+     * that [put] cannot represent. It does not add storage alongside the host's own properties.
+     */
+    public fun defineOwnPropertyOrFalse(cx: Context, id: Any?, desc: ScriptableObject.DescriptorInfo): Boolean =
+        AbstractEcmaObjectOperations.defaultDefineOwnProperty(cx, this, id, desc)
+
+    /** [[IsExtensible]]. Legacy hosts remain extensible until they supply a different contract. */
+    public val isExtensible: Boolean get() = true
+
+    /** [[PreventExtensions]]. A legacy host cannot enforce this through [put], so it refuses. */
+    public fun preventExtensions(): Boolean = false
+
+    /** [[SetPrototypeOf]], with extensibility and ordinary prototype-cycle checks. */
+    public fun setPrototypeOf(cx: Context, proto: Scriptable?): Boolean =
+        AbstractEcmaObjectOperations.defaultSetPrototypeOf(this, proto)
+
     /** Converts this object to a primitive, guided by [hint]. */
     public fun getDefaultValue(hint: KClass<*>?): Any?
 

@@ -1039,6 +1039,26 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   DateInvocationTest pins 70 fixed Node/V8 controls for receivers, binding, proxies, newTarget,
   coercion and reentry; IdInvocationTest checks callback compatibility and kind restoration.
 
+- D-119: Reflect accepts every object implemented by Scriptable, including callable hosts,
+  descriptors, receivers, array-like argument lists and prototypes (#79). Scriptable supplies
+  default own-key, descriptor, definition, extensibility and prototype operations; existing
+  hosts still compile without implementing them. Legacy data properties are writable,
+  enumerable and configurable. Unsupported accessors or attribute changes are refused, and
+  preventing extensions returns false unless the host can enforce it. Descriptor-aware hosts
+  override these operations. ScriptableObject retains its existing throwing definition API;
+  defineOwnPropertyOrFalse is the separate boolean operation shared by Reflect, Object,
+  Delegator, With and proxy forwarding. Object integrity operations no longer treat a plain
+  host as a primitive. Own-key order is established by the object, with ordinary strings
+  preceding symbols and exotic order preserved. ObjectDefineProperties checks each key's
+  current enumerability and converts all descriptors before starting definitions. Argument
+  lists are read with Get, without HasProperty or iteration; Reflect.apply checks callability
+  first and preserves null/undefined through the existing receiver conversion. Primitive
+  receiver boxing (#47/#78) remains open. Proxy descriptor arguments use the operating realm.
+  ReflectHostObjectTest covers actual legacy and descriptor-aware hosts, wrappers, refusals,
+  symbols, prototypes, callable/constructable capabilities and observable argument reads;
+  ReflectObjectOperationsTest pins 43 fixed Node/V8 controls for the shared algorithms,
+  including complete getter metadata for setter-only properties.
+
 ## Phases
 
 | Phase | Deliverable | Done when |

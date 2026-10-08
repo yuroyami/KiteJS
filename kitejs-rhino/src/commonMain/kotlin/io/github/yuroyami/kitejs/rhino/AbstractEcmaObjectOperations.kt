@@ -28,16 +28,16 @@ public object AbstractEcmaObjectOperations {
      * symbol threw (D-91).
      */
     internal fun hasOwnPropertyKey(cx: Context, obj: Scriptable, key: Any): Boolean = when {
-        obj is NativeProxy -> obj.getOwnPropertyDescriptor(cx, key) != null
-        key is Symbol -> ScriptableObject.ensureSymbolScriptable(obj).has(key, obj)
+        obj is NativeProxy || obj !is ScriptableObject -> obj.getOwnPropertyDescriptor(cx, key) != null
+        key is Symbol -> (obj as? SymbolScriptable)?.has(key, obj) == true
         key is Int -> obj.has(key, obj)
         else -> obj.has(key.toString(), obj)
     }
 
     internal fun testIntegrityLevel(cx: Context, o: Any?, level: INTEGRITY_LEVEL): Boolean {
-        val obj = ScriptableObject.ensureScriptableObject(o)
+        val obj = ensureObject(o)
         if (obj.isExtensible) return false
-        val ids = obj.startCompoundOp(false).use { obj.getIds(it, true, true) }
+        val ids = obj.ownPropertyKeys()
         for (name in ids) {
             val desc = obj.getOwnPropertyDescriptor(cx, name) ?: continue
             if (desc.isConfigurable) return false
@@ -54,9 +54,9 @@ public object AbstractEcmaObjectOperations {
      * current descriptor and ignored a refusal (D-88).
      */
     internal fun setIntegrityLevel(cx: Context, o: Any?, level: INTEGRITY_LEVEL): Boolean {
-        val obj = ScriptableObject.ensureScriptableObject(o)
+        val obj = ensureObject(o)
         if (!obj.preventExtensions()) return false
-        val ids = obj.startCompoundOp(false).use { obj.getIds(it, true, true) }
+        val ids = obj.ownPropertyKeys()
         val nf = Scriptable.NOT_FOUND
         for (key in ids) {
             val desc = if (level == INTEGRITY_LEVEL.SEALED) {
@@ -71,7 +71,7 @@ public object AbstractEcmaObjectOperations {
             }
             // The public form, which a proxy overrides; the internal one would define the key on
             // the proxy object itself and never reach the trap.
-            if (!obj.defineOwnProperty(cx, key, desc)) {
+            if (!obj.defineOwnPropertyOrFalse(cx, key, desc)) {
                 throw ScriptRuntime.typeErrorById(
                     "msg.define.refused",
                     if (key is Symbol) key.toString() else ScriptRuntime.toString(key),
@@ -114,19 +114,14 @@ public object AbstractEcmaObjectOperations {
         var obj: Scriptable? = o
         while (obj != null) {
             if (obj is NativeProxy) return obj.get(cx, key, receiver)
-            if (obj !is ScriptableObject) {
-                val v = rawGet(obj, key, ScriptRuntime.toObject(cx, ScriptableObject.getTopLevelScope(obj), receiver))
-                if (v !== Scriptable.NOT_FOUND) return v
-            } else {
-                val desc = obj.getOwnPropertyDescriptor(cx, key)
-                if (desc != null) {
-                    if (!desc.isAccessorDescriptor) return desc.value.let { if (it === Scriptable.NOT_FOUND) Undefined.instance else it }
-                    val getter = desc.getter
-                    if (getter !is Callable) return Undefined.instance
-                    return callAccessor(cx, getter, receiver, ScriptRuntime.emptyArgs)
-                }
-                if (key !is Symbol && endsLookup(obj, key)) return Undefined.instance
+            val desc = obj.getOwnPropertyDescriptor(cx, key)
+            if (desc != null) {
+                if (!desc.isAccessorDescriptor) return desc.value.let { if (it === Scriptable.NOT_FOUND) Undefined.instance else it }
+                val getter = desc.getter
+                if (getter !is Callable) return Undefined.instance
+                return callAccessor(cx, getter, receiver, ScriptRuntime.emptyArgs)
             }
+            if (obj is ScriptableObject && key !is Symbol && endsLookup(obj, key)) return Undefined.instance
             obj = obj.prototype
         }
         return Undefined.instance
@@ -139,16 +134,11 @@ public object AbstractEcmaObjectOperations {
     internal fun set(cx: Context, o: Scriptable, key: Any, value: Any?, receiver: Any?): Boolean = when {
         o is NativeProxy -> o.set(cx, key, value, receiver)
         o is NativeTypedArrayView && key !is Symbol -> o.set(cx, key, value, receiver) ?: ordinarySet(cx, o, key, value, receiver)
-        o is ScriptableObject -> ordinarySet(cx, o, key, value, receiver)
-        else -> {
-            // An object outside the descriptor protocol takes the write the only way it can.
-            rawPut(o, key, ScriptRuntime.toObject(cx, ScriptableObject.getTopLevelScope(o), receiver), value)
-            true
-        }
+        else -> ordinarySet(cx, o, key, value, receiver)
     }
 
     /** OrdinarySet and OrdinarySetWithOwnDescriptor (ECMAScript 2015, 9.1.9). */
-    internal fun ordinarySet(cx: Context, o: ScriptableObject, key: Any, value: Any?, receiver: Any?): Boolean {
+    internal fun ordinarySet(cx: Context, o: Scriptable, key: Any, value: Any?, receiver: Any?): Boolean {
         val ownDesc = o.getOwnPropertyDescriptor(cx, key)
         if (ownDesc == null) {
             val parent = o.prototype
@@ -168,16 +158,12 @@ public object AbstractEcmaObjectOperations {
     /** The data property half of OrdinarySetWithOwnDescriptor: the write lands on [receiver]. */
     private fun setOnReceiver(cx: Context, key: Any, value: Any?, receiver: Any?): Boolean {
         if (receiver !is Scriptable || !ScriptRuntime.isObject(receiver)) return false
-        if (receiver !is ScriptableObject) {
-            rawPut(receiver, key, receiver, value)
-            return true
-        }
         val existing = receiver.getOwnPropertyDescriptor(cx, key)
             ?: return createDataProperty(cx, receiver, key, value)
         if (existing.isAccessorDescriptor || !ScriptableObject.isTrue(existing.writable)) return false
-        if (receiver is NativeProxy || (receiver is NativeArray && key == "length")) {
+        if (receiver !is ScriptableObject || receiver is NativeProxy || (receiver is NativeArray && key == "length")) {
             val valueOnly = DescriptorInfo(Scriptable.NOT_FOUND, Scriptable.NOT_FOUND, Scriptable.NOT_FOUND, Scriptable.NOT_FOUND, Scriptable.NOT_FOUND, value)
-            return receiver.defineOwnProperty(cx, key, valueOnly)
+            return receiver.defineOwnPropertyOrFalse(cx, key, valueOnly)
         }
         // Receiver.[[DefineOwnProperty]](P, {[[Value]]: V}) on a writable data property it owns.
         // Writing it through the object's own put finds that property first and keeps whatever a
@@ -187,7 +173,7 @@ public object AbstractEcmaObjectOperations {
     }
 
     /** CreateDataProperty: a writable, enumerable, configurable data property, or false. */
-    internal fun createDataProperty(cx: Context, o: ScriptableObject, key: Any, value: Any?): Boolean =
+    internal fun createDataProperty(cx: Context, o: Scriptable, key: Any, value: Any?): Boolean =
         defineOwnPropertyOrFalse(cx, o, key, DescriptorInfo(true, true, true, value))
 
     /**
@@ -196,22 +182,31 @@ public object AbstractEcmaObjectOperations {
      * ValidateAndApplyPropertyDescriptor would, and only made when it can succeed. A proxy answers
      * through its trap, and an exotic object may still refuse with false.
      */
-    internal fun defineOwnPropertyOrFalse(cx: Context, o: ScriptableObject, key: Any, desc: DescriptorInfo): Boolean {
-        if (o is NativeProxy) return o.defineOwnProperty(cx, key, desc)
-        // ArraySetLength converts the value before validating the current descriptor.
-        if (o is NativeArray && key == "length") return o.defineOwnProperty(cx, key, desc)
-        val current = o.getOwnPropertyDescriptor(cx, key)
-        if (!isCompatiblePropertyDescriptor(cx, o.isExtensible, desc, current)) return false
-        return o.defineOwnProperty(cx, key, desc)
+    internal fun defineOwnPropertyOrFalse(cx: Context, o: Scriptable, key: Any, desc: DescriptorInfo): Boolean =
+        o.defineOwnPropertyOrFalse(cx, key, desc)
+
+    /** ObjectDefineProperties: convert every enumerable descriptor before defining any key. */
+    internal fun defineOwnProperties(cx: Context, o: Scriptable, props: Scriptable) {
+        val definitions = ArrayList<Pair<Any, DescriptorInfo>>()
+        for (id in props.ownPropertyKeys()) {
+            val key = ScriptRuntime.toPropertyKey(id)
+            if (props.getOwnPropertyDescriptor(cx, key)?.isEnumerable != true) continue
+            val desc = DescriptorInfo(ensureObject(get(cx, props, key, props)))
+            ScriptableObject.checkPropertyDefinition(desc)
+            definitions.add(key to desc)
+        }
+        for ((key, desc) in definitions) {
+            if (!o.defineOwnPropertyOrFalse(cx, key, desc)) throw ScriptRuntime.typeErrorById("msg.define.refused", key.toString())
+        }
     }
 
     /** O.[[Delete]](P) as a boolean: only an own property is looked at. */
-    internal fun delete(cx: Context, o: ScriptableObject, key: Any): Boolean {
+    internal fun delete(cx: Context, o: Scriptable, key: Any): Boolean {
         if (o is NativeProxy) return o.delete(cx, key)
         val desc = o.getOwnPropertyDescriptor(cx, key) ?: return true
         if (!ScriptableObject.isTrue(desc.configurable)) return false
         when (key) {
-            is Symbol -> o.delete(key)
+            is Symbol -> (o as? SymbolScriptable)?.delete(key)
             is Int -> o.delete(key)
             else -> o.delete(key as String)
         }
@@ -225,11 +220,7 @@ public object AbstractEcmaObjectOperations {
 
     /** DeletePropertyOrThrow: refusal is an error even in a sloppy caller. */
     internal fun deleteOrThrow(cx: Context, o: Scriptable, key: Any) {
-        val deleted = if (o is ScriptableObject) delete(cx, o, key) else when (key) {
-            is Int -> { o.delete(key); !o.has(key, o) }
-            is Symbol -> if (o is SymbolScriptable) { o.delete(key); !o.has(key, o) } else true
-            else -> { o.delete(key as String); !o.has(key, o) }
-        }
+        val deleted = delete(cx, o, key)
         if (!deleted) throw ScriptRuntime.typeErrorById("msg.delete.property.with.configurable.false", key)
     }
 
@@ -243,7 +234,7 @@ public object AbstractEcmaObjectOperations {
      * proxy before the first get, and miss a property a getter makes enumerable or deletes.
      */
     internal fun ownKeysForEnumeration(o: Scriptable, symbols: Boolean): Array<Any?> =
-        if (o is ScriptableObject) o.startCompoundOp(false).use { o.getIds(it, true, symbols) } else o.getIds()
+        if (symbols) o.ownPropertyKeys() else o.ownPropertyKeys().filter { it !is Symbol }.toTypedArray()
 
     /**
      * Whether [key] is, at this moment, an own enumerable property of [o]. A proxy answers through
@@ -253,11 +244,7 @@ public object AbstractEcmaObjectOperations {
     internal fun isOwnEnumerable(cx: Context, o: Scriptable, key: Any): Boolean {
         if (o is NativeProxy) return o.getOwnPropertyDescriptor(cx, key)?.isEnumerable == true
         if (o !is ScriptableObject) {
-            return when (key) {
-                is Symbol -> ScriptableObject.ensureSymbolScriptable(o).has(key, o)
-                is Int -> o.has(key, o)
-                else -> o.has(key.toString(), o)
-            }
+            return o.getOwnPropertyDescriptor(cx, key)?.isEnumerable == true
         }
         return try {
             when (key) {
@@ -299,9 +286,61 @@ public object AbstractEcmaObjectOperations {
     internal fun trapKey(key: Any): Any = if (key is Int) key.toString() else key
 
     internal fun rawGet(o: Scriptable, key: Any, start: Scriptable): Any? = when (key) {
-        is Symbol -> ScriptableObject.ensureSymbolScriptable(o).get(key, start)
+        is Symbol -> if (o is SymbolScriptable) o.get(key, start) else Scriptable.NOT_FOUND
         is Int -> o.get(key, start)
         else -> o.get(key as String, start)
+    }
+
+    /** Type(Object) validation, independent of the host class that implements its operations. */
+    internal fun ensureObject(value: Any?): Scriptable {
+        if (!ScriptRuntime.isObject(value)) throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(value))
+        return value as Scriptable
+    }
+
+    /** Descriptor operations supported by the original Scriptable value-property interface. */
+    internal fun defaultGetOwnPropertyDescriptor(o: Scriptable, id: Any?): DescriptorInfo? {
+        val key = ScriptRuntime.toPropertyKey(id)
+        val present = when (key) {
+            is Symbol -> (o as? SymbolScriptable)?.has(key, o) == true
+            is Int -> o.has(key, o)
+            else -> o.has(key as String, o)
+        }
+        if (!present) return null
+        val value = rawGet(o, key, o)
+        if (value === Scriptable.NOT_FOUND) return null
+        return DescriptorInfo(true, true, true, value)
+    }
+
+    internal fun defaultDefineOwnProperty(cx: Context, o: Scriptable, id: Any?, desc: DescriptorInfo): Boolean {
+        ScriptableObject.checkPropertyDefinition(desc)
+        val key = ScriptRuntime.toPropertyKey(id)
+        if (key is Symbol && o !is SymbolScriptable) return false
+        val current = o.getOwnPropertyDescriptor(cx, key)
+        val nf = Scriptable.NOT_FOUND
+        if (current != null && desc.isGenericDescriptor && desc.enumerable === nf && desc.configurable === nf) return true
+        if (desc.isAccessorDescriptor || current?.isAccessorDescriptor == true) return false
+        val writable = if (desc.hasWritable()) desc.isWritable else current?.isWritable ?: false
+        val enumerable = if (desc.hasEnumerable()) desc.isEnumerable else current?.isEnumerable ?: false
+        val configurable = if (desc.hasConfigurable()) desc.isConfigurable else current?.isConfigurable ?: false
+        // The legacy put/delete protocol cannot retain accessors or altered attributes.
+        if (!writable || !enumerable || !configurable || (current == null && !o.isExtensible)) return false
+        val value = if (desc.hasValue()) desc.value else if (current != null) current.value else Undefined.instance
+        rawPut(o, key, o, value)
+        val applied = o.getOwnPropertyDescriptor(cx, key) ?: return false
+        return applied.isDataDescriptor && applied.isWritable && applied.isEnumerable && applied.isConfigurable && sameValue(applied.value, value)
+    }
+
+    internal fun defaultSetPrototypeOf(o: Scriptable, proto: Scriptable?): Boolean {
+        if (proto === o.prototype) return true
+        if (!o.isExtensible) return false
+        var parent = proto
+        while (parent != null) {
+            if (parent === o) return false
+            if (parent is NativeProxy) break
+            parent = parent.prototype
+        }
+        o.prototype = proto
+        return o.prototype === proto
     }
 
     internal fun rawPut(o: Scriptable, key: Any, start: Scriptable, value: Any?) {
@@ -491,7 +530,7 @@ public object AbstractEcmaObjectOperations {
     public fun isConstructor(cx: Context, argument: Any?): Boolean = isConstructor(argument)
 
     internal fun isConstructor(argument: Any?): Boolean = when (argument) {
-        is NativeProxy.NativeProxyFunction -> argument.isConstructor
+        is NativeProxy -> argument.isConstructor
         is BaseFunction -> argument.isConstructor
         else -> argument is Constructable
     }
@@ -504,7 +543,7 @@ public object AbstractEcmaObjectOperations {
      */
     internal fun construct(cx: Context, scope: Scriptable, f: Constructable, args: Array<Any?>, newTarget: Scriptable): Scriptable =
         when {
-            f is NativeProxy.NativeProxyFunction -> f.construct(cx, scope, args, newTarget)
+            f is NativeProxy -> f.construct(cx, scope, args, newTarget)
             f is BaseFunction -> f.construct(cx, scope, args, newTarget)
             newTarget === f -> f.construct(cx, scope, args)
             else -> {

@@ -12,13 +12,15 @@ package io.github.yuroyami.kitejs.rhino
  * there, then check the answer against what the target itself reports and throw a TypeError when
  * the two contradict each other. A missing trap simply falls through to the target.
  */
-internal open class NativeProxy protected constructor(target: ScriptableObject, handler: Scriptable) :
-    ScriptableObject() {
+internal open class NativeProxy protected constructor(target: Scriptable, handler: Scriptable) :
+    ScriptableObject(), Constructable {
 
-    private var targetObj: ScriptableObject? = target
+    private var targetObj: Scriptable? = target
     private var handlerObj: Scriptable? = handler
 
-    private val typeOfValue: String = if (target is Callable) target.typeOf else super.typeOf
+    private val typeOfValue: String = if (target is Callable) ScriptRuntime.typeOf(target) else super.typeOf
+    /** ProxyCreate captures this capability, so revocation does not change IsConstructor. */
+    internal val isConstructor: Boolean = AbstractEcmaObjectOperations.isConstructor(target)
 
     /** Revoking clears both slots, which makes every later operation throw. */
     private class Revoker(private var revocableProxy: NativeProxy?) : SerializableCallable {
@@ -112,20 +114,20 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
      * which made every non-configurable index look skipped, and after the checks for a
      * non-extensible target it answered with the target's own keys in place of the trap's (D-91).
      */
-    internal fun ownPropertyKeys(): Array<Any?> {
+    override fun ownPropertyKeys(): Array<Any?> {
         val target = getTargetThrowIfRevoked()
 
         val trap = getTrap(TRAP_OWN_KEYS)
-            ?: return target.startCompoundOp(false).use { target.getIds(it, true, true) }.map { AbstractEcmaObjectOperations.trapKey(it!!) }.toTypedArray()
+            ?: return target.ownPropertyKeys().map { AbstractEcmaObjectOperations.trapKey(it!!) }.toTypedArray()
 
         val res = callTrap(trap, arrayOf(target))
-        if (res !is Scriptable || ScriptRuntime.isSymbol(res)) throw ScriptRuntime.typeError("ownKeys trap must return an object")
+        if (!ScriptRuntime.isObject(res)) throw ScriptRuntime.typeError("ownKeys trap must return an object")
 
         val cx = Context.getContext()
 
         val trapResult = AbstractEcmaObjectOperations.createListFromArrayLike(
             cx,
-            res,
+            res as Scriptable,
             { o -> o is CharSequence || ScriptRuntime.isSymbol(o) },
             "proxy [[OwnPropertyKeys]] must return an array with only string and symbol elements",
         ).map { if (it is CharSequence) it.toString() else it }
@@ -136,7 +138,7 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
         }
 
         val extensibleTarget = target.isExtensible
-        val targetKeys = target.startCompoundOp(false).use { target.getIds(it, true, true) }
+        val targetKeys = target.ownPropertyKeys()
 
         val targetConfigurableKeys = ArrayList<Any?>()
         val targetNonconfigurableKeys = ArrayList<Any?>()
@@ -295,7 +297,7 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
      * when that property is non-configurable or the target is non-extensible. Upstream's message
      * printed the literal text `' + name + '` where the key belongs.
      */
-    private fun checkDeleteInvariants(target: ScriptableObject, key: Any, targetDesc: DescriptorInfo?) {
+    private fun checkDeleteInvariants(target: Scriptable, key: Any, targetDesc: DescriptorInfo?) {
         if (targetDesc == null) return
         if (targetDesc.isConfigurable(false) || !target.isExtensible) {
             throw ScriptRuntime.typeError(
@@ -320,7 +322,7 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
         val trap = getTrap(TRAP_GET_OWN_PROPERTY_DESCRIPTOR) ?: return target.getOwnPropertyDescriptor(cx, key)
 
         val trapResultObj = callTrap(trap, arrayOf(target, key))
-        if (!Undefined.isUndefined(trapResultObj) && !(trapResultObj is ScriptableObject && !ScriptRuntime.isSymbol(trapResultObj))) {
+        if (!Undefined.isUndefined(trapResultObj) && !ScriptRuntime.isObject(trapResultObj)) {
             throw ScriptRuntime.typeError("getOwnPropertyDescriptor trap has to return undefined or an object")
         }
 
@@ -337,7 +339,7 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
         }
 
         val extensibleTarget = target.isExtensible
-        val resultDesc = DescriptorInfo(trapResultObj as ScriptableObject)
+        val resultDesc = DescriptorInfo(trapResultObj as Scriptable)
         checkPropertyDefinition(resultDesc)
         completePropertyDescriptor(resultDesc)
 
@@ -355,6 +357,9 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
         return resultDesc
     }
 
+    override fun defineOwnPropertyOrFalse(cx: Context, id: Any?, desc: DescriptorInfo): Boolean =
+        defineOwnProperty(cx, id, desc)
+
     override fun defineOwnProperty(cx: Context, id: Any?, desc: DescriptorInfo): Boolean {
         val target = getTargetThrowIfRevoked()
 
@@ -362,7 +367,7 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
         if (trap != null) {
             val key = propertyKey(id)
             val booleanTrapResult = ScriptRuntime.toBoolean(
-                callTrap(trap, arrayOf(target, key, desc.toObject(trap.declarationScope!!))),
+                callTrap(trap, arrayOf(target, key, desc.toObject(cx.currentRealm ?: ScriptRuntime.getTopCallScope(cx)))),
             )
             if (!booleanTrapResult) return false
 
@@ -487,16 +492,21 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
 
     // ---- Traps ---------------------------------------------------------------------------------
 
-    protected fun getTrap(trapName: String): Function? {
+    protected fun getTrap(trapName: String): Callable? {
         val handlerProp = getProperty(handlerObj!!, trapName)
         if (Scriptable.NOT_FOUND === handlerProp) return null
         if (handlerProp == null || Undefined.isUndefined(handlerProp)) return null
         if (handlerProp !is Callable) throw ScriptRuntime.notFunctionError(handlerProp, trapName)
-        return handlerProp as Function
+        return handlerProp
     }
 
-    protected fun callTrap(trap: Function, args: Array<Any?>): Any? =
-        trap.call(Context.getContext(), trap.declarationScope!!, handlerObj, args)
+    protected fun callTrap(trap: Callable, args: Array<Any?>): Any? {
+        val cx = Context.getContext()
+        val scope = (trap as? Function)?.declarationScope
+            ?: (trap as? Scriptable)?.let { getTopLevelScope(it) }
+            ?: ScriptRuntime.getTopCallScope(cx)
+        return trap.call(cx, scope, handlerObj, args)
+    }
 
     /** A property key as a trap receives it: a string or a symbol, never an int index. */
     private fun propertyKey(id: Any?): Any = when (id) {
@@ -518,47 +528,35 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
         if (!desc.hasConfigurable()) desc.configurable = false
     }
 
-    internal fun getTargetThrowIfRevoked(): ScriptableObject =
+    internal fun getTargetThrowIfRevoked(): Scriptable =
         targetObj ?: throw ScriptRuntime.typeError("Illegal operation attempted on a revoked proxy")
 
-    /** A proxy whose target is callable, so the proxy itself is a function too. */
-    internal class NativeProxyFunction(target: ScriptableObject, handler: Scriptable) :
-        NativeProxy(target, handler), Function {
+    override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable =
+        construct(cx, scope, args, this)
 
-        /**
-         * ProxyCreate decides once whether the proxy gets a [[Construct]], from its target, so a
-         * revoked proxy keeps its answer instead of throwing when asked (D-91).
-         */
-        internal val isConstructor: Boolean = AbstractEcmaObjectOperations.isConstructor(target)
+    /** [[Construct]] also supports host constructors that do not expose [[Call]]. */
+    internal fun construct(cx: Context, scope: Scriptable, args: Array<Any?>, newTarget: Scriptable): Scriptable {
+        if (!isConstructor) throw ScriptRuntime.typeErrorById("msg.not.ctor", typeOf)
+        val target = getTargetThrowIfRevoked()
 
-        override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable =
-            construct(cx, scope, args, this)
-
-        /**
-         * [[Construct]] (ES 10.5.13): the trap gets the newTarget the caller passed, and without a
-         * trap the target is constructed with that same newTarget. Upstream passed the proxy itself
-         * to the trap and constructed the target with none, so `Reflect.construct(p, args, F)`
-         * lost F on both paths (D-91).
-         */
-        internal fun construct(cx: Context, scope: Scriptable, args: Array<Any?>, newTarget: Scriptable): Scriptable {
-            if (!isConstructor) throw ScriptRuntime.typeErrorById("msg.not.ctor", typeOf)
-            val target = getTargetThrowIfRevoked()
-
-            val trap = getTrap(TRAP_CONSTRUCT)
-            if (trap != null) {
-                // Upstream hands the raw argument array to the trap, which only reads as an array
-                // in script because Java interop wraps it. There is no interop here, so the trap
-                // gets a real JavaScript array, the same way the apply trap does (D-51).
-                val result = callTrap(trap, arrayOf(target, cx.newArray(scope, args), newTarget))
-                if (result !is Scriptable || ScriptRuntime.isSymbol(result)) {
-                    throw ScriptRuntime.typeError("Constructor trap has to return a scriptable.")
-                }
-                return result
+        val trap = getTrap(TRAP_CONSTRUCT)
+        if (trap != null) {
+            // Upstream hands the raw argument array to the trap, which only reads as an array
+            // in script because Java interop wraps it. There is no interop here, so the trap
+            // gets a real JavaScript array, the same way the apply trap does (D-51).
+            val result = callTrap(trap, arrayOf(target, cx.newArray(scope, args), newTarget))
+            if (!ScriptRuntime.isObject(result)) {
+                throw ScriptRuntime.typeError("Constructor trap has to return a scriptable.")
             }
-
-            return AbstractEcmaObjectOperations.construct(cx, scope, target as Constructable, args, newTarget)
+            return result as Scriptable
         }
 
+        return AbstractEcmaObjectOperations.construct(cx, scope, target as Constructable, args, newTarget)
+    }
+
+    /** A proxy whose target is callable, so the proxy itself is a function too. */
+    internal class NativeProxyFunction(target: Scriptable, handler: Scriptable) :
+        NativeProxy(target, handler), Function {
         override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val target = getTargetThrowIfRevoked()
 
@@ -576,7 +574,7 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
             get() {
                 val target = getTargetThrowIfRevoked()
                 if (target is Function) return target.declarationScope
-                throw Kit.codeBug()
+                return getTopLevelScope(target)
             }
     }
 
@@ -642,10 +640,10 @@ internal open class NativeProxy protected constructor(target: ScriptableObject, 
                     args.size.toString(),
                 )
             }
-            val target = ensureScriptableObjectButNotSymbol(args[0])
-            val handler = ensureScriptableObjectButNotSymbol(args[1])
+            val target = AbstractEcmaObjectOperations.ensureObject(args[0])
+            val handler = AbstractEcmaObjectOperations.ensureObject(args[1])
 
-            val proxy = if (target is Function) {
+            val proxy = if (target is Callable) {
                 NativeProxyFunction(target, handler)
             } else {
                 NativeProxy(target, handler)

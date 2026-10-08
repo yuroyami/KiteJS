@@ -466,6 +466,7 @@ public class io/github/yuroyami/kitejs/rhino/Delegator : io/github/yuroyami/kite
 	public fun <init> (Lio/github/yuroyami/kitejs/rhino/Scriptable;)V
 	public fun call (Lio/github/yuroyami/kitejs/rhino/Context;Lio/github/yuroyami/kitejs/rhino/Scriptable;Lio/github/yuroyami/kitejs/rhino/Scriptable;[Ljava/lang/Object;)Ljava/lang/Object;
 	public fun construct (Lio/github/yuroyami/kitejs/rhino/Context;Lio/github/yuroyami/kitejs/rhino/Scriptable;[Ljava/lang/Object;)Lio/github/yuroyami/kitejs/rhino/Scriptable;
+	public fun defineOwnPropertyOrFalse (Lio/github/yuroyami/kitejs/rhino/Context;Ljava/lang/Object;Lio/github/yuroyami/kitejs/rhino/ScriptableObject$DescriptorInfo;)Z
 	public fun delete (I)V
 	public fun delete (Lio/github/yuroyami/kitejs/rhino/Symbol;)V
 	public fun delete (Ljava/lang/String;)V
@@ -477,19 +478,24 @@ public class io/github/yuroyami/kitejs/rhino/Delegator : io/github/yuroyami/kite
 	public fun getDefaultValue (Lkotlin/reflect/KClass;)Ljava/lang/Object;
 	public fun getDelegee ()Lio/github/yuroyami/kitejs/rhino/Scriptable;
 	public fun getIds ()[Ljava/lang/Object;
+	public fun getOwnPropertyDescriptor (Lio/github/yuroyami/kitejs/rhino/Context;Ljava/lang/Object;)Lio/github/yuroyami/kitejs/rhino/ScriptableObject$DescriptorInfo;
 	public fun getParentScope ()Lio/github/yuroyami/kitejs/rhino/Scriptable;
 	public fun getPrototype ()Lio/github/yuroyami/kitejs/rhino/Scriptable;
 	public fun has (ILio/github/yuroyami/kitejs/rhino/Scriptable;)Z
 	public fun has (Lio/github/yuroyami/kitejs/rhino/Symbol;Lio/github/yuroyami/kitejs/rhino/Scriptable;)Z
 	public fun has (Ljava/lang/String;Lio/github/yuroyami/kitejs/rhino/Scriptable;)Z
 	public fun hasInstance (Lio/github/yuroyami/kitejs/rhino/Scriptable;)Z
+	public fun isExtensible ()Z
 	protected fun newInstance ()Lio/github/yuroyami/kitejs/rhino/Delegator;
+	public fun ownPropertyKeys ()[Ljava/lang/Object;
+	public fun preventExtensions ()Z
 	public fun put (ILio/github/yuroyami/kitejs/rhino/Scriptable;Ljava/lang/Object;)V
 	public fun put (Lio/github/yuroyami/kitejs/rhino/Symbol;Lio/github/yuroyami/kitejs/rhino/Scriptable;Ljava/lang/Object;)V
 	public fun put (Ljava/lang/String;Lio/github/yuroyami/kitejs/rhino/Scriptable;Ljava/lang/Object;)V
 	public fun setDelegee (Lio/github/yuroyami/kitejs/rhino/Scriptable;)V
 	public fun setParentScope (Lio/github/yuroyami/kitejs/rhino/Scriptable;)V
 	public fun setPrototype (Lio/github/yuroyami/kitejs/rhino/Scriptable;)V
+	public fun setPrototypeOf (Lio/github/yuroyami/kitejs/rhino/Context;Lio/github/yuroyami/kitejs/rhino/Scriptable;)Z
 }
 
 public final class io/github/yuroyami/kitejs/rhino/ES6Generator : io/github/yuroyami/kitejs/rhino/ScriptableObject {
@@ -588,7 +594,13 @@ public abstract interface class io/github/yuroyami/kitejs/rhino/Function : io/gi
 }
 
 public final class io/github/yuroyami/kitejs/rhino/Function$DefaultImpls {
+	public static fun defineOwnPropertyOrFalse (Lio/github/yuroyami/kitejs/rhino/Function;Lio/github/yuroyami/kitejs/rhino/Context;Ljava/lang/Object;Lio/github/yuroyami/kitejs/rhino/ScriptableObject$DescriptorInfo;)Z
 	public static fun getDeclarationScope (Lio/github/yuroyami/kitejs/rhino/Function;)Lio/github/yuroyami/kitejs/rhino/Scriptable;
+	public static fun getOwnPropertyDescriptor (Lio/github/yuroyami/kitejs/rhino/Function;Lio/github/yuroyami/kitejs/rhino/Context;Ljava/lang/Object;)Lio/github/yuroyami/kitejs/rhino/ScriptableObject$DescriptorInfo;
+	public static fun isExtensible (Lio/github/yuroyami/kitejs/rhino/Function;)Z
+	public static fun ownPropertyKeys (Lio/github/yuroyami/kitejs/rhino/Function;)[Ljava/lang/Object;
+	public static fun preventExtensions (Lio/github/yuroyami/kitejs/rhino/Function;)Z
+	public static fun setPrototypeOf (Lio/github/yuroyami/kitejs/rhino/Function;Lio/github/yuroyami/kitejs/rhino/Context;Lio/github/yuroyami/kitejs/rhino/Scriptable;)Z
 }
 
 public final class io/github/yuroyami/kitejs/rhino/HashSlotMap : io/github/yuroyami/kitejs/rhino/SlotMap {
@@ -702,6 +714,7 @@ public abstract class io/github/yuroyami/kitejs/rhino/IdScriptableObject : io/gi
 	protected fun getInstanceIdName (I)Ljava/lang/String;
 	protected fun getInstanceIdValue (I)Ljava/lang/Object;
 	protected fun getMaxInstanceId ()I
+	public fun getOwnPropertyDescriptor (Lio/github/yuroyami/kitejs/rhino/Context;Ljava/lang/Object;)Lio/github/yuroyami/kitejs/rhino/ScriptableObject$DescriptorInfo;
 	public fun has (Lio/github/yuroyami/kitejs/rhino/Symbol;Lio/github/yuroyami/kitejs/rhino/Scriptable;)Z
 	public fun has (Ljava/lang/String;Lio/github/yuroyami/kitejs/rhino/Scriptable;)Z
 	public final fun hasPrototypeMap ()Z
@@ -1071,6 +1084,7 @@ public final class io/github/yuroyami/kitejs/rhino/NativeArray : io/github/yuroy
 	public fun getDefaultValue (Lkotlin/reflect/KClass;)Ljava/lang/Object;
 	public final fun getIndexIds ()Ljava/util/List;
 	public final fun getLength ()J
+	public fun getOwnPropertyDescriptor (Lio/github/yuroyami/kitejs/rhino/Context;Ljava/lang/Object;)Lio/github/yuroyami/kitejs/rhino/ScriptableObject$DescriptorInfo;
 	public fun getPrototype ()Lio/github/yuroyami/kitejs/rhino/Scriptable;
 	public fun has (ILio/github/yuroyami/kitejs/rhino/Scriptable;)Z
 	public fun isEmpty ()Z
@@ -1314,6 +1328,7 @@ public final class io/github/yuroyami/kitejs/rhino/NativeWeakSet$Companion {
 public class io/github/yuroyami/kitejs/rhino/NativeWith : io/github/yuroyami/kitejs/rhino/IdFunctionCall, io/github/yuroyami/kitejs/rhino/Scriptable, io/github/yuroyami/kitejs/rhino/SymbolScriptable {
 	public static final field Companion Lio/github/yuroyami/kitejs/rhino/NativeWith$Companion;
 	protected fun <init> (Lio/github/yuroyami/kitejs/rhino/Scriptable;Lio/github/yuroyami/kitejs/rhino/Scriptable;)V
+	public fun defineOwnPropertyOrFalse (Lio/github/yuroyami/kitejs/rhino/Context;Ljava/lang/Object;Lio/github/yuroyami/kitejs/rhino/ScriptableObject$DescriptorInfo;)Z
 	public fun delete (I)V
 	public fun delete (Lio/github/yuroyami/kitejs/rhino/Symbol;)V
 	public fun delete (Ljava/lang/String;)V
@@ -1324,6 +1339,7 @@ public class io/github/yuroyami/kitejs/rhino/NativeWith : io/github/yuroyami/kit
 	public fun getClassName ()Ljava/lang/String;
 	public fun getDefaultValue (Lkotlin/reflect/KClass;)Ljava/lang/Object;
 	public fun getIds ()[Ljava/lang/Object;
+	public fun getOwnPropertyDescriptor (Lio/github/yuroyami/kitejs/rhino/Context;Ljava/lang/Object;)Lio/github/yuroyami/kitejs/rhino/ScriptableObject$DescriptorInfo;
 	protected final fun getParentField ()Lio/github/yuroyami/kitejs/rhino/Scriptable;
 	public fun getParentScope ()Lio/github/yuroyami/kitejs/rhino/Scriptable;
 	public fun getPrototype ()Lio/github/yuroyami/kitejs/rhino/Scriptable;
@@ -1332,6 +1348,9 @@ public class io/github/yuroyami/kitejs/rhino/NativeWith : io/github/yuroyami/kit
 	public fun has (Lio/github/yuroyami/kitejs/rhino/Symbol;Lio/github/yuroyami/kitejs/rhino/Scriptable;)Z
 	public fun has (Ljava/lang/String;Lio/github/yuroyami/kitejs/rhino/Scriptable;)Z
 	public fun hasInstance (Lio/github/yuroyami/kitejs/rhino/Scriptable;)Z
+	public fun isExtensible ()Z
+	public fun ownPropertyKeys ()[Ljava/lang/Object;
+	public fun preventExtensions ()Z
 	public fun put (ILio/github/yuroyami/kitejs/rhino/Scriptable;Ljava/lang/Object;)V
 	public fun put (Lio/github/yuroyami/kitejs/rhino/Symbol;Lio/github/yuroyami/kitejs/rhino/Scriptable;Ljava/lang/Object;)V
 	public fun put (Ljava/lang/String;Lio/github/yuroyami/kitejs/rhino/Scriptable;Ljava/lang/Object;)V
@@ -1339,6 +1358,7 @@ public class io/github/yuroyami/kitejs/rhino/NativeWith : io/github/yuroyami/kit
 	public fun setParentScope (Lio/github/yuroyami/kitejs/rhino/Scriptable;)V
 	public fun setPrototype (Lio/github/yuroyami/kitejs/rhino/Scriptable;)V
 	protected final fun setPrototypeField (Lio/github/yuroyami/kitejs/rhino/Scriptable;)V
+	public fun setPrototypeOf (Lio/github/yuroyami/kitejs/rhino/Context;Lio/github/yuroyami/kitejs/rhino/Scriptable;)Z
 	protected fun updateDotQuery (Z)Ljava/lang/Object;
 }
 
@@ -1955,6 +1975,7 @@ public final class io/github/yuroyami/kitejs/rhino/ScriptStackElement {
 
 public abstract interface class io/github/yuroyami/kitejs/rhino/Scriptable {
 	public static final field Companion Lio/github/yuroyami/kitejs/rhino/Scriptable$Companion;
+	public fun defineOwnPropertyOrFalse (Lio/github/yuroyami/kitejs/rhino/Context;Ljava/lang/Object;Lio/github/yuroyami/kitejs/rhino/ScriptableObject$DescriptorInfo;)Z
 	public abstract fun delete (I)V
 	public abstract fun delete (Ljava/lang/String;)V
 	public abstract fun get (ILio/github/yuroyami/kitejs/rhino/Scriptable;)Ljava/lang/Object;
@@ -1962,19 +1983,33 @@ public abstract interface class io/github/yuroyami/kitejs/rhino/Scriptable {
 	public abstract fun getClassName ()Ljava/lang/String;
 	public abstract fun getDefaultValue (Lkotlin/reflect/KClass;)Ljava/lang/Object;
 	public abstract fun getIds ()[Ljava/lang/Object;
+	public fun getOwnPropertyDescriptor (Lio/github/yuroyami/kitejs/rhino/Context;Ljava/lang/Object;)Lio/github/yuroyami/kitejs/rhino/ScriptableObject$DescriptorInfo;
 	public abstract fun getParentScope ()Lio/github/yuroyami/kitejs/rhino/Scriptable;
 	public abstract fun getPrototype ()Lio/github/yuroyami/kitejs/rhino/Scriptable;
 	public abstract fun has (ILio/github/yuroyami/kitejs/rhino/Scriptable;)Z
 	public abstract fun has (Ljava/lang/String;Lio/github/yuroyami/kitejs/rhino/Scriptable;)Z
 	public abstract fun hasInstance (Lio/github/yuroyami/kitejs/rhino/Scriptable;)Z
+	public fun isExtensible ()Z
+	public fun ownPropertyKeys ()[Ljava/lang/Object;
+	public fun preventExtensions ()Z
 	public abstract fun put (ILio/github/yuroyami/kitejs/rhino/Scriptable;Ljava/lang/Object;)V
 	public abstract fun put (Ljava/lang/String;Lio/github/yuroyami/kitejs/rhino/Scriptable;Ljava/lang/Object;)V
 	public abstract fun setParentScope (Lio/github/yuroyami/kitejs/rhino/Scriptable;)V
 	public abstract fun setPrototype (Lio/github/yuroyami/kitejs/rhino/Scriptable;)V
+	public fun setPrototypeOf (Lio/github/yuroyami/kitejs/rhino/Context;Lio/github/yuroyami/kitejs/rhino/Scriptable;)Z
 }
 
 public final class io/github/yuroyami/kitejs/rhino/Scriptable$Companion {
 	public final fun getNOT_FOUND ()Ljava/lang/Object;
+}
+
+public final class io/github/yuroyami/kitejs/rhino/Scriptable$DefaultImpls {
+	public static fun defineOwnPropertyOrFalse (Lio/github/yuroyami/kitejs/rhino/Scriptable;Lio/github/yuroyami/kitejs/rhino/Context;Ljava/lang/Object;Lio/github/yuroyami/kitejs/rhino/ScriptableObject$DescriptorInfo;)Z
+	public static fun getOwnPropertyDescriptor (Lio/github/yuroyami/kitejs/rhino/Scriptable;Lio/github/yuroyami/kitejs/rhino/Context;Ljava/lang/Object;)Lio/github/yuroyami/kitejs/rhino/ScriptableObject$DescriptorInfo;
+	public static fun isExtensible (Lio/github/yuroyami/kitejs/rhino/Scriptable;)Z
+	public static fun ownPropertyKeys (Lio/github/yuroyami/kitejs/rhino/Scriptable;)[Ljava/lang/Object;
+	public static fun preventExtensions (Lio/github/yuroyami/kitejs/rhino/Scriptable;)Z
+	public static fun setPrototypeOf (Lio/github/yuroyami/kitejs/rhino/Scriptable;Lio/github/yuroyami/kitejs/rhino/Context;Lio/github/yuroyami/kitejs/rhino/Scriptable;)Z
 }
 
 public abstract class io/github/yuroyami/kitejs/rhino/ScriptableObject : io/github/yuroyami/kitejs/rhino/SlotMapOwner, io/github/yuroyami/kitejs/rhino/ConstProperties, io/github/yuroyami/kitejs/rhino/Scriptable, io/github/yuroyami/kitejs/rhino/SymbolScriptable {
@@ -1997,6 +2032,7 @@ public abstract class io/github/yuroyami/kitejs/rhino/ScriptableObject : io/gith
 	public final fun defineOwnProperties (Lio/github/yuroyami/kitejs/rhino/Context;Lio/github/yuroyami/kitejs/rhino/ScriptableObject;)V
 	public fun defineOwnProperty (Lio/github/yuroyami/kitejs/rhino/Context;Ljava/lang/Object;Lio/github/yuroyami/kitejs/rhino/ScriptableObject$DescriptorInfo;)Z
 	public final fun defineOwnProperty (Lio/github/yuroyami/kitejs/rhino/Context;Ljava/lang/Object;Lio/github/yuroyami/kitejs/rhino/ScriptableObject;)Z
+	public fun defineOwnPropertyOrFalse (Lio/github/yuroyami/kitejs/rhino/Context;Ljava/lang/Object;Lio/github/yuroyami/kitejs/rhino/ScriptableObject$DescriptorInfo;)Z
 	public final fun defineProperty (Lio/github/yuroyami/kitejs/rhino/Context;Lio/github/yuroyami/kitejs/rhino/Symbol;Lio/github/yuroyami/kitejs/rhino/ScriptableObject$LambdaGetterFunction;Lio/github/yuroyami/kitejs/rhino/ScriptableObject$LambdaSetterFunction;I)V
 	public final fun defineProperty (Lio/github/yuroyami/kitejs/rhino/Context;Ljava/lang/String;Lio/github/yuroyami/kitejs/rhino/ScriptableObject$LambdaGetterFunction;I)V
 	public final fun defineProperty (Lio/github/yuroyami/kitejs/rhino/Context;Ljava/lang/String;Lio/github/yuroyami/kitejs/rhino/ScriptableObject$LambdaGetterFunction;Lio/github/yuroyami/kitejs/rhino/ScriptableObject$LambdaSetterFunction;I)V
@@ -2024,6 +2060,7 @@ public abstract class io/github/yuroyami/kitejs/rhino/ScriptableObject : io/gith
 	public final fun getExternalArrayLength ()Ljava/lang/Object;
 	public final fun getGetterOrSetter (Ljava/lang/String;ILio/github/yuroyami/kitejs/rhino/Scriptable;Z)Ljava/lang/Object;
 	public fun getIds ()[Ljava/lang/Object;
+	public fun getOwnPropertyDescriptor (Lio/github/yuroyami/kitejs/rhino/Context;Ljava/lang/Object;)Lio/github/yuroyami/kitejs/rhino/ScriptableObject$DescriptorInfo;
 	public fun getParentScope ()Lio/github/yuroyami/kitejs/rhino/Scriptable;
 	public fun getPrototype ()Lio/github/yuroyami/kitejs/rhino/Scriptable;
 	public fun getTypeOf ()Ljava/lang/String;
@@ -2038,6 +2075,7 @@ public abstract class io/github/yuroyami/kitejs/rhino/ScriptableObject : io/gith
 	protected fun isGetterOrSetter (Lio/github/yuroyami/kitejs/rhino/CompoundOperationMap;Ljava/lang/String;IZ)Z
 	protected fun isGetterOrSetter (Ljava/lang/String;IZ)Z
 	public final fun isSealed ()Z
+	public fun ownPropertyKeys ()[Ljava/lang/Object;
 	public fun preventExtensions ()Z
 	public fun put (ILio/github/yuroyami/kitejs/rhino/Scriptable;Ljava/lang/Object;)V
 	public fun put (Lio/github/yuroyami/kitejs/rhino/Symbol;Lio/github/yuroyami/kitejs/rhino/Scriptable;Ljava/lang/Object;)V
@@ -2053,6 +2091,7 @@ public abstract class io/github/yuroyami/kitejs/rhino/ScriptableObject : io/gith
 	public final fun setGetterOrSetter (Ljava/lang/Object;ILio/github/yuroyami/kitejs/rhino/Callable;Z)V
 	public fun setParentScope (Lio/github/yuroyami/kitejs/rhino/Scriptable;)V
 	public fun setPrototype (Lio/github/yuroyami/kitejs/rhino/Scriptable;)V
+	public fun setPrototypeOf (Lio/github/yuroyami/kitejs/rhino/Context;Lio/github/yuroyami/kitejs/rhino/Scriptable;)Z
 	public fun size ()I
 }
 
@@ -2100,6 +2139,7 @@ public final class io/github/yuroyami/kitejs/rhino/ScriptableObject$Companion {
 }
 
 public final class io/github/yuroyami/kitejs/rhino/ScriptableObject$DescriptorInfo {
+	public fun <init> (Lio/github/yuroyami/kitejs/rhino/Scriptable;)V
 	public fun <init> (Lio/github/yuroyami/kitejs/rhino/ScriptableObject;)V
 	public fun <init> (Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)V
 	public fun <init> (ZZZLjava/lang/Object;)V
@@ -3979,6 +4019,7 @@ public abstract class io/github/yuroyami/kitejs/rhino/typedarrays/NativeTypedArr
 	public fun getArrayLength ()I
 	public abstract fun getBytesPerElement ()I
 	protected final fun getLength ()I
+	public fun getOwnPropertyDescriptor (Lio/github/yuroyami/kitejs/rhino/Context;Ljava/lang/Object;)Lio/github/yuroyami/kitejs/rhino/ScriptableObject$DescriptorInfo;
 	public fun has (ILio/github/yuroyami/kitejs/rhino/Scriptable;)Z
 	public fun has (Ljava/lang/String;Lio/github/yuroyami/kitejs/rhino/Scriptable;)Z
 	public final fun isTypedArrayOutOfBounds ()Z

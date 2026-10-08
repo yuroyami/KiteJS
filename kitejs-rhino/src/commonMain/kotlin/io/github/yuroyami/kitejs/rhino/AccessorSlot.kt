@@ -53,7 +53,10 @@ public class AccessorSlot : Slot {
         }
 
         val fName = name?.toString() ?: "f"
-        getter?.let { desc.getter = it.asGetterFunction(fName, scope) ?: Undefined.instance }
+        when {
+            getter != null -> desc.getter = getter!!.asGetterFunction(fName, scope) ?: Undefined.instance
+            es6 && setter != null -> desc.getter = Undefined.instance
+        }
         when {
             setter != null -> desc.setter = setter!!.asSetterFunction(fName, scope) ?: Undefined.instance
             es6 -> desc.setter = Undefined.instance

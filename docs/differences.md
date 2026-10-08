@@ -152,6 +152,10 @@ Engine errors use the intrinsics of the realm whose code raises them. A function
 one global to another can therefore throw an error that belongs to the first global's
 `TypeError`, including when a Promise carries it to the second global.
 
+`Reflect` accepts host objects implemented through Rhino's `Scriptable` interface. Host
+implementations determine which property definitions and integrity operations they support;
+see [Rhino host objects](rhino-host-objects.md) for the embedding contract.
+
 In ES6 and later, `yield` is an identifier in sloppy code outside generators, as in a browser.
 It is reserved in strict code and acts as an operator only in a generator body. Explicitly
 selecting the pre-ES6 language version preserves Rhino's implicit generators.

@@ -11,14 +11,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * The interfaces the rest of the runtime is written against carry no behaviour, so the only thing
- * worth checking is that their member sets match upstream. Every ported contract is compared
+ * Every ported contract is compared
  * against its upstream class by reflection: same method names, same arity, same parameter and
  * return shapes.
  *
  * Type names are normalised before comparison, because the two sides live in different packages and
- * a few types are deliberately different (see [expectedDifferences]). Anything not listed there is
- * a failure.
+ * a few types are deliberately different (see [expectedDifferences]). The host-object operations
+ * in [expectedAdditions] have JVM defaults so existing host implementations remain compatible.
+ * Any other difference is a failure.
  */
 class ContractParityTest {
 
@@ -28,6 +28,16 @@ class ContractParityTest {
         "Script.getDescriptor()JSDescriptor" to "the descriptor layer is not ported yet",
         // The debug package is never ported beyond what the interpreter itself needs.
         "Evaluator.getDebuggableScript(Object)DebuggableScript" to "the debugger surface is dropped",
+    )
+
+    /** D-119: the object-operation protocol also supports hosts outside ScriptableObject. */
+    private val expectedAdditions = setOf(
+        "Scriptable.ownPropertyKeys()Object[]",
+        "Scriptable.getOwnPropertyDescriptor(Context,Object)DescriptorInfo",
+        "Scriptable.defineOwnPropertyOrFalse(Context,Object,DescriptorInfo)boolean",
+        "Scriptable.isExtensible()boolean",
+        "Scriptable.preventExtensions()boolean",
+        "Scriptable.setPrototypeOf(Context,Scriptable)boolean",
     )
 
     private val pairs: List<Pair<Class<*>, Class<*>>> = listOf(
@@ -78,7 +88,7 @@ class ContractParityTest {
             val theirs = members(upstream)
 
             val missing = (theirs - mine).filterNot { expectedDifferences.containsKey("$name.$it") }
-            val extra = mine - theirs
+            val extra = (mine - theirs).filterNot { "$name.$it" in expectedAdditions }
             if (missing.isNotEmpty()) failures.add("$name is missing $missing")
             if (extra.isNotEmpty()) failures.add("$name has members upstream does not: $extra")
         }
@@ -95,6 +105,14 @@ class ContractParityTest {
             val (ported, upstream) = pairs.first { it.first.simpleName == typeName }
             if (member !in members(upstream)) stale.add("$key: upstream no longer has it ($reason)")
             if (member in members(ported)) stale.add("$key: the port has it now, drop the entry")
+        }
+        for (key in expectedAdditions) {
+            val (typeName, member) = key.split('.', limit = 2)
+            val (ported, upstream) = pairs.first { it.first.simpleName == typeName }
+            if (member in members(upstream)) stale.add("$key: upstream has it now, drop the entry")
+            val method = ported.declaredMethods.singleOrNull { signature(it) == member }
+            if (method == null) stale.add("$key: the port no longer has it")
+            else if (!method.isDefault) stale.add("$key: existing host classes need a JVM default")
         }
         assertEquals(emptyList(), stale, "the expected-difference list is out of date")
     }

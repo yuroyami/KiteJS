@@ -513,7 +513,7 @@ public object ScriptRuntime {
             val type = value.typeOf
             return type == "object" || type == "function"
         }
-        if (value is Scriptable) return value !is Callable
+        if (value is Scriptable) return true
         return false
     }
 
@@ -965,8 +965,7 @@ public object ScriptRuntime {
 
     internal fun getApplyArguments(cx: Context, arg1: Any?): Array<Any?> = when {
         arg1 == null || Undefined.isUndefined(arg1) -> emptyArgs
-        arg1 is Scriptable && isArrayLike(arg1) -> cx.getElements(arg1)
-        arg1 is ScriptableObject -> emptyArgs
+        arg1 is Scriptable && isObject(arg1) -> cx.getElements(arg1)
         else -> throw typeErrorById("msg.arg.isnt.array")
     }
 

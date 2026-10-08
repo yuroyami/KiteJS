@@ -320,18 +320,21 @@ public open class NativeObject : ScriptableObject {
             if (proto != null && (proto !is Scriptable || !ScriptRuntime.isObject(proto))) {
                 throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(proto))
             }
-            if (arg0 !is ScriptableObject || !ScriptRuntime.isObject(arg0)) return arg0
-            if (!arg0.setPrototypeOf(cx, proto as Scriptable?)) throw arg0.prototypeRefusedError(proto as Scriptable?)
+            if (!ScriptRuntime.isObject(arg0)) return arg0
+            val obj = arg0 as Scriptable
+            if (!obj.setPrototypeOf(cx, proto as Scriptable?)) {
+                if (obj is ScriptableObject) throw obj.prototypeRefusedError(proto)
+                throw ScriptRuntime.typeError("Object refused to set its prototype")
+            }
             return arg0
         }
 
         private fun js_keys(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val arg = if (args.isEmpty()) Undefined.instance else args[0]
             val obj = getCompatibleObject(cx, scope, arg)
-            val ids = obj.getIds()
-            for (i in ids.indices) {
-                ids[i] = ScriptRuntime.toString(ids[i])
-            }
+            val ids: Array<Any?> = AbstractEcmaObjectOperations.ownKeysForEnumeration(obj, false)
+                .filter { AbstractEcmaObjectOperations.isOwnEnumerable(cx, obj, it!!) }
+                .map { ScriptRuntime.toString(it) }.toTypedArray()
             return cx.newArray(scope, ids)
         }
 
@@ -388,20 +391,15 @@ public open class NativeObject : ScriptableObject {
 
         private fun js_getOwnPropertyNames(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val arg = if (args.isEmpty()) Undefined.instance else args[0]
-            val s = getCompatibleObject(cx, scope, arg)
-            val obj = ensureScriptableObject(s)
-            val ids = obj.startCompoundOp(false).use { obj.getIds(it, true, false) }
-            for (i in ids.indices) {
-                ids[i] = ScriptRuntime.toString(ids[i])
-            }
+            val obj = getCompatibleObject(cx, scope, arg)
+            val ids: Array<Any?> = obj.ownPropertyKeys().filter { it !is Symbol }.map { ScriptRuntime.toString(it) }.toTypedArray()
             return cx.newArray(scope, ids)
         }
 
         private fun js_getOwnPropertySymbols(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val arg = if (args.isEmpty()) Undefined.instance else args[0]
-            val s = getCompatibleObject(cx, scope, arg)
-            val obj = ensureScriptableObject(s)
-            val ids = obj.startCompoundOp(false).use { obj.getIds(it, true, true) }
+            val obj = getCompatibleObject(cx, scope, arg)
+            val ids = obj.ownPropertyKeys()
             val syms = ArrayList<Any?>()
             for (o in ids) {
                 if (o is Symbol) syms.add(o)
@@ -411,41 +409,41 @@ public open class NativeObject : ScriptableObject {
 
         private fun js_getOwnPropDesc(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val arg = if (args.isEmpty()) Undefined.instance else args[0]
-            val s = getCompatibleObject(cx, scope, arg)
-            val obj = ensureScriptableObject(s)
+            val obj = getCompatibleObject(cx, scope, arg)
             val nameArg = if (args.size < 2) Undefined.instance else args[1]
-            val desc = obj.getOwnPropertyDescriptor(cx, nameArg)
+            val desc = obj.getOwnPropertyDescriptor(cx, ScriptRuntime.toPropertyKey(nameArg))
             return desc?.toObject(scope) ?: Undefined.instance
         }
 
         private fun js_getOwnPropDescs(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val arg = if (args.isEmpty()) Undefined.instance else args[0]
-            val s = getCompatibleObject(cx, scope, arg)
-            val obj = ensureScriptableObject(s)
+            val obj = getCompatibleObject(cx, scope, arg)
             val descs = cx.newObject(scope) as ScriptableObject
-            val ids = obj.startCompoundOp(false).use { obj.getIds(it, true, true) }
+            val ids = obj.ownPropertyKeys()
             for (key in ids) {
                 val desc = obj.getOwnPropertyDescriptor(cx, key) ?: continue
-                when (key) {
-                    is Symbol -> descs.put(key, descs, desc.toObject(scope))
-                    is Int -> descs.put(key, descs, desc.toObject(scope))
-                    else -> descs.put(ScriptRuntime.toString(key), descs, desc.toObject(scope))
-                }
+                AbstractEcmaObjectOperations.createDataProperty(cx, descs, ScriptRuntime.toPropertyKey(key), desc.toObject(scope))
             }
             return descs
         }
 
         private fun js_defineProperty(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val arg = if (args.isEmpty()) Undefined.instance else args[0]
-            val obj = ensureScriptableObject(arg)
+            val obj = AbstractEcmaObjectOperations.ensureObject(arg)
             // The key is converted before the descriptor is read, and only once (ES2015 19.1.2.4).
             val key = ScriptRuntime.toPropertyKey(if (args.size < 2) Undefined.instance else args[1])
             val descArg = if (args.size < 3) Undefined.instance else args[2]
-            val desc = DescriptorInfo(ensureScriptableObject(descArg))
+            val desc = DescriptorInfo(AbstractEcmaObjectOperations.ensureObject(descArg))
             checkPropertyDefinition(desc)
             // DefinePropertyOrThrow: a refusal, which a typed array or a proxy can answer, is a
             // TypeError (D-88).
-            if (!obj.defineOwnProperty(cx, key, desc)) {
+            val defined = if (obj is ScriptableObject) {
+                // Retain the existing detailed diagnostics for ordinary engine objects.
+                obj.defineOwnProperty(cx, key, desc)
+            } else {
+                obj.defineOwnPropertyOrFalse(cx, key, desc)
+            }
+            if (!defined) {
                 throw ScriptRuntime.typeErrorById("msg.define.refused", if (key is Symbol) key.toString() else ScriptRuntime.toString(key))
             }
             return obj
@@ -453,19 +451,19 @@ public open class NativeObject : ScriptableObject {
 
         private fun js_isExtensible(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val arg = if (args.isEmpty()) Undefined.instance else args[0]
-            if (cx.languageVersion >= Context.VERSION_ES6 && arg !is ScriptableObject) {
+            if (cx.languageVersion >= Context.VERSION_ES6 && !ScriptRuntime.isObject(arg)) {
                 return false
             }
-            val obj = ensureScriptableObject(arg)
+            val obj = AbstractEcmaObjectOperations.ensureObject(arg)
             return obj.isExtensible
         }
 
         private fun js_preventExtensions(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val arg = if (args.isEmpty()) Undefined.instance else args[0]
-            if (cx.languageVersion >= Context.VERSION_ES6 && arg !is ScriptableObject) {
+            if (cx.languageVersion >= Context.VERSION_ES6 && !ScriptRuntime.isObject(arg)) {
                 return arg
             }
-            val obj = ensureScriptableObject(arg)
+            val obj = AbstractEcmaObjectOperations.ensureObject(arg)
             if (!obj.preventExtensions()) {
                 throw ScriptRuntime.typeError("Object.preventExtensions is not allowed")
             }
@@ -474,10 +472,10 @@ public open class NativeObject : ScriptableObject {
 
         private fun js_defineProperties(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val arg = if (args.isEmpty()) Undefined.instance else args[0]
-            val obj = ensureScriptableObject(arg)
+            val obj = AbstractEcmaObjectOperations.ensureObject(arg)
             val propsObj = if (args.size < 2) Undefined.instance else args[1]
             val props = ScriptRuntime.toObject(scope, propsObj)
-            obj.defineOwnProperties(cx, ensureScriptableObject(props))
+            AbstractEcmaObjectOperations.defineOwnProperties(cx, obj, props)
             return obj
         }
 
@@ -489,14 +487,14 @@ public open class NativeObject : ScriptableObject {
             newObject.prototype = obj
             if (args.size > 1 && !Undefined.isUndefined(args[1])) {
                 val props = ScriptRuntime.toObject(scope, args[1])
-                newObject.defineOwnProperties(cx, ensureScriptableObject(props))
+                AbstractEcmaObjectOperations.defineOwnProperties(cx, newObject, props)
             }
             return newObject
         }
 
         private fun js_isSealed(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val arg = if (args.isEmpty()) Undefined.instance else args[0]
-            if (cx.languageVersion >= Context.VERSION_ES6 && arg !is ScriptableObject) {
+            if (cx.languageVersion >= Context.VERSION_ES6 && !ScriptRuntime.isObject(arg)) {
                 return true
             }
             return AbstractEcmaObjectOperations.testIntegrityLevel(cx, arg, AbstractEcmaObjectOperations.INTEGRITY_LEVEL.SEALED)
@@ -504,7 +502,7 @@ public open class NativeObject : ScriptableObject {
 
         private fun js_isFrozen(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val arg = if (args.isEmpty()) Undefined.instance else args[0]
-            if (cx.languageVersion >= Context.VERSION_ES6 && arg !is ScriptableObject) {
+            if (cx.languageVersion >= Context.VERSION_ES6 && !ScriptRuntime.isObject(arg)) {
                 return true
             }
             return AbstractEcmaObjectOperations.testIntegrityLevel(cx, arg, AbstractEcmaObjectOperations.INTEGRITY_LEVEL.FROZEN)
@@ -512,7 +510,7 @@ public open class NativeObject : ScriptableObject {
 
         private fun js_seal(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val arg = if (args.isEmpty()) Undefined.instance else args[0]
-            if (cx.languageVersion >= Context.VERSION_ES6 && arg !is ScriptableObject) {
+            if (cx.languageVersion >= Context.VERSION_ES6 && !ScriptRuntime.isObject(arg)) {
                 return arg
             }
             val status = AbstractEcmaObjectOperations.setIntegrityLevel(cx, arg, AbstractEcmaObjectOperations.INTEGRITY_LEVEL.SEALED)
@@ -524,7 +522,7 @@ public open class NativeObject : ScriptableObject {
 
         private fun js_freeze(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val arg = if (args.isEmpty()) Undefined.instance else args[0]
-            if (cx.languageVersion >= Context.VERSION_ES6 && arg !is ScriptableObject) {
+            if (cx.languageVersion >= Context.VERSION_ES6 && !ScriptRuntime.isObject(arg)) {
                 return arg
             }
             val status = AbstractEcmaObjectOperations.setIntegrityLevel(cx, arg, AbstractEcmaObjectOperations.INTEGRITY_LEVEL.FROZEN)

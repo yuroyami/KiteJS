@@ -90,6 +90,18 @@ public open class NativeWith : Scriptable, SymbolScriptable, IdFunctionCall {
 
     override fun getIds(): Array<Any?> = prototypeField!!.getIds()
 
+    override fun ownPropertyKeys(): Array<Any?> = prototypeField!!.ownPropertyKeys()
+
+    override fun getOwnPropertyDescriptor(cx: Context, id: Any?): ScriptableObject.DescriptorInfo? =
+        prototypeField!!.getOwnPropertyDescriptor(cx, id)
+
+    override fun defineOwnPropertyOrFalse(cx: Context, id: Any?, desc: ScriptableObject.DescriptorInfo): Boolean =
+        prototypeField!!.defineOwnPropertyOrFalse(cx, id, desc)
+
+    override val isExtensible: Boolean get() = prototypeField!!.isExtensible
+
+    override fun preventExtensions(): Boolean = prototypeField!!.preventExtensions()
+
     override fun getDefaultValue(hint: KClass<*>?): Any? = prototypeField!!.getDefaultValue(hint)
 
     override fun hasInstance(instance: Scriptable): Boolean = prototypeField!!.hasInstance(instance)

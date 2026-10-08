@@ -95,6 +95,20 @@ public open class Delegator : Function, SymbolScriptable {
 
     override fun getIds(): Array<Any?> = required().getIds()
 
+    override fun ownPropertyKeys(): Array<Any?> = required().ownPropertyKeys()
+
+    override fun getOwnPropertyDescriptor(cx: Context, id: Any?): ScriptableObject.DescriptorInfo? =
+        required().getOwnPropertyDescriptor(cx, id)
+
+    override fun defineOwnPropertyOrFalse(cx: Context, id: Any?, desc: ScriptableObject.DescriptorInfo): Boolean =
+        required().defineOwnPropertyOrFalse(cx, id, desc)
+
+    override val isExtensible: Boolean get() = required().isExtensible
+
+    override fun preventExtensions(): Boolean = required().preventExtensions()
+
+    override fun setPrototypeOf(cx: Context, proto: Scriptable?): Boolean = required().setPrototypeOf(cx, proto)
+
     /** A delegator is its own primitive when asked for an object, and defers otherwise. */
     override fun getDefaultValue(hint: KClass<*>?): Any? =
         if (hint == null || hint == ScriptRuntime.ScriptableClass || hint == ScriptRuntime.FunctionClass) this

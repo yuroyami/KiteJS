@@ -57,21 +57,11 @@ internal class NativeReflect private constructor() : ScriptableObject() {
                 )
             }
 
-            val callable = ensureScriptable(args[0])
-
-            var self = thisObj
-            if (args[1] is Scriptable) {
-                self = args[1] as Scriptable
-            } else if (ScriptRuntime.isPrimitive(args[1])) {
-                self = cx.newObject(scope, "Object", arrayOf(args[1]))
-            }
-
-            if (ScriptRuntime.isSymbol(args[2])) {
-                throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(args[2]))
-            }
-            val argumentsList = ensureScriptableObject(args[2])
-
-            return ScriptRuntime.applyOrCall(true, cx, scope, callable, arrayOf(self, argumentsList))
+            val callable = args[0] as? Callable ?: throw ScriptRuntime.notFunctionError(args[0])
+            val argumentsList = AbstractEcmaObjectOperations.ensureObject(args[2])
+            val callArgs = ScriptRuntime.getApplyArguments(cx, argumentsList)
+            val self = ScriptRuntime.getApplyOrCallThis(cx, scope, args[1], 1, callable)
+            return callable.call(cx, scope, self, callArgs)
         }
 
         private fun construct(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Scriptable {
@@ -119,7 +109,7 @@ internal class NativeReflect private constructor() : ScriptableObject() {
         private fun defineProperty(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any {
             val target = checkTarget(args)
             val key = ScriptRuntime.toPropertyKey(args.getOrElse(1) { Undefined.instance })
-            val desc = DescriptorInfo(ensureScriptableObject(args.getOrElse(2) { Undefined.instance }))
+            val desc = DescriptorInfo(AbstractEcmaObjectOperations.ensureObject(args.getOrElse(2) { Undefined.instance }))
             checkPropertyDefinition(desc)
             return AbstractEcmaObjectOperations.defineOwnPropertyOrFalse(cx, target, key, desc)
         }
@@ -180,21 +170,11 @@ internal class NativeReflect private constructor() : ScriptableObject() {
         private fun ownKeys(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Scriptable {
             val target = checkTarget(args)
 
-            // A proxy's [[OwnPropertyKeys]] is the trap's list in the trap's order; upstream sorted
-            // it like an ordinary object's, strings before symbols (D-91).
-            if (target is NativeProxy) return cx.newArray(scope, target.ownPropertyKeys())
-
-            val strings = ArrayList<Any?>()
-            val symbols = ArrayList<Any?>()
-
-            val ids = target.startCompoundOp(false).use { target.getIds(it, true, true) }
-            for (o in ids) {
-                if (o is Symbol) symbols.add(o) else strings.add(ScriptRuntime.toString(o))
-            }
-
-            // Strings first, then symbols, which is the order the spec asks for.
-            strings.addAll(symbols)
-            return cx.newArray(scope, strings.toTypedArray())
+            // Ordinary objects order their own keys; proxies and hosts may supply another order.
+            val ids: Array<Any?> = target.ownPropertyKeys().map {
+                if (it is Symbol) it else ScriptRuntime.toString(it)
+            }.toTypedArray()
+            return cx.newArray(scope, ids)
         }
 
         private fun preventExtensions(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any =
@@ -232,16 +212,13 @@ internal class NativeReflect private constructor() : ScriptableObject() {
             return target.setPrototypeOf(cx, proto as Scriptable?)
         }
 
-        private fun checkTarget(args: Array<Any?>): ScriptableObject {
-            if (args.isEmpty() || args[0] == null || args[0] === Undefined.instance) {
+        private fun checkTarget(args: Array<Any?>): Scriptable {
+            if (args.isEmpty() || args[0] == null || Undefined.isUndefined(args[0])) {
                 val argument = if (args.isEmpty()) Undefined.instance else args[0]
                 throw ScriptRuntime.typeErrorById("msg.no.properties", ScriptRuntime.toString(argument))
             }
 
-            if (ScriptRuntime.isSymbol(args[0])) {
-                throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(args[0]))
-            }
-            return ensureScriptableObject(args[0])
+            return AbstractEcmaObjectOperations.ensureObject(args[0])
         }
     }
 }
