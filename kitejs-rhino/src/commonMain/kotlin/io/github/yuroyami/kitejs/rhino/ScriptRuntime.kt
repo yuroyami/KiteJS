@@ -3102,6 +3102,12 @@ public object ScriptRuntime {
             while (varScope is NativeWith) varScope = varScope.parentScope!!
             for (i in varCount - 1 downTo 0) {
                 val name = desc.getParamOrVarName(i)
+                if (name in desc.annexBOnlyVarNames) {
+                    if (EvalScope.canDeclareAnnexBVar(varScope, name) && !varScope.has(name, varScope)) {
+                        ScriptableObject.defineProperty(varScope, name, Undefined.instance, if (evalScript) 0 else ScriptableObject.PERMANENT)
+                    }
+                    continue
+                }
                 val isConst = desc.getParamOrVarConst(i)
                 if (!ScriptableObject.hasProperty(scope, name)) {
                     if (isConst) {
@@ -3149,6 +3155,15 @@ public object ScriptRuntime {
         val call = cx.currentActivationCall!!
         cx.currentActivationCall = call.parentActivationCall
         call.parentActivationCall = null
+    }
+
+    /** Copies the current block binding to an eligible Annex B variable binding. */
+    internal fun copyAnnexBFunction(cx: Context, scope: Scriptable, name: String) {
+        var variables = scope
+        while (variables is NativeWith) variables = variables.parentScope!!
+        val value = name(cx, scope, name)
+        if (variables is EvalScope) variables.copyAnnexBFunction(name, value)
+        else if (EvalScope.canDeclareAnnexBVar(variables, name)) variables.put(name, variables, value)
     }
 
     /** Puts a declared function into the scope it belongs to. */

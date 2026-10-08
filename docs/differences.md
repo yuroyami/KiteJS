@@ -132,11 +132,12 @@ A `break`, `return` or throw out of a `for-of` loop, or an array pattern that ta
 elements than the iterable has, never calls the iterator's `return` method, so a generator's
 `finally` block does not run then. Call `it.return()` yourself where the cleanup matters.
 
-### Older scoping rules for block functions
+### Block, parameter and eval scopes
 
-A function declared inside a block belongs to the whole enclosing function, in strict code too,
-and a `for (let ...)` body's function sees the last value of the loop variable. Code that avoids
-these corners runs the same as in a browser.
+Functions declared inside blocks have lexical bindings initialized when the block is entered.
+Strict block functions stay in their block. In sloppy code, an eligible ordinary declaration
+also updates an outer variable when execution reaches the declaration. Closures in a
+`for (let ...)` body retain that iteration's binding.
 
 Parameter defaults initialize from left to right, can read the function's unmapped `arguments`
 object, and cannot read a later parameter before it is initialized. Closures created in defaults

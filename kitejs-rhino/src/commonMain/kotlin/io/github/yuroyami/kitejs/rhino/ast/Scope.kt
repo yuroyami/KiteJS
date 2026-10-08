@@ -43,6 +43,8 @@ public open class Scope(pos: Int = -1, len: Int = 1) : Jump() {
      */
     internal var nonPlainFunctionNamesWithin: MutableSet<String>? = null
 
+    internal val blockFunctions: MutableList<FunctionNode> = mutableListOf()
+
     private var childScopeList: MutableList<Scope>? = null
 
     init {

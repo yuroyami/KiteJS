@@ -10,6 +10,10 @@ import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CALLSPECIAL_OPTIONA
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_PARAMETER_VALUE
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_INITIALIZE_PARAMETER
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_ENTER_FUNCTION_BODY
+import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_INIT_BLOCK_FUNCTION
+import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_ANNEX_B_COPY
+import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_LOCAL_STORE
+import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CREATE_ITERATION_SCOPE
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_OPTIONAL_CALL_LOOKUP
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CALL_ON_SUPER
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CLASS_BEGIN
@@ -281,6 +285,18 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
     private fun badTree(node: Node): RuntimeException = RuntimeException(node.toString())
 
     private fun visitStatement(node: Node, initialStackDepth: Int) {
+        node.iterationBindings?.takeIf { it.isNotEmpty() }?.let {
+            if (!itsInFunctionFlag || (scriptOrFn as FunctionNode).requiresActivation) {
+                val index = literalIds.size
+                literalIds.add(it.toTypedArray())
+                addIndexOp(Icode_CREATE_ITERATION_SCOPE, index)
+            }
+        }
+        node.blockFunctionInitializers?.forEach { addIndexOp(Icode_INIT_BLOCK_FUNCTION, it) }
+        node.annexBFunctionName?.let {
+            addStringOp(Icode_ANNEX_B_COPY, it)
+            return
+        }
         if (node.getIntProp(Node.FUNCTION_BODY_START_PROP, 0) != 0) {
             addIcode(Icode_ENTER_FUNCTION_BODY)
             return
@@ -467,6 +483,11 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
     }
 
     private fun visitExpression(node: Node, contextFlags: Int) {
+        node.localStoreBlock?.let {
+            visitExpression(node.firstChild!!, contextFlags)
+            addIndexOp(Icode_LOCAL_STORE, it.getExistingIntProp(Node.LOCAL_PROP))
+            return
+        }
         val type = node.type
         var child = node.firstChild
         val savedStackDepth = stackDepth

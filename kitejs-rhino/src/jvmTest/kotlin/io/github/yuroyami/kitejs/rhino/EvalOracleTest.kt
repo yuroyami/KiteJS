@@ -1696,6 +1696,11 @@ class EvalOracleTest {
                 val standard = "\"localglobal|ReferenceError|number|undefined|true|2|42|2|global||5|1|3|undefined|SyntaxError|RangeError:from eval|3|string|3|true\""
                 assertEquals(standard.replace("number|undefined", "number|number"), expected)
                 assertEquals(standard, actual)
+            } else if (file.name == "closures_in_loops.js") {
+                // D-120: classic for(let) creates a fresh environment before each update.
+                val standard = "\"3,3,3|0,1,2|0,1,2|0,10,20|1,4,9|3|init:1|init:1\""
+                assertEquals(standard.replaceFirst("|0,1,2", "|3,3,3"), expected)
+                assertEquals(standard, actual)
             } else if (expected != actual) failures.add("${file.name}\n  upstream: $expected\n  ported:   $actual")
         }
         assertEquals(emptyList(), failures, "corpus evaluation differs from upstream")

@@ -24,6 +24,11 @@ import io.github.yuroyami.kitejs.rhino.ast.ScriptNode
  */
 public open class Node : Iterable<Node> {
 
+    internal var blockFunctionInitializers: List<Int>? = null
+    internal var annexBFunctionName: String? = null
+    internal var localStoreBlock: Node? = null
+    internal var iterationBindings: List<String>? = null
+
     public constructor(nodeType: Int) {
         typeField = nodeType
     }

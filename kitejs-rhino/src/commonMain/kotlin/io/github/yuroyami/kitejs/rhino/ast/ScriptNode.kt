@@ -31,6 +31,9 @@ public open class ScriptNode(pos: Int = -1) : Scope(pos) {
     /** Every symbol in this script or function, in declaration order. */
     public var symbols: MutableList<Symbol> = ArrayList(4)
 
+    internal val blockFunctionCandidates: MutableList<FunctionNode> = mutableListOf()
+    internal val annexBOnlyVarNames: MutableSet<String> = mutableSetOf()
+
     /** Number of parameters, counted as [Token.LP] symbols arrive. */
     public var paramCount: Int = 0
         private set

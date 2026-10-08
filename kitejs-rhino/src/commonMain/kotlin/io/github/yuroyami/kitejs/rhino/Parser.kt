@@ -635,6 +635,7 @@ public class Parser(
             inUseStrictDirective = savedStrictMode
         }
 
+        finishBlockFunctionDeclarations(root, root.isInStrictMode)
         reportErrorsIfExists(baseLineno)
 
         // Add comments to the root in lexical order.
@@ -752,6 +753,7 @@ public class Parser(
         }
 
         getAndResetJsDoc()
+        finishBlockFunctionDeclarations(fnNode, savedStrictMode || fnNode.isInStrictMode)
         return pn
     }
 
@@ -1049,6 +1051,14 @@ public class Parser(
         }
 
         val fnNode = FunctionNode(functionSourceStart, name)
+        if (compilerEnv.languageVersion >= Context.VERSION_ES6 &&
+            syntheticType != FunctionNode.FUNCTION_EXPRESSION && name != null &&
+            currentScope !== currentScriptOrFn
+        ) {
+            fnNode.blockDeclarationScope = currentScope
+            currentScope!!.blockFunctions.add(fnNode)
+            currentScriptOrFn!!.blockFunctionCandidates.add(fnNode)
+        }
         fnNode.isMethodDefinition = isMethodDefiniton
         fnNode.functionType = type
         fnNode.classConstructorKind = classConstructorKind
@@ -1650,7 +1660,7 @@ public class Parser(
         val pn = IfStatement(pos)
         val data = condition()
         ifClauseFunction = peekToken() == Token.FUNCTION
-        val ifTrue = getNextStatementAfterInlineComments(pn)
+        val ifTrue = getNextStatementAfterInlineComments(pn, ifClause = true)
         ifClauseFunction = false
         checkControlBody(ifTrue, isIfBody = true)
         var ifFalse: AstNode? = null
@@ -1661,7 +1671,7 @@ public class Parser(
             }
             elsePos = ts.tokenBeg - pos
             ifClauseFunction = peekToken() == Token.FUNCTION
-            ifFalse = statement()
+            ifFalse = getNextStatementAfterInlineComments(null, ifClause = true)
             ifClauseFunction = false
             checkControlBody(ifFalse, isIfBody = true)
         }
@@ -1835,11 +1845,28 @@ public class Parser(
         return t
     }
 
-    private fun getNextStatementAfterInlineComments(pn: AstNode?): AstNode {
-        var body = statement()
+    private fun getNextStatementAfterInlineComments(pn: AstNode?, ifClause: Boolean = false): AstNode {
+        fun clause(): AstNode {
+            if (!ifClause || peekToken() != Token.FUNCTION || compilerEnv.languageVersion < Context.VERSION_ES6) return statement()
+            val block = Scope(ts.tokenBeg)
+            pushScope(block)
+            try {
+                val function = statement()
+                checkControlBody(function, isIfBody = true)
+                block.position = function.position
+                block.length = function.length
+                block.setLineColumnNumber(function.lineno, function.column)
+                block.addChildToBack(function)
+                function.parent = block
+                return block
+            } finally {
+                popScope()
+            }
+        }
+        var body = clause()
         if (Token.COMMENT == body.type) {
             val commentNode = body
-            body = statement()
+            body = clause()
             if (pn != null) {
                 pn.inlineComment = commentNode
             } else {
@@ -2658,7 +2685,7 @@ public class Parser(
         }
         // A const in a block belongs to the block, as a let does, and is bound afresh each time
         // its declaration runs, so one in a loop body takes the value of each pass (D-74).
-        val blockConst = declType == Token.CONST && !blockScopedConst && isInBlockStatement()
+        val blockConst = declType == Token.CONST && !blockScopedConst && isInLexicalBlockBody()
         if (!blockConst) return variablesIn(declType, pos, isStatement)
         val saved = blockScopedConst
         blockScopedConst = true
@@ -2672,15 +2699,14 @@ public class Parser(
     }
 
     /**
-     * Whether a declaration here sits in a `{ ... }` block statement, rather than directly in a
-     * function or script body, a loop or a switch, which keep upstream's function-wide const.
+     * Whether a declaration here sits in a block statement or a switch CaseBlock, rather than
+     * directly in a function or script body. Loop heads select their own lexical const handling.
      */
-    private fun isInBlockStatement(): Boolean {
+    private fun isInLexicalBlockBody(): Boolean {
         val scope = currentScope ?: return false
         return compilerEnv.languageVersion >= Context.VERSION_ES6 &&
             scope !== currentScriptOrFn &&
-            scope::class == Scope::class &&
-            scope.type == Token.BLOCK
+            (scope is SwitchStatement || (scope::class == Scope::class && scope.type == Token.BLOCK))
     }
 
     private fun variablesIn(declType: Int, pos: Int, isStatement: Boolean): VariableDeclaration {
@@ -2844,6 +2870,21 @@ public class Parser(
             if (declType == Token.VAR && fn.parsingBody && name != null) fn.bodyVarNames.add(name)
         }
         val scope = currentScope!!
+        if (declType == Token.FUNCTION && scope !== currentScriptOrFn &&
+            compilerEnv.languageVersion >= Context.VERSION_ES6
+        ) {
+            val existing = scope.getSymbol(name!!)
+            val duplicatePlain = name in (scope.functionNamesWithin ?: emptySet()) &&
+                !inUseStrictDirective && plainFunction && name !in (scope.nonPlainFunctionNamesWithin ?: emptySet())
+            if ((existing != null && !duplicatePlain) || scope.varNamesWithin?.contains(name) == true) {
+                addError("msg.fn.redecl", name)
+                return
+            }
+            (scope.functionNamesWithin ?: HashSet<String>().also { scope.functionNamesWithin = it }).add(name)
+            if (!plainFunction) (scope.nonPlainFunctionNamesWithin ?: HashSet<String>().also { scope.nonPlainFunctionNamesWithin = it }).add(name)
+            if (existing == null) scope.putSymbol(Symbol(Token.LET, name))
+            return
+        }
         val definingScope = scope.getDefiningScope(name!!)
         val symbol = definingScope?.getSymbol(name)
         val symDeclType = symbol?.declType ?: -1
@@ -2944,6 +2985,36 @@ public class Parser(
     /** Whether a var inside [scope], or a function declared directly in it, already uses [name]. */
     private fun clashesWithBlock(scope: Scope, name: String): Boolean =
         scope.varNamesWithin?.contains(name) == true || scope.functionNamesWithin?.contains(name) == true
+
+    /** Annex B eligibility uses the complete enclosing body, including later lexical names. */
+    private fun finishBlockFunctionDeclarations(tree: ScriptNode, strict: Boolean) {
+        if (strict) return
+        for (function in tree.blockFunctionCandidates) {
+            if (function.isES6Generator || function.isAsync) continue
+            val name = function.name
+            if (tree is FunctionNode && name in tree.parameterBindingNames) continue
+            var scope = function.blockDeclarationScope!!.parentScope
+            var eligible = true
+            while (scope != null) {
+                val declaration = scope.getSymbol(name)?.declType
+                val plainBlockFunction = name in (scope.functionNamesWithin ?: emptySet()) &&
+                    name !in (scope.nonPlainFunctionNamesWithin ?: emptySet())
+                if ((declaration == Token.LET || declaration == Token.CONST) && !plainBlockFunction) {
+                    eligible = false
+                    break
+                }
+                if (scope === tree) break
+                scope = scope.parentScope
+            }
+            if (!eligible) continue
+            function.hasAnnexBCopy = true
+            if (tree.getSymbol(name) == null) {
+                tree.annexBOnlyVarNames.add(name)
+                tree.putSymbol(Symbol(Token.VAR, name).also { it.onlyFromBlocks = true })
+            }
+            if (tree is FunctionNode) tree.bodyVarNames.add(name)
+        }
+    }
 
     /**
      * The message for a lexical declaration of [name] that a var declared here would hoist past:

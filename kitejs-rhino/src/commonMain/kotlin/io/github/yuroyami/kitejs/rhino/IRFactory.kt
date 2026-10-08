@@ -425,6 +425,9 @@ public class IRFactory(
 
     private fun transformBigInt(node: BigIntLiteral): Node = node
 
+    private fun blockFunctionInitializers(scope: Scope): List<Int> =
+        scope.blockFunctions.associateBy { it.name }.values.map { it.blockFunctionIndex }
+
     private fun transformBlock(node: AstNode): Node {
         if (node is Scope) {
             parser.pushScope(node)
@@ -437,7 +440,7 @@ public class IRFactory(
 
             for (kid in node) {
                 if (kid is FunctionNode &&
-                    kid.functionType == FunctionNode.FUNCTION_EXPRESSION_STATEMENT
+                    kid.functionType == FunctionNode.FUNCTION_EXPRESSION_STATEMENT && kid.blockDeclarationScope == null
                 ) {
                     functions.add(transform(kid))
                 } else {
@@ -452,6 +455,7 @@ public class IRFactory(
             for (kid in kids) {
                 node.addChildToBack(kid)
             }
+            if (node is Scope) node.blockFunctionInitializers = blockFunctionInitializers(node)
             return node
         } finally {
             if (node is Scope) {
@@ -527,6 +531,9 @@ public class IRFactory(
         val savedScope = parser.currentScope
         parser.currentScope = loop
         try {
+            if (loop.initializer!!.type == Token.LET && parser.compilerEnv.languageVersion >= Context.VERSION_ES6) {
+                loop.iterationBindings = loop.symbolTable?.values?.filter { it.declType == Token.LET }?.map { it.name!! }
+            }
             // The names a const head destructures belong to the loop as well (D-72).
             val savedBlockScopedConst = parser.blockScopedConst
             parser.blockScopedConst = loop.initializer!!.type == Token.CONST
@@ -619,7 +626,8 @@ public class IRFactory(
                 body.addChildToFront(Node(Token.EXPR_VOID, destructuring, lineno, column))
             }
 
-            val syntheticType = fn.functionType
+            val syntheticType = if (fn.blockDeclarationScope != null) FunctionNode.FUNCTION_EXPRESSION else fn.functionType
+            fn.blockFunctionIndex = index
             var pn = initFunction(fn, index, body, syntheticType)
             if (mexpr != null) {
                 astNodePos.push(fn)
@@ -630,6 +638,11 @@ public class IRFactory(
                 }
                 if (syntheticType != FunctionNode.FUNCTION_EXPRESSION) {
                     pn = createExprStatementNoReturn(pn, fn.lineno, fn.column)
+                }
+            }
+            if (fn.blockDeclarationScope != null) {
+                return Node(Token.EMPTY, fn.lineno, fn.column).also {
+                    if (fn.hasAnnexBCopy) it.annexBFunctionName = fn.name
                 }
             }
             return pn
@@ -1155,6 +1168,17 @@ public class IRFactory(
                 addSwitchCase(block, caseExpr, body)
             }
             closeSwitch(block)
+            if (block.symbolTable?.isNotEmpty() == true) {
+                block.blockFunctionInitializers = blockFunctionInitializers(node)
+                // The discriminant is evaluated before the CaseBlock environment exists.
+                val local = Node(Token.LOCAL_BLOCK)
+                val load = Node(Token.LOCAL_LOAD).also { it.putProp(Node.LOCAL_BLOCK_PROP, local) }
+                node.replaceChild(switchExpr, load)
+                val save = Node(Token.EMPTY, switchExpr).also { it.localStoreBlock = local }
+                local.addChildToBack(Node(Token.EXPR_VOID, save))
+                local.addChildToBack(block)
+                return local
+            }
             return block
         } finally {
             parser.currentScope = savedScope
@@ -1373,7 +1397,7 @@ public class IRFactory(
         }
 
         // A class binds its own name in a scope of its own, not inside its constructor.
-        if (functionType == FunctionNode.FUNCTION_EXPRESSION && fnNode.classConstructorKind == FunctionNode.NOT_CLASS_CONSTRUCTOR) {
+        if (functionType == FunctionNode.FUNCTION_EXPRESSION && fnNode.classConstructorKind == FunctionNode.NOT_CLASS_CONSTRUCTOR && fnNode.blockDeclarationScope == null) {
             val name = fnNode.functionName
             if (name != null && name.length() != 0 && fnNode.getSymbol(name.identifier!!) == null) {
                 // A function expression needs its own name as a variable, unless one is already
@@ -2135,6 +2159,9 @@ public class IRFactory(
                     if (incrNode.type != Token.EMPTY) {
                         incrNode = Node(Token.EXPR_VOID, incrNode)
                         loop.addChildAfter(incrNode, incrTarget)
+                    }
+                    if (loop.iterationBindings?.isNotEmpty() == true) {
+                        loop.addChildAfter(Node(Token.EMPTY).also { it.iterationBindings = loop.iterationBindings }, incrTarget)
                     }
                     continueTarget = incrTarget
                 }

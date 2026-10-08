@@ -63,10 +63,12 @@ internal object IrDump {
         return sb.toString()
     }
 
-    fun ported(root: Node?): String {
+    fun ported(root: Node?, omitIterationMarkers: Boolean = false): String {
         val sb = StringBuilder()
         fun walk(n: Node?, depth: Int) {
             if (n == null) return
+            // D-120: callers opt in only for the exact classic-for(let) oracle fixture.
+            if (omitIterationMarkers && n.type == Token.EMPTY && n.iterationBindings != null) return
             repeat(depth) { sb.append("  ") }
             sb.append(n.type)
             runCatching { n.string }.getOrNull()?.let { sb.append(" str=").append(it) }

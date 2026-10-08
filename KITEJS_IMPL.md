@@ -1059,6 +1059,29 @@ Living list. Every entry is a known, deliberate behavior or structure difference
   ReflectObjectOperationsTest pins 43 fixed Node/V8 controls for the shared algorithms,
   including complete getter metadata for setter-only properties.
 
+- D-120: ES6 block function declarations have mutable lexical bindings initialized on block
+  entry (#85). Sloppy duplicate ordinary declarations select the last function for that
+  binding. Strict, generator and async declarations create no outer var copy. Annex B
+  eligibility is resolved after the complete enclosing body is parsed, excluding formal
+  parameter names and intervening lexical declarations, including later declarations.
+  Eligible var bindings exist before execution, but the current block binding is copied only
+  when the declaration's source position is reached. Direct if-clause declarations receive
+  synthetic blocks. Eval checks its intervening environments; global scripts and eval skip
+  optional bindings forbidden by HasLexicalDeclaration or CanDeclareGlobalVar rather than
+  rejecting the lexical declaration. This follows GlobalDeclarationInstantiation and
+  EvalDeclarationInstantiation even in the six global controls where Node 26/V8 throws.
+  Switch consts and functions share the CaseBlock environment, initialized after evaluating
+  the discriminant and before evaluating case expressions. Classic for(let) clones its
+  bindings before the first condition and each update, preserving closures across continue,
+  finally and later iterations. Explicit older language versions retain Rhino's behavior.
+  Four appended icodes implement block initialization, Annex B copies, saved discriminants
+  and iteration scopes without changing upstream instruction numbers. Their handlers live
+  outside the hot JVM dispatch method. BlockFunctionDeclarationTest pins the reported cases
+  and normative global checks; BlockFunctionSemanticsTest pins 118 fixed Node/V8 controls.
+  Exact corrected test262 paths are recorded individually and remain subject to stale-entry
+  checks. The let-const IR oracle compares the unchanged tree after separately checking the
+  two iteration markers, and its bytecode oracle retains all shared metadata and pools.
+
 ## Phases
 
 | Phase | Deliverable | Done when |

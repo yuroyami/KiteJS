@@ -123,6 +123,10 @@ public open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(p
     internal var parameterBindingNames: List<String> = emptyList()
     internal var parameterLocalNames: List<String> = emptyList()
     internal val bodyVarNames: MutableSet<String> = mutableSetOf()
+
+    internal var blockDeclarationScope: Scope? = null
+    internal var blockFunctionIndex: Int = -1
+    internal var hasAnnexBCopy: Boolean = false
     internal var parsingBody: Boolean = false
     internal var hasParameterExpressions: Boolean = false
     internal var hasParameterInitialization: Boolean = false

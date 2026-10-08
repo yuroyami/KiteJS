@@ -47,15 +47,16 @@ class NodeTransformerOracleTest {
         }
     }
 
-    private fun portedTransformed(source: String, version: Int, optionalChainFixture: Boolean = false): String {
+    private fun portedTransformed(source: String, version: Int, optionalChainFixture: Boolean = false, iterationFixture: Boolean = false): String {
         val env = CompilerEnvirons()
         env.languageVersion = version
         val ast = Parser(env).parse(source, "corpus.js", 1)
         val tree = IRFactory(env, "corpus.js", source, env.errorReporter).transformTree(ast)!!
         NodeTransformer().transform(tree, env)
         if (optionalChainFixture) OptionalChainOracleExpectations.assertStructure(tree)
+        if (iterationFixture) BlockFunctionOracleExpectations.assertIterationMarkers(tree)
         return buildString {
-            append(IrDump.ported(tree))
+            append(IrDump.ported(tree, omitIterationMarkers = iterationFixture))
             for (i in 0 until tree.functionCount) {
                 append("--- function ").append(i).append(" ---\n")
                 append(IrDump.ported(tree.getFunctionNode(i)))
@@ -69,7 +70,7 @@ class NodeTransformerOracleTest {
         for (file in corpusFiles()) {
             val source = file.readText()
             val expected = runCatching { upstreamTransformed(source, upstreamVersion) }
-            val actual = runCatching { portedTransformed(source, portedVersion, file.name == "optional-chaining.js") }
+            val actual = runCatching { portedTransformed(source, portedVersion, file.name == "optional-chaining.js", file.name == "let-const.js" && portedVersion >= Context.VERSION_ES6) }
 
             if (expected.isFailure) {
                 if (actual.isSuccess) {
@@ -126,7 +127,7 @@ class NodeTransformerOracleTest {
             val source = "'use strict';\n" + file.readText()
 
             val expected = runCatching { upstreamTransformed(source, UContext.VERSION_ES6) }
-            val actual = runCatching { portedTransformed(source, Context.VERSION_ES6, file.name == "optional-chaining.js") }
+            val actual = runCatching { portedTransformed(source, Context.VERSION_ES6, file.name == "optional-chaining.js", file.name == "let-const.js") }
             if (expected.isFailure) {
                 if (actual.isSuccess) {
                     failures.add("${file.name}: upstream rejects it but the port accepts it")

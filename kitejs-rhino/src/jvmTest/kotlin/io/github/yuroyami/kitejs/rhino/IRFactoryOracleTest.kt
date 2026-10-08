@@ -39,12 +39,14 @@ class IRFactoryOracleTest {
         return IrDump.upstream(irf.transformTree(ast))
     }
 
-    private fun portedIr(source: String, version: Int): String {
+    private fun portedIr(source: String, version: Int, iterationFixture: Boolean = false): String {
         val env = CompilerEnvirons()
         env.languageVersion = version
         val ast = Parser(env).parse(source, "corpus.js", 1)
         val irf = IRFactory(env, "corpus.js", source, env.errorReporter)
-        return IrDump.ported(irf.transformTree(ast))
+        val tree = irf.transformTree(ast)
+        if (iterationFixture) BlockFunctionOracleExpectations.assertIterationMarkers(tree!!)
+        return IrDump.ported(tree, omitIterationMarkers = iterationFixture)
     }
 
     private fun checkCorpus(upstreamVersion: Int, portedVersion: Int) {
@@ -53,7 +55,7 @@ class IRFactoryOracleTest {
         for (file in corpusFiles()) {
             val source = file.readText()
             val expected = runCatching { upstreamIr(source, upstreamVersion) }
-            val actual = runCatching { portedIr(source, portedVersion) }
+            val actual = runCatching { portedIr(source, portedVersion, file.name == "let-const.js" && portedVersion >= Context.VERSION_ES6) }
 
             if (expected.isFailure) {
                 // Both have to reject it, otherwise the port is more permissive.

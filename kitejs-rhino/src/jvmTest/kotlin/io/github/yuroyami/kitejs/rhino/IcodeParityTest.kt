@@ -70,6 +70,7 @@ class IcodeParityTest {
         )
         // The icodes must stay clear of the bytecode tokens, which run upward from FIRST_BYTECODE.
         assertTrue(Icode.MIN_ICODE < 0)
+        assertTrue(Icode.MIN_ICODE >= Byte.MIN_VALUE, "every instruction must fit in a signed byte")
         assertTrue(Token.FIRST_BYTECODE_TOKEN > 0)
     }
 
@@ -89,10 +90,12 @@ class IcodeParityTest {
             // (D-95), which upstream has no syntax for. The `await` of an async function, and the
             // generator return whose value was stored before its finally blocks ran (D-97).
             // Testing a call reference's callee without losing its receiver (#132).
+            // Lexical block initialization, source-position Annex B copies, saved switch
+            // discriminants and per-iteration let environments (D-120).
             listOf(
-                "Icode_AWAIT", "Icode_CALL_SPREAD", "Icode_CLASS_BEGIN", "Icode_CLASS_CTOR", "Icode_CLASS_ELEMENT",
-                "Icode_CLASS_END", "Icode_CLASS_PRIVATE_NAMES", "Icode_ENTER_FUNCTION_BODY", "Icode_GENERATOR_RETURN_RESULT", "Icode_INITCONST", "Icode_INITCONSTVAR",
-                "Icode_INITIALIZE_PARAMETER", "Icode_NEW_SPREAD", "Icode_NEW_TARGET", "Icode_OPTIONAL_CALL_LOOKUP", "Icode_PARAMETER_VALUE", "Icode_SUPER_CALL", "Icode_SUPER_CALL_SPREAD",
+                "Icode_ANNEX_B_COPY", "Icode_AWAIT", "Icode_CALL_SPREAD", "Icode_CLASS_BEGIN", "Icode_CLASS_CTOR", "Icode_CLASS_ELEMENT",
+                "Icode_CLASS_END", "Icode_CLASS_PRIVATE_NAMES", "Icode_CREATE_ITERATION_SCOPE", "Icode_ENTER_FUNCTION_BODY", "Icode_GENERATOR_RETURN_RESULT", "Icode_INITCONST", "Icode_INITCONSTVAR",
+                "Icode_INITIALIZE_PARAMETER", "Icode_INIT_BLOCK_FUNCTION", "Icode_LOCAL_STORE", "Icode_NEW_SPREAD", "Icode_NEW_TARGET", "Icode_OPTIONAL_CALL_LOOKUP", "Icode_PARAMETER_VALUE", "Icode_SUPER_CALL", "Icode_SUPER_CALL_SPREAD",
                 "Icode_SUPER_CTOR",
             ),
             extras.keys.toList(),

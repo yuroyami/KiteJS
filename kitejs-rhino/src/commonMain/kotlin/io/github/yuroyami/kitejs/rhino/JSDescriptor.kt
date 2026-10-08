@@ -26,6 +26,7 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
     internal val bodyVarNames: Set<String>,
     internal val hasParameterExpressions: Boolean,
     internal val hasParameterInitialization: Boolean,
+    internal val annexBOnlyVarNames: Set<String>,
     private val flags: Int,
     public val sourceName: String?,
     private val wholeSource: String?,
@@ -132,6 +133,7 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
         internal var bodyVarNames: Set<String> = emptySet()
         internal var hasParameterExpressions: Boolean = false
         internal var hasParameterInitialization: Boolean = false
+        internal var annexBOnlyVarNames: Set<String> = emptySet()
         public var isStrict: Boolean = false
         public var isScript: Boolean = false
         public var isTopLevel: Boolean = false
@@ -219,6 +221,7 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
                 paramIsLexical ?: BooleanArray(paramAndVarCount),
                 parameterSlotNames, parameterBindingNames, parameterLocalNames, bodyVarNames,
                 hasParameterExpressions, hasParameterInitialization,
+                annexBOnlyVarNames,
                 f,
                 sourceFile,
                 rawSource,

@@ -27,6 +27,7 @@ public object CodeGenUtils {
             builder.hasPrototype = true
             builder.constructor = builder.code
         }
+        if (fn.blockDeclarationScope != null) builder.declaredAsFunctionExpression = true
         fillInForFunction(builder, fn)
     }
 
@@ -84,6 +85,7 @@ public object CodeGenUtils {
     }
 
     private fun fillInCommon(builder: JSDescriptor.Builder<*>, scriptOrFn: ScriptNode) {
+        builder.annexBOnlyVarNames = scriptOrFn.annexBOnlyVarNames.toSet()
         builder.paramAndVarNames = disambiguateNames(scriptOrFn.paramAndVarNames, scriptOrFn.paramCount)
         builder.paramCount = scriptOrFn.paramCount
         builder.paramIsConst = scriptOrFn.paramAndVarConst

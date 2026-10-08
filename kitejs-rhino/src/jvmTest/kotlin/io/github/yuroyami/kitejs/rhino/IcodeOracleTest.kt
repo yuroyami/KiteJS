@@ -195,6 +195,15 @@ class IcodeOracleTest {
             compared++
             val e = expected.getOrThrow()
             val a = actual.getOrThrow()
+            if (file.name == "let-const.js") {
+                // D-120 adds exactly two iteration-environment instructions and their names.
+                // The IR oracle checks their positions; fixed V8 controls check the closures.
+                fun metadata(text: String) = text.lines().filterNot { it.startsWith("icode=") || it.startsWith("literals=") }
+                assertEquals(metadata(e), metadata(a))
+                assertEquals(e.lines().single { it.startsWith("literals=") } + "|ids[g]|ids[g]", a.lines().single { it.startsWith("literals=") })
+                assertTrue(e != a)
+                continue
+            }
             if (file.name in setOf("destructuring.js", "spread.js")) {
                 // D-116 deliberately changes activation, temporaries and parameter instructions.
                 assertEquals(parameterMetadata(e), parameterMetadata(a))
@@ -293,6 +302,18 @@ class IcodeOracleTest {
             compared++
             val e = expected.getOrThrow()
             val a = actual.getOrThrow()
+            if (source == "if (a) { function f() {} }") {
+                // D-120: initialize the lexical binding on entry and copy at the declaration.
+                assertEquals(
+                    "icode=-31,0,1,-48,44,7,0,17,-39,-34,0,-58,-4,-57,-36,73,2,-39,-107,-49,-108,3,71",
+                    a.lines().first { it.startsWith("icode=") },
+                )
+                assertTrue(e != a)
+                val script = Context.getContext().compileString(source, "block-functions.js", 1) as JSScript
+                assertEquals(setOf("f"), script.descriptor.annexBOnlyVarNames)
+                assertEquals(io.github.yuroyami.kitejs.rhino.ast.FunctionNode.FUNCTION_EXPRESSION, script.descriptor.getFunction(0).functionType)
+                continue
+            }
             if (source in setOf("function f(...rest) { return rest }", "function f(a = 1, b = a + 1) { return b }")) {
                 assertEquals(parameterMetadata(e), parameterMetadata(a))
                 assertTrue(e != a)

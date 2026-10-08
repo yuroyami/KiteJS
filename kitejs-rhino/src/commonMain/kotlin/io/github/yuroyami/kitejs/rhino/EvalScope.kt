@@ -10,6 +10,7 @@ import io.github.yuroyami.kitejs.rhino.ast.FunctionNode
 internal class EvalScope(outer: Scriptable, private val strictEval: Boolean) : NativeObject() {
     internal val variableScope: Scriptable = if (strictEval) this else variableEnvironment(outer)
     private val lexicalNames = mutableSetOf<String>()
+    private val annexBNames = mutableSetOf<String>()
 
     init {
         parentScope = outer
@@ -18,7 +19,9 @@ internal class EvalScope(outer: Scriptable, private val strictEval: Boolean) : N
 
     internal fun instantiate(cx: Context, desc: JSDescriptor<*>) {
         val varNames = (0 until desc.paramAndVarCount).filter { !desc.isLexicalDeclaration(it) }
-            .map { desc.getParamOrVarName(it) }.toSet()
+            .map { desc.getParamOrVarName(it) }.filter { name ->
+                name !in desc.annexBOnlyVarNames || canDeclareAnnexB(name).also { if (it) annexBNames.add(name) }
+            }.toSet()
         if (!strictEval) {
             for (name in varNames) checkDeclarationConflict(parentScope!!, variableScope, name)
             if (variableScope.parentScope == null) {
@@ -61,6 +64,15 @@ internal class EvalScope(outer: Scriptable, private val strictEval: Boolean) : N
         } else variableScope.put(name, variableScope, function)
     }
 
+    private fun canDeclareAnnexB(name: String): Boolean = !strictEval &&
+        !hasDeclarationConflict(parentScope!!, variableScope, name) && canDeclareAnnexBVar(variableScope, name)
+
+    internal fun copyAnnexBFunction(name: String, value: Any?) {
+        if (name in annexBNames || (variableScope.has(name, variableScope) && canDeclareAnnexB(name))) {
+            variableScope.put(name, variableScope, value)
+        }
+    }
+
     internal companion object {
         private val GLOBAL_LEXICAL_NAMES = Any()
         private class GlobalLexicalNames(val names: MutableSet<String> = mutableSetOf())
@@ -73,6 +85,10 @@ internal class EvalScope(outer: Scriptable, private val strictEval: Boolean) : N
         }
 
         private fun checkDeclarationConflict(start: Scriptable, end: Scriptable, name: String) {
+            if (hasDeclarationConflict(start, end, name)) declarationError(name)
+        }
+
+        private fun hasDeclarationConflict(start: Scriptable, end: Scriptable, name: String): Boolean {
             var scope: Scriptable? = start
             while (scope != null) {
                 val conflicts = when (scope) {
@@ -84,10 +100,20 @@ internal class EvalScope(outer: Scriptable, private val strictEval: Boolean) : N
                     is ScriptableObject -> (scope.getAssociatedValue(GLOBAL_LEXICAL_NAMES) as? GlobalLexicalNames)?.names?.contains(name) == true
                     else -> false
                 }
-                if (conflicts) declarationError(name)
+                if (conflicts) return true
                 if (scope === end) break
                 scope = scope.parentScope
             }
+            return false
+        }
+
+        internal fun canDeclareAnnexBVar(scope: Scriptable, name: String): Boolean {
+            if (scope.parentScope != null) return true
+            if (scope is ScriptableObject) {
+                if ((scope.getAssociatedValue(GLOBAL_LEXICAL_NAMES) as? GlobalLexicalNames)?.names?.contains(name) == true) return false
+                return scope.has(name, scope) || scope.isExtensible
+            }
+            return true
         }
 
         private fun declarationError(name: String): Nothing =

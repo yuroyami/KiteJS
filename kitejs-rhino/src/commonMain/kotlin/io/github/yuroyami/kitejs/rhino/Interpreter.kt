@@ -10,6 +10,10 @@ import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CALLSPECIAL_OPTIONA
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_PARAMETER_VALUE
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_INITIALIZE_PARAMETER
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_ENTER_FUNCTION_BODY
+import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_INIT_BLOCK_FUNCTION
+import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_ANNEX_B_COPY
+import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_LOCAL_STORE
+import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CREATE_ITERATION_SCOPE
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_OPTIONAL_CALL_LOOKUP
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CALL_ON_SUPER
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CLOSURE_EXPR
@@ -1742,6 +1746,35 @@ public class Interpreter : Evaluator {
                 }
                 Icode_CLOSURE_STMT -> {
                     initFunction(cx, frame.scope!!, frame.fnOrScript.descriptor!!, state.indexReg)
+                    return null
+                }
+                Icode_INIT_BLOCK_FUNCTION -> {
+                    val function = createClosure(cx, frame, state.indexReg)
+                    val lexical = frame.scope as NativeWith
+                    if (lexical.isObjectEnvironment) throw Kit.codeBug()
+                    ScriptableObject.defineProperty(lexical.prototype!!, function.functionName, function, ScriptableObject.PERMANENT)
+                    return null
+                }
+                Icode_LOCAL_STORE -> {
+                    val local = state.indexReg + frame.idata.itsMaxVars
+                    stack[local] = stack[state.stackTop]
+                    sDbl[local] = sDbl[state.stackTop]
+                    return null
+                }
+                Icode_ANNEX_B_COPY -> {
+                    ScriptRuntime.copyAnnexBFunction(cx, frame.scope!!, state.stringReg!!)
+                    return null
+                }
+                Icode_CREATE_ITERATION_SCOPE -> {
+                    val previous = frame.scope as NativeWith
+                    if (previous.isObjectEnvironment) throw Kit.codeBug()
+                    val bindings = frame.idata.literalIds!![state.indexReg] as Array<*>
+                    val next = NativeObject()
+                    for (binding in bindings) {
+                        val name = binding as String
+                        next.defineProperty(name, ScriptableObject.getProperty(previous.prototype!!, name), ScriptableObject.PERMANENT)
+                    }
+                    frame.scope = NativeWith.create(previous.parentScope, next, false)
                     return null
                 }
                 Token.REGEXP -> {

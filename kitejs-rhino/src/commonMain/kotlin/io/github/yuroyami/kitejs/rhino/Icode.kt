@@ -169,8 +169,12 @@ internal abstract class Icode {
         const val Icode_PARAMETER_VALUE = Icode_OPTIONAL_CALL_LOOKUP - 1
         const val Icode_INITIALIZE_PARAMETER = Icode_PARAMETER_VALUE - 1
         const val Icode_ENTER_FUNCTION_BODY = Icode_INITIALIZE_PARAMETER - 1
+        const val Icode_INIT_BLOCK_FUNCTION = Icode_ENTER_FUNCTION_BODY - 1
+        const val Icode_ANNEX_B_COPY = Icode_INIT_BLOCK_FUNCTION - 1
+        const val Icode_LOCAL_STORE = Icode_ANNEX_B_COPY - 1
+        const val Icode_CREATE_ITERATION_SCOPE = Icode_LOCAL_STORE - 1
 
-        const val MIN_ICODE = Icode_ENTER_FUNCTION_BODY
+        const val MIN_ICODE = Icode_CREATE_ITERATION_SCOPE
 
         // The operand byte of CLASS_ELEMENT: the kind of element in the low bits, then flags.
         const val CLASS_ELEMENT_METHOD = 0
@@ -304,6 +308,10 @@ internal abstract class Icode {
             Icode_PARAMETER_VALUE -> "PARAMETER_VALUE"
             Icode_INITIALIZE_PARAMETER -> "INITIALIZE_PARAMETER"
             Icode_ENTER_FUNCTION_BODY -> "ENTER_FUNCTION_BODY"
+            Icode_INIT_BLOCK_FUNCTION -> "INIT_BLOCK_FUNCTION"
+            Icode_ANNEX_B_COPY -> "ANNEX_B_COPY"
+            Icode_LOCAL_STORE -> "LOCAL_STORE"
+            Icode_CREATE_ITERATION_SCOPE -> "CREATE_ITERATION_SCOPE"
                 // An icode with no name.
                 else -> throw IllegalStateException(bytecode.toString())
             }
