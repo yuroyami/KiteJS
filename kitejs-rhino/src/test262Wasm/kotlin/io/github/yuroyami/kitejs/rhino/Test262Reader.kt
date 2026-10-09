@@ -20,3 +20,6 @@ private fun browserRead(name: String): String? = js("""(function(fileName) {
 
 internal actual fun readTest262Bundle(name: String): String = browserRead(name)
     ?: SystemFileSystem.source(Path("$TEST262_BUNDLE_ROOT/$name")).buffered().use { it.readString() }
+
+// A browser has no file to write, and a crash there is reported by the runner.
+internal actual fun markTest262Case(name: String) {}

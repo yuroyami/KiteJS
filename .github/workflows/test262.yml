@@ -14,8 +14,9 @@ on:
 permissions:
   contents: read
 
+# A late nightly run must not cancel a run started by hand.
 concurrency:
-  group: test262-${{ github.ref }}
+  group: test262-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
@@ -112,5 +113,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test262-${{ matrix.task }}-results
-          path: kitejs-rhino/build/test-results/${{ matrix.task }}/
+          path: |
+            kitejs-rhino/build/test-results/${{ matrix.task }}/
+            kitejs-rhino/build/test262/current-case.txt
           if-no-files-found: error

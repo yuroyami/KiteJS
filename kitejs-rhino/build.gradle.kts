@@ -139,6 +139,9 @@ if (providers.gradleProperty("test262Replay").isPresent) {
                 config.files.push({ pattern: test262Bundle + '/**/*', included: false, served: true, watched: false });
                 config.proxies = Object.assign({}, config.proxies, { '/test262/': '/absolute' + test262Bundle + '/' });
                 config.browserNoActivityTimeout = 3600000;
+                // The replay is one synchronous test, so the page answers no ping until it ends.
+                config.pingTimeout = 3600000;
+                config.browserDisconnectTimeout = 3600000;
                 config.client.mocha = Object.assign({}, config.client.mocha, { timeout: 3600000 });
             """.trimIndent())
         }
@@ -161,4 +164,6 @@ if (providers.gradleProperty("test262Replay").isPresent) {
     tasks.matching { it.name.endsWith("Test") && it.name != "test262Parity" }.configureEach {
         outputs.upToDateWhen { false }
     }
+    // The producer's heap, so a case that fits there does not run out of memory here.
+    tasks.withType<Test>().matching { it.name != "test262Parity" }.configureEach { maxHeapSize = "4g" }
 }
