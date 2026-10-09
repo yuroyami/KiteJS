@@ -947,8 +947,10 @@ public open class NativeRegExp : IdScriptableObject {
 
         /** The spec's "this must be an object" step, answering a value the rest of the body can use. */
         private fun requireObject(value: Scriptable?): Scriptable {
-            if (!ScriptRuntime.isObject(value)) {
-                throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(value))
+            // A primitive `this` arrives wrapped and marked as a receiver (#78).
+            val primitive = ScriptRuntime.takeReceiver(value)
+            if (primitive != null || !ScriptRuntime.isObject(value)) {
+                throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(primitive ?: value))
             }
             return value!!
         }

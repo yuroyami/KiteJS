@@ -75,7 +75,8 @@ public abstract class ES6Iterator : ScriptableObject {
             val proto = NativeObject()
             proto.parentScope = scope
             proto.prototype = getObjectPrototype(scope)
-            val iterator = LambdaFunction(scope, "[Symbol.iterator]", 0, SerializableCallable { _, _, thisObj, _ -> thisObj })
+            // A primitive `this` comes back as it was.
+            val iterator = LambdaFunction(scope, "[Symbol.iterator]", 0, SerializableCallable { _, _, thisObj, _ -> ScriptRuntime.takeReceiver(thisObj) ?: thisObj })
             proto.defineProperty(SymbolKey.ITERATOR, iterator, DONTENUM)
             if (sealed) proto.sealObject()
             return scope.associateValue(ITERATOR_PROTOTYPE_TAG, proto) as ScriptableObject

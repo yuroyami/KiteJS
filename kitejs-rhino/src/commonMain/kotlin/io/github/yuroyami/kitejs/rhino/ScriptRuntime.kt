@@ -2075,8 +2075,15 @@ public object ScriptRuntime {
 
     // ---- Property access from script ---------------------------------------------------------
 
+    // A primitive's wrapper is marked, so a getter in strict code sees the primitive (#78).
     private fun asScriptableOrThrowUndefReadError(cx: Context, scope: Scriptable, obj: Any?, elem: Any?): Scriptable =
-        toObjectOrNull(cx, obj, scope) ?: throw undefReadError(obj, elem)
+        (toObjectOrNull(cx, obj, scope) ?: throw undefReadError(obj, elem)).also { if (obj !is Scriptable) markReceiver(it) }
+
+    /** GetV: a property of [value], read so that a getter in strict code sees a primitive `this`. */
+    internal fun getV(cx: Context, scope: Scriptable, value: Any?, key: Any): Any? {
+        val obj = toReceiver(cx, value, scope) ?: throw undefReadError(value, key)
+        return if (key is Symbol) ScriptableObject.getProperty(obj, key) else ScriptableObject.getProperty(obj, key as String)
+    }
 
     private fun asScriptableOrThrowUndefWriteError(cx: Context, scope: Scriptable, obj: Any?, elem: Any?, value: Any?): Scriptable =
         toObjectOrNull(cx, obj, scope) ?: throw undefWriteError(obj, elem, value)
@@ -2668,6 +2675,7 @@ public object ScriptRuntime {
         if (value !is Callable && isOptionalChainingCall && (value === Scriptable.NOT_FOUND || value == null || Undefined.isUndefined(value))) {
             return null
         }
+        if (obj !is Scriptable) markReceiver(thisObj)
         return LookupResult(value, thisObj, elem.toString())
     }
 
@@ -2691,6 +2699,8 @@ public object ScriptRuntime {
         if (value !is Callable && isOptionalChainingCall && (value === Scriptable.NOT_FOUND || value == null || Undefined.isUndefined(value))) {
             return null
         }
+        // A getter on the way took the mark, and the call that follows needs it again.
+        if (obj !is Scriptable) markReceiver(thisObj)
         return LookupResult(value, thisObj, property)
     }
 
@@ -2723,6 +2733,7 @@ public object ScriptRuntime {
             value = ScriptableObject.getProperty(thisObj, s.index)
         }
         if (value !is Callable) throw notFunctionError(value, elem)
+        if (obj !is Scriptable) markReceiver(thisObj)
         storeScriptable(cx, thisObj)
         return value
     }

@@ -61,7 +61,7 @@ internal class OpenIterator(private val iterator: Scriptable, private val nextMe
         /** GetIterator (7.4.1): a TypeError for a value with no callable `Symbol.iterator`. */
         fun open(cx: Context, scope: Scriptable, value: Any?, pc: Int): OpenIterator {
             if (value == null || Undefined.isUndefined(value)) throw notIterable(value)
-            val method = ScriptableObject.getProperty(ScriptRuntime.toObject(cx, scope, value), SymbolKey.ITERATOR)
+            val method = ScriptRuntime.getV(cx, scope, value, SymbolKey.ITERATOR)
             if (method !is Callable) throw notIterable(value)
             val iterator = method.call(cx, scope, ScriptRuntime.toReceiver(cx, value, scope)!!, ScriptRuntime.emptyArgs)
             if (iterator !is Scriptable) throw ScriptRuntime.typeErrorById("msg.iterator.result.not.object", ScriptRuntime.toString(iterator))

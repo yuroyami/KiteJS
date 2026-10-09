@@ -110,8 +110,8 @@ public object ArrayLikeAbstractOperations {
         val callbackArg = if (args.isNotEmpty()) args[0] else Undefined.instance
         val f = getCallbackArg(cx, callbackArg)
         val parent = ScriptableObject.getTopLevelScope(f)
-        val thisArg = ScriptRuntime.getApplyOrCallThis(cx, scope,
-            if (args.size < 2) Undefined.instance else args[1], 1, f)
+        // Converted for each call: the first call takes a primitive's receiver mark (#78).
+        val thisValue = if (args.size < 2) Undefined.instance else args[1]
         var array: Scriptable? = null
         if (operation == IterativeOperation.FILTER || operation == IterativeOperation.MAP) {
             val resultLength = if (operation == IterativeOperation.MAP) length.toInt() else 0
@@ -137,7 +137,7 @@ public object ArrayLikeAbstractOperations {
             innerArgs[0] = elem
             innerArgs[1] = i
             innerArgs[2] = o
-            val result = f.call(cx, parent, thisArg, innerArgs)
+            val result = f.call(cx, parent, ScriptRuntime.getApplyOrCallThis(cx, scope, thisValue, 1, f), innerArgs)
             when (operation) {
                 IterativeOperation.EVERY -> if (!ScriptRuntime.toBoolean(result)) return false
                 IterativeOperation.FILTER -> if (ScriptRuntime.toBoolean(result)) defineElem(cx, array!!, j++, innerArgs[0])

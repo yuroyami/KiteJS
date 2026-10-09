@@ -77,4 +77,31 @@ class PrimitiveThisTest {
         var f = function () { 'use strict'; return typeof this; };
         [f(), f.call(undefined), Reflect.apply(f, undefined, []), f.bind(undefined)()].join(' ');
     """)
+
+    @Test
+    fun aCallbackSeesThePrimitiveOnEveryCall() = check(
+        "string,string,string,string,string,string,string,string,string,string,string,string",
+        """
+        var r = [];
+        var k = function () { 'use strict'; r.push(typeof this); return 0; };
+        [1, 2].forEach(k, 's'); [1, 2].map(k, 's'); [1, 2].flatMap(k, 's'); Array.from([1, 2], k, 's');
+        Uint8Array.from([1, 2], k, 's'); new Uint8Array(2).forEach(k, 's');
+        r.join();
+        """,
+    )
+
+    @Test
+    fun aGetterOnAPrimitiveSeesThePrimitive() = check(
+        "string,string,string,string/string,object,string",
+        """
+        Object.defineProperty(String.prototype, 'g', { get: function () { 'use strict'; return typeof this; }, configurable: true });
+        Object.defineProperty(String.prototype, 'm', { get: function () { 'use strict'; var t = typeof this;
+            return function () { 'use strict'; return t + '/' + typeof this; }; }, configurable: true });
+        Object.defineProperty(String.prototype, 'w', { get: function () { return typeof this; }, configurable: true });
+        var seen; var it = String.prototype[Symbol.iterator];
+        Object.defineProperty(String.prototype, Symbol.iterator, { get: function () { 'use strict'; seen = typeof this; return it; }, configurable: true });
+        [...'ab'];
+        ['a'.g, 'a'['g'], 'a'.g, 'a'.m(), 'a'.w, seen].join();
+        """,
+    )
 }

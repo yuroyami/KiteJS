@@ -914,9 +914,7 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
             val mapArg = args.getOrElse(1) { Undefined.instance }
             val mapFn = if (Undefined.isUndefined(mapArg)) null else mapArg as? Callable
                 ?: throw ScriptRuntime.typeErrorById("msg.map.function.not")
-            val mapThis = if (mapFn == null) null else ScriptRuntime.getApplyOrCallThis(
-                cx, scope, args.getOrElse(2) { Undefined.instance }, 1, mapFn,
-            )
+            val mapThis = args.getOrElse(2) { Undefined.instance }
             val items = ScriptRuntime.toObject(cx, scope, args.getOrElse(0) { Undefined.instance })
             val values = iterableToList(cx, scope, items)
             val size = values?.size ?: arrayLikeSize(cx, items)
@@ -926,7 +924,7 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
 
             for (k in 0 until size) {
                 var value = if (values != null) values[k] else ScriptRuntime.getObjectIndex(items, k.toDouble(), cx, scope)
-                if (mapFn != null) value = mapFn.call(cx, scope, mapThis, arrayOf(value, k))
+                if (mapFn != null) value = mapFn.call(cx, scope, ScriptRuntime.getApplyOrCallThis(cx, scope, mapThis, 1, mapFn), arrayOf(value, k))
                 result.setArrayElement(k, value)
             }
             return result

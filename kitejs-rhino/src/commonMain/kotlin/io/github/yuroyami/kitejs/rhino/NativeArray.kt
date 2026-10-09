@@ -663,9 +663,10 @@ public class NativeArray : ScriptableObject {
         }
 
         private fun js_from(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val items = ScriptRuntime.toObject(scope, if (args.isNotEmpty()) args[0] else Undefined.instance)
+            val itemsArg = if (args.isNotEmpty()) args[0] else Undefined.instance
+            val items = ScriptRuntime.toObject(scope, itemsArg)
             val mapArg = if (args.size >= 2) args[1] else Undefined.instance
-            var thisArg: Scriptable? = null
+            var thisValue: Any? = Undefined.SCRIPTABLE_UNDEFINED
             val mapping = !Undefined.isUndefined(mapArg)
             var mapFn: Function? = null
             if (mapping) {
@@ -673,12 +674,14 @@ public class NativeArray : ScriptableObject {
                     throw ScriptRuntime.typeErrorById("msg.map.function.not")
                 }
                 mapFn = mapArg
-                val callThisArg = if (args.size >= 3) args[2] else Undefined.SCRIPTABLE_UNDEFINED
-                thisArg = ScriptRuntime.getApplyOrCallThis(cx, scope, callThisArg, 1, mapFn)
+                // Converted for each call: the first call takes a primitive's receiver mark (#78).
+                thisValue = if (args.size >= 3) args[2] else Undefined.SCRIPTABLE_UNDEFINED
             }
-            val iteratorProp = ScriptableObject.getProperty(items, SymbolKey.ITERATOR)
-            if (iteratorProp !== Scriptable.NOT_FOUND && !Undefined.isUndefined(iteratorProp)) {
-                val iterator = ScriptRuntime.callIterator(items, cx, scope)
+            // GetMethod reads Symbol.iterator once, and a getter on a primitive sees the primitive (#78).
+            val iteratorProp = ScriptRuntime.getV(cx, scope, itemsArg, SymbolKey.ITERATOR)
+            if (iteratorProp !== Scriptable.NOT_FOUND && iteratorProp != null && !Undefined.isUndefined(iteratorProp)) {
+                if (iteratorProp !is Callable) throw ScriptRuntime.notFunctionError(iteratorProp, SymbolKey.ITERATOR)
+                val iterator = iteratorProp.call(cx, scope, ScriptRuntime.toReceiver(cx, itemsArg, scope)!!, ScriptRuntime.emptyArgs)
                 if (!Undefined.isUndefined(iterator)) {
                     val result = callConstructorOrCreateArray(cx, scope, thisObj, 0, false)
                     var k = 0L
@@ -686,7 +689,7 @@ public class NativeArray : ScriptableObject {
                         for (item in it) {
                             var temp = item
                             if (mapping) {
-                                temp = mapFn!!.call(cx, scope, thisArg, arrayOf(temp, k))
+                                temp = mapFn!!.call(cx, scope, ScriptRuntime.getApplyOrCallThis(cx, scope, thisValue, 1, mapFn), arrayOf(temp, k))
                             }
                             ArrayLikeAbstractOperations.defineElem(cx, result, k, temp)
                             k++
@@ -701,7 +704,7 @@ public class NativeArray : ScriptableObject {
             for (k in 0 until length) {
                 var temp = getElem(cx, items, k)
                 if (mapping) {
-                    temp = mapFn!!.call(cx, scope, thisArg, arrayOf(temp, k))
+                    temp = mapFn!!.call(cx, scope, ScriptRuntime.getApplyOrCallThis(cx, scope, thisValue, 1, mapFn), arrayOf(temp, k))
                 }
                 ArrayLikeAbstractOperations.defineElem(cx, result, k, temp)
             }
@@ -1629,8 +1632,7 @@ public class NativeArray : ScriptableObject {
             val callbackArg = if (args.isNotEmpty()) args[0] else Undefined.instance
             val f = ArrayLikeAbstractOperations.getCallbackArg(cx, callbackArg)
             val parent = ScriptableObject.getTopLevelScope(f)
-            val thisArg = ScriptRuntime.getApplyOrCallThis(cx, scope,
-                if (args.size < 2) Undefined.instance else args[1], 1, f)
+            val thisValue = if (args.size < 2) Undefined.instance else args[1]
             val length = getLengthProperty(cx, o)
             val result = ArrayLikeAbstractOperations.arraySpeciesCreate(cx, scope, o, 0)
             var j = 0L
@@ -1638,7 +1640,7 @@ public class NativeArray : ScriptableObject {
                 val elem = getRawElem(o, i)
                 if (elem === Scriptable.NOT_FOUND) continue
                 val innerArgs = arrayOf(elem, i, o)
-                val mapCall = f.call(cx, parent, thisArg, innerArgs)
+                val mapCall = f.call(cx, parent, ScriptRuntime.getApplyOrCallThis(cx, scope, thisValue, 1, f), innerArgs)
                 if (isArray(mapCall)) {
                     val arr = mapCall as Scriptable
                     val arrLength = getLengthProperty(cx, arr)
