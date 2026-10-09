@@ -151,7 +151,9 @@ public class ES6Generator : ScriptableObject {
 
             putProperty(result, ES6Iterator.VALUE_PROPERTY, r)
         } catch (gce: NativeGenerator.GeneratorClosedException) {
+            // A return() whose finally block yielded ends once the block does, with its value.
             state = State.COMPLETED
+            putProperty(result, ES6Iterator.VALUE_PROPERTY, gce.value)
         } catch (jse: JavaScriptException) {
             state = State.COMPLETED
             val thrown = jse.value

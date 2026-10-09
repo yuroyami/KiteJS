@@ -2420,7 +2420,11 @@ public class Interpreter : Evaluator {
         }
 
         private fun freezeGenerator(cx: Context, frame: CallFrame, state: InterpreterState, generatorState: GeneratorState, op: Int): Any? {
-            if (generatorState.operation == NativeGenerator.GENERATOR_CLOSE) throw ScriptRuntime.typeErrorById("msg.yield.closing")
+            // An ES6 generator may yield from a finally block that its return() runs (ECMAScript 2015,
+            // 25.3.3.3); the return goes on when the block ends. A JavaScript 1.7 generator may not.
+            if (generatorState.operation == NativeGenerator.GENERATOR_CLOSE && !frame.fnOrScript.descriptor!!.isES6Generator) {
+                throw ScriptRuntime.typeErrorById("msg.yield.closing")
+            }
             frame.frozen = true
             // The yielded value leaves through the return value, not frame.result, which may
             // hold what a return stored before a finally block that yields (D-97).
