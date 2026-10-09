@@ -51,7 +51,6 @@ Reading them gives `undefined`, so `typeof x === 'undefined'` is a safe check.
 | `document`, `window`, `navigator` | No DOM. Bind whatever object your host needs to expose |
 | `Intl` | Needs a full locale database. `toLocaleString` formats numbers and dates for en-US; format other locales in Kotlin |
 | `structuredClone` | Use `JSON.parse(JSON.stringify(x))`, or bind your own |
-| `SharedArrayBuffer`, `Atomics` | One thread, so they would mean nothing |
 
 `globalThis` is there and works.
 
@@ -111,6 +110,21 @@ There is no `Intl` object itself; this holds on both engines.
 (1234.5).toLocaleString("en-US", { style: "currency", currency: "EUR" })   // "€1,234.50"
 (0.256).toLocaleString(undefined, { style: "percent" })                    // "26%"
 (1234).toLocaleString("ja-JP", { notation: "compact" })                    // "1.2K", not "1234"
+```
+
+### `Atomics.wait` always throws
+
+`SharedArrayBuffer` and `Atomics` are there, but a script runs on one thread and cannot block.
+`Atomics.wait` checks its arguments and then throws a `TypeError`, as it does on a browser's
+main thread. Use `Atomics.waitAsync` instead.
+
+There is no event loop, so a `waitAsync` timeout does not use the wall clock. When every
+microtask has run, the waiter with the earliest deadline resolves to `"timed-out"`.
+
+```js
+const i32 = new Int32Array(new SharedArrayBuffer(16))
+Atomics.wait(i32, 0, 0, 10)                       // TypeError
+await Atomics.waitAsync(i32, 0, 0, 10).value      // "timed-out", with no 10 ms delay
 ```
 
 ### Dates format for en-US only

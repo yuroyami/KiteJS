@@ -31,18 +31,21 @@ class Test262ParityTest {
     private val harnessRoot = File(corpusRoot, "harness")
     private val propertiesFile = File("src/jvmTest/resources/test262.properties")
 
-    /** Upstream's list, except default arguments (D-116) and resizable buffers (#114), which this port implements. */
+    /**
+     * Upstream's list, except default arguments (D-116), resizable buffers (#114),
+     * `SharedArrayBuffer` and `Atomics` (#72), which this port implements.
+     */
     private val unsupportedFeatures = setOf(
-        "Atomics", "IsHTMLDDA", "decorators",
+        "IsHTMLDDA", "decorators",
         "object-rest", "regexp-dotall", "regexp-unicode-property-escapes",
-        "SharedArrayBuffer", "tail-call-optimization", "Temporal",
+        "tail-call-optimization", "Temporal",
         "upsert", "u180e",
     )
 
     /**
      * Folders upstream's properties file skips whole because upstream has no class syntax (D-95),
-     * no async functions (D-97), no async generators (#91) and no WeakRef or FinalizationRegistry
-     * (#89), which the port runs anyway.
+     * no async functions (D-97), no async generators (#91), no WeakRef or FinalizationRegistry
+     * (#89) and no SharedArrayBuffer or Atomics (#72), which the port runs anyway.
      * Upstream fails to parse almost every file in them, so they mostly add to the port's own
      * outcomes and to the cannot-parse list.
      */
@@ -52,7 +55,9 @@ class Test262ParityTest {
         "built-ins/AsyncGeneratorFunction",
         "built-ins/AsyncGeneratorPrototype",
         "built-ins/AsyncIteratorPrototype",
+        "built-ins/Atomics",
         "built-ins/FinalizationRegistry",
+        "built-ins/SharedArrayBuffer",
         "built-ins/WeakRef",
         "language/expressions/async-function",
         "language/expressions/async-generator",
@@ -78,6 +83,10 @@ class Test262ParityTest {
     /** Test262 features the port has and upstream lacks. They follow the same rule as [portFeatureFolders]. */
     private val portFeatures = mapOf(
         "resizable-arraybuffer" to "#114: resizable ArrayBuffer runs here",
+        "SharedArrayBuffer" to "#72: SharedArrayBuffer runs here",
+        "Atomics" to "#72: Atomics runs here",
+        "Atomics.waitAsync" to "#72: Atomics.waitAsync runs here",
+        "Atomics.pause" to "#72: Atomics.pause runs here",
     )
 
     /**
@@ -1933,6 +1942,17 @@ class Test262ParityTest {
             if (meta.features.any { it in unsupportedFeatures }) {
                 exclusions.append(relative).append("\tunsupported features: ")
                     .append(meta.features.filter { it in unsupportedFeatures }.joinToString(",")).append('\n')
+                skipped++
+                continue
+            }
+            // `$262.agent` needs real threads, and this agent cannot block (#72).
+            if (source.contains("\$262.agent")) {
+                exclusions.append(relative).append("\tneeds \$262.agent\n")
+                skipped++
+                continue
+            }
+            if (meta.hasFlag("CanBlockIsTrue")) {
+                exclusions.append(relative).append("\tCanBlockIsTrue\n")
                 skipped++
                 continue
             }

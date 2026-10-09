@@ -1464,6 +1464,8 @@ public object ScriptRuntime {
             cx.languageVersion >= Context.VERSION_ES6
         ) {
             LazilyLoadedCtor(scope, "ArrayBuffer", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.rhino.typedarrays.NativeArrayBuffer.init(icx, s, sld) })
+            LazilyLoadedCtor(scope, "SharedArrayBuffer", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.rhino.typedarrays.NativeSharedArrayBuffer.init(icx, s, sld) })
+            LazilyLoadedCtor(scope, "Atomics", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.rhino.typedarrays.NativeAtomics.init(icx, s, sld) })
             LazilyLoadedCtor(scope, "Int8Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.rhino.typedarrays.NativeInt8Array.init(icx, s, sld) })
             LazilyLoadedCtor(scope, "Uint8Array", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.rhino.typedarrays.NativeUint8Array.init(icx, s, sld) })
             LazilyLoadedCtor(scope, "Uint8ClampedArray", sealed, Initializable { icx, s, sld -> io.github.yuroyami.kitejs.rhino.typedarrays.NativeUint8ClampedArray.init(icx, s, sld) })

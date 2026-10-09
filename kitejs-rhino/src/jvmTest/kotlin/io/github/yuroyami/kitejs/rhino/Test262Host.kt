@@ -10,7 +10,7 @@ package io.github.yuroyami.kitejs.rhino
  * engines, not two different hosts.
  *
  * `agent` is missing on purpose, the same as upstream: the tests that want it need real threads,
- * and they are filtered out with the `Atomics` and `SharedArrayBuffer` features.
+ * and the parity test skips every file that names `$262.agent`.
  */
 internal object Test262Host {
 

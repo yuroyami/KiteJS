@@ -217,6 +217,17 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
 
     override val arrayLength: Int get() = length
 
+    /** Element access for `Atomics`, which validates the index itself. */
+    internal val atomicLength: Int get() = length
+
+    internal val atomicBuffer: NativeArrayBuffer get() = arrayBuffer
+
+    internal fun atomicRead(index: Int): Any? = js_get(index)
+
+    internal fun atomicWrite(index: Int, value: Any?) {
+        js_set(index, value)
+    }
+
     // ---- Copying between views -----------------------------------------------------------------
 
     private fun setRange(source: NativeTypedArrayView, dbloff: Double) {

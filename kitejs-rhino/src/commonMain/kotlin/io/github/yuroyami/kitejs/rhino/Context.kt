@@ -406,7 +406,8 @@ public open class Context internal constructor(public val factory: ContextFactor
             val head = microtasks.firstOrNull()
             if (head == null) {
                 keptObjects.clear() // ClearKeptObjects
-                if (!queueFinalizationCleanups()) break
+                if (queueFinalizationCleanups()) continue
+                if (!fireNextTimeout()) break
                 continue
             }
             // Each job is a call, and asks the observer before it runs, so a stop leaves it queued.
@@ -414,6 +415,37 @@ public open class Context internal constructor(public val factory: ContextFactor
             microtasks.removeFirst()
             head.run()
         }
+    }
+
+    // ---- Timeouts ------------------------------------------------------------------------------
+
+    /**
+     * Jobs that run after a delay, such as an `Atomics.waitAsync` timeout. The engine has no event
+     * loop, so time is virtual: when the queue is empty, the clock jumps to the earliest deadline.
+     */
+    private val timeouts = ArrayList<Timeout>()
+    private var virtualNow = 0.0
+    private var timeoutSequence = 0L
+
+    private class Timeout(val deadline: Double, val sequence: Long, val job: Runnable)
+
+    internal fun enqueueTimeout(delay: Double, job: Runnable) {
+        timeouts.add(Timeout(virtualNow + delay, timeoutSequence++, job))
+    }
+
+    private fun fireNextTimeout(): Boolean {
+        if (timeouts.isEmpty()) return false
+        var next = 0
+        for (i in 1 until timeouts.size) {
+            val t = timeouts[i]
+            val best = timeouts[next]
+            if (t.deadline < best.deadline || (t.deadline == best.deadline && t.sequence < best.sequence)) next = i
+        }
+        val timeout = timeouts.removeAt(next)
+        if (timeout.deadline > virtualNow) virtualNow = timeout.deadline
+        addInstructionCount(MICROTASK_COST)
+        timeout.job.run()
+        return true
     }
 
     // ---- WeakRef and FinalizationRegistry ------------------------------------------------------
@@ -458,6 +490,7 @@ public open class Context internal constructor(public val factory: ContextFactor
     internal fun discardMicrotasks() {
         microtasks.clear()
         keptObjects.clear()
+        timeouts.clear()
     }
 
     // ---- Compilation ---------------------------------------------------------------------------

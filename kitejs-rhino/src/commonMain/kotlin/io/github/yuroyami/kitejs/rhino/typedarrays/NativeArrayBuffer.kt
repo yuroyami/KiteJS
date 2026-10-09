@@ -28,8 +28,15 @@ public class NativeArrayBuffer : ScriptableObject {
     public var buffer: ByteArray? = EMPTY_BUF
         internal set
 
+    /** True for a `SharedArrayBuffer`. It is never detached, and the `ArrayBuffer` methods refuse it. */
+    public var isShared: Boolean = false
+        internal set
+
+    /** The `Atomics.waitAsync` callers that wait on this shared buffer, oldest first. */
+    internal var waiters: ArrayList<NativeAtomics.Waiter>? = null
+
     override val className: String
-        get() = CLASS_NAME
+        get() = if (isShared) NativeSharedArrayBuffer.CLASS_NAME else CLASS_NAME
 
     /** An empty buffer. */
     public constructor() : super() {
@@ -56,6 +63,7 @@ public class NativeArrayBuffer : ScriptableObject {
         get() = buffer?.size ?: 0
 
     public fun detach() {
+        check(!isShared) { "a SharedArrayBuffer cannot be detached" }
         buffer = null
     }
 
@@ -136,14 +144,25 @@ public class NativeArrayBuffer : ScriptableObject {
             return constructor
         }
 
-        private fun getSelf(thisObj: Scriptable?): NativeArrayBuffer =
-            LambdaConstructor.convertThisObject<NativeArrayBuffer>(thisObj)
+        /** The `ArrayBuffer` methods refuse a `SharedArrayBuffer`, which has its own. */
+        private fun getSelf(thisObj: Scriptable?): NativeArrayBuffer {
+            val self = LambdaConstructor.convertThisObject<NativeArrayBuffer>(thisObj)
+            if (self.isShared) throw ScriptRuntime.typeErrorById("msg.this.not.instance", CLASS_NAME)
+            return self
+        }
 
         /**
          * `new ArrayBuffer(length, options)` (ECMAScript 2024, 25.1.4.1). The length is converted
          * before `options.maxByteLength` is read, and a length over that maximum is a RangeError.
          */
-        private fun js_constructor(cx: Context, scope: Scriptable, args: Array<Any?>): NativeArrayBuffer {
+        private fun js_constructor(cx: Context, scope: Scriptable, args: Array<Any?>): NativeArrayBuffer =
+            construct(args, shared = false)
+
+        /**
+         * The body `ArrayBuffer` and `SharedArrayBuffer` share. ToIndex on the length keeps the
+         * messages upstream gives, and the size limit is checked once the options are read.
+         */
+        internal fun construct(args: Array<Any?>, shared: Boolean): NativeArrayBuffer {
             val number = if (isArg(args, 0)) ScriptRuntime.toNumber(args[0]) else 0.0
             if (number <= -1) throw ScriptRuntime.rangeError("Negative array length $number")
             if (number > NativeNumber.MAX_SAFE_INTEGER) throw ScriptRuntime.rangeError("length parameter ($number) is too large ")
@@ -159,7 +178,10 @@ public class NativeArrayBuffer : ScriptableObject {
                     if (length > max) throw ScriptRuntime.rangeErrorById("msg.arraybuf.max.length", length.toLong(), max)
                 }
             }
-            return NativeArrayBuffer(length).also { it.maxByteLength = max }
+            return NativeArrayBuffer(length).also {
+                it.maxByteLength = max
+                it.isShared = shared
+            }
         }
 
         /** ArrayBuffer.prototype.resize (ECMAScript 2024, 25.1.6.6). */
@@ -201,7 +223,7 @@ public class NativeArrayBuffer : ScriptableObject {
                 Intrinsics.constructor(cx, scope, CLASS_NAME),
             )
             val buf = ctor.construct(cx, scope, arrayOf<Any?>(newLen))
-            if (buf !is NativeArrayBuffer) throw ScriptRuntime.typeErrorById("msg.species.invalid.ctor")
+            if (buf !is NativeArrayBuffer || buf.isShared) throw ScriptRuntime.typeErrorById("msg.species.invalid.ctor")
             if (buf.isDetached) throw ScriptRuntime.typeErrorById("msg.arraybuf.detached")
             if (buf === self) throw ScriptRuntime.typeErrorById("msg.arraybuf.same")
             if (buf.length < newLen) throw ScriptRuntime.typeErrorById("msg.arraybuf.smaller.len", newLen, buf.length)
