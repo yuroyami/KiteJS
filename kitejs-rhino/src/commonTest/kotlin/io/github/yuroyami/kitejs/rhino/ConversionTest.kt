@@ -148,6 +148,23 @@ class ConversionTest {
     }
 
     @Test
+    fun aNullFromValueOfOrToStringIsAPrimitive() {
+        // Upstream skips a null result and tries the other method, so `+o` gave NaN, not 0.
+        val cx = Context.enter()
+        try {
+            cx.languageVersion = Context.VERSION_ECMASCRIPT
+            val source = """
+                var v = { valueOf() { return null } }, s = { toString() { return null } };
+                [+v, +s, String(s), `${'$'}{s}`, v + 1, v == null, new Date(v).getTime()].join()
+            """
+            val result = cx.evaluateString(cx.initStandardObjects(), source, "null.js", 1, null)
+            assertEquals("0,0,null,null,1,false,0", ScriptRuntime.toString(result))
+        } finally {
+            Context.exit()
+        }
+    }
+
+    @Test
     fun undefinedHasTwoRepresentations() {
         assertTrue(Undefined.isUndefined(Undefined.instance))
         assertTrue(Undefined.isUndefined(Undefined.SCRIPTABLE_UNDEFINED))

@@ -166,6 +166,8 @@ public class ES6Generator : ScriptableObject {
                 throw jse
             }
         } catch (re: RhinoException) {
+            // An engine error ends the body as a script throw does.
+            state = State.COMPLETED
             lineNumber = re.lineNumber
             lineSource = re.lineSource
             throw re

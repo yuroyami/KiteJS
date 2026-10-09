@@ -473,9 +473,10 @@ public open class NativeRegExp : IdScriptableObject {
         val functionalReplace = replaceValue is io.github.yuroyami.kitejs.rhino.Callable
         val replaceOps: List<io.github.yuroyami.kitejs.rhino.AbstractEcmaStringOperations.ReplacementOperation>
         val replaceFn: io.github.yuroyami.kitejs.rhino.Callable?
+        val replaceString = if (functionalReplace) null else ScriptRuntime.toString(replaceValue)
         if (!functionalReplace) {
             replaceFn = null
-            replaceOps = io.github.yuroyami.kitejs.rhino.AbstractEcmaStringOperations.buildReplacementList(ScriptRuntime.toString(replaceValue))
+            replaceOps = io.github.yuroyami.kitejs.rhino.AbstractEcmaStringOperations.buildReplacementList(replaceString!!)
         } else {
             replaceFn = replaceValue
             replaceOps = emptyList()
@@ -483,12 +484,17 @@ public open class NativeRegExp : IdScriptableObject {
         val flags = ScriptRuntime.toString(ScriptRuntime.getObjectProp(thisObj, "flags", cx))
         val fullUnicode = flags.indexOf('u') != -1 || flags.indexOf('v') != -1
 
+        val global = (re!!.flags and JSREG_GLOB) != 0
+        if ((flags.indexOf('g') != -1) != global) {
+            // A script changed what `flags` reports, so the spec's steps run with the flags it read.
+            return js_SymbolReplaceSlow(cx, scope, thisObj, arrayOf(s, replaceFn ?: replaceString), flags)
+        }
+
         val results = ArrayList<ExecResult>()
         var done = false
 
         val reImpl = getImpl(cx)
         val sticky = (re!!.flags and JSREG_STICKY) != 0
-        val global = (re!!.flags and JSREG_GLOB) != 0
 
         val indexp = intArrayOf(0)
         if (sticky) indexp[0] = getLastIndex(cx, thisObj).toInt()
@@ -545,7 +551,8 @@ public open class NativeRegExp : IdScriptableObject {
         return accumulatedResult.toString()
     }
 
-    private fun js_SymbolReplaceSlow(cx: Context, scope: Scriptable, thisObj: Scriptable, args: Array<Any?>): Any? {
+    /** [flagsRead] is what the fast path already read from `flags`, so the getter does not run twice. */
+    private fun js_SymbolReplaceSlow(cx: Context, scope: Scriptable, thisObj: Scriptable, args: Array<Any?>, flagsRead: String? = null): Any? {
         if (!ScriptRuntime.isObject(thisObj)) {
             throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(thisObj))
         }
@@ -564,7 +571,7 @@ public open class NativeRegExp : IdScriptableObject {
             replaceFn = replaceValue
             replaceOps = emptyList()
         }
-        val flags = ScriptRuntime.toString(ScriptRuntime.getObjectProp(thisObj, "flags", cx))
+        val flags = flagsRead ?: ScriptRuntime.toString(ScriptRuntime.getObjectProp(thisObj, "flags", cx))
         val global = flags.indexOf('g') != -1
         val fullUnicode = flags.indexOf('u') != -1 || flags.indexOf('v') != -1
         if (global) setLastIndex(thisObj, ScriptRuntime.zeroObj)

@@ -52,7 +52,12 @@ internal class NativeError : IdScriptableObject() {
                 }
                 return js_toString(realThis(thisObj, f))
             }
-            Id_toSource -> return js_toSource(cx, scope, thisObj!!)
+            Id_toSource -> {
+                if (thisObj == null || Undefined.isUndefined(thisObj)) {
+                    throw ScriptRuntime.typeErrorById("msg.called.null.or.undefined", "Error", "toSource")
+                }
+                return js_toSource(cx, scope, thisObj)
+            }
             ConstructorId_captureStackTrace -> {
                 js_captureStackTrace(cx, f.parentScope!!, args)
                 return Undefined.instance

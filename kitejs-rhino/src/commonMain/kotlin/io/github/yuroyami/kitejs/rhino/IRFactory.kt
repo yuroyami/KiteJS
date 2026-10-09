@@ -1433,22 +1433,9 @@ public class IRFactory(
         // A class binds its own name in a scope of its own, not inside its constructor.
         if (functionType == FunctionNode.FUNCTION_EXPRESSION && fnNode.classConstructorKind == FunctionNode.NOT_CLASS_CONSTRUCTOR && fnNode.blockDeclarationScope == null) {
             val name = fnNode.functionName
-            if (name != null && name.length() != 0 && fnNode.getSymbol(name.identifier!!) == null) {
-                // A function expression needs its own name as a variable, unless one is already
-                // allocated. See ECMA chapter 13. Code goes at the front of the function to bind a
-                // local of the function's name to the function value, but only when the function
-                // does not already declare a parameter, var or nested function of that name.
-                fnNode.putSymbol(Symbol(Token.FUNCTION, name.identifier))
-                val setFn = Node(
-                    Token.EXPR_VOID,
-                    Node(
-                        Token.SETNAME,
-                        Node.newString(Token.BINDNAME, name.identifier!!),
-                        Node(Token.THISFN),
-                    ),
-                )
-                statements.addChildrenToFront(setFn)
-            }
+            // The name lives in a scope of its own around the function, made with each closure, so
+            // a parameter or var of the same name shadows it and an assignment cannot change it.
+            if (name != null && name.length() != 0) fnNode.bindsOwnName = true
         }
 
         // Add a return at the end when one is missing.
@@ -2313,6 +2300,10 @@ public class IRFactory(
                         val ref = child.firstChild!!
                         child.removeChild(ref)
                         n = Node(Token.DEL_REF, ref)
+                    } else if (child.getIntProp(Node.OPTIONAL_CHAINING, 0) == 1) {
+                        // delete f?.(): the call may short-circuit with nothing else on the
+                        // stack, so it runs first and true follows.
+                        return Node(Token.COMMA, child, Node(Token.TRUE))
                     } else {
                         // Always evaluate the delete operand. See ES5 11.4.1 and bug 726121.
                         n = Node(nodeType, Node(Token.TRUE), child)

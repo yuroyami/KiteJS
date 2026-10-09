@@ -64,12 +64,27 @@ class NodeTransformerOracleTest {
         }
     }
 
+    /**
+     * Upstream assigns a named function expression's name at the start of its body. The port
+     * binds the name in a scope around the function instead, so it has no such statement.
+     */
+    private fun withoutOwnNameAssignments(dump: String): String {
+        val lines = dump.lines().toMutableList()
+        var i = 0
+        while (i + 3 < lines.size) {
+            val own = lines[i].trim() == "149 ln=-1 col=-1" && lines[i + 1].trim() == "62 ln=-1 col=-1" &&
+                lines[i + 2].trim().startsWith("46 str=") && lines[i + 3].trim() == "70 ln=-1 col=-1"
+            if (own) repeat(4) { lines.removeAt(i) } else i++
+        }
+        return lines.joinToString("\n")
+    }
+
     private fun checkCorpus(upstreamVersion: Int, portedVersion: Int) {
         val failures = mutableListOf<String>()
         var compared = 0
         for (file in corpusFiles()) {
             val source = file.readText()
-            val expected = runCatching { upstreamTransformed(source, upstreamVersion) }
+            val expected = runCatching { withoutOwnNameAssignments(upstreamTransformed(source, upstreamVersion)) }
             val actual = runCatching { portedTransformed(source, portedVersion, file.name == "optional-chaining.js", file.name == "let-const.js" && portedVersion >= Context.VERSION_ES6) }
 
             if (expected.isFailure) {
@@ -132,7 +147,7 @@ class NodeTransformerOracleTest {
         for (file in corpusFiles()) {
             val source = "'use strict';\n" + file.readText()
 
-            val expected = runCatching { upstreamTransformed(source, UContext.VERSION_ES6) }
+            val expected = runCatching { withoutOwnNameAssignments(upstreamTransformed(source, UContext.VERSION_ES6)) }
             val actual = runCatching { portedTransformed(source, Context.VERSION_ES6, file.name == "optional-chaining.js", file.name == "let-const.js") }
             if (expected.isFailure) {
                 if (actual.isSuccess) {

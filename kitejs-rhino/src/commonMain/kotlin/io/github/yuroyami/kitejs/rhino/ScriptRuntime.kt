@@ -1243,6 +1243,9 @@ public object ScriptRuntime {
 
     /** `Object.prototype.toSource`: an object literal that rebuilds [thisObj]. */
     internal fun defaultObjectToSource(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): String {
+        if (thisObj == null || Undefined.isUndefined(thisObj)) {
+            throw typeErrorById("msg.called.null.or.undefined", "Object", "toSource")
+        }
         val toplevel: Boolean
         val iterating: Boolean
         var cxIterating = cx.iterating
@@ -1612,7 +1615,7 @@ public object ScriptRuntime {
             if (d.isNaN() || d.isInfinite() || d != kotlin.math.floor(d)) {
                 throw rangeErrorById("msg.cant.convert.to.bigint.isnt.integer", toString(v))
             }
-            return KBigInt.parse(numberToString(d, 10))
+            return KBigInt.fromDouble(d)
         }
         return toBigInt(v)
     }
@@ -3144,7 +3147,9 @@ public object ScriptRuntime {
                     continue
                 }
                 val isConst = desc.getParamOrVarConst(i)
-                if (!ScriptableObject.hasProperty(scope, name)) {
+                // A const is lexical, so a name the global only inherits, such as `valueOf`, does not clash.
+                val present = if (isConst) scope.has(name, scope) || varScope.has(name, varScope) else ScriptableObject.hasProperty(scope, name)
+                if (!present) {
                     if (isConst) {
                         ScriptableObject.defineConstProperty(varScope, name)
                     } else if (!evalScript) {
@@ -3165,6 +3170,13 @@ public object ScriptRuntime {
                         else -> false
                     }
                     if (constBinding) throw typeErrorById("msg.const.redecl", name)
+                } else if (isConst && varScope is ScriptableObject && !varScope.isConstBinding(name) &&
+                    (varScope.getAttributes(name) and ScriptableObject.PERMANENT) == 0
+                ) {
+                    // A configurable global such as `Array` may be shadowed. There is no separate
+                    // lexical scope here, so the const takes the global's place, as `let` does.
+                    varScope.delete(name)
+                    ScriptableObject.defineConstProperty(varScope, name)
                 } else {
                     ScriptableObject.redefineProperty(scope, name, isConst)
                 }

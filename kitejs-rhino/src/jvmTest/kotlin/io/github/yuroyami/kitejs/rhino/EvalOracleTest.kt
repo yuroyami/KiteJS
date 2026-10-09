@@ -575,7 +575,6 @@ class EvalOracleTest {
         "function* g() { try { yield 1 } catch (e) { yield 'caught ' + e } } var it = g(); it.next(); it.throw('boom').value",
         "function* g() { yield 1 } var it = g(); it.next(); try { it.throw(new Error('x')) } catch (e) { e.message }",
         "function* g() { yield 1 } var it = g(); try { it.throw('early') } catch (e) { e }",
-        "function* g() { try { yield 1 } finally { yield 2 } } var it = g(); it.next(); it.return(9).value",
         "function* g() { yield 1; yield 2 } var it = g(); it.next(); it.return(); var r = it.next(); r.value + ':' + r.done",
 
         // Errors from inside.
@@ -1739,6 +1738,8 @@ class EvalOracleTest {
             Triple("typeof StopIteration", "\"object\"", "\"undefined\""),
             Triple("try { new Iterator({ a: 1 }); 'made' } catch (e) { e.name }", "\"made\"", "\"TypeError\""),
             Triple("typeof [].values().map", "\"undefined\"", "\"function\""),
+            // A finally block that return() runs may yield (ECMAScript 2015, 25.3.3.3).
+            Triple("function* g() { try { yield 1 } finally { yield 2 } } var it = g(); it.next(); it.return(9).value", "throws TypeError: Yield from closing generator", "2"),
         )
         for ((source, legacy, standard) in cases) {
             assertEquals(legacy, upstream(source), source)

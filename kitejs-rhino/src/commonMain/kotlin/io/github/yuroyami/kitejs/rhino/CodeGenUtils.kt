@@ -51,6 +51,7 @@ public object CodeGenUtils {
         // An async function is no constructor and has no `prototype` (ECMAScript 2017, 14.7.10).
         if (fn.isAsyncFunction) builder.hasPrototype = false
         if (fn.isShorthand) builder.isShorthand = true
+        if (fn.bindsOwnName) builder.bindsOwnName = true
         if (fn.isClassFieldInitializer) builder.isClassFieldInitializer = true
         if (fn.classConstructorKind != FunctionNode.NOT_CLASS_CONSTRUCTOR) {
             builder.isClassConstructor = true

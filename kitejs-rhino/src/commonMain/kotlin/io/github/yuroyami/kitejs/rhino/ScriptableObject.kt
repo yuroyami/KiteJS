@@ -1557,18 +1557,18 @@ public abstract class ScriptableObject :
                 if (v !is Function) continue
                 if (cx == null) cx = Context.getContext()
                 v = v.call(cx, v.declarationScope!!, obj, ScriptRuntime.emptyArgs)
-                if (v != null) {
-                    if (v !is Scriptable) return v
-                    if (typeHint == ScriptRuntime.ScriptableClass ||
-                        typeHint == ScriptRuntime.FunctionClass
-                    ) {
-                        return v
-                    }
-                    // A wrapped string counts as a primitive string.
-                    if (tryToString && v is Wrapper) {
-                        val u = v.unwrap()
-                        if (u is String) return u
-                    }
+                // null is a primitive too, so it ends the search.
+                if (v == null) return null
+                if (v !is Scriptable) return v
+                if (typeHint == ScriptRuntime.ScriptableClass ||
+                    typeHint == ScriptRuntime.FunctionClass
+                ) {
+                    return v
+                }
+                // A wrapped string counts as a primitive string.
+                if (tryToString && v is Wrapper) {
+                    val u = v.unwrap()
+                    if (u is String) return u
                 }
             }
             val arg = typeHint?.simpleName ?: "undefined"

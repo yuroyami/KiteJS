@@ -978,17 +978,32 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
             return result
         }
 
-        /** A stable insertion sort, matching the stability of the sort upstream uses. */
+        /** A stable merge sort. An insertion sort took minutes on 1024 elements in reverse order. */
         private fun sortStable(a: Array<Any?>, compare: (Any?, Any?) -> Int) {
-            for (i in 1 until a.size) {
-                val key = a[i]
-                var j = i - 1
-                while (j >= 0 && compare(a[j], key) > 0) {
-                    a[j + 1] = a[j]
-                    j--
+            if (a.size < 2) return
+            var from = a
+            var to = arrayOfNulls<Any?>(a.size)
+            var width = 1
+            while (width < a.size) {
+                var lo = 0
+                while (lo < a.size) {
+                    val mid = minOf(lo + width, a.size)
+                    val hi = minOf(lo + 2 * width, a.size)
+                    var i = lo
+                    var j = mid
+                    var k = lo
+                    // Taking from the left run on a tie keeps equal elements in order.
+                    while (i < mid && j < hi) to[k++] = if (compare(from[i], from[j]) <= 0) from[i++] else from[j++]
+                    while (i < mid) to[k++] = from[i++]
+                    while (j < hi) to[k++] = from[j++]
+                    lo = hi
                 }
-                a[j + 1] = key
+                val swap = from
+                from = to
+                to = swap
+                width *= 2
             }
+            if (from !== a) from.copyInto(a)
         }
     }
 }

@@ -162,6 +162,31 @@ class IcodeOracleTest {
         return sb.toString()
     }
 
+    /**
+     * A named function expression binds its name in a scope around the function here, so the
+     * function itself has no slot and no instructions for the name. Every other function must match.
+     */
+    private fun sameApartFromOwnNames(upstream: String, ported: String): Boolean {
+        fun blocks(text: String) = text.lines().fold(mutableListOf<MutableList<String>>()) { acc, line ->
+            if (line.trimStart().startsWith("fn=") || acc.isEmpty()) acc.add(mutableListOf())
+            acc.last().add(line)
+            acc
+        }
+        val e = blocks(upstream)
+        val a = blocks(ported)
+        if (e.size != a.size) return false
+        var skipped = 0
+        for (i in e.indices) {
+            val bindsOwnName = (a[i][0].substringAfter(" flags=").toInt() and (1 shl 19)) != 0
+            if (bindsOwnName) {
+                skipped++
+                continue
+            }
+            if (e[i] != a[i]) return false
+        }
+        return skipped > 0
+    }
+
     /** Shared declaration metadata for the exact fixtures whose parameter instructions changed. */
     /** Hand-written sources with a pattern, which the port lowers to Icode_DESTRUCTURE steps. */
     private val iteratorPatterns = setOf("try { f() } catch ({ x }) { g(x) }", "var [a, b = 2, ...c] = d; var { e, f: g, ...h } = i")
@@ -220,6 +245,10 @@ class IcodeOracleTest {
                 // D-116 deliberately changes activation, temporaries and parameter instructions.
                 assertEquals(parameterMetadata(e), parameterMetadata(a))
                 assertTrue(e != a)
+                continue
+            }
+            if (file.name == "functions.js") {
+                assertTrue(sameApartFromOwnNames(e, a), "functions.js differs beyond its named function expressions")
                 continue
             }
             if (file.name == "optional-chaining.js") {
@@ -326,6 +355,10 @@ class IcodeOracleTest {
                 val script = Context.getContext().compileString(source, "block-functions.js", 1) as JSScript
                 assertEquals(setOf("f"), script.descriptor.annexBOnlyVarNames)
                 assertEquals(io.github.yuroyami.kitejs.rhino.ast.FunctionNode.FUNCTION_EXPRESSION, script.descriptor.getFunction(0).functionType)
+                continue
+            }
+            if (source == "x = function named() { return named }") {
+                assertTrue(sameApartFromOwnNames(e, a), source)
                 continue
             }
             if (source in iteratorPatterns) {

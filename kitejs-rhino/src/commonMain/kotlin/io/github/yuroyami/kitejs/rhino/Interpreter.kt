@@ -519,25 +519,33 @@ public class Interpreter : Evaluator {
          * Closes the iterators that a throw leaves (ECMAScript 2015, 7.4.6): those opened inside the
          * try block of [handler], or every one when no handler in [frame] catches it. What their
          * `return` methods do is ignored, so the throw goes on. [dropOnly] forgets them unclosed,
-         * for a throwable no script may see.
+         * for a throwable no script may see. A generator's `return` is a return completion
+         * instead, so the first error its closes raise replaces it and comes back from here.
          */
-        private fun closeOpenIterators(cx: Context, frame: CallFrame, handler: Int, dropOnly: Boolean) {
-            val open = frame.openIterators ?: return
-            if (open.isEmpty()) return
+        private fun closeOpenIterators(cx: Context, frame: CallFrame, handler: Int, dropOnly: Boolean, throwable: Any? = null): RhinoException? {
+            val open = frame.openIterators ?: return null
+            if (open.isEmpty()) return null
             val table = frame.idata.itsExceptionTable
             val start = if (handler >= 0) table!![handler + EXCEPTION_TRY_START_SLOT] else Int.MIN_VALUE
             val end = if (handler >= 0) table!![handler + EXCEPTION_TRY_END_SLOT] else Int.MAX_VALUE
+            var error: RhinoException? = null
             for (i in open.indices.reversed()) {
                 val record = open[i]
                 if (record.openPc < start || record.openPc >= end) continue
                 open.removeAt(i)
+                val returning = throwable is NativeGenerator.GeneratorClosedException && error == null
                 // A `for await` loop closes its own iterator in a finally block, which can await.
                 if (record.isAsync) {
-                    record.thrown = true
+                    record.thrown = !returning
                 } else if (!dropOnly) {
-                    record.close(cx, frame.scope!!, quiet = true)
+                    try {
+                        record.close(cx, frame.scope!!, quiet = !returning)
+                    } catch (e: RhinoException) {
+                        error = e
+                    }
                 }
             }
+            return error
         }
 
         /** Starts a for-of loop: its enumeration, whose iterator the frame keeps open until the loop ends. */
@@ -880,7 +888,13 @@ public class Interpreter : Evaluator {
                     while (true) {
                         if (exState != exNoJsState) {
                             indexReg = getExceptionHandler(f!!, exState != exCatchState)
-                            closeOpenIterators(cx, f, indexReg, exState == exNoJsState)
+                            val closeError = closeOpenIterators(cx, f, indexReg, exState == exNoJsState, throwable)
+                            if (closeError != null) {
+                                // The error replaces the return, and a catch in this frame can see it.
+                                throwable = closeError
+                                exState = exCatchState
+                                continue
+                            }
                             if (indexReg >= 0) {
                                 frame = f
                                 continue@stateLoop
@@ -2699,6 +2713,15 @@ public class Interpreter : Evaluator {
             val desc = frame.fnOrScript.descriptor!!.getFunction(index)
             val isArrow = desc.functionType == FunctionNode.ARROW_FUNCTION
             val homeObject = if (isArrow) frame.fnOrScript.homeObject else null
+            if (desc.bindsOwnName) {
+                // funcEnv (ECMAScript 2015, 14.1.20): an immutable binding of the name, between
+                // the scope the expression runs in and the function's own.
+                val env = NativeObject()
+                env.parentScope = frame.scope
+                val fn = JSFunction(cx, env, desc, frame.thisObj, homeObject)
+                env.defineProperty(desc.name!!, fn, ScriptableObject.READONLY or ScriptableObject.PERMANENT)
+                return fn
+            }
             val fn = JSFunction(cx, frame.scope!!, desc, frame.thisObj, homeObject)
             if (isArrow) {
                 fn.lexicalThisBinding = frame.thisBinding

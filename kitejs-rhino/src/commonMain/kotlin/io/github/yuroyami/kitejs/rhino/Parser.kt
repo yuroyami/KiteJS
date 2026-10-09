@@ -2001,9 +2001,14 @@ public class Parser(
                     if (init.variables.size > 1) {
                         reportError("msg.mult.index")
                     }
-                    // A const head takes each value as it comes, so it has no initializer.
-                    if (init.type == Token.CONST && init.variables.any { it.initializer != null }) {
-                        reportError("msg.bad.for.in.lhs")
+                    // A head takes each value as it comes, so it has no initializer. Annex B keeps
+                    // one for a plain `var` name of a sloppy for-in only.
+                    if (init.variables.any { it.initializer != null }) {
+                        val annexB = isForIn && init.type == Token.VAR && !inUseStrictDirective &&
+                            init.variables.none { it.isDestructuring }
+                        if (init.type == Token.CONST || (!annexB && compilerEnv.languageVersion >= Context.VERSION_ES6)) {
+                            reportError("msg.bad.for.in.lhs")
+                        }
                     }
                 }
                 if (isForOf && isForEach) {
@@ -5932,6 +5937,10 @@ public class Parser(
                 defineSymbol(variableType, name, true)
                 destructuringNames.add(name)
             }
+        } else if (variableType == -1 && (target.type == Token.GETPROP || target.type == Token.GETELEM)) {
+            // The property reference is evaluated before the value is read (ECMAScript 2015,
+            // 12.14.5.5), so a yield in it runs before the iterator steps.
+            parent.addChildToBack(simpleAssignment(target, value, transformer))
         } else {
             parent.addChildToBack(
                 destructuringAssignmentHelper(

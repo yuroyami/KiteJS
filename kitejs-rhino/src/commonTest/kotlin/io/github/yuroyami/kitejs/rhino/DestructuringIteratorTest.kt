@@ -166,4 +166,24 @@ class DestructuringIteratorTest {
         var [[a, ...b], { c: [d] = [5] }] = [[1, 2, 3], {}];
         f(0) + '|' + [a, b.join(), d].join();
     """)
+
+    /**
+     * A for-let head keeps the iterator of its pattern in a scope of its own, which strict code
+     * needs declared. A property target is evaluated before the iterator steps.
+     */
+    @Test
+    fun forLetHeadsAndPropertyTargets() = check("3,30,open next key a step key rest,undefined,0", """
+        'use strict';
+        var out = [];
+        for (let [a, b = 2] = [1]; ;) { out.push(a + b); break; }
+        for (let [x] = [5], [y] = [6]; ;) { out.push(x * y); break; }
+        var log = [];
+        var iterator = { get next() { log.push('next'); return function () { log.push('step'); return { done: true }; }; } };
+        var iterable = { [Symbol.iterator]() { log.push('open'); return iterator; } };
+        var target = {};
+        function key(k) { log.push('key ' + k); return k; }
+        [target[key('a')], ...target[key('rest')]] = iterable;
+        out.push(log.join(' '), String(target.a), target.rest.length);
+        out.join();
+    """)
 }

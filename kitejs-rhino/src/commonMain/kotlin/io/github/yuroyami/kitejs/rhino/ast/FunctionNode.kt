@@ -125,6 +125,9 @@ public open class FunctionNode(pos: Int = -1, name: Name? = null) : ScriptNode(p
     internal val bodyVarNames: MutableSet<String> = mutableSetOf()
 
     internal var blockDeclarationScope: Scope? = null
+
+    /** A named function expression, whose name is a read-only binding around its body (ECMAScript 2015, 14.1.20). */
+    internal var bindsOwnName: Boolean = false
     internal var blockFunctionIndex: Int = -1
     internal var hasAnnexBCopy: Boolean = false
     internal var parsingBody: Boolean = false

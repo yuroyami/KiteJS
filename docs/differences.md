@@ -140,12 +140,6 @@ its declaration has run. Here the binding is there from the start of its block a
 `undefined` until then, so `new C()` above `class C {}` throws a `TypeError` for calling
 `undefined` rather than a `ReferenceError`. Code that runs in a browser runs the same here.
 
-### Leaving a `for-of` early does not close the iterator
-
-A `break`, `return` or throw out of a `for-of` loop, or an array pattern that takes fewer
-elements than the iterable has, never calls the iterator's `return` method, so a generator's
-`finally` block does not run then. Call `it.return()` yourself where the cleanup matters.
-
 ### Block, parameter and eval scopes
 
 Functions declared inside blocks have lexical bindings initialized when the block is entered.

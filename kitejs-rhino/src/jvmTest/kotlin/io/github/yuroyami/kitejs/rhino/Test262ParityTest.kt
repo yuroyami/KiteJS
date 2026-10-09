@@ -15,9 +15,10 @@ import org.mozilla.javascript.Scriptable as UScriptable
 /**
  * test262 through both engines, comparing outcomes.
  *
- * The point is not a pass rate. It is that for every file upstream runs, the port passes exactly
- * when upstream passes. A test both engines fail is fine and expected: upstream has no classes and
- * no modules either. A test where they disagree is either a bug to fix or a ledger entry.
+ * The point is not a pass rate. It is that the port passes every file upstream passes. A test both
+ * engines fail is fine and expected: upstream has no modules either. A test the port fails and
+ * upstream passes is either a bug to fix or a ledger entry. A test the port passes and upstream
+ * fails is a fix the port carries: it goes to `improvements.txt` and does not fail the run.
  *
  * The suite is fetched by `tools/fetch-test262.sh` at the commit upstream pins. This dedicated
  * task fails if the corpus is missing; ordinary development tests do not run it.
@@ -36,7 +37,7 @@ class Test262ParityTest {
      * `SharedArrayBuffer` and `Atomics` (#72), which this port implements.
      */
     private val unsupportedFeatures = setOf(
-        "IsHTMLDDA", "decorators",
+        "IsHTMLDDA", "decorators", "explicit-resource-management",
         "object-rest", "regexp-dotall", "regexp-unicode-property-escapes",
         "tail-call-optimization", "Temporal",
         "upsert", "u180e",
@@ -671,6 +672,10 @@ class Test262ParityTest {
         }
         put("built-ins/ThrowTypeError/unique-per-realm-function-proto.js",
             "D-109: Function.prototype restrictions share the realm intrinsic here")
+        // The test expects a sloppy function's caller to be undefined or the calling function.
+        for (number in 2..3) {
+            put("language/arguments-object/10.6-13-a-$number.js", "#87: a sloppy function's caller is always null here")
+        }
         // D-111: iterable/array-like dispatch and validation follow ECMAScript here.
         for (path in listOf(
             "built-ins/TypedArrayConstructors/ctors-bigint/length-arg/is-infinity-throws-rangeerror.js",
@@ -1912,6 +1917,8 @@ class Test262ParityTest {
         // Files upstream cannot parse. The port takes syntax upstream rejects, so there is
         // nothing to compare on these: they are counted and listed, not treated as a difference.
         val upstreamCannotParse = mutableListOf<String>()
+        // Files the port passes and upstream fails, with no more specific reason recorded.
+        val improvements = mutableListOf<String>()
         val staleExpectations = mutableListOf<String>()
         val agreedButExpectedToDiffer = mutableListOf<String>()
         var ran = 0
@@ -1991,6 +1998,7 @@ class Test262ParityTest {
                     known -> knownDifferences[relative] ?: (if (strict) knownStrictDifferences else knownSloppyDifferences)[relative]!!
                     feature != null -> feature
                     upstreamFailedToParse(upstream) -> "upstream cannot parse"
+                    ported == PASS -> "the port passes where upstream fails"
                     else -> "unexpected difference"
                 }
                 outcomes.append(relative).append(if (strict) "\tstrict\t" else "\tsloppy\t")
@@ -2001,6 +2009,8 @@ class Test262ParityTest {
                         // Pinned on purpose; the stale check below watches a pinned file.
                     } else if (upstreamFailedToParse(upstream)) {
                         upstreamCannotParse.add("$relative [$mode]\n  upstream: $upstream\n  ported:   $ported")
+                    } else if (ported == PASS) {
+                        improvements.add("$relative [$mode]\n  upstream: $upstream")
                     } else {
                         differences.add("$relative [$mode]\n  upstream: $upstream\n  ported:   $ported")
                     }
@@ -2035,6 +2045,13 @@ class Test262ParityTest {
             report.parentFile.mkdirs()
             report.writeText(upstreamCannotParse.joinToString("\n\n"))
             println("that list: ${report.absolutePath}")
+        }
+
+        if (improvements.isNotEmpty()) {
+            val report = File("build/test262/improvements.txt")
+            report.parentFile.mkdirs()
+            report.writeText(improvements.joinToString("\n\n"))
+            println("${improvements.size} cases pass here and fail upstream: ${report.absolutePath}")
         }
 
         // The whole list goes to a file: a long run is expensive, so nothing it learned is thrown

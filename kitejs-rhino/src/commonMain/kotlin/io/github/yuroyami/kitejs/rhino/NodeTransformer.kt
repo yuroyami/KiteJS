@@ -477,6 +477,14 @@ public open class NodeTransformer {
                 objectLiteral.addChildToBack(init)
                 v = v.next
             }
+            // The temporaries an array pattern keeps its iterator in live here too, though no
+            // declaration names them.
+            (scopeNode as? Scope)?.symbolTable?.keys?.forEach { name ->
+                if (name !in list) {
+                    list.add(name)
+                    objectLiteral.addChildToBack(Node(Token.VOID, Node.newNumber(0.0)))
+                }
+            }
             objectLiteral.putProp(Node.OBJECT_IDS_PROP, list.toTypedArray())
             newVars = Node(Token.ENTERWITH, objectLiteral)
             newVars.putIntProp(Node.LEXICAL_SCOPE_PROP, 1)

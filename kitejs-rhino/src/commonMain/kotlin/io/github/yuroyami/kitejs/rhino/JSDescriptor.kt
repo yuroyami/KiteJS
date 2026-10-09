@@ -67,6 +67,9 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
     public val requiresArgumentObject: Boolean get() = (flags and REQUIRES_ARGUMENT_OBJECT_FLAG) != 0
     public val declaredAsFunctionExpression: Boolean get() = (flags and DECLARED_AS_FUNCTION_EXPRESSION_FLAG) != 0
 
+    /** A named function expression, whose closure gets a read-only binding of its name. */
+    internal val bindsOwnName: Boolean get() = (flags and BINDS_OWN_NAME_FLAG) != 0
+
     /** A class constructor, which [[Call]] refuses and [[Construct]] runs with class semantics. */
     public val isClassConstructor: Boolean get() = (flags and IS_CLASS_CONSTRUCTOR_FLAG) != 0
 
@@ -163,6 +166,7 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
         public var isDerivedConstructor: Boolean = false
         public var isDefaultConstructor: Boolean = false
         public var isClassFieldInitializer: Boolean = false
+        internal var bindsOwnName: Boolean = false
         public var securityDomain: Any? = null
         public var functionType: Int = 0
 
@@ -210,6 +214,7 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
             f = f or (if (isDerivedConstructor) IS_DERIVED_CONSTRUCTOR_FLAG else 0)
             f = f or (if (isDefaultConstructor) IS_DEFAULT_CONSTRUCTOR_FLAG else 0)
             f = f or (if (isClassFieldInitializer) IS_CLASS_FIELD_INITIALIZER_FLAG else 0)
+            f = f or (if (bindsOwnName) BINDS_OWN_NAME_FLAG else 0)
 
             val result = JSDescriptor<T>(
                 code!!.build(),
@@ -262,5 +267,6 @@ public class JSDescriptor<T : ScriptOrFn<T>> private constructor(
         const val IS_CLASS_FIELD_INITIALIZER_FLAG = 1 shl 16
         const val IS_ASYNC_FLAG = 1 shl 17
         const val NON_SIMPLE_PARAMETERS_FLAG = 1 shl 18
+        const val BINDS_OWN_NAME_FLAG = 1 shl 19
     }
 }

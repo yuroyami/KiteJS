@@ -122,12 +122,24 @@ public open class JSFunction(
     }
 
     override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable {
+        if (!ScriptRuntime.hasTopCall(cx)) return topCall(cx, scope) { construct(cx, scope, args) }
         if (descriptor.isClassConstructor) return constructClass(cx, scope, args, this)
         val ctor = descriptor.constructor ?: throw ScriptRuntime.typeErrorById("msg.not.ctor", functionName)
         var thisObj = if (homeObject == null) createObject(cx, scope) else null
         val res = ctor.execute(cx, this, this, scope, thisObj, args)
         if (res is Scriptable) thisObj = res
         return thisObj!!
+    }
+
+    /**
+     * Runs [body] as the outermost call, as [call] does. Native code outside any script, such as a
+     * promise job that builds a subclass instance, reaches a constructor with no call open.
+     */
+    private fun topCall(cx: Context, scope: Scriptable, body: () -> Scriptable): Scriptable {
+        val callable = object : Callable {
+            override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? = body()
+        }
+        return ScriptRuntime.doTopCall(callable, cx, scope, null, ScriptRuntime.emptyArgs, isStrict) as Scriptable
     }
 
     /** Arrow functions, methods, accessors and generators have no constructor code. */
@@ -140,6 +152,7 @@ public open class JSFunction(
      */
     override fun construct(cx: Context, scope: Scriptable, args: Array<Any?>, newTarget: Scriptable): Scriptable {
         if (newTarget === this) return construct(cx, scope, args)
+        if (!ScriptRuntime.hasTopCall(cx)) return topCall(cx, scope) { construct(cx, scope, args, newTarget) }
         if (descriptor.isClassConstructor) return constructClass(cx, scope, args, newTarget)
         val ctor = descriptor.constructor
         if (ctor == null || homeObject != null) throw ScriptRuntime.typeErrorById("msg.not.ctor", functionName)
