@@ -18,7 +18,7 @@ public open class JSFunction(
         set(_) = throw UnsupportedOperationException("Cannot set home object on JS function.")
 
     init {
-        ScriptRuntime.setFunctionProtoAndParent(this, cx, scope, descriptor.isES6Generator, descriptor.isAsyncFunction)
+        ScriptRuntime.setFunctionProtoAndParent(this, cx, scope, descriptor.isES6Generator, descriptor.isAsync)
         // A class constructor gets its read-only `prototype` from the class definition, and an
         // async function has none.
         if (!descriptor.isShorthand && !descriptor.isClassConstructor && !descriptor.isAsyncFunction) setupDefaultPrototype(scope)
@@ -78,6 +78,8 @@ public open class JSFunction(
     override fun hasPrototypeProperty(): Boolean = true
 
     override val isGeneratorFunction: Boolean get() = descriptor.isES6Generator
+
+    override val isAsyncGeneratorFunction: Boolean get() = descriptor.isAsync && descriptor.isES6Generator
 
     override val length: Int
         get() {

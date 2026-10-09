@@ -94,6 +94,7 @@ public class NativeSymbol internal constructor(internal val key: SymbolKey) : Sc
             defineProperty(scope, CLASS_NAME, ctor, DONTENUM)
 
             createStandardSymbol(ctor, "iterator", SymbolKey.ITERATOR)
+            createStandardSymbol(ctor, "asyncIterator", SymbolKey.ASYNC_ITERATOR)
             createStandardSymbol(ctor, "species", SymbolKey.SPECIES)
             createStandardSymbol(ctor, "toStringTag", SymbolKey.TO_STRING_TAG)
             createStandardSymbol(ctor, "hasInstance", SymbolKey.HAS_INSTANCE)

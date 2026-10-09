@@ -814,7 +814,8 @@ public object ScriptRuntime {
     ) {
         fn.parentScope = scope
         fn.prototype =
-            if (asyncFunction) TopLevel.getBuiltinPrototype(ScriptableObject.getTopLevelScope(scope), TopLevel.Builtins.AsyncFunction)
+            if (asyncFunction && es6GeneratorFunction) TopLevel.getBuiltinPrototype(ScriptableObject.getTopLevelScope(scope), TopLevel.Builtins.AsyncGeneratorFunction)
+            else if (asyncFunction) TopLevel.getBuiltinPrototype(ScriptableObject.getTopLevelScope(scope), TopLevel.Builtins.AsyncFunction)
             else if (es6GeneratorFunction) ScriptableObject.getGeneratorFunctionPrototype(scope)
             else ScriptableObject.getFunctionPrototype(scope)
         if (cx != null && cx.languageVersion >= Context.VERSION_ES6) {
@@ -1320,7 +1321,7 @@ public object ScriptRuntime {
     private fun methodSource(function: JSFunction, key: String): String? {
         if (function.homeObject == null || function.descriptor.isClassConstructor || function.descriptor.hasLexicalThis) return null
         val suffix = function.descriptor.parametersAndBodySource ?: return null
-        val prefix = if (function.descriptor.isAsyncFunction) "async " else
+        val prefix = if (function.descriptor.isAsync) (if (function.descriptor.isES6Generator) "async *" else "async ") else
             if (function.descriptor.isES6Generator) "*" else ""
         return prefix + key + suffix
     }

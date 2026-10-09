@@ -33,7 +33,7 @@ class Test262ParityTest {
 
     /** Upstream's list, except default arguments which this port implements (D-116). */
     private val unsupportedFeatures = setOf(
-        "Atomics", "IsHTMLDDA", "async-iteration", "decorators",
+        "Atomics", "IsHTMLDDA", "decorators",
         "object-rest", "regexp-dotall", "regexp-unicode-property-escapes",
         "resizable-arraybuffer", "SharedArrayBuffer", "tail-call-optimization", "Temporal",
         "upsert", "u180e",
@@ -41,20 +41,37 @@ class Test262ParityTest {
 
     /**
      * Folders upstream's properties file skips whole because upstream has no class syntax (D-95),
-     * no async functions (D-97) and no WeakRef or FinalizationRegistry (#89), which the port runs
-     * anyway. Upstream fails to parse almost every file in them, so they mostly add to the port's
-     * own outcomes and to the cannot-parse list.
+     * no async functions (D-97), no async generators (#91) and no WeakRef or FinalizationRegistry
+     * (#89), which the port runs anyway.
+     * Upstream fails to parse almost every file in them, so they mostly add to the port's own
+     * outcomes and to the cannot-parse list.
      */
     private val portOnlyFolders = listOf(
+        "built-ins/AsyncFromSyncIteratorPrototype",
         "built-ins/AsyncFunction",
+        "built-ins/AsyncGeneratorFunction",
+        "built-ins/AsyncGeneratorPrototype",
+        "built-ins/AsyncIteratorPrototype",
         "built-ins/FinalizationRegistry",
         "built-ins/WeakRef",
         "language/expressions/async-function",
+        "language/expressions/async-generator",
         "language/expressions/await",
         "language/expressions/class",
         "language/expressions/new.target",
         "language/statements/async-function",
+        "language/statements/async-generator",
         "language/statements/class",
+        "language/statements/for-await-of",
+    )
+
+    /**
+     * Folders for a built-in the port has and upstream lacks, with the reason. A file there that
+     * passes here and fails upstream is an expected difference. A file that fails here still
+     * counts as a difference.
+     */
+    private val portFeatureFolders = mapOf(
+        "built-ins/Array/fromAsync/" to "#91: Array.fromAsync runs here",
     )
 
     /**
@@ -1591,6 +1608,13 @@ class Test262ParityTest {
         ).flatMap { listOf("language/eval-code/direct/async-func-expr-nameless-$it-declare-arguments.js", "language/eval-code/direct/async-func-expr-nameless-$it-declare-arguments-and-assign.js") }) {
             put(path, "D-97: async functions run here")
         }
+        // Async generators, which upstream cannot parse inside a test that otherwise runs (#91).
+        for (path in listOf(
+            "built-ins/AsyncGeneratorFunction/is-a-constructor.js",
+        )) {
+            put(path, "#91: async generators run here")
+        }
+        put("built-ins/Symbol/asyncIterator/prop-desc.js", "#91: Symbol.asyncIterator is there")
         // `for (async of` is an early error, which upstream takes as a loop over a name (D-97).
         put("language/statements/for-of/head-lhs-async-invalid.js", "D-97: `for (async of` is an early error here")
         // An async test now runs to the end of its microtasks on both engines, and a resolve
@@ -1928,9 +1952,15 @@ class Test262ParityTest {
                 val known = relative in knownDifferences ||
                     (!strict && relative in knownSloppyDifferences) ||
                     (strict && relative in knownStrictDifferences)
+                val feature = if (ported == PASS) {
+                    portFeatureFolders.entries.firstOrNull { relative.startsWith(it.key) }?.value
+                } else {
+                    null
+                }
                 val comparison = when {
                     upstream == ported -> "agreement"
                     known -> knownDifferences[relative] ?: (if (strict) knownStrictDifferences else knownSloppyDifferences)[relative]!!
+                    feature != null -> feature
                     upstreamFailedToParse(upstream) -> "upstream cannot parse"
                     else -> "unexpected difference"
                 }
@@ -1938,8 +1968,8 @@ class Test262ParityTest {
                     .append(upstream).append('\t').append(ported).append('\t').append(comparison).append('\n')
                 if (upstream != ported) {
                     val mode = if (strict) "strict" else "non-strict"
-                    if (known) {
-                        // Pinned on purpose; the stale check below watches it.
+                    if (known || feature != null) {
+                        // Pinned on purpose; the stale check below watches a pinned file.
                     } else if (upstreamFailedToParse(upstream)) {
                         upstreamCannotParse.add("$relative [$mode]\n  upstream: $upstream\n  ported:   $ported")
                     } else {

@@ -531,7 +531,12 @@ public class Interpreter : Evaluator {
                 val record = open[i]
                 if (record.openPc < start || record.openPc >= end) continue
                 open.removeAt(i)
-                if (!dropOnly) record.close(cx, frame.scope!!, quiet = true)
+                // A `for await` loop closes its own iterator in a finally block, which can await.
+                if (record.isAsync) {
+                    record.thrown = true
+                } else if (!dropOnly) {
+                    record.close(cx, frame.scope!!, quiet = true)
+                }
             }
         }
 
@@ -593,6 +598,34 @@ public class Interpreter : Evaluator {
                     operand
                 }
                 Icode.DESTRUCTURE_KEY -> ScriptRuntime.toPropertyKey(operand)
+                Icode.DESTRUCTURE_ASYNC_OPEN -> OpenIterator.openAsync(cx, scope, operand, pc).also { frame.openIterators!!.add(it) }
+                Icode.DESTRUCTURE_ASYNC_NEXT -> (operand as OpenIterator).asyncNext(cx, scope)
+                Icode.DESTRUCTURE_ASYNC_STEP -> {
+                    val record = operand as OpenIterator
+                    val more = record.asyncStep(stack[first + 1])
+                    if (!more) forget(frame, record)
+                    more
+                }
+                Icode.DESTRUCTURE_ASYNC_VALUE -> (operand as OpenIterator).asyncValue()
+                Icode.DESTRUCTURE_ASYNC_CLOSE -> {
+                    // Undefined when opening the iterator threw.
+                    val record = operand as? OpenIterator ?: return false
+                    forget(frame, record)
+                    record.asyncClose(cx, scope)
+                }
+                Icode.DESTRUCTURE_ASYNC_RESULT -> (operand as OpenIterator).asyncResult()
+                Icode.DESTRUCTURE_ASYNC_CLOSED -> {
+                    val record = operand as OpenIterator
+                    val settled = stack[first + 1]
+                    if (!record.thrown) {
+                        if (settled is AsyncFunctionDriver.Rejection) {
+                            val line = if (frame.pcSourceLineStart >= 0) getIndex(frame.idata.itsICode, frame.pcSourceLineStart) else 0
+                            throw JavaScriptException(settled.reason, frame.fnOrScript.descriptor!!.sourceName, line)
+                        }
+                        if (settled !is Scriptable) throw ScriptRuntime.typeErrorById("msg.iterator.result.not.object", ScriptRuntime.toString(settled))
+                    }
+                    Undefined.instance
+                }
                 Icode.DESTRUCTURE_COPY_REST -> {
                     // CopyDataProperties with the keys the pattern named excluded.
                     val excluded = HashSet<Any?>()
@@ -622,7 +655,7 @@ public class Interpreter : Evaluator {
         /** How many bytes an instruction takes, including its operands. */
         private fun bytecodeSpan(bytecode: Int): Int {
             when (bytecode) {
-                Token.THROW, Token.YIELD, Icode_YIELD_STAR, Icode_AWAIT, Icode_GENERATOR, Icode_GENERATOR_END, Icode_GENERATOR_RETURN,
+                Token.THROW, Token.YIELD, Icode_YIELD_STAR, Icode_AWAIT, Icode.Icode_AWAIT_SETTLED, Icode_GENERATOR, Icode_GENERATOR_END, Icode_GENERATOR_RETURN,
                 Icode_GENERATOR_RETURN_RESULT -> return 1 + 2
                 Icode_GOSUB, Token.GOTO, Token.IFEQ, Token.IFNE, Icode_IFEQ_POP, Icode_IF_NULL_UNDEF, Icode_IF_NOT_NULL_UNDEF, Icode_LEAVEDQ -> return 1 + 2
                 Icode_CALLSPECIAL, Icode_CALLSPECIAL_OPTIONAL -> return 1 + 1 + 1 + 2
@@ -1611,7 +1644,7 @@ public class Interpreter : Evaluator {
          * leaves the whole interpreter running interpreted (D-42).
          */
         private fun executeCold(cx: Context, frame: CallFrame, state: InterpreterState, op: Int): NewState? {
-            if (op == Icode_AWAIT) {
+            if (op == Icode_AWAIT || op == Icode.Icode_AWAIT_SETTLED) {
                 // Suspends like a yield, which an async function never has, so it lives here.
                 if (!frame.frozen) return NewState.YieldResult(freezeGenerator(cx, frame, state, state.generatorState!!, op))
                 val obj = thawGenerator(frame, state, state.generatorState!!, op)
@@ -2405,7 +2438,9 @@ public class Interpreter : Evaluator {
                 }
                 return
             }
-            frame.result = if (cx.languageVersion >= Context.VERSION_ES6) {
+            frame.result = if (fn.descriptor.isAsync) {
+                NativeAsyncGenerator(frame.scope!!, fn, generatorFrame)
+            } else if (cx.languageVersion >= Context.VERSION_ES6) {
                 ES6Generator(frame.scope!!, fn, generatorFrame)
             } else {
                 NativeGenerator(frame.scope!!, fn, generatorFrame)
@@ -2436,8 +2471,8 @@ public class Interpreter : Evaluator {
             val result = if (yielded !== DBL_MRK) yielded else ScriptRuntime.wrapNumber(frame.sDbl[state.stackTop])
             return when (op) {
                 Icode_YIELD_STAR -> ES6Generator.YieldStarResult(result)
-                Icode_AWAIT -> AsyncFunctionDriver.AwaitRequest(result)
-                else -> result
+                Icode_AWAIT, Icode.Icode_AWAIT_SETTLED -> AsyncFunctionDriver.AwaitRequest(result)
+                else -> if (frame.fnOrScript.descriptor!!.isAsync) NativeAsyncGenerator.YieldRequest(result) else result
             }
         }
 
@@ -2446,11 +2481,15 @@ public class Interpreter : Evaluator {
             val sourceLine = getIndex(frame.idata.itsICode, frame.pc)
             frame.pc += 2
             if (generatorState.operation == NativeGenerator.GENERATOR_THROW) {
+                if (op == Icode.Icode_AWAIT_SETTLED) {
+                    frame.stack[state.stackTop] = AsyncFunctionDriver.Rejection(generatorState.value)
+                    return Scriptable.NOT_FOUND
+                }
                 return JavaScriptException(generatorState.value, frame.fnOrScript.descriptor!!.sourceName, sourceLine)
             }
             if (generatorState.operation == NativeGenerator.GENERATOR_CLOSE) return generatorState.value
             if (generatorState.operation != NativeGenerator.GENERATOR_SEND) throw Kit.codeBug()
-            if (op == Token.YIELD || op == Icode_YIELD_STAR || op == Icode_AWAIT) frame.stack[state.stackTop] = generatorState.value
+            if (op == Token.YIELD || op == Icode_YIELD_STAR || op == Icode_AWAIT || op == Icode.Icode_AWAIT_SETTLED) frame.stack[state.stackTop] = generatorState.value
             return Scriptable.NOT_FOUND
         }
 

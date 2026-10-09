@@ -413,6 +413,9 @@ public class NativeArray : ScriptableObject {
             ctor.setPrototypeScriptable(proto)
             defineMethodOnConstructor(ctor, scope, "of", 0, ::js_of)
             defineMethodOnConstructor(ctor, scope, "from", 1, ::js_from)
+            if (cx.languageVersion >= Context.VERSION_ES6) {
+                defineMethodOnConstructor(ctor, scope, "fromAsync", 1) { c, s, t, a -> ArrayFromAsync.start(c, s, t, a) }
+            }
             defineMethodOnConstructor(ctor, scope, "isArray", 1, ::js_isArrayMethod)
             exposeMethodOnConstructor(ctor, scope, "join", 1, ::js_join)
             exposeMethodOnConstructor(ctor, scope, "reverse", 0, ::js_reverse)
@@ -654,11 +657,13 @@ public class NativeArray : ScriptableObject {
          * TypeError for "not a constructor", so a constructor's own TypeError vanished into a
          * plain array (D-91).
          */
-        private fun callConstructorOrCreateArray(cx: Context, scope: Scriptable, arg: Scriptable?, length: Long, lengthAlways: Boolean): Scriptable {
+        internal fun callConstructorOrCreateArray(cx: Context, scope: Scriptable, arg: Scriptable?, length: Long, lengthAlways: Boolean): Scriptable {
             if (AbstractEcmaObjectOperations.isConstructor(arg)) {
                 val args: Array<Any?> = if (lengthAlways || length > 0) arrayOf(length) else ScriptRuntime.emptyArgs
                 return (arg as Constructable).construct(cx, scope, args)
             }
+            // ArrayCreate refuses a length past 2^32 - 1, which a huge array-like asks for.
+            if (lengthAlways && length > 4294967295L) throw ScriptRuntime.rangeErrorById("msg.arraylength.bad")
             return cx.newArray(scope, if (length > Int.MAX_VALUE) 0 else length.toInt())
         }
 
@@ -759,7 +764,7 @@ public class NativeArray : ScriptableObject {
             return doubleLen.toLong()
         }
 
-        private fun setLengthProperty(cx: Context, target: Scriptable, length: Long): Any? {
+        internal fun setLengthProperty(cx: Context, target: Scriptable, length: Long): Any? {
             val len = ScriptRuntime.wrapNumber(length.toDouble())
             AbstractEcmaObjectOperations.setOrThrow(cx, target, "length", len)
             return len

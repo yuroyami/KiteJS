@@ -59,18 +59,12 @@ internal class NativeFinalizationRegistry private constructor(
 
     /** The cleanup job: CleanupFinalizationRegistry, where each empty cell leaves before its callback runs. */
     internal fun cleanupJob(): Context.Runnable {
-        val reaction = object : Callable {
-            override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-                if (!ScriptRuntime.hasTopCall(cx)) return ScriptRuntime.doTopCall(this, cx, scope, thisObj, args, false)
-                cx.withRealm(realm) {
-                    while (true) {
-                        val i = cells.indexOfFirst { it.target.get() == null }
-                        if (i < 0) break
-                        val cell = cells.removeAt(i)
-                        callback.call(cx, realm, Undefined.SCRIPTABLE_UNDEFINED, arrayOf(cell.heldValue))
-                    }
-                }
-                return Undefined.instance
+        val reaction = NativeAsyncGenerator.HostReaction(realm, false) { cx, _ ->
+            while (true) {
+                val i = cells.indexOfFirst { it.target.get() == null }
+                if (i < 0) break
+                val cell = cells.removeAt(i)
+                callback.call(cx, realm, Undefined.SCRIPTABLE_UNDEFINED, arrayOf(cell.heldValue))
             }
         }
         return Context.Runnable { reaction.call(Context.getContext(), realm, null, ScriptRuntime.emptyArgs) }

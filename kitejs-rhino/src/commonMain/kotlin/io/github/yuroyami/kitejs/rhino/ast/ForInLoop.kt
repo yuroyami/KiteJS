@@ -38,6 +38,9 @@ public open class ForInLoop(pos: Int = -1, len: Int = 1) : Loop(pos, len) {
 
     public var isForOf: Boolean = false
 
+    /** A `for await..of` loop, which iterates an async iterable (ECMAScript 2018). */
+    public var isForAwait: Boolean = false
+
     init {
         typeField = Token.FOR
     }
@@ -46,6 +49,7 @@ public open class ForInLoop(pos: Int = -1, len: Int = 1) : Loop(pos, len) {
         val sb = StringBuilder()
         sb.append(makeIndent(depth))
         sb.append("for ")
+        if (isForAwait) sb.append("await ")
         if (isForEach) {
             sb.append("each ")
         }

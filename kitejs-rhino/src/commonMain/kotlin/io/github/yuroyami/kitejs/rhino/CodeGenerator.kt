@@ -528,7 +528,7 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
             }
             Icode_DESTRUCTURE -> {
                 val step = node.getExistingIntProp(Node.DESTRUCTURE_PROP)
-                if (step == Icode.DESTRUCTURE_OPEN) itsData.opensIterators = true
+                if (step == Icode.DESTRUCTURE_OPEN || step == Icode.DESTRUCTURE_ASYNC_OPEN) itsData.opensIterators = true
                 var operands = 0
                 while (child != null) {
                     visitExpression(child, 0)
@@ -848,7 +848,7 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
             }
             Token.AWAIT -> {
                 visitExpression(child!!, 0)
-                addIcode(Icode_AWAIT)
+                addIcode(if (node.getIntProp(Node.AWAIT_SETTLED_PROP, 0) == 1) Icode.Icode_AWAIT_SETTLED else Icode_AWAIT)
                 addUint16(node.lineno and 0xFFFF)
             }
             Token.WITHEXPR -> {

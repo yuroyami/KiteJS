@@ -38,6 +38,7 @@ public class SymbolKey(private val nameOrNull: String?, override val kind: Symbo
     public companion object {
         // The well-known symbols from the spec.
         public val ITERATOR: SymbolKey = SymbolKey("Symbol.iterator", BUILT_IN)
+        public val ASYNC_ITERATOR: SymbolKey = SymbolKey("Symbol.asyncIterator", BUILT_IN)
         public val TO_STRING_TAG: SymbolKey = SymbolKey("Symbol.toStringTag", BUILT_IN)
         public val SPECIES: SymbolKey = SymbolKey("Symbol.species", BUILT_IN)
         public val HAS_INSTANCE: SymbolKey = SymbolKey("Symbol.hasInstance", BUILT_IN)

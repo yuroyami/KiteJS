@@ -5,7 +5,7 @@ do here, and what to write instead. Everything below was checked against the eng
 remembered.
 
 This page is about Rhino. QuickJS is a different engine with its own, much shorter list: it runs
-the newer syntax and built-ins below, async iteration included, and the gaps it shares with Rhino
+the newer syntax and built-ins below, and the gaps it shares with Rhino
 are the ones that come from not being a browser, such as having no DOM and no `fetch`. See
 [Choosing an engine](engines.md).
 
@@ -16,8 +16,6 @@ These are syntax errors. A script using any of them will not even parse.
 | Not supported | Write instead |
 |---|---|
 | `import` and `export` | Nothing. Concatenate the sources, or bind a loader function yourself |
-| `for await (... of ...)` | A plain `for` loop that awaits each promise in an async function |
-| `async function*`, `async *m() {}` | An async function that returns an array, or a generator of promises |
 | `return` outside a function | Wrap the script in a function and call it |
 | The regular expression flags `d` and `v` | Read `exec` results for positions; use `u` for Unicode |
 
@@ -36,6 +34,9 @@ An array pattern goes through the iterator of its value, as in a browser, so `va
 gives `1`. When a pattern or a `for-of` loop stops before the iterator runs out, it calls the
 iterator's `return` method, so the `finally` blocks of a generator run.
 
+Async generators, `for await` and `Array.fromAsync` work as in a browser. A `for await` loop
+that stops early awaits what the iterator's `return` method answers before it goes on.
+
 Spreading or destructuring a value with no iterator, such as `[...5]`, `f(...null)` or
 `var [a] = {}`, throws a `TypeError`, as it does in a browser.
 
@@ -51,7 +52,6 @@ Reading them gives `undefined`, so `typeof x === 'undefined'` is a safe check.
 | `Intl` | Needs a full locale database. `toLocaleString` formats numbers and dates for en-US; format other locales in Kotlin |
 | `structuredClone` | Use `JSON.parse(JSON.stringify(x))`, or bind your own |
 | `SharedArrayBuffer`, `Atomics` | One thread, so they would mean nothing |
-| `Array.fromAsync` | Needs async iteration |
 
 `globalThis` is there and works.
 

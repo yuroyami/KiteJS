@@ -22,7 +22,7 @@ commonMain.dependencies {
 | | Rhino | QuickJS |
 |---|---|---|
 | What it is | Mozilla Rhino's interpreter, ported to common Kotlin | QuickJS-ng 0.17.0, the C engine, compiled into each target |
-| Language | ES5.1 and most of ES2015 and later | ES2023 and most of what came after, including async generators and `for await` |
+| Language | ES5.1 and most of ES2015 and later, async generators and `for await` included | ES2023 and most of what came after |
 | Native code | None | A static library, a JNI library or a WebAssembly module, depending on the target |
 | Size it adds | Kotlin code only | About 1 MB of native code per platform, about 360 KB gzipped on the web |
 | Speed | An interpreter written in Kotlin | An interpreter written in C, between 3 and 12 times faster on the JVM on loops, strings, objects, recursion and sorting |

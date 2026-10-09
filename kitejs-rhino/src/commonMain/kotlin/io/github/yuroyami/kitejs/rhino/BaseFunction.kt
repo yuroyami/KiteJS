@@ -105,6 +105,8 @@ public open class BaseFunction : ScriptableObject, Function {
     /** Generated code overrides this. */
     protected open val isGeneratorFunction: Boolean get() = isGeneratorFunctionField
 
+    protected open val isAsyncGeneratorFunction: Boolean get() = false
+
     /** Generated code overrides this. */
     internal open fun hasDefaultParameters(): Boolean = false
 
@@ -263,9 +265,11 @@ public open class BaseFunction : ScriptableObject, Function {
         prototypePropertyValue = obj
 
         val proto: Scriptable? = if (isGeneratorFunction) {
-            // A generator function's prototype hangs off %GeneratorPrototype%, not Object.prototype.
+            // A generator function's prototype hangs off %GeneratorPrototype%, not Object.prototype,
+            // and an async generator function's off %AsyncGeneratorPrototype%.
             val top = getTopLevelScope(scope)
-            getTopScopeValue(top, ES6Generator.GENERATOR_TAG) as? Scriptable ?: getObjectPrototype(this)
+            val tag = if (isAsyncGeneratorFunction) NativeAsyncGenerator.ASYNC_GENERATOR_TAG else ES6Generator.GENERATOR_TAG
+            getTopScopeValue(top, tag) as? Scriptable ?: getObjectPrototype(this)
         } else {
             getObjectPrototype(this)
         }
@@ -287,6 +291,9 @@ public open class BaseFunction : ScriptableObject, Function {
 
         /** Where %AsyncFunction% is parked on the global, which has no such global (D-97). */
         internal const val ASYNC_FUNCTION_CLASS = "__AsyncFunction"
+
+        /** Where %AsyncGeneratorFunction% is parked on the global, which has no such global either. */
+        internal const val ASYNC_GENERATOR_FUNCTION_CLASS = "__AsyncGeneratorFunction"
 
         private const val PROTOTYPE_PROPERTY_NAME = "prototype"
 
@@ -487,6 +494,37 @@ public open class BaseFunction : ScriptableObject, Function {
             }
             return (scope as? ScriptableObject)?.associateValue(ASYNC_FUNCTION_CLASS, ctor) ?: ctor
         }
+
+        /**
+         * Builds %AsyncGeneratorFunction%, its prototype and %AsyncGeneratorPrototype%
+         * (ECMAScript 2018, 27.4 and 27.6), which name each other the way the generator ones do.
+         */
+        internal fun initAsAsyncGeneratorFunction(scope: Scriptable, sealed: Boolean): Any {
+            val proto = NativeObject()
+            val function = getProperty(scope, FUNCTION_CLASS) as Scriptable
+            proto.prototype = getProperty(function, PROTOTYPE_PROPERTY_NAME) as Scriptable
+            proto.parentScope = getTopLevelScope(scope)
+            val generatorPrototype = NativeAsyncGenerator.init(getTopLevelScope(scope) as ScriptableObject, sealed)
+            proto.defineProperty(PROTOTYPE_PROPERTY_NAME, generatorPrototype, READONLY or DONTENUM)
+            generatorPrototype.defineProperty("constructor", proto, READONLY or DONTENUM)
+            val ctor = LambdaConstructor(scope, "AsyncGeneratorFunction", 1, proto, ::js_async_gen_constructorCall, ::js_async_gen_constructor)
+            ctor.prototype = function
+            proto.defineProperty("constructor", ctor, READONLY or DONTENUM)
+            ctor.setPrototypePropertyAttributes(DONTENUM or READONLY or PERMANENT)
+            proto.defineProperty(SymbolKey.TO_STRING_TAG, "AsyncGeneratorFunction", READONLY or DONTENUM)
+            if (sealed) {
+                ctor.sealObject()
+                proto.sealObject()
+                generatorPrototype.sealObject()
+            }
+            return (scope as? ScriptableObject)?.associateValue(ASYNC_GENERATOR_FUNCTION_CLASS, ctor) ?: ctor
+        }
+
+        private fun js_async_gen_constructorCall(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
+            js_async_gen_constructor(cx, scope, args)
+
+        private fun js_async_gen_constructor(cx: Context, scope: Scriptable, args: Array<Any?>): Scriptable =
+            withoutStrictMode(cx) { jsConstructor(cx, scope, args, "async function* ") }
 
         private fun js_async_constructorCall(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
             js_async_constructor(cx, scope, args)

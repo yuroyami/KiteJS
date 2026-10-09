@@ -590,6 +590,7 @@ public object AbstractEcmaObjectOperations {
         TopLevel.cachedBuiltinCtor(realm, type)?.let { return it }
         if (type == TopLevel.Builtins.GeneratorFunction) return ScriptableObject.getTopScopeValue(realm, BaseFunction.GENERATOR_FUNCTION_CLASS)
         if (type == TopLevel.Builtins.AsyncFunction) return ScriptableObject.getTopScopeValue(realm, BaseFunction.ASYNC_FUNCTION_CLASS)
+        if (type == TopLevel.Builtins.AsyncGeneratorFunction) return ScriptableObject.getTopScopeValue(realm, BaseFunction.ASYNC_GENERATOR_FUNCTION_CLASS)
         return ScriptableObject.getProperty(realm, type.name)
     }
 

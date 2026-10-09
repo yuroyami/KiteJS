@@ -509,6 +509,9 @@ public class IRFactory(
 
     private fun transformForInLoop(loop: ForInLoop): Node {
         loop.type = Token.LOOP
+        // The iterator of a `for await` lives outside the loop, whose names a let or const head
+        // makes fresh on every pass.
+        val iteratorName = if (loop.isForAwait) parser.newDestructuringTemp() else null
         parser.pushScope(loop)
         try {
             var declType = -1
@@ -519,10 +522,34 @@ public class IRFactory(
             val lhs = transform(iter)
             val obj = transform(loop.iteratedObject!!)
             val body = transform(loop.body!!)
+            if (loop.isForAwait) {
+                val forAwait = createForIn(declType, loop, lhs, obj, body, loop, false, true, iteratorName)
+                return createForAwaitClose(forAwait, iteratorName!!, loop.lineno, loop.column)
+            }
             return createForIn(declType, loop, lhs, obj, body, loop, loop.isForEach, loop.isForOf)
         } finally {
             parser.popScope()
         }
+    }
+
+    /**
+     * Puts a `for await` loop in a try whose finally closes its iterator, unless it ran out, and
+     * awaits what the iterator's `return` answers (ECMAScript 2018, 7.4.7 AsyncIteratorClose). On
+     * a throw the interpreter marks the iterator, so the close keeps the throw and ignores its
+     * own errors.
+     */
+    private fun createForAwaitClose(loop: Node, iteratorName: String, lineno: Int, column: Int): Node {
+        val result = Node(Token.BLOCK, lineno, column)
+        // The finally reads the iterator even when opening it threw, so it starts out undefined.
+        result.addChildToBack(Node(Token.EXPR_VOID, Node(Token.SETNAME, parser.createName(Token.BINDNAME, iteratorName, null), Node(Token.UNDEFINED))))
+        val settled = Node(Token.AWAIT, parser.destructureStep(Icode.DESTRUCTURE_ASYNC_RESULT, parser.createName(iteratorName)), lineno, column)
+        settled.putIntProp(Node.AWAIT_SETTLED_PROP, 1)
+        val closed = Node(Token.EXPR_VOID, parser.destructureStep(Icode.DESTRUCTURE_ASYNC_CLOSED, parser.createName(iteratorName), settled))
+        val close = createIf(parser.destructureStep(Icode.DESTRUCTURE_ASYNC_CLOSE, parser.createName(iteratorName)), closed, null, lineno, column)
+        val finallyBlock = Node(Token.BLOCK, lineno, column)
+        finallyBlock.addChildToBack(close)
+        result.addChildToBack(createTryCatchFinally(loop, Node(Token.BLOCK), finallyBlock, lineno, column))
+        return result
     }
 
     private fun transformForLoop(loop: ForLoop): Node {
@@ -1097,7 +1124,9 @@ public class IRFactory(
 
     private fun transformReturn(node: ReturnStatement): Node {
         val rv = node.returnValue
-        val value = if (rv == null) null else transform(rv)
+        var value = if (rv == null) null else transform(rv)
+        // An async generator awaits what it returns (ECMAScript 2018, 13.10.1).
+        if (value != null && inAsyncGenerator()) value = Node(Token.AWAIT, value, node.lineno, node.column)
         return if (rv == null) {
             Node(Token.RETURN, node.lineno, node.column)
         } else {
@@ -1351,10 +1380,15 @@ public class IRFactory(
     }
 
     private fun transformYield(node: Yield): Node {
-        val kid = node.value?.let { transform(it) }
+        var kid = node.value?.let { transform(it) }
+        // An async generator awaits what it yields, though not what `yield*` passes on
+        // (ECMAScript 2018, 27.6.3.8 AsyncGeneratorYield).
+        if (node.type == Token.YIELD && inAsyncGenerator()) kid = Node(Token.AWAIT, kid ?: Node(Token.UNDEFINED), node.lineno, node.column)
         if (kid != null) return Node(node.type, kid, node.lineno, node.column)
         return Node(node.type, node.lineno, node.column)
     }
+
+    private fun inAsyncGenerator(): Boolean = (parser.currentScriptOrFn as? FunctionNode)?.let { it.isAsync && it.isES6Generator } == true
 
     private fun transformSpread(node: Spread): Node {
         val kid = transform(node.expression!!)
@@ -1450,6 +1484,7 @@ public class IRFactory(
         ast: AstNode,
         isForEach: Boolean,
         isForOf: Boolean,
+        awaitIterator: String? = null,
     ): Node {
         astNodePos.push(ast)
         try {
@@ -1503,12 +1538,24 @@ public class IRFactory(
                 legacyKeyValue -> Token.ENUM_INIT_ARRAY
                 else -> Token.ENUM_INIT_KEYS
             }
-            val init = Node(initType, obj)
-            init.putProp(Node.LOCAL_BLOCK_PROP, localBlock)
-            val cond = Node(Token.ENUM_NEXT)
-            cond.putProp(Node.LOCAL_BLOCK_PROP, localBlock)
-            val id = Node(Token.ENUM_ID)
-            id.putProp(Node.LOCAL_BLOCK_PROP, localBlock)
+            val init: Node
+            val cond: Node
+            val id: Node
+            if (awaitIterator != null) {
+                // Each pass awaits what `next` answers (ECMAScript 2018, 14.7.5.7).
+                val open = parser.destructureStep(Icode.DESTRUCTURE_ASYNC_OPEN, obj)
+                init = Node(Token.EXPR_VOID, Node(Token.SETNAME, parser.createName(Token.BINDNAME, awaitIterator, null), open))
+                val next = Node(Token.AWAIT, parser.destructureStep(Icode.DESTRUCTURE_ASYNC_NEXT, parser.createName(awaitIterator)), loop.lineno, loop.column)
+                cond = parser.destructureStep(Icode.DESTRUCTURE_ASYNC_STEP, parser.createName(awaitIterator), next)
+                id = parser.destructureStep(Icode.DESTRUCTURE_ASYNC_VALUE, parser.createName(awaitIterator))
+            } else {
+                init = Node(initType, obj)
+                init.putProp(Node.LOCAL_BLOCK_PROP, localBlock)
+                cond = Node(Token.ENUM_NEXT)
+                cond.putProp(Node.LOCAL_BLOCK_PROP, localBlock)
+                id = Node(Token.ENUM_ID)
+                id.putProp(Node.LOCAL_BLOCK_PROP, localBlock)
+            }
 
             val newBody = iterationScope ?: Node(Token.BLOCK)
             val assign: Node
@@ -1545,6 +1592,7 @@ public class IRFactory(
             val builtLoop = createLoop(loop as Jump, LOOP_WHILE, newBody, cond, null, null)
             builtLoop.addChildToFront(init)
             if (type == Token.VAR || type == Token.LET) builtLoop.addChildToFront(lhs)
+            if (awaitIterator != null) return builtLoop
             localBlock.addChildToBack(builtLoop)
 
             return localBlock

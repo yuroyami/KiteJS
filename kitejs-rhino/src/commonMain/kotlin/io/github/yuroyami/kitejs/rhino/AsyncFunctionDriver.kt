@@ -21,6 +21,9 @@ internal class AsyncFunctionDriver(
     /** What an `await` suspends the body with: the operand to wait for. */
     internal class AwaitRequest(val value: Any?)
 
+    /** What a settled await (Icode_AWAIT_SETTLED) resumes with when its operand rejected. */
+    internal class Rejection(val reason: Any?)
+
     /** The promise the call returns. */
     val promise: NativePromise = NativePromise.newIntrinsic(cx, scope)
 

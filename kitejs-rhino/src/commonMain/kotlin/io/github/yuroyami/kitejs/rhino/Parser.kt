@@ -1067,8 +1067,6 @@ public class Parser(
         // name either.
         if (isGenerator || isGeneratorMethod) {
             fnNode.isES6Generator = true
-            // Async generators are ECMAScript 2018 and follow on their own (D-97).
-            if (isAsync) reportError("msg.async.generator.unsupported")
         }
         if (lpPos != -1) fnNode.lp = lpPos - functionSourceStart
         fnNode.parametersSourceStart = lpPos
@@ -1904,6 +1902,7 @@ public class Parser(
         var isForEach = false
         var isForIn = false
         var isForOf = false
+        var isForAwait = false
         var eachPos = -1
         var inPos = -1
         var lp = -1
@@ -1918,7 +1917,10 @@ public class Parser(
         try {
             // See whether this is a "for each ()" rather than just a "for ()".
             if (matchToken(Token.NAME, true)) {
-                if ("each" == ts.string) {
+                if ("await" == ts.string && !ts.identifierEscaped && awaitContext == AWAIT_OPERATOR) {
+                    // `for await` belongs to async functions and async generators (ECMAScript 2018, 14.7.5).
+                    isForAwait = true
+                } else if ("each" == ts.string) {
                     isForEach = true
                     eachPos = ts.tokenBeg - forPos
                 } else {
@@ -1978,6 +1980,7 @@ public class Parser(
                 }
             }
 
+            if (isForAwait && !isForOf) reportError("msg.for.await.of")
             if (mustMatchToken(Token.RP, "msg.no.paren.for.ctrl", true)) rp = ts.tokenBeg - forPos
 
             if (isForIn || isForOf) {
@@ -2012,6 +2015,7 @@ public class Parser(
                 fis.isForEach = isForEach
                 fis.eachPosition = eachPos
                 fis.isForOf = isForOf
+                fis.isForAwait = isForAwait
                 pn = fis
             } else {
                 val fl = ForLoop(forPos)
@@ -5806,14 +5810,14 @@ public class Parser(
     }
 
     /** A temporary the lowering of a pattern keeps a value in, declared so strict code can use it. */
-    private fun newDestructuringTemp(): String {
+    internal fun newDestructuringTemp(): String {
         val name = currentScriptOrFn!!.getNextTempName()
         defineSymbol(Token.LET, name, true)
         return name
     }
 
     /** One step of a pattern for the interpreter to run (Icode.DESTRUCTURE_OPEN and so on). */
-    private fun destructureStep(step: Int, vararg operands: Node): Node {
+    internal fun destructureStep(step: Int, vararg operands: Node): Node {
         val node = Node(Icode.Icode_DESTRUCTURE)
         for (operand in operands) node.addChildToBack(operand)
         node.putIntProp(Node.DESTRUCTURE_PROP, step)

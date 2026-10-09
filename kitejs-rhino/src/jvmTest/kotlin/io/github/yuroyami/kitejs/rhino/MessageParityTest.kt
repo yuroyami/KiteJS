@@ -42,11 +42,11 @@ class MessageParityTest {
         // Const declarations need an initializer, except in for-in and for-of heads.
         "msg.const.no.init",
         // D-97: async functions.
-        "msg.async.decl.not.in.block", "msg.async.generator.unsupported", "msg.async.yield", "msg.await.params",
+        "msg.async.decl.not.in.block", "msg.async.yield", "msg.await.params",
         // Rest elements and the iterator protocol of patterns (#81, #96).
         "msg.rest.not.last", "msg.iterator.result.not.object", "msg.destruct.not.coercible",
         "msg.weakref.target", "msg.finalization.callback", "msg.finalization.target", "msg.finalization.same",
-        "msg.finalization.token",
+        "msg.finalization.token", "msg.for.await.of", "msg.iterator.no.throw",
     )
 
     private fun portedKeys(): List<String> {

@@ -864,7 +864,9 @@ public open class Node : Iterable<Node> {
         internal const val FUNCTION_BODY_START_PROP: Int = 43
         /** The step of an Icode_DESTRUCTURE node. */
         internal const val DESTRUCTURE_PROP: Int = 44
-        public const val LAST_PROP: Int = DESTRUCTURE_PROP
+        // An await that resumes with a rejection as a value instead of throwing it.
+        internal const val AWAIT_SETTLED_PROP: Int = 45
+        public const val LAST_PROP: Int = AWAIT_SETTLED_PROP
 
         internal const val CLASS_HAS_HERITAGE: Int = 1
         internal const val CLASS_HAS_BINDING: Int = 2
@@ -971,6 +973,7 @@ public open class Node : Iterable<Node> {
             INITIALIZE_PARAMETER_PROP -> "initialize_parameter"
             FUNCTION_BODY_START_PROP -> "function_body_start"
             DESTRUCTURE_PROP -> "destructure"
+            AWAIT_SETTLED_PROP -> "await_settled"
             else -> throw Kit.codeBug()
         }
 

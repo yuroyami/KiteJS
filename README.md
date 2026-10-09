@@ -33,9 +33,9 @@ and the errors behave the same on both.
 generation at runtime, and the parser, the regular expressions, the date arithmetic and the
 number formatting are all computed inside the engine. It runs ES5.1 and most of ES2015 and later:
 `let` and `const`, arrow functions, destructuring, classes with private and static members,
-`Symbol`, `Map`, `Set`, generators, `Promise`, async functions, `Proxy`, `Reflect`, `BigInt`, typed
-arrays, optional chaining and the full regular expression syntax. It does not run modules, async
-generators or `for await`.
+`Symbol`, `Map`, `Set`, generators, `Promise`, async functions, async generators and `for await`,
+`Proxy`, `Reflect`, `BigInt`, typed arrays, optional chaining and the full regular expression
+syntax. It does not run modules.
 
 **QuickJS** is QuickJS-ng 0.17.0, the C engine, compiled in: a static library on Kotlin/Native, a
 JNI library inside the jar and the AAR, and a WebAssembly module on JavaScript and Wasm. It runs

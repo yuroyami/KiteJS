@@ -178,8 +178,11 @@ internal abstract class Icode {
         const val Icode_DESTRUCTURE = Icode_CREATE_ITERATION_SCOPE - 1
         // Closes the iterator of the for-of loop in the local block register, on a jump out of it.
         const val Icode_ENUM_CLOSE = Icode_DESTRUCTURE - 1
+        // An await whose rejection resumes the body with an AsyncFunctionDriver.Rejection, so the
+        // close of a `for await` loop after a throw can ignore it.
+        const val Icode_AWAIT_SETTLED = Icode_ENUM_CLOSE - 1
 
-        const val MIN_ICODE = Icode_ENUM_CLOSE
+        const val MIN_ICODE = Icode_AWAIT_SETTLED
 
         // The steps of Icode_DESTRUCTURE.
         const val DESTRUCTURE_OPEN = 0
@@ -189,6 +192,15 @@ internal abstract class Icode {
         const val DESTRUCTURE_COERCIBLE = 4
         const val DESTRUCTURE_KEY = 5
         const val DESTRUCTURE_COPY_REST = 6
+
+        // The steps of a `for await` loop.
+        const val DESTRUCTURE_ASYNC_OPEN = 7
+        const val DESTRUCTURE_ASYNC_NEXT = 8
+        const val DESTRUCTURE_ASYNC_STEP = 9
+        const val DESTRUCTURE_ASYNC_VALUE = 10
+        const val DESTRUCTURE_ASYNC_CLOSE = 11
+        const val DESTRUCTURE_ASYNC_RESULT = 12
+        const val DESTRUCTURE_ASYNC_CLOSED = 13
 
         // The operand byte of CLASS_ELEMENT: the kind of element in the low bits, then flags.
         const val CLASS_ELEMENT_METHOD = 0
@@ -327,6 +339,7 @@ internal abstract class Icode {
             Icode_LOCAL_STORE -> "LOCAL_STORE"
             Icode_CREATE_ITERATION_SCOPE -> "CREATE_ITERATION_SCOPE"
             Icode_DESTRUCTURE -> "DESTRUCTURE"
+            Icode_AWAIT_SETTLED -> "AWAIT_SETTLED"
             Icode_ENUM_CLOSE -> "ENUM_CLOSE"
                 // An icode with no name.
                 else -> throw IllegalStateException(bytecode.toString())
