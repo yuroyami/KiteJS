@@ -77,6 +77,12 @@ class IRFactoryOracleTest {
                 OptionalChainOracleExpectations.assertStructure(IRFactory(env, "corpus.js", source, env.errorReporter).transformTree(ast)!!)
                 continue
             }
+            if (file.name == "destructuring.js" && portedVersion >= Context.VERSION_ES6) {
+                // Patterns iterate and check their value (#81, #96); DestructuringIteratorTest
+                // checks them against fixed Node results.
+                assertTrue(expected.getOrThrow() != actual.getOrThrow())
+                continue
+            }
             if (expected.getOrThrow() != actual.getOrThrow()) {
                 failures.add(
                     "${file.name}: IR " +
@@ -149,7 +155,11 @@ class IRFactoryOracleTest {
                 append("regexps=").append(ktree.regexpCount).append('\n')
                 append("templates=").append(ktree.templateLiteralCount).append('\n')
             }
-            if (expected != actual) {
+            if (file.name == "destructuring.js") {
+                // The iterator lowering of patterns keeps more temporaries (#81, #96).
+                assertEquals(expected.substringBefore("symbols="), actual.substringBefore("symbols="))
+                assertEquals(expected.substringAfter('\n' + "regexps="), actual.substringAfter('\n' + "regexps="))
+            } else if (expected != actual) {
                 failures.add("${file.name}:\n  upstream: $expected\n  ported:   $actual")
             }
         }

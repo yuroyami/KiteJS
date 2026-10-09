@@ -24,6 +24,16 @@ public open class NodeTransformer {
     private var loopEnds: ArrayDeque<Node> = ArrayDeque()
     private var hasFinally = false
 
+    /** For a for-of loop, a node that closes its iterator on a jump out of it (#83); null for anything else. */
+    private fun forOfClose(loop: Node): Node? {
+        if (loop.type != Token.LOOP) return null
+        // A for-of loop starts with the ENUM_INIT_VALUES_IN_ORDER that opens its iterator.
+        var child = loop.firstChild
+        while (child != null && child.type != Token.ENUM_INIT_VALUES_IN_ORDER) child = child.next
+        val block = child?.getProp(Node.LOCAL_BLOCK_PROP) ?: return null
+        return Node(Icode.Icode_ENUM_CLOSE).also { it.putProp(Node.LOCAL_BLOCK_PROP, block) }
+    }
+
     public fun transform(tree: ScriptNode, env: CompilerEnvirons) {
         transform(tree, false, env)
     }
@@ -106,6 +116,8 @@ public open class NodeTransformer {
                 Token.LABEL, Token.SWITCH, Token.LOOP -> {
                     loops.addFirst(n)
                     loopEnds.addFirst((n as Jump).target!!)
+                    // A return out of a for-of loop closes its iterator, as a finally block runs.
+                    if (forOfClose(n) != null) hasFinally = true
                 }
 
                 Token.WITH -> {
@@ -151,9 +163,12 @@ public open class NodeTransformer {
                         // Walk from the top of the stack, most recently pushed first.
                         for (loopNode in loops) {
                             val elemtype = loopNode.type
-                            if (elemtype == Token.TRY || elemtype == Token.WITH) {
+                            val close = forOfClose(loopNode)
+                            if (elemtype == Token.TRY || elemtype == Token.WITH || close != null) {
                                 val unwind: Node
-                                if (elemtype == Token.TRY) {
+                                if (close != null) {
+                                    unwind = close
+                                } else if (elemtype == Token.TRY) {
                                     val jsrnode = Jump(Token.JSR)
                                     jsrnode.target = (loopNode as Jump).finallyTarget
                                     unwind = jsrnode
@@ -211,11 +226,16 @@ public open class NodeTransformer {
                     // Walk from the top of the stack, most recently pushed first.
                     for (loopNode in loops) {
                         if (loopNode === jumpStatement) {
+                            // A break leaves the loop it names; a continue stays in it.
+                            if (type == Token.BREAK) forOfClose(loopNode)?.let { previous = addBeforeCurrent(parent, previous, n, it) }
                             break
                         }
 
                         val elemtype = loopNode.type
-                        if (elemtype == Token.WITH) {
+                        val close = forOfClose(loopNode)
+                        if (close != null) {
+                            previous = addBeforeCurrent(parent, previous, n, close)
+                        } else if (elemtype == Token.WITH) {
                             val leave = Node(Token.LEAVEWITH)
                             previous = addBeforeCurrent(parent, previous, n, leave)
                         } else if (elemtype == Token.TRY) {

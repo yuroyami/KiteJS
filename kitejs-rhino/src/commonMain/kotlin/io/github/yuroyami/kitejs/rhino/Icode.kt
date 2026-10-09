@@ -173,8 +173,22 @@ internal abstract class Icode {
         const val Icode_ANNEX_B_COPY = Icode_INIT_BLOCK_FUNCTION - 1
         const val Icode_LOCAL_STORE = Icode_ANNEX_B_COPY - 1
         const val Icode_CREATE_ITERATION_SCOPE = Icode_LOCAL_STORE - 1
+        // A step of a destructuring pattern on the operands below it; the next byte names the
+        // step (DESTRUCTURE_OPEN and so on) and the one after it the operand count.
+        const val Icode_DESTRUCTURE = Icode_CREATE_ITERATION_SCOPE - 1
+        // Closes the iterator of the for-of loop in the local block register, on a jump out of it.
+        const val Icode_ENUM_CLOSE = Icode_DESTRUCTURE - 1
 
-        const val MIN_ICODE = Icode_CREATE_ITERATION_SCOPE
+        const val MIN_ICODE = Icode_ENUM_CLOSE
+
+        // The steps of Icode_DESTRUCTURE.
+        const val DESTRUCTURE_OPEN = 0
+        const val DESTRUCTURE_STEP = 1
+        const val DESTRUCTURE_REST = 2
+        const val DESTRUCTURE_CLOSE = 3
+        const val DESTRUCTURE_COERCIBLE = 4
+        const val DESTRUCTURE_KEY = 5
+        const val DESTRUCTURE_COPY_REST = 6
 
         // The operand byte of CLASS_ELEMENT: the kind of element in the low bits, then flags.
         const val CLASS_ELEMENT_METHOD = 0
@@ -312,6 +326,8 @@ internal abstract class Icode {
             Icode_ANNEX_B_COPY -> "ANNEX_B_COPY"
             Icode_LOCAL_STORE -> "LOCAL_STORE"
             Icode_CREATE_ITERATION_SCOPE -> "CREATE_ITERATION_SCOPE"
+            Icode_DESTRUCTURE -> "DESTRUCTURE"
+            Icode_ENUM_CLOSE -> "ENUM_CLOSE"
                 // An icode with no name.
                 else -> throw IllegalStateException(bytecode.toString())
             }

@@ -18,25 +18,26 @@ These are syntax errors. A script using any of them will not even parse.
 | `import` and `export` | Nothing. Concatenate the sources, or bind a loader function yourself |
 | `for await (... of ...)` | A plain `for` loop that awaits each promise in an async function |
 | `async function*`, `async *m() {}` | An async function that returns an array, or a generator of promises |
-| `var [a, ...rest] = list` | `var a = list[0], rest = list.slice(1)` |
-| `var { a, ...rest } = obj` | `var a = obj.a, rest = Object.assign({}, obj); delete rest.a` |
-| `var { [key]: v } = obj` | `var v = obj[key]` |
 | `return` outside a function | Wrap the script in a function and call it |
 | The regular expression flags `d` and `v` | Read `exec` results for positions; use `u` for Unicode |
 
-Spread works in an array literal, an object literal and an argument list. It is destructuring
-with a rest element that the parser does not take.
+Spread and rest work in an array literal, an object literal, an argument list and a
+destructuring pattern.
 
 ```js
-[...set]              // fine
-({ ...defaults })     // fine
-Math.max(...numbers)  // fine
-new Date(...parts)    // fine
-var [a, ...rest] = xs // syntax error, use xs[0] and xs.slice(1)
+[...set]                  // fine
+({ ...defaults })         // fine
+Math.max(...numbers)      // fine
+var [first, ...rest] = xs // fine
+var { id, ...fields } = o // fine
 ```
 
-Spreading a value with no iterator, such as `[...5]` or `f(...null)`, throws a `TypeError`, as it
-does in a browser.
+An array pattern goes through the iterator of its value, as in a browser, so `var [a] = new Set([1])`
+gives `1`. When a pattern or a `for-of` loop stops before the iterator runs out, it calls the
+iterator's `return` method, so the `finally` blocks of a generator run.
+
+Spreading or destructuring a value with no iterator, such as `[...5]`, `f(...null)` or
+`var [a] = {}`, throws a `TypeError`, as it does in a browser.
 
 ## Globals that are not there
 
@@ -186,8 +187,8 @@ that:
 The rest of ES5.1 and most of ES2015 and later is there and tested: `let`, `const` (also in a
 `for` head, as in `for (const x of xs)`, with a fresh binding on every pass), classes (with
 `extends`, `super`, `new.target`, public and private fields, private methods and accessors,
-`#x in obj`, static fields and static blocks), arrow functions, template literals and tagged templates, destructuring in declarations and parameters,
-default and rest parameters, computed keys, getters and setters in object literals, generators
+`#x in obj`, static fields and static blocks), arrow functions, template literals and tagged templates, destructuring in declarations, assignments and parameters
+(with rest elements and rest properties), default and rest parameters, computed keys, getters and setters in object literals, generators
 and `yield*`, `Symbol` and every well-known symbol, `Map`, `Set`, `WeakMap`, `WeakSet`,
 `Promise`, `Proxy`, `Reflect`, `BigInt`, typed arrays and `DataView`, optional chaining, nullish
 coalescing and the logical assignment operators, numeric separators, `**`, and the full regular

@@ -28,6 +28,8 @@ internal class InterpreterData<T : ScriptOrFn<T>>(
     val asmModule: io.github.yuroyami.kitejs.rhino.asm.AsmModule?,
     /** ENTERWITH instruction offsets belonging to declarative lexical environments. */
     val lexicalScopePcs: Set<Int>,
+    /** Whether the code opens iterators that a throw must close: an array pattern or a for-of loop. */
+    val opensIterators: Boolean,
 ) : JSCode<T>() {
 
     private var icodeHashCode = 0
@@ -78,6 +80,7 @@ internal class InterpreterData<T : ScriptOrFn<T>>(
         var firstLinePC = -1
         var asmModule: io.github.yuroyami.kitejs.rhino.asm.AsmModule? = null
         val lexicalScopePcs: MutableSet<Int> = mutableSetOf()
+        var opensIterators = false
 
         override fun build(): JSCode<T> {
             var b = built
@@ -86,7 +89,7 @@ internal class InterpreterData<T : ScriptOrFn<T>>(
                     itsStringTable, itsDoubleTable, itsBigIntTable, itsNestedFunctions, itsRegExpLiterals,
                     itsTemplateLiterals, itsICode, itsExceptionTable, itsMaxVars, itsMaxLocals, itsMaxStack,
                     itsMaxFrameArray, itsMaxCalleeArgs, literalIds, longJumps?.toMap(), firstLinePC,
-                    asmModule, lexicalScopePcs.toSet(),
+                    asmModule, lexicalScopePcs.toSet(), opensIterators,
                 )
                 built = b
             }

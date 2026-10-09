@@ -5764,10 +5764,8 @@ public class Parser(
         result.addChildToBack(comma)
         val destructuringNames = mutableListOf<String>()
         var empty = true
-        var iteratorName: String? = null
-        var lastResultName: String? = null
         if (left is ArrayLiteral) {
-            val arrayResult =
+            empty =
                 destructuringArray(
                     left,
                     variableType,
@@ -5778,9 +5776,6 @@ public class Parser(
                     transformer,
                     isFunctionParameter,
                 )
-            empty = arrayResult.empty
-            iteratorName = arrayResult.iteratorName
-            lastResultName = arrayResult.lastResultName
         } else if (left is ObjectLiteral) {
             empty =
                 destructuringObject(
@@ -5806,55 +5801,31 @@ public class Parser(
             comma.addChildToBack(createNumber(0.0))
         }
 
-        // Close the iterator in the comma sequence when one was opened. This generates
-        // !lastResult.done ? ((f = iterator.return) !== undefined ? f.call(iterator) : undefined)
-        //                  : undefined
-        if (isFunctionParameter && iteratorName != null && lastResultName != null) {
-            // Allocate a temp for the return method.
-            val returnMethodName = currentScriptOrFn!!.getNextTempName()
-            defineSymbol(Token.LET, returnMethodName, true)
-
-            // Check whether the iterator is done: !lastResult.done
-            val getDone = Node(Token.GETPROP, createName(lastResultName), Node.newString("done"))
-            val notDone = Node(Token.NOT, getDone)
-
-            // Get iterator.return and store it: f = iterator.return
-            val getReturn =
-                Node(Token.GETPROP, createName(iteratorName), Node.newString("return"))
-            val assignReturn =
-                Node(
-                    Token.SETNAME,
-                    createName(Token.BINDNAME, returnMethodName, null),
-                    getReturn,
-                )
-
-            // Check that the return method exists: (f = iterator.return) !== undefined
-            val notUndefined = Node(Token.NE, assignReturn, Node(Token.UNDEFINED))
-
-            // Call the return method: f.call(iterator)
-            val getCall =
-                Node(Token.GETPROP, createName(returnMethodName), Node.newString("call"))
-            val callReturn = Node(Token.CALL, getCall)
-            callReturn.addChildToBack(createName(iteratorName)) // the 'this' argument
-
-            val innerTernary =
-                Node(Token.HOOK, notUndefined, callReturn, Node(Token.UNDEFINED))
-
-            val outerTernary = Node(Token.HOOK, notDone, innerTernary, Node(Token.UNDEFINED))
-
-            comma.addChildToBack(outerTernary)
-        }
-
         result.putProp(Node.DESTRUCTURING_NAMES, destructuringNames)
         return result
     }
 
-    private class DestructuringArrayResult(
-        val empty: Boolean,
-        val iteratorName: String?,
-        val lastResultName: String?,
-    )
+    /** A temporary the lowering of a pattern keeps a value in, declared so strict code can use it. */
+    private fun newDestructuringTemp(): String {
+        val name = currentScriptOrFn!!.getNextTempName()
+        defineSymbol(Token.LET, name, true)
+        return name
+    }
 
+    /** One step of a pattern for the interpreter to run (Icode.DESTRUCTURE_OPEN and so on). */
+    private fun destructureStep(step: Int, vararg operands: Node): Node {
+        val node = Node(Icode.Icode_DESTRUCTURE)
+        for (operand in operands) node.addChildToBack(operand)
+        node.putIntProp(Node.DESTRUCTURE_PROP, step)
+        return node
+    }
+
+    /**
+     * Lowers an array pattern. From ECMAScript 2015 on it goes through the value's iterator
+     * (12.14.5.2, 13.3.3.5): each element takes the next value, a rest element takes the rest in
+     * a new array, and the iterator is closed at the end unless it ran out (#81, #83, #96).
+     * Older language versions read the elements by index.
+     */
     private fun destructuringArray(
         array: ArrayLiteral,
         variableType: Int,
@@ -5864,134 +5835,112 @@ public class Parser(
         defaultValue: AstNode?,
         transformer: Transformer?,
         isFunctionParameter: Boolean,
-    ): DestructuringArrayResult {
-        var empty = true
+    ): Boolean {
         val setOp = if (variableType == Token.CONST) Token.SETCONST else Token.SETNAME
-        var index = 0
-        var defaultValuesSetup = false
-        var iteratorSetup = false
-        var iteratorName: String? = null
-        var lastResultName: String? = null
-
-        for (element in array.elements) {
-            val n = patternTarget(element, variableType)
-            if (n.type == Token.EMPTY) {
-                index++
-                continue
-            }
-
-            val rightElem: Node
-
-            if (defaultValue != null && !defaultValuesSetup) {
-                setupDefaultValues(tempName, parent, defaultValue, setOp, transformer)
-                defaultValuesSetup = true
-            }
-
-            // Set up the iterator for function parameters, after the default value is applied.
-            // Only ES6+ uses the iterator protocol; older versions use index-based access.
-            if (isFunctionParameter &&
-                !iteratorSetup &&
-                compilerEnv.languageVersion >= Context.VERSION_ES6
-            ) {
-                // Allocate temp names for iterator tracking.
-                iteratorName = currentScriptOrFn!!.getNextTempName()
-                lastResultName = currentScriptOrFn!!.getNextTempName()
-                // Define the iterator temps, needed for strict mode.
-                defineSymbol(Token.LET, iteratorName, true)
-                defineSymbol(Token.LET, lastResultName, true)
-
-                // Generate iterator = tempName[Symbol.iterator]() as pure AST:
-                // CALL(GETELEM(tempName, GETPROP(NAME("Symbol"), "iterator")))
-                val symbolName = createName("Symbol")
-                val getIteratorProp = Node(Token.GETPROP, symbolName, Node.newString("iterator"))
-                val getIteratorMethod = Node(Token.GETELEM, createName(tempName))
-                getIteratorMethod.addChildToBack(getIteratorProp)
-                val callIterator = Node(Token.CALL, getIteratorMethod)
-                val iteratorAssign =
-                    Node(
-                        Token.SETNAME,
-                        createName(Token.BINDNAME, iteratorName, null),
-                        callIterator,
-                    )
-                parent.addChildToBack(iteratorAssign)
-                iteratorSetup = true
-                empty = false
-            }
-
-            // Generate the code that fetches the element.
-            if (isFunctionParameter && iteratorName != null) {
-                // ES6+: call iterator.next() and keep the whole result to check done later.
-                val getNextProp =
-                    Node(Token.GETPROP, createName(iteratorName), Node.newString("next"))
-                val callNext = Node(Token.CALL, getNextProp)
-                val storeResult =
-                    Node(
-                        Token.SETNAME,
-                        createName(Token.BINDNAME, lastResultName!!, null),
-                        callNext,
-                    )
-                parent.addChildToBack(storeResult)
-                // Extract .value from the result.
-                val elemTempName = currentScriptOrFn!!.getNextTempName()
-                // Define the element temp, needed for strict mode.
-                defineSymbol(Token.LET, elemTempName, true)
-                val getValue =
-                    Node(Token.GETPROP, createName(lastResultName), Node.newString("value"))
-                val storeElem =
-                    Node(
-                        Token.SETNAME,
-                        createName(Token.BINDNAME, elemTempName, null),
-                        getValue,
-                    )
-                parent.addChildToBack(storeElem)
-                // Use the temp for element access.
-                rightElem = createName(elemTempName)
-                empty = false
-            } else {
-                // Regular index-based access for var, let and const.
-                rightElem = Node(Token.GETELEM, createName(tempName), createNumber(index.toDouble()))
-            }
-
-            if (n.type == Token.NAME) {
-                // [x] = [1]
-                val name = n.string!!
-                parent.addChildToBack(
-                    Node(setOp, createName(Token.BINDNAME, name, null), rightElem),
-                )
-                if (variableType != -1) {
-                    defineSymbol(variableType, name, true)
-                    destructuringNames.add(name)
-                }
-            } else if (n.type == Token.ASSIGN) {
-                // [x = 1] = [2]
-                processDestructuringDefaults(
-                    variableType,
-                    parent,
-                    destructuringNames,
-                    n as Assignment,
-                    rightElem,
-                    setOp,
-                    transformer,
-                    isFunctionParameter,
-                )
-            } else {
-                parent.addChildToBack(
-                    destructuringAssignmentHelper(
-                        variableType,
-                        n,
-                        rightElem,
-                        currentScriptOrFn!!.getNextTempName(),
-                        null,
-                        transformer,
-                        isFunctionParameter,
-                    ),
-                )
-            }
-            index++
-            empty = false
+        if (defaultValue != null) setupDefaultValues(tempName, parent, defaultValue, setOp, transformer)
+        if (compilerEnv.languageVersion < Context.VERSION_ES6) {
+            return destructuringArrayByIndex(array, variableType, tempName, parent, destructuringNames, transformer, isFunctionParameter) && defaultValue == null
         }
 
-        return DestructuringArrayResult(empty, iteratorName, lastResultName)
+        val iteratorName = newDestructuringTemp()
+        parent.addChildToBack(
+            Node(Token.SETNAME, createName(Token.BINDNAME, iteratorName, null), destructureStep(Icode.DESTRUCTURE_OPEN, createName(tempName))),
+        )
+        val elements = array.elements
+        for ((index, element) in elements.withIndex()) {
+            if (element.type == Token.EMPTY) {
+                parent.addChildToBack(destructureStep(Icode.DESTRUCTURE_STEP, createName(iteratorName)))
+                continue
+            }
+            if (element is Spread) {
+                // [a, ...rest]: last, with no trailing comma and no initializer.
+                if (index != elements.size - 1 || array.destructuringLength > elements.size) reportError("msg.rest.not.last")
+                val target = patternTarget(element.expression!!, variableType)
+                if (target.type == Token.ASSIGN) reportError("msg.bad.assign.left")
+                assignPatternTarget(
+                    variableType, parent, destructuringNames, target,
+                    destructureStep(Icode.DESTRUCTURE_REST, createName(iteratorName)), setOp, transformer, isFunctionParameter,
+                )
+                continue
+            }
+            val n = patternTarget(element, variableType)
+            if (n.type == Token.ASSIGN) {
+                // The default tests the value and may stand in for it, so the value is read once into a temporary.
+                val elemTempName = newDestructuringTemp()
+                parent.addChildToBack(
+                    Node(Token.SETNAME, createName(Token.BINDNAME, elemTempName, null), destructureStep(Icode.DESTRUCTURE_STEP, createName(iteratorName))),
+                )
+                processDestructuringDefaults(variableType, parent, destructuringNames, n as Assignment, elemTempName, setOp, transformer, isFunctionParameter)
+            } else {
+                assignPatternTarget(
+                    variableType, parent, destructuringNames, n,
+                    destructureStep(Icode.DESTRUCTURE_STEP, createName(iteratorName)), setOp, transformer, isFunctionParameter,
+                )
+            }
+        }
+        parent.addChildToBack(destructureStep(Icode.DESTRUCTURE_CLOSE, createName(iteratorName)))
+        return false
+    }
+
+    /** The lowering of an array pattern before ECMAScript 2015: each element reads its index. */
+    private fun destructuringArrayByIndex(
+        array: ArrayLiteral,
+        variableType: Int,
+        tempName: String,
+        parent: Node,
+        destructuringNames: MutableList<String>,
+        transformer: Transformer?,
+        isFunctionParameter: Boolean,
+    ): Boolean {
+        var empty = true
+        val setOp = if (variableType == Token.CONST) Token.SETCONST else Token.SETNAME
+        for ((index, element) in array.elements.withIndex()) {
+            val n = patternTarget(element, variableType)
+            if (n.type == Token.EMPTY) continue
+            val rightElem = Node(Token.GETELEM, createName(tempName), createNumber(index.toDouble()))
+            if (n.type == Token.ASSIGN) {
+                val elemTempName = newDestructuringTemp()
+                parent.addChildToBack(Node(Token.SETNAME, createName(Token.BINDNAME, elemTempName, null), rightElem))
+                processDestructuringDefaults(variableType, parent, destructuringNames, n as Assignment, elemTempName, setOp, transformer, isFunctionParameter)
+            } else {
+                assignPatternTarget(variableType, parent, destructuringNames, n, rightElem, setOp, transformer, isFunctionParameter)
+            }
+            empty = false
+        }
+        return empty
+    }
+
+    /** Assigns [value] to one target of a pattern: a name, a nested pattern, or in an assignment a property. */
+    private fun assignPatternTarget(
+        variableType: Int,
+        parent: Node,
+        destructuringNames: MutableList<String>,
+        target: Node,
+        value: Node,
+        setOp: Int,
+        transformer: Transformer?,
+        isFunctionParameter: Boolean,
+    ) {
+        if (target.type == Token.NAME) {
+            val name = target.string!!
+            parent.addChildToBack(Node(setOp, createName(Token.BINDNAME, name, null), value))
+            if (variableType != -1) {
+                defineSymbol(variableType, name, true)
+                destructuringNames.add(name)
+            }
+        } else {
+            parent.addChildToBack(
+                destructuringAssignmentHelper(
+                    variableType,
+                    target,
+                    value,
+                    currentScriptOrFn!!.getNextTempName(),
+                    null,
+                    transformer,
+                    isFunctionParameter,
+                ),
+            )
+        }
     }
 
     /**
@@ -6026,12 +5975,13 @@ public class Parser(
         }
     }
 
+    /** An element or property with a default, [n], whose value [valueTempName] holds. */
     private fun processDestructuringDefaults(
         variableType: Int,
         parent: Node,
         destructuringNames: MutableList<String>,
         n: Assignment,
-        rightElem: Node,
+        valueTempName: String,
         setOp: Int,
         transformer: Transformer?,
         isFunctionParameter: Boolean,
@@ -6039,92 +5989,33 @@ public class Parser(
         val left: Node = patternTarget(n.left!!, variableType)
         // A parenthesized name is no IdentifierRef, so its default stays anonymous.
         val parenthesized = n.left is ParenthesizedExpression
-        val right: Node
-        if (left.type == Token.NAME) {
-            val name = left.string!!
-            // x = (x == undefined)
-            //         ? (($1[0] == undefined) ? 1 : $1[0])
-            //         : x
-            right = transformer?.transform(n.right!!) ?: n.right!!
-            // A default for a plain name names an anonymous function or class after it
-            // (ECMAScript 2015, 13.3.3.6); a deferred default is named when IRFactory transforms it.
-            val nameNode = if (parenthesized) null else Name((left as? AstNode)?.position ?: 0, name)
-            if (transformer != null && nameNode != null) inferNameIfMissing(nameNode, right, null)
-
-            val condInner =
-                Node(
-                    Token.HOOK,
-                    Node(
-                        Token.SHEQ,
-                        KeywordLiteral().apply { type = Token.UNDEFINED },
-                        rightElem,
-                    ),
-                    right,
-                    rightElem,
-                )
-
-            val cond =
-                Node(
-                    Token.HOOK,
-                    Node(
-                        Token.SHEQ,
-                        KeywordLiteral().apply { type = Token.UNDEFINED },
-                        createName(name),
-                    ),
-                    condInner,
-                    left,
-                )
-
-            // Store it so it can be transformed later.
-            if (transformer == null) {
-                currentScriptOrFn!!.putDestructuringRvalues(condInner, right, nameNode)
-            }
-
-            parent.addChildToBack(Node(setOp, createName(Token.BINDNAME, name, null), if (isFunctionParameter) condInner else cond))
-            if (variableType != -1) {
-                defineSymbol(variableType, name, true)
-                destructuringNames.add(name)
-            }
-        } else {
-            // Nested destructuring patterns with defaults, such as [[x, y, z] = [4, 5, 6]], and
-            // in an assignment a property with one, such as [o.x = 1] = [] (ECMAScript 2015,
-            // 12.14.5); upstream took patterns only.
-            if (left is ArrayLiteral || left is ObjectLiteral ||
-                (variableType == -1 && (left.type == Token.GETPROP || left.type == Token.GETELEM))
-            ) {
-                right = transformer?.transform(n.right!!) ?: n.right!!
-
-                val condDefault =
-                    Node(
-                        Token.HOOK,
-                        Node(
-                            Token.SHEQ,
-                            KeywordLiteral().apply { type = Token.UNDEFINED },
-                            rightElem,
-                        ),
-                        right,
-                        rightElem,
-                    )
-
-                if (transformer == null) {
-                    currentScriptOrFn!!.putDestructuringRvalues(condDefault, right)
-                }
-
-                parent.addChildToBack(
-                    destructuringAssignmentHelper(
-                        variableType,
-                        left,
-                        condDefault,
-                        currentScriptOrFn!!.getNextTempName(),
-                        null,
-                        transformer,
-                        isFunctionParameter,
-                    ),
-                )
-            } else {
-                reportError("msg.bad.assign.left")
-            }
+        if (left.type != Token.NAME && left !is ArrayLiteral && left !is ObjectLiteral &&
+            !(variableType == -1 && (left.type == Token.GETPROP || left.type == Token.GETELEM))
+        ) {
+            // In an assignment a property can take a default too, such as [o.x = 1] = []
+            // (ECMAScript 2015, 12.14.5); upstream took names and patterns only.
+            reportError("msg.bad.assign.left")
+            return
         }
+        // value === undefined ? default : value
+        val right = transformer?.transform(n.right!!) ?: n.right!!
+        val nameNode = if (left.type == Token.NAME && !parenthesized) Name((left as? AstNode)?.position ?: 0, left.string!!) else null
+        // A default for a plain name names an anonymous function or class after it
+        // (ECMAScript 2015, 13.3.3.6); a deferred default is named when IRFactory transforms it.
+        if (transformer != null && nameNode != null) inferNameIfMissing(nameNode, right, null)
+        val withDefault =
+            Node(
+                Token.HOOK,
+                Node(Token.SHEQ, KeywordLiteral().apply { type = Token.UNDEFINED }, createName(valueTempName)),
+                right,
+                createName(valueTempName),
+            )
+        // Store it so it can be transformed later.
+        if (transformer == null) {
+            if (nameNode != null) currentScriptOrFn!!.putDestructuringRvalues(withDefault, right, nameNode)
+            else currentScriptOrFn!!.putDestructuringRvalues(withDefault, right)
+        }
+        assignPatternTarget(variableType, parent, destructuringNames, left, withDefault, setOp, transformer, isFunctionParameter)
     }
 
     private fun setupDefaultValues(
@@ -6159,6 +6050,12 @@ public class Parser(
         }
     }
 
+    /**
+     * Lowers an object pattern. From ECMAScript 2015 on a value that is null or undefined throws
+     * first, even for an empty pattern (13.3.3.5); a computed key is evaluated once, in order; and
+     * a rest property copies the own enumerable properties that no key named (ECMAScript 2018,
+     * 13.3.3.6) (#81, #96).
+     */
     internal fun destructuringObject(
         node: ObjectLiteral,
         variableType: Int,
@@ -6171,12 +6068,31 @@ public class Parser(
     ): Boolean {
         var empty = true
         val setOp = if (variableType == Token.CONST) Token.SETCONST else Token.SETNAME
-        var defaultValuesSetup = false
+        if (defaultValue != null) {
+            setupDefaultValues(tempName, parent, defaultValue, setOp, transformer)
+            empty = false
+        }
+        if (compilerEnv.languageVersion >= Context.VERSION_ES6) {
+            parent.addChildToBack(destructureStep(Icode.DESTRUCTURE_COERCIBLE, createName(tempName)))
+            empty = false
+        }
+        // The keys named so far, for a rest property to leave out: a string, or the temporary holding a computed key.
+        val namedKeys = mutableListOf<Pair<String, Boolean>>()
 
-        for (abstractProp in node.elements) {
+        val elements = node.elements
+        for ((index, abstractProp) in elements.withIndex()) {
             if (abstractProp is SpreadObjectProperty) {
-                reportError("msg.no.object.rest")
-                return false
+                // {a, ...rest}: last, and the target is a name, or in an assignment a property.
+                if (index != elements.size - 1) reportError("msg.rest.not.last")
+                val target = patternTarget(abstractProp.spreadNode.expression!!, variableType)
+                if (target !is Name && !(variableType == -1 && (target.type == Token.GETPROP || target.type == Token.GETELEM))) {
+                    reportError("msg.bad.assign.left")
+                }
+                val copy = destructureStep(Icode.DESTRUCTURE_COPY_REST, createName(tempName))
+                for ((key, isTemp) in namedKeys) copy.addChildToBack(if (isTemp) createName(key) else Node.newString(key))
+                assignPatternTarget(variableType, parent, destructuringNames, target, copy, setOp, transformer, isFunctionParameter)
+                empty = false
+                continue
             }
             val prop = abstractProp as ObjectProperty
 
@@ -6201,6 +6117,7 @@ public class Parser(
                     createName(tempName),
                     Node.newString(id.identifier!!),
                 )
+                namedKeys.add(id.identifier!! to false)
             } else if (id is StringLiteral) {
                 // An element access, so that a key like "0" finds an index property; upstream's
                 // named access missed it.
@@ -6209,6 +6126,7 @@ public class Parser(
                     createName(tempName),
                     Node.newString(id.value!!),
                 )
+                namedKeys.add(id.value!! to false)
             } else if (id is NumberLiteral || id is BigIntLiteral) {
                 // The key is the number's string form, so `{ 1.5: a }` reads "1.5" and `{ 1n: a }`
                 // reads "1"; upstream cut the number to an int and had no case for a BigInt.
@@ -6218,52 +6136,31 @@ public class Parser(
                     createName(tempName),
                     Node.newString(key),
                 )
+                namedKeys.add(key to false)
             } else if (id is ComputedPropertyKey) {
-                reportError("msg.bad.computed.property.in.destruct")
-                return false
+                // { [k]: v }: the key is evaluated and converted once, before the value is read.
+                val keyTempName = newDestructuringTemp()
+                val keyExpr = id.expression!!
+                val key = transformer?.transform(keyExpr) ?: keyExpr
+                val toKey = destructureStep(Icode.DESTRUCTURE_KEY, key)
+                if (transformer == null) currentScriptOrFn!!.putDestructuringRvalues(toKey, key)
+                parent.addChildToBack(Node(Token.SETNAME, createName(Token.BINDNAME, keyTempName, null), toKey))
+                rightElem = Node(Token.GETELEM, createName(tempName), createName(keyTempName))
+                namedKeys.add(keyTempName to true)
             } else {
                 throw codeBug()
             }
 
             rightElem.setLineColumnNumber(lineno, column)
-            if (defaultValue != null && !defaultValuesSetup) {
-                setupDefaultValues(tempName, parent, defaultValue, setOp, transformer)
-                defaultValuesSetup = true
-            }
 
             val value = patternTarget(prop.value!!, variableType)
-            if (value.type == Token.NAME) {
-                val name = (value as Name).identifier!!
-                parent.addChildToBack(
-                    Node(setOp, createName(Token.BINDNAME, name, null), rightElem),
-                )
-                if (variableType != -1) {
-                    defineSymbol(variableType, name, true)
-                    destructuringNames.add(name)
-                }
-            } else if (value.type == Token.ASSIGN) {
-                processDestructuringDefaults(
-                    variableType,
-                    parent,
-                    destructuringNames,
-                    value as Assignment,
-                    rightElem,
-                    setOp,
-                    transformer,
-                    isFunctionParameter,
-                )
+            if (value.type == Token.ASSIGN) {
+                // The default tests the value and may stand in for it, so a getter runs once.
+                val valueTempName = newDestructuringTemp()
+                parent.addChildToBack(Node(Token.SETNAME, createName(Token.BINDNAME, valueTempName, null), rightElem))
+                processDestructuringDefaults(variableType, parent, destructuringNames, value as Assignment, valueTempName, setOp, transformer, isFunctionParameter)
             } else {
-                parent.addChildToBack(
-                    destructuringAssignmentHelper(
-                        variableType,
-                        value,
-                        rightElem,
-                        currentScriptOrFn!!.getNextTempName(),
-                        null,
-                        transformer,
-                        isFunctionParameter,
-                    ),
-                )
+                assignPatternTarget(variableType, parent, destructuringNames, value, rightElem, setOp, transformer, isFunctionParameter)
             }
             empty = false
         }

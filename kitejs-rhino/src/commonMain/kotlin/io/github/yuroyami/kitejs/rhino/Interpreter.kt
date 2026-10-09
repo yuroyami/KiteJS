@@ -14,6 +14,8 @@ import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_INIT_BLOCK_FUNCTION
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_ANNEX_B_COPY
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_LOCAL_STORE
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CREATE_ITERATION_SCOPE
+import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_DESTRUCTURE
+import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_ENUM_CLOSE
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_OPTIONAL_CALL_LOOKUP
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CALL_ON_SUPER
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CLOSURE_EXPR
@@ -220,6 +222,9 @@ public class Interpreter : Evaluator {
         /** The `this` binding of the derived class constructor this frame runs in, or null. */
         var thisBinding: ThisBinding? = null
 
+        /** The iterators open in array patterns and for-of loops, innermost last, which a throw closes (#83). */
+        val openIterators: ArrayList<OpenIterator>?
+
         val realm: Scriptable
 
         constructor(cx: Context, thisObj: Scriptable?, fnOrScript: ScriptOrFn<*>, code: InterpreterData<*>, parentFrame: CallFrame?, previousInterpreterFrame: CallFrame?, realm: Scriptable) {
@@ -247,6 +252,7 @@ public class Interpreter : Evaluator {
             this.previousInterpreterFrame = previousInterpreterFrame
             pcSourceLineStart = idata.firstLinePC
             savedStackTop = emptyStackTop
+            openIterators = if (code.opensIterators) ArrayList() else null
         }
 
         /** A copy of a frozen frame with its own stack, for resuming a generator. */
@@ -285,6 +291,7 @@ public class Interpreter : Evaluator {
             throwable = original.throwable
             newTarget = original.newTarget
             thisBinding = original.thisBinding
+            openIterators = original.openIterators
         }
 
         /** A copy that shares the stack arrays, to keep the parent chain right for stack traces. */
@@ -323,6 +330,7 @@ public class Interpreter : Evaluator {
             throwable = original.throwable
             newTarget = original.newTarget
             thisBinding = original.thisBinding
+            openIterators = original.openIterators
         }
 
         fun initializeArgs(cx: Context, callerScope: Scriptable, argsIn: Array<Any?>, argsDblIn: DoubleArray?, boundArgsIn: Array<Any?>?, argShiftIn: Int, argCount: Int, homeObject: Scriptable?) {
@@ -507,6 +515,101 @@ public class Interpreter : Evaluator {
             return best
         }
 
+        /**
+         * Closes the iterators that a throw leaves (ECMAScript 2015, 7.4.6): those opened inside the
+         * try block of [handler], or every one when no handler in [frame] catches it. What their
+         * `return` methods do is ignored, so the throw goes on. [dropOnly] forgets them unclosed,
+         * for a throwable no script may see.
+         */
+        private fun closeOpenIterators(cx: Context, frame: CallFrame, handler: Int, dropOnly: Boolean) {
+            val open = frame.openIterators ?: return
+            if (open.isEmpty()) return
+            val table = frame.idata.itsExceptionTable
+            val start = if (handler >= 0) table!![handler + EXCEPTION_TRY_START_SLOT] else Int.MIN_VALUE
+            val end = if (handler >= 0) table!![handler + EXCEPTION_TRY_END_SLOT] else Int.MAX_VALUE
+            for (i in open.indices.reversed()) {
+                val record = open[i]
+                if (record.openPc < start || record.openPc >= end) continue
+                open.removeAt(i)
+                if (!dropOnly) record.close(cx, frame.scope!!, quiet = true)
+            }
+        }
+
+        /** Starts a for-of loop: its enumeration, whose iterator the frame keeps open until the loop ends. */
+        private fun openForOf(cx: Context, frame: CallFrame, value: Any?): Any {
+            val enumeration = ScriptRuntime.enumInitIterator(value, cx, frame.scope!!, frame.pc - 1)
+            frame.openIterators!!.add(ScriptRuntime.enumIterator(enumeration)!!)
+            return enumeration
+        }
+
+        /** Whether a for-in or for-of loop goes on; a for-of loop that ran out forgets its iterator. */
+        private fun enumNext(cx: Context, frame: CallFrame, enumeration: Any?): Boolean {
+            val more = ScriptRuntime.enumNext(enumeration, cx)
+            if (!more) ScriptRuntime.enumIterator(enumeration)?.let { forget(frame, it) }
+            return more
+        }
+
+        /** What `this` evaluates to; the scriptable stand-in for undefined must not reach typeof as an object. */
+        private fun thisOf(frame: CallFrame): Any? =
+            frame.thisPrimitive ?: thisValue(frame).let { if (it === Undefined.SCRIPTABLE_UNDEFINED) Undefined.instance else it }
+
+        /** Forgets [record] once it is done or closed, which is almost always the innermost one. */
+        private fun forget(frame: CallFrame, record: OpenIterator) {
+            val open = frame.openIterators ?: return
+            val i = open.lastIndexOf(record)
+            if (i >= 0) open.removeAt(i)
+        }
+
+        /**
+         * One step of a destructuring pattern (ECMAScript 2015, 12.14.5 and 13.3.3; ECMAScript
+         * 2018, 13.3.3.6), on the [count] operands from `stack[first]` on.
+         */
+        private fun destructure(cx: Context, frame: CallFrame, step: Int, stack: Array<Any?>, first: Int, count: Int, pc: Int): Any? {
+            val scope = frame.scope!!
+            val operand = stack[first]
+            return when (step) {
+                Icode.DESTRUCTURE_OPEN -> OpenIterator.open(cx, scope, operand, pc).also { frame.openIterators!!.add(it) }
+                Icode.DESTRUCTURE_STEP -> {
+                    val record = operand as OpenIterator
+                    val value = record.step(cx, scope)
+                    if (value !== Scriptable.NOT_FOUND) return value
+                    forget(frame, record)
+                    Undefined.instance
+                }
+                Icode.DESTRUCTURE_REST -> {
+                    val record = operand as OpenIterator
+                    record.rest(cx, scope).also { forget(frame, record) }
+                }
+                Icode.DESTRUCTURE_CLOSE -> {
+                    val record = operand as OpenIterator
+                    forget(frame, record)
+                    record.close(cx, scope, quiet = false)
+                    Undefined.instance
+                }
+                Icode.DESTRUCTURE_COERCIBLE -> {
+                    if (operand == null || Undefined.isUndefined(operand)) {
+                        throw ScriptRuntime.typeErrorById("msg.destruct.not.coercible", ScriptRuntime.toString(operand))
+                    }
+                    operand
+                }
+                Icode.DESTRUCTURE_KEY -> ScriptRuntime.toPropertyKey(operand)
+                Icode.DESTRUCTURE_COPY_REST -> {
+                    // CopyDataProperties with the keys the pattern named excluded.
+                    val excluded = HashSet<Any?>()
+                    for (i in first + 1 until first + count) excluded.add(ScriptRuntime.toPropertyKey(stack[i]))
+                    val from = ScriptRuntime.toObject(cx, scope, operand)
+                    val rest = cx.newObject(scope)
+                    for (id in AbstractEcmaObjectOperations.ownKeysForEnumeration(from, true)) {
+                        if (ScriptRuntime.toPropertyKey(id) in excluded) continue
+                        if (!AbstractEcmaObjectOperations.isOwnEnumerable(cx, from, id!!)) continue
+                        AbstractEcmaObjectOperations.createDataProperty(cx, rest, id, AbstractEcmaObjectOperations.getForEnumeration(cx, from, id))
+                    }
+                    rest
+                }
+                else -> throw Kit.codeBug()
+            }
+        }
+
         /** Counts active callers across native reentry before allocating another frame's arrays. */
         private fun nextFrameIndex(cx: Context, parent: CallFrame?, previous: CallFrame?): Int {
             val index = ((parent ?: previous)?.frameIndex ?: -1) + 1
@@ -537,6 +640,7 @@ public class Interpreter : Evaluator {
                 Icode_LINE -> return 1 + 2
                 Icode_LITERAL_NEW_OBJECT -> return 1 + 1
                 Icode_CLASS_CTOR, Icode_CLASS_ELEMENT -> return 1 + 1
+                Icode_DESTRUCTURE -> return 1 + 1 + 2
                 Icode_REG_BIGINT1 -> return 1 + 1
                 Icode_REG_BIGINT2 -> return 1 + 2
                 Icode_REG_BIGINT4 -> return 1 + 4
@@ -743,10 +847,13 @@ public class Interpreter : Evaluator {
                     while (true) {
                         if (exState != exNoJsState) {
                             indexReg = getExceptionHandler(f!!, exState != exCatchState)
+                            closeOpenIterators(cx, f, indexReg, exState == exNoJsState)
                             if (indexReg >= 0) {
                                 frame = f
                                 continue@stateLoop
                             }
+                        } else {
+                            closeOpenIterators(cx, f!!, -1, true)
                         }
                         exitFrame(cx, f!!, throwable)
                         f = f.parentFrame
@@ -1475,21 +1582,7 @@ public class Interpreter : Evaluator {
                     return null
                 }
                 Token.THIS -> {
-                    // The scriptable stand-in for undefined must not reach typeof as an object.
-                    stack[++state.stackTop] = frame.thisPrimitive ?: thisValue(frame).let { if (it === Undefined.SCRIPTABLE_UNDEFINED) Undefined.instance else it }
-                    return null
-                }
-                Icode_NEW_TARGET -> {
-                    stack[++state.stackTop] = frame.newTarget ?: Undefined.instance
-                    return null
-                }
-                Token.SUPER -> {
-                    // A super property reference asks for `this` first, so in a derived class
-                    // constructor before super() it is a ReferenceError ahead of anything else in
-                    // the expression (ECMAScript 2015, 12.3.5.1).
-                    frame.thisBinding?.get()
-                    val homeObject = frame.fnOrScript.homeObject
-                    stack[++state.stackTop] = if (homeObject == null) Undefined.instance else homeObject.prototype
+                    stack[++state.stackTop] = thisOf(frame)
                     return null
                 }
                 Token.THISFN -> {
@@ -1531,6 +1624,38 @@ public class Interpreter : Evaluator {
             val stack = frame.stack
             val sDbl = frame.sDbl
             when (op) {
+                Icode_NEW_TARGET -> {
+                    stack[++state.stackTop] = frame.newTarget ?: Undefined.instance
+                    return null
+                }
+                Token.SUPER -> {
+                    // A super property reference asks for `this` first, so in a derived class
+                    // constructor before super() it is a ReferenceError ahead of anything else in
+                    // the expression (ECMAScript 2015, 12.3.5.1).
+                    frame.thisBinding?.get()
+                    val homeObject = frame.fnOrScript.homeObject
+                    stack[++state.stackTop] = if (homeObject == null) Undefined.instance else homeObject.prototype
+                    return null
+                }
+                Icode_ENUM_CLOSE -> {
+                    // A break, continue or return out of a for-of loop (ECMAScript 2015, 13.7.5.13).
+                    state.indexReg += frame.idata.itsMaxVars
+                    val record = ScriptRuntime.enumIterator(stack[state.indexReg])!!
+                    forget(frame, record)
+                    record.close(cx, frame.scope!!, quiet = false)
+                    return null
+                }
+                Icode_DESTRUCTURE -> {
+                    val iCode = frame.idata.itsICode
+                    val step = iCode[frame.pc].toInt() and 0xFF
+                    val operands = getIndex(iCode, frame.pc + 1)
+                    val first = state.stackTop - operands + 1
+                    for (i in first..state.stackTop) if (stack[i] === DBL_MRK) stack[i] = ScriptRuntime.wrapNumber(sDbl[i])
+                    stack[first] = destructure(cx, frame, step, stack, first, operands, frame.pc - 1)
+                    state.stackTop = first
+                    frame.pc += 3
+                    return null
+                }
                 Icode_ENTER_FUNCTION_BODY -> {
                     val parameters = frame.scope as NativeCall
                     val body = parameters.enterBody()
@@ -1660,14 +1785,14 @@ public class Interpreter : Evaluator {
                         Token.ENUM_INIT_VALUES_IN_ORDER -> ScriptRuntime.ENUMERATE_VALUES_IN_ORDER
                         else -> ScriptRuntime.ENUMERATE_ARRAY
                     }
-                    stack[state.indexReg] = ScriptRuntime.enumInit(lhs, cx, frame.scope!!, enumType)
+                    stack[state.indexReg] = if (op == Token.ENUM_INIT_VALUES_IN_ORDER) openForOf(cx, frame, lhs) else ScriptRuntime.enumInit(lhs, cx, frame.scope!!, enumType)
                     --state.stackTop
                     return null
                 }
                 Token.ENUM_NEXT, Token.ENUM_ID -> {
                     state.indexReg += frame.idata.itsMaxVars
                     val v = stack[state.indexReg]
-                    stack[++state.stackTop] = if (op == Token.ENUM_NEXT) ScriptRuntime.enumNext(v, cx) else ScriptRuntime.enumId(v, cx)
+                    stack[++state.stackTop] = if (op == Token.ENUM_NEXT) enumNext(cx, frame, v) else ScriptRuntime.enumId(v, cx)
                     return null
                 }
                 Token.REF_SPECIAL -> {

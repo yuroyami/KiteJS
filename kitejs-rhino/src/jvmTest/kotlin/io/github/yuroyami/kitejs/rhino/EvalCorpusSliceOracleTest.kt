@@ -9,7 +9,7 @@ import kotlin.test.assertEquals
 import org.mozilla.javascript.Context as UContext
 
 /**
- * Keeps [EvalCorpusSlice] honest: each recorded answer has to be what upstream Rhino gives today,
+ * Keeps [EvalCorpusSlice] honest: each recorded upstream answer has to be what upstream Rhino gives today,
  * and each program has to be the file of the same name in `resources/eval`.
  */
 class EvalCorpusSliceOracleTest {
@@ -33,7 +33,7 @@ class EvalCorpusSliceOracleTest {
                 } catch (e: org.mozilla.javascript.RhinoException) {
                     "throws " + e.details()
                 }
-                if (actual != program.expected) failures.add(program.name)
+                if (actual != program.upstream) failures.add(program.name)
             }
             assertEquals(emptyList(), failures, "recorded answers are stale; regenerate EvalCorpusSlice")
         } finally {

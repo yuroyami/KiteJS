@@ -266,9 +266,9 @@ class EvalSmokeTest {
         assertEquals("caught boom", eval("function* g() { try { yield 1 } catch (e) { yield 'caught ' + e } } var it = g(); it.next(); it.throw('boom').value"))
         assertEquals("1,2", eval("var o = { *g() { yield 1; yield 2 } }; [...o.g()].join()"))
         assertEquals("true", eval("function* g() { yield 1 } var it = g(); it[Symbol.iterator]() === it"))
-        // Rhino runs the finally on an explicit return(), but not when a for-of loop breaks.
+        // The finally runs on an explicit return(), and when a for-of loop breaks (#83).
         assertEquals("ran", eval("function* g() { try { yield 1 } finally { globalThis.fin = 'ran' } } var it = g(); it.next(); it.return(0); globalThis.fin"))
-        assertEquals("undefined", eval("function* g() { try { yield 1; yield 2 } finally { globalThis.brk = 'ran' } } for (var v of g()) break; globalThis.brk"))
+        assertEquals("ran", eval("function* g() { try { yield 1; yield 2 } finally { globalThis.brk = 'ran' } } for (var v of g()) break; globalThis.brk"))
         assertEquals("0,1,2", eval("var o = {}; o[Symbol.iterator] = function () { var n = 0; return { next: function () { return n < 3 ? { value: n++, done: false } : { done: true } } } }; [...o].join()"))
     }
 

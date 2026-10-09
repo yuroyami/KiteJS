@@ -14,6 +14,8 @@ import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_INIT_BLOCK_FUNCTION
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_ANNEX_B_COPY
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_LOCAL_STORE
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CREATE_ITERATION_SCOPE
+import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_DESTRUCTURE
+import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_ENUM_CLOSE
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_OPTIONAL_CALL_LOOKUP
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CALL_ON_SUPER
 import io.github.yuroyami.kitejs.rhino.Icode.Companion.Icode_CLASS_BEGIN
@@ -472,10 +474,12 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
                 }
             }
             Token.ENUM_INIT_KEYS, Token.ENUM_INIT_VALUES, Token.ENUM_INIT_ARRAY, Token.ENUM_INIT_VALUES_IN_ORDER -> {
+                if (type == Token.ENUM_INIT_VALUES_IN_ORDER) itsData.opensIterators = true
                 visitExpression(child!!, 0)
                 addIndexOp(type, getLocalBlockRef(node))
                 stackChange(-1)
             }
+            Icode_ENUM_CLOSE -> addIndexOp(Icode_ENUM_CLOSE, getLocalBlockRef(node))
             Icode_GENERATOR -> {}
             else -> throw badTree(node)
         }
@@ -521,6 +525,20 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
             Token.NEW_TARGET -> {
                 addIcode(Icode_NEW_TARGET)
                 stackChange(1)
+            }
+            Icode_DESTRUCTURE -> {
+                val step = node.getExistingIntProp(Node.DESTRUCTURE_PROP)
+                if (step == Icode.DESTRUCTURE_OPEN) itsData.opensIterators = true
+                var operands = 0
+                while (child != null) {
+                    visitExpression(child, 0)
+                    operands++
+                    child = child.next
+                }
+                addIcode(Icode_DESTRUCTURE)
+                addUint8(step)
+                addUint16(operands)
+                stackChange(1 - operands)
             }
             Token.REF_CALL, Token.CALL, Token.NEW -> {
                 val isOptionalChainingCall = node.getIntProp(Node.OPTIONAL_CHAINING, 0) == 1

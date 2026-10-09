@@ -92,9 +92,12 @@ class IcodeParityTest {
             // Testing a call reference's callee without losing its receiver (#132).
             // Lexical block initialization, source-position Annex B copies, saved switch
             // discriminants and per-iteration let environments (D-120).
+            // The steps of a destructuring pattern, and closing a for-of loop's iterator on a
+            // jump out of it (#81, #83, #96).
             listOf(
                 "Icode_ANNEX_B_COPY", "Icode_AWAIT", "Icode_CALL_SPREAD", "Icode_CLASS_BEGIN", "Icode_CLASS_CTOR", "Icode_CLASS_ELEMENT",
-                "Icode_CLASS_END", "Icode_CLASS_PRIVATE_NAMES", "Icode_CREATE_ITERATION_SCOPE", "Icode_ENTER_FUNCTION_BODY", "Icode_GENERATOR_RETURN_RESULT", "Icode_INITCONST", "Icode_INITCONSTVAR",
+                "Icode_CLASS_END", "Icode_CLASS_PRIVATE_NAMES", "Icode_CREATE_ITERATION_SCOPE", "Icode_DESTRUCTURE", "Icode_ENTER_FUNCTION_BODY", "Icode_ENUM_CLOSE",
+                "Icode_GENERATOR_RETURN_RESULT", "Icode_INITCONST", "Icode_INITCONSTVAR",
                 "Icode_INITIALIZE_PARAMETER", "Icode_INIT_BLOCK_FUNCTION", "Icode_LOCAL_STORE", "Icode_NEW_SPREAD", "Icode_NEW_TARGET", "Icode_OPTIONAL_CALL_LOOKUP", "Icode_PARAMETER_VALUE", "Icode_SUPER_CALL", "Icode_SUPER_CALL_SPREAD",
                 "Icode_SUPER_CTOR",
             ),

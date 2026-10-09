@@ -87,7 +87,13 @@ class NodeTransformerOracleTest {
             }
             compared++
             if (file.name == "optional-chaining.js") continue // Its corrected structure is checked by portedTransformed.
-            if (portedVersion >= Context.VERSION_ES6 && file.name in setOf("destructuring.js", "spread.js")) {
+            if (portedVersion >= Context.VERSION_ES6 && file.name == "destructuring.js") {
+                // Patterns iterate and check their value (#81, #96); DestructuringIteratorTest
+                // checks them against fixed Node results.
+                assertTrue(expected.getOrThrow() != actual.getOrThrow())
+                continue
+            }
+            if (portedVersion >= Context.VERSION_ES6 && file.name == "spread.js") {
                 // D-116 changes these parameter bodies. Compare the enclosing script exactly;
                 // ParameterEnvironmentTest checks their binding behavior against fixed V8 results.
                 assertEquals(expected.getOrThrow().substringBefore("--- function"), actual.getOrThrow().substringBefore("--- function"))
@@ -138,7 +144,11 @@ class NodeTransformerOracleTest {
                 failures.add("${file.name}: the port threw ${actual.exceptionOrNull()}")
                 continue
             }
-            if (file.name in setOf("destructuring.js", "spread.js")) {
+            if (file.name == "destructuring.js") {
+                assertTrue(expected.getOrThrow() != actual.getOrThrow())
+                continue
+            }
+            if (file.name == "spread.js") {
                 assertEquals(expected.getOrThrow().substringBefore("--- function"), actual.getOrThrow().substringBefore("--- function"))
                 assertTrue(expected.getOrThrow() != actual.getOrThrow())
                 continue

@@ -5,12 +5,14 @@
 package io.github.yuroyami.kitejs.rhino
 
 /**
- * Whole programs from `jvmTest/resources/eval`, each with the answer upstream Rhino gives.
+ * Whole programs from `jvmTest/resources/eval`, each with the answer upstream Rhino gives, or the
+ * corrected answer next to upstream's.
  * Generated from the corpus files; `EvalCorpusSliceOracleTest` fails when either side drifts.
  */
 object EvalCorpusSlice {
 
-    class Program(val name: String, val source: String, val expected: String)
+    /** [upstream] differs from [expected] only where the port corrects upstream, as V8 answers. */
+    class Program(val name: String, val source: String, val expected: String, val upstream: String = expected)
 
     val programs: List<Program> = listOf(
         Program(
@@ -106,6 +108,7 @@ object EvalCorpusSlice {
         Program(
             "wrapper_objects",
             "var n = new Number(5), s = new String('str'), b = new Boolean(false);\nvar prim = 5;\nprim.prop = 'lost';\nvar out = [typeof n, typeof s, typeof b, n + 1, s + '!', b ? 'truthy' : 'falsy', n == 5, n === 5, s == 'str', s === 'str', b == false, b === false, !b, !!b,\n  n.valueOf() === 5, s.valueOf() === 'str', b.valueOf() === false, n instanceof Number, (5) instanceof Number, Object(5) instanceof Number, typeof Object('x'), Object(true).valueOf(),\n  prim.prop, s.length, s[0], s.charAt(1), Object.keys(s).join(), JSON.stringify([n, s, b]), n.toFixed(1), new Number(1) + new Number(2), new String('a') + new String('b'), new Boolean(false) + 1,\n  Number(new Number(3)) === 3, String(new String('x')) === 'x', new Number(NaN) == NaN, [new Number(1)].indexOf(1), [1].indexOf(new Number(1)), new String('ab') == new String('ab'), Object.prototype.toString.call(n), Object.prototype.toString.call(s), Object.prototype.toString.call(b),\n  (function () { 'use strict'; return typeof this; }).call(5), (function () { return typeof this; }).call(5), (function () { return this instanceof Number; }).call(5)];\nout.join('|');\n",
+            "object|object|object|6|str!|truthy|true|false|true|false|true|false|false|true|true|true|true|true|false|true|object|true||3|s|t|0,1,2|[5,\"str\",false]|5.0|3|ab|1|true|true|false|-1|-1|false|[object Number]|[object String]|[object Boolean]|number|object|true",
             "object|object|object|6|str!|truthy|true|false|true|false|true|false|false|true|true|true|true|true|false|true|object|true||3|s|t|0,1,2|[5,\"str\",false]|5.0|3|ab|1|true|true|false|-1|-1|false|[object Number]|[object String]|[object Boolean]|object|object|true",
         ),
         Program(
@@ -116,6 +119,7 @@ object EvalCorpusSlice {
         Program(
             "lazy_pipeline",
             "// A pull-based pipeline: nothing runs until the consumer asks for the next value.\nfunction* range(start, end, step) {\n  for (var i = start; i < end; i += (step || 1)) yield i;\n}\nfunction* map(it, f) {\n  for (var v of it) yield f(v);\n}\nfunction* filter(it, pred) {\n  for (var v of it) if (pred(v)) yield v;\n}\nfunction* take(it, n) {\n  var i = 0;\n  for (var v of it) {\n    if (i++ >= n) return;\n    yield v;\n  }\n}\nfunction* zip(a, b) {\n  var ia = a[Symbol.iterator]();\n  var ib = b[Symbol.iterator]();\n  while (true) {\n    var ra = ia.next();\n    var rb = ib.next();\n    if (ra.done || rb.done) return;\n    yield [ra.value, rb.value];\n  }\n}\nfunction drain(it) {\n  var out = [];\n  for (var v of it) out.push(v);\n  return out;\n}\n\nvar calls = 0;\nfunction counted(x) { calls++; return x * x; }\n\nvar squares = take(map(range(1, 1000), counted), 5);\nvar first = drain(squares).join();\nvar lazily = calls;\n\nvar evens = drain(take(filter(range(0, 100), function (n) { return n % 2 === 0; }), 6)).join();\nvar pairs = drain(zip(range(0, 4), 'abcd')).map(function (p) { return p.join(':'); }).join();\nvar spread = [...take(range(10, 100, 10), 4)].join();\nvar summed = drain(map(range(1, 6), function (n) { return n; })).reduce(function (a, b) { return a + b; }, 0);\n\n// Rhino does not close a generator when a for-of loop breaks, so this finally never runs.\n// The value stays at its starting point, which is what both engines have to agree on.\nvar closedAt = -1;\nfunction* watched() {\n  try {\n    var i = 0;\n    while (true) yield i++;\n  } finally {\n    closedAt = i;\n  }\n}\nfor (var v of watched()) if (v === 3) break;\n\n// Delegation keeps the same laziness.\nfunction* concat(a, b) { yield* a; yield* b; }\nvar joined = drain(concat(range(0, 3), range(10, 13))).join();\n\n[first, lazily, evens, pairs, spread, summed, closedAt, joined].join('|');\n",
+            "1,4,9,16,25|6|0,2,4,6,8,10|0:a,1:b,2:c,3:d|10,20,30,40|15|4|0,1,2,10,11,12",
             "1,4,9,16,25|6|0,2,4,6,8,10|0:a,1:b,2:c,3:d|10,20,30,40|15|-1|0,1,2,10,11,12",
         ),
         Program(

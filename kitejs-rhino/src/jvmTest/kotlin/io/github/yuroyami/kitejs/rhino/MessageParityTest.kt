@@ -43,6 +43,8 @@ class MessageParityTest {
         "msg.const.no.init",
         // D-97: async functions.
         "msg.async.decl.not.in.block", "msg.async.generator.unsupported", "msg.async.yield", "msg.await.params",
+        // Rest elements and the iterator protocol of patterns (#81, #96).
+        "msg.rest.not.last", "msg.iterator.result.not.object", "msg.destruct.not.coercible",
     )
 
     private fun portedKeys(): List<String> {

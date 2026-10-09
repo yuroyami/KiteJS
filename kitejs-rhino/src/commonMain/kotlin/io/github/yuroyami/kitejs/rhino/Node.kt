@@ -862,7 +862,9 @@ public open class Node : Iterable<Node> {
         internal const val PARAMETER_VALUE_PROP: Int = 41
         internal const val INITIALIZE_PARAMETER_PROP: Int = 42
         internal const val FUNCTION_BODY_START_PROP: Int = 43
-        public const val LAST_PROP: Int = FUNCTION_BODY_START_PROP
+        /** The step of an Icode_DESTRUCTURE node. */
+        internal const val DESTRUCTURE_PROP: Int = 44
+        public const val LAST_PROP: Int = DESTRUCTURE_PROP
 
         internal const val CLASS_HAS_HERITAGE: Int = 1
         internal const val CLASS_HAS_BINDING: Int = 2
@@ -968,6 +970,7 @@ public open class Node : Iterable<Node> {
             PARAMETER_VALUE_PROP -> "parameter_value"
             INITIALIZE_PARAMETER_PROP -> "initialize_parameter"
             FUNCTION_BODY_START_PROP -> "function_body_start"
+            DESTRUCTURE_PROP -> "destructure"
             else -> throw Kit.codeBug()
         }
 

@@ -163,6 +163,12 @@ class IcodeOracleTest {
     }
 
     /** Shared declaration metadata for the exact fixtures whose parameter instructions changed. */
+    /** Hand-written sources with a pattern, which the port lowers to Icode_DESTRUCTURE steps. */
+    private val iteratorPatterns = setOf("try { f() } catch ({ x }) { g(x) }", "var [a, b = 2, ...c] = d; var { e, f: g, ...h } = i")
+
+    private fun destructures(rendered: String): Boolean =
+        rendered.lines().first { it.startsWith("icode=") }.removePrefix("icode=").split(',').contains(Icode.Icode_DESTRUCTURE.toString())
+
     private fun parameterMetadata(rendered: String): List<String> = rendered.lines().mapNotNull { line ->
         when {
             line.trimStart().startsWith("fn=") -> {
@@ -204,7 +210,13 @@ class IcodeOracleTest {
                 assertTrue(e != a)
                 continue
             }
-            if (file.name in setOf("destructuring.js", "spread.js")) {
+            if (file.name == "destructuring.js") {
+                // D-116 and the iterator lowering of patterns (#81, #96) change its temporaries and instructions.
+                assertTrue(destructures(a))
+                assertTrue(e != a)
+                continue
+            }
+            if (file.name == "spread.js") {
                 // D-116 deliberately changes activation, temporaries and parameter instructions.
                 assertEquals(parameterMetadata(e), parameterMetadata(a))
                 assertTrue(e != a)
@@ -292,7 +304,9 @@ class IcodeOracleTest {
             val expected = runCatching { upstreamIcode(source) }
             val actual = runCatching { portedIcode(source) }
             if (expected.isFailure) {
-                if (actual.isSuccess) failures.add("$source: upstream rejects it but the port accepts it")
+                // Rest elements and rest properties compile here; upstream rejects them (#81).
+                if (actual.isSuccess && source !in iteratorPatterns) failures.add("$source: upstream rejects it but the port accepts it")
+                if (source in iteratorPatterns) assertTrue(destructures(actual.getOrThrow()), source)
                 continue
             }
             if (actual.isFailure) {
@@ -312,6 +326,12 @@ class IcodeOracleTest {
                 val script = Context.getContext().compileString(source, "block-functions.js", 1) as JSScript
                 assertEquals(setOf("f"), script.descriptor.annexBOnlyVarNames)
                 assertEquals(io.github.yuroyami.kitejs.rhino.ast.FunctionNode.FUNCTION_EXPRESSION, script.descriptor.getFunction(0).functionType)
+                continue
+            }
+            if (source in iteratorPatterns) {
+                // Patterns iterate, check their value and close their iterator (#81, #83, #96).
+                assertTrue(destructures(a), source)
+                assertTrue(e != a)
                 continue
             }
             if (source in setOf("function f(...rest) { return rest }", "function f(a = 1, b = a + 1) { return b }")) {

@@ -550,8 +550,6 @@ class EvalOracleTest {
         "function* g() { yield 1; yield 2; yield 3 } var r = []; for (var v of g()) r.push(v); r.join()",
         "function* g() { yield 1; yield 2; yield 3 } [...g()].join()",
         "function* g() { yield 1; yield 2; yield 3 } var a = [...g()]; a.length",
-        "function* g() { yield 1; yield 2 } var [a, b] = g(); a + ':' + b",
-        "function* g() { yield 1; yield 2; yield 3 } var [a, ...rest] = g(); a + ':' + rest.join()",
         "function* g() { var i = 0; while (true) yield i++ } var it = g(); var r = []; for (var i = 0; i < 5; i++) r.push(it.next().value); r.join()",
         "function* g() { yield 1; yield 2 } Array.from(g()).join()",
         "function* g() { yield 1; yield 2 } var m = 0; for (var v of g()) m += v; m",
@@ -606,12 +604,10 @@ class EvalOracleTest {
 
         // Custom iterables, and closing one on break.
         "var o = {}; o[Symbol.iterator] = function () { var n = 0; return { next: function () { return n < 3 ? { value: n++, done: false } : { value: undefined, done: true } } } }; [...o].join()",
-        "var closed = false; var o = {}; o[Symbol.iterator] = function () { return { next: function () { return { value: 1, done: false } }, return: function () { closed = true; return { done: true } } } }; for (var v of o) break; closed",
         "var o = {}; o[Symbol.iterator] = function () { return { next: function () { return { done: true } } } }; [...o].length",
         "var o = {}; o[Symbol.iterator] = 5; try { [...o] } catch (e) { e.name }",
         "var o = {}; o[Symbol.iterator] = function () { return 5 }; try { [...o] } catch (e) { e.name }",
         "function* g() { yield 1; yield 2; yield 3 } var r = []; for (var v of g()) { if (v == 2) break; r.push(v) } r.join()",
-        "function* g() { try { yield 1; yield 2 } finally { globalThis.fin = 'ran' } } for (var v of g()) break; globalThis.fin",
 
         // The iterator built-in and its prototype.
         "typeof Iterator", "typeof StopIteration", "Object.prototype.toString.call(StopIteration)",
@@ -1584,7 +1580,7 @@ class EvalOracleTest {
         "var it = [1, 2].values(); it.next(); it.next(); it.next().done", 
         "Object.prototype.toString.call([].values())", "'' + [].values()",
         "var r = ''; for (var x of [1, 2, 3]) r += x; r", "var r = ''; for (var [k, v] of [[1, 'a'], [2, 'b']]) r += k + v; r",
-        "var [a, b] = [1, 2]; a + b", "var [a, , c] = [1, 2, 3]; c", "var [a = 5] = []; a", "var [a, ...rest] = [1, 2, 3]; rest.join()",
+        "var [a, b] = [1, 2]; a + b", "var [a, , c] = [1, 2, 3]; c",
         "var { x, y } = { x: 1, y: 2 }; x + y", "[...[1, 2], ...[3]].join()", "function f(...a) { return a.length } f(1, 2, 3)",
         // Spread in an argument list runs here and is a syntax error upstream, so it cannot be
         // compared. SpreadArgumentsTest holds what it does.
@@ -1701,9 +1697,50 @@ class EvalOracleTest {
                 val standard = "\"3,3,3|0,1,2|0,1,2|0,10,20|1,4,9|3|init:1|init:1\""
                 assertEquals(standard.replaceFirst("|0,1,2", "|3,3,3"), expected)
                 assertEquals(standard, actual)
+            } else if (file.name in iterationCorrections) {
+                // #78, #81, #83, #96: Node 26.10 controls for what upstream gets wrong.
+                val (legacy, standard) = iterationCorrections.getValue(file.name)
+                assertEquals(legacy, expected)
+                assertEquals(standard, actual)
             } else if (expected != actual) failures.add("${file.name}\n  upstream: $expected\n  ported:   $actual")
         }
         assertEquals(emptyList(), failures, "corpus evaluation differs from upstream")
+    }
+
+    /** Corpus files whose answer the port corrects: upstream's, then Node 26.10's. */
+    private val iterationCorrections = mapOf(
+        "destructuring.js" to ("throws Invalid assignment left-hand side." to
+            "\"1|2|3|4,5|10|20|zed|ok|P|Q|2|1|k/0/none/none|j/5/x/y|6|5|ac|a1|b2|m=1,n=2\""),
+        "lazy_pipeline.js" to ("\"1,4,9,16,25|6|0,2,4,6,8,10|0:a,1:b,2:c,3:d|10,20,30,40|15|-1|0,1,2,10,11,12\"" to
+            "\"1,4,9,16,25|6|0,2,4,6,8,10|0:a,1:b,2:c,3:d|10,20,30,40|15|4|0,1,2,10,11,12\""),
+        "wrapper_objects.js" to (
+            "\"object|object|object|6|str!|truthy|true|false|true|false|true|false|false|true|true|true|true|true|false|true|object|true||3|s|t|0,1,2|[5,\"str\",false]|5.0|3|ab|1|true|true|false|-1|-1|false|[object Number]|[object String]|[object Boolean]|object|object|true\"" to
+                "\"object|object|object|6|str!|truthy|true|false|true|false|true|false|false|true|true|true|true|true|false|true|object|true||3|s|t|0,1,2|[5,\"str\",false]|5.0|3|ab|1|true|true|false|-1|-1|false|[object Number]|[object String]|[object Boolean]|number|object|true\""
+            ),
+    )
+
+    /**
+     * Array patterns iterate and take a rest element, and a for-of loop closes its iterator on a
+     * break (#81, #83, #96). Upstream reads patterns by index, rejects the rest element, and
+     * never closes; the port answers as Node 26.10 does.
+     */
+    @Test
+    fun iterationDiffersFromTheLegacyOracle() {
+        val cases = listOf(
+            Triple("function* g() { yield 1; yield 2 } var [a, b] = g(); a + ':' + b", "\"undefined:undefined\"", "\"1:2\""),
+            Triple("function* g() { yield 1; yield 2; yield 3 } var [a, ...rest] = g(); a + ':' + rest.join()", "throws Invalid assignment left-hand side.", "\"1:2,3\""),
+            Triple("var closed = false; var o = {}; o[Symbol.iterator] = function () { return { next: function () { return { value: 1, done: false } }, return: function () { closed = true; return { done: true } } } }; for (var v of o) break; closed", "false", "true"),
+            Triple("function* g() { try { yield 1; yield 2 } finally { globalThis.fin = 'ran' } } for (var v of g()) break; globalThis.fin", "undefined", "\"ran\""),
+            Triple("var [a, ...rest] = [1, 2, 3]; rest.join()", "throws Invalid assignment left-hand side.", "\"2,3\""),
+        )
+        for ((source, legacy, standard) in cases) {
+            assertEquals(legacy, upstream(source), source)
+            assertEquals(standard, ported(source), source)
+        }
+        // Upstream's default skips a var that already holds a value.
+        val default = "var a = 1; var [a = 5] = []; a"
+        assertEquals("1", upstream(default))
+        assertEquals("5", ported(default))
     }
 
     @Test

@@ -2938,6 +2938,8 @@ public object ScriptRuntime {
         var enumType = 0
         var enumNumbers = false
         var iterator: Scriptable? = null
+        /** The iterator a for-of loop goes through, which a jump or a throw out of the loop closes. */
+        var record: OpenIterator? = null
     }
 
     /** Makes the enumeration hand back Int indices rather than their string form. */
@@ -2951,13 +2953,9 @@ public object ScriptRuntime {
     public fun enumInit(value: Any?, cx: Context, enumType: Int): Any = enumInit(value, cx, getTopCallScope(cx), enumType)
 
     public fun enumInit(value: Any?, cx: Context, scope: Scriptable, enumType: Int): Any {
+        if (enumType == ENUMERATE_VALUES_IN_ORDER) return enumInitIterator(value, cx, scope, -1)
         val x = IdEnumeration()
         x.obj = toObjectOrNull(cx, value, scope)
-        if (enumType == ENUMERATE_VALUES_IN_ORDER) {
-            x.enumType = enumType
-            x.iterator = null
-            return enumInitInOrder(cx, x)
-        }
         if (x.obj == null) return x
         x.enumType = enumType
         x.iterator = null
@@ -2971,19 +2969,16 @@ public object ScriptRuntime {
         return x
     }
 
-    private fun enumInitInOrder(cx: Context, x: IdEnumeration): Any {
-        val obj = x.obj
-        if (obj !is SymbolScriptable || !ScriptableObject.hasProperty(obj, SymbolKey.ITERATOR)) {
-            throw typeErrorById("msg.not.iterable", toString(obj))
-        }
-        val iterator = ScriptableObject.getProperty(obj, SymbolKey.ITERATOR)
-        if (iterator !is Callable) throw typeErrorById("msg.not.iterable", toString(obj))
-        val scope = if (iterator is Function) iterator.declarationScope!! else cx.topCallScope!!
-        val v = iterator.call(cx, scope, obj, emptyArgs)
-        if (v !is Scriptable) throw typeErrorById("msg.not.iterable", toString(obj))
-        x.iterator = v
+    /** The start of a for-of loop at [pc]: GetIterator on [value] (ECMAScript 2015, 13.7.5.12). */
+    internal fun enumInitIterator(value: Any?, cx: Context, scope: Scriptable, pc: Int): Any {
+        val x = IdEnumeration()
+        x.enumType = ENUMERATE_VALUES_IN_ORDER
+        x.record = OpenIterator.open(cx, scope, value, pc)
         return x
     }
+
+    /** The iterator of a for-of enumeration, or null for any other enumeration. */
+    internal fun enumIterator(enumObj: Any?): OpenIterator? = (enumObj as IdEnumeration).record
 
     /** The legacy `__iterator__` protocol. Null when the object does not use it. */
     public fun toIterator(cx: Context, obj: Scriptable, keyOnly: Boolean): Scriptable? {
@@ -3001,9 +2996,14 @@ public object ScriptRuntime {
 
     public fun enumNext(enumObj: Any?, cx: Context): Boolean {
         val x = enumObj as IdEnumeration
+        x.record?.let { record ->
+            val value = record.step(cx, getTopCallScope(cx))
+            if (value === Scriptable.NOT_FOUND) return false
+            x.currentId = value
+            return true
+        }
         val iterator = x.iterator
         if (iterator != null) {
-            if (x.enumType == ENUMERATE_VALUES_IN_ORDER) return enumNextInOrder(x, cx)
             val v = ScriptableObject.getProperty(iterator, "next")
             if (v !is Callable) return false
             val scope = if (v is Function) v.declarationScope!! else cx.topCallScope!!
@@ -3052,22 +3052,9 @@ public object ScriptRuntime {
     private fun passedObjects(x: IdEnumeration): ArrayList<Pair<Scriptable, Array<Any?>>> =
         x.passed ?: ArrayList<Pair<Scriptable, Array<Any?>>>().also { x.passed = it }
 
-    private fun enumNextInOrder(enumObj: IdEnumeration, cx: Context): Boolean {
-        val iterator = enumObj.iterator!!
-        val v = ScriptableObject.getProperty(iterator, ES6Iterator.NEXT_METHOD)
-        if (v !is Callable) throw notFunctionError(iterator, ES6Iterator.NEXT_METHOD)
-        val scope = if (v is Function) v.declarationScope!! else cx.topCallScope!!
-        val r = v.call(cx, scope, iterator, emptyArgs)
-        val iteratorResult = toObject(cx, scope, r)
-        val done = ScriptableObject.getProperty(iteratorResult, ES6Iterator.DONE_PROPERTY)
-        if (done !== Scriptable.NOT_FOUND && toBoolean(done)) return false
-        enumObj.currentId = ScriptableObject.getProperty(iteratorResult, ES6Iterator.VALUE_PROPERTY)
-        return true
-    }
-
     public fun enumId(enumObj: Any?, cx: Context): Any? {
         val x = enumObj as IdEnumeration
-        if (x.iterator != null) return x.currentId
+        if (x.iterator != null || x.record != null) return x.currentId
         return when (x.enumType) {
             ENUMERATE_KEYS, ENUMERATE_KEYS_NO_ITERATOR -> x.currentId
             ENUMERATE_VALUES, ENUMERATE_VALUES_NO_ITERATOR -> enumValue(enumObj, cx)
