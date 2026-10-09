@@ -75,7 +75,7 @@ internal object Test262Execution {
      */
     fun asyncOutcome(printed: String): String {
         val failure = printed.lineSequence().firstOrNull { it.startsWith("Test262:AsyncTestFailure:") }
-        if (failure != null) return "threw " + failure.removePrefix("Test262:AsyncTestFailure:").substringBefore(":")
+        if (failure != null) return "threw " + oneLine(failure.removePrefix("Test262:AsyncTestFailure:").substringBefore(":"))
         if (printed.lineSequence().any { it == "Test262:AsyncTestComplete" }) return PASS
         return "async test never called \$DONE"
     }
@@ -100,7 +100,23 @@ internal object Test262Execution {
 
     private fun errorName(e: RhinoException): String {
         if (e is EvaluatorException) return "SyntaxError"
-        return e.details().substringBefore(":")
+        return oneLine(e.details().substringBefore(":"))
+    }
+
+    /**
+     * Escapes the tabs and line breaks in [name], since each outcome is one line of a tab-separated
+     * file. A thrown function, such as `throw Error`, is named by its multi-line source.
+     */
+    fun oneLine(name: String): String = buildString {
+        for (c in name) {
+            if (c == '\t' || c == '\n' || c == '\r' || c in '\u000B'..'\u000C' || c in '\u001C'..'\u001E' ||
+                c == '\u0085' || c == '\u2028' || c == '\u2029'
+            ) {
+                append("\\u").append(c.code.toString(16).padStart(4, '0'))
+            } else {
+                append(c)
+            }
+        }
     }
 
     /**

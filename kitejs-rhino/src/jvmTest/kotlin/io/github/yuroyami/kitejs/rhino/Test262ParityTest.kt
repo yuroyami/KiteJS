@@ -2229,7 +2229,7 @@ class Test262ParityTest {
 
     private fun errorNameUpstream(e: org.mozilla.javascript.RhinoException): String {
         if (e is org.mozilla.javascript.EvaluatorException) return "SyntaxError"
-        return e.details().substringBefore(":")
+        return Test262Execution.oneLine(e.details().substringBefore(":"))
     }
 
     private fun errorNamePorted(e: RhinoException): String {
