@@ -55,19 +55,29 @@ physical iOS devices. Ordinary pull-request CI remains independent of this corpu
 
 ### Recorded validation
 
-At engine revision `78e9f68bce319c6ad2ea5e820fd231609243e56d`,
-[run 37714893637](https://github.com/yuroyami/KiteJS/actions/runs/37714893637) completed all ten
-replay jobs from clean checkouts. Each target's result records the same 192 for-in cases
-(102 strict, 90 sloppy): 158 passing outcomes, 34 expected non-passing outcomes, and no unexpected
-or intentional platform differences. The corpus revision was
-`3fd4ec27f1798ebecafc73b354a45dcdda9bde29`, with Rhino 1.9.1 as oracle.
+At engine revision `f8622aeb23c9606d556cca2cbf50717d061d3845`,
+[run 37954352802](https://github.com/yuroyami/KiteJS/actions/runs/37954352802) completed all ten
+replay jobs from clean checkouts. Each target replayed the whole selected corpus of 78,402 cases
+(37,604 strict, 40,798 sloppy) with no unexpected mismatches. The corpus revision was
+`3fd4ec27f1798ebecafc73b354a45dcdda9bde29`, with Rhino 1.9.1 as oracle. The selection excluded
+9,513 corpus files, each with a recorded reason.
 
-The unfiltered local producer at that engine revision executed 67,212 cases and failed on 362
-unclassified differences. It reported 45,865 agreeing passes, 6,273 agreeing failures, and 13,120
-cases upstream could not parse (11,332 of those passed in the port). It also recorded host crashes.
-No completed full-corpus artifact was produced. These results validate the bounded transport and
-execution pipeline; full-corpus replay remains unqualified while the producer differences and
-crashes are investigated. Do not widen exclusions merely to make that producer pass.
+| Targets | Passed | Expected non-passing | Intentional differences |
+|:--|--:|--:|--:|
+| JVM, Android host | 76,295 | 2,107 | 0 |
+| Linux x64, Windows x64, macOS arm64, iOS simulator arm64 | 76,299 | 2,103 | 4 |
+| Wasm on Node and Chrome | 76,299 | 2,103 | 5 |
+| JS on Node and Chrome | 76,300 | 2,102 | 6 |
+
+The intentional differences are these:
+
+- Outside the JVM, `toLowerCase` and `toLocaleLowerCase` apply the conditional special casing that
+  the JVM oracle misses. Each target passes the two `special_casing_conditional.js` files in both
+  modes, four cases in all.
+- `staging/sm/String/replace-math.js` crashes the JVM with `OutOfMemoryError`. On JS and Wasm it
+  crashes too, with another error type.
+- On JS, `staging/sm/String/string-code-point-upper-lower-mapping.js` passes where the JVM oracle
+  fails.
 
 Artifact-validation regressions run with:
 

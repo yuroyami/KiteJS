@@ -64,7 +64,8 @@ jobs:
 
   replay:
     needs: parity
-    timeout-minutes: 120
+    # The Windows replay took 117 minutes at f8622ae.
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
