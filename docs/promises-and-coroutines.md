@@ -38,7 +38,7 @@ There is no `async`/`await`. See [Differences from a browser](differences.md).
 `kitejs-coroutines` is a separate artifact. Add it when you want the engine from suspending code.
 
 ```kotlin
-implementation("io.github.yuroyami:kitejs-coroutines:0.6.0")
+implementation("io.github.yuroyami:kitejs-coroutines:0.7.0")
 ```
 
 ```kotlin

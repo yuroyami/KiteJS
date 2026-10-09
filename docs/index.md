@@ -25,7 +25,8 @@ the two.
 On Rhino, complete ES5.1 plus most of ES2015 and later: `let` and `const`, arrow functions,
 template literals, destructuring, spread, classes, `Symbol`, `Map`, `Set`, `WeakMap`, `WeakSet`,
 generators, `Promise`, async functions and `await`, `Proxy`, `Reflect`, `BigInt`, typed arrays,
-async generators and `for await`, optional chaining, and the full regular expression syntax
+async generators and `for await`, iterator helpers, `WeakRef` and `FinalizationRegistry`, resizable
+and shared buffers with `Atomics`, optional chaining, and the full regular expression syntax
 including named groups and lookbehind. It does not run modules. See
 [Differences from a browser](differences.md) for the full list and what to write instead.
 

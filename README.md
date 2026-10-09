@@ -34,8 +34,9 @@ generation at runtime, and the parser, the regular expressions, the date arithme
 number formatting are all computed inside the engine. It runs ES5.1 and most of ES2015 and later:
 `let` and `const`, arrow functions, destructuring, classes with private and static members,
 `Symbol`, `Map`, `Set`, generators, `Promise`, async functions, async generators and `for await`,
-`Proxy`, `Reflect`, `BigInt`, typed arrays, optional chaining and the full regular expression
-syntax. It does not run modules.
+iterator helpers, `Proxy`, `Reflect`, `BigInt`, `WeakRef`, typed arrays over resizable and shared
+buffers with `Atomics`, optional chaining and the full regular expression syntax. It does not run
+modules.
 
 **QuickJS** is QuickJS-ng 0.17.0, the C engine, compiled in: a static library on Kotlin/Native, a
 JNI library inside the jar and the AAR, and a WebAssembly module on JavaScript and Wasm. It runs
@@ -60,9 +61,9 @@ KiteJS is on Maven Central. Add the engine you want, or both:
 ```kotlin
 // build.gradle.kts
 commonMain.dependencies {
-    implementation("io.github.yuroyami:kitejs-rhino:0.6.0")       // KiteJs(Rhino)
-    implementation("io.github.yuroyami:kitejs-quickjs:0.6.0")     // KiteJs(QuickJs)
-    implementation("io.github.yuroyami:kitejs-coroutines:0.6.0")  // optional
+    implementation("io.github.yuroyami:kitejs-rhino:0.7.0")       // KiteJs(Rhino)
+    implementation("io.github.yuroyami:kitejs-quickjs:0.7.0")     // KiteJs(QuickJs)
+    implementation("io.github.yuroyami:kitejs-coroutines:0.7.0")  // optional
 }
 ```
 
