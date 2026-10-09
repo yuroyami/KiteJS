@@ -1003,7 +1003,36 @@ different types over one buffer fails.
 
 - Where: the typed array element conversions, which go through `ByteIo` in big-endian order.
 
+### A named group inside an unnamed group is lost
+
+`/((?<a>x))/.exec('x').groups.a` is `undefined` where it is `'x'`. The walk that collects named
+groups skips the body of every capturing group that has no name, so it never sees a named group
+nested in one. ECMAScript 2018, 22.2.2 gives every named group a property of `groups`, wherever
+it sits.
+
+- Where: `NativeRegExp.extractNamedCaptureGroups`.
+- Test: `RegExpDepthTest.aNamedGroupInsideAnUnnamedGroupIsFound`.
+
 ## Runtime defects
+
+### A long alternation overflows the stack
+
+`new RegExp(words.join('|'))` with 20,000 words throws a Java `StackOverflowError` on a 1 MB
+thread stack. The parser and the bytecode emitter recurse once for each `|`, and so does the walk
+that collects named groups. The port walks the alternatives in a loop.
+
+- Where: `NativeRegExp.parseDisjunction`, `emitREBytecode` and `extractNamedCaptureGroups`.
+- Test: `RegExpDepthTest.twentyThousandAlternativesCompileAndMatch`.
+
+### A regexp program longer than 64 KB is refused
+
+With a stack large enough for the alternation above, the same pattern throws `InternalError: Too
+complex regexp`. The bytecode stores each jump offset in two bytes, so no jump can cross more
+than 64 KB of program. V8 and SpiderMonkey compile it. The port stores offsets in three bytes,
+which allows a program of 16 MB.
+
+- Where: `NativeRegExp.addIndex` and `getIndex`.
+- Test: `RegExpDepthTest.manyAlternativesWithNamedGroupsCompile`.
 
 ### A write through a Delegator overflows the stack (D-65)
 

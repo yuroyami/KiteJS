@@ -885,7 +885,14 @@ public open class NativeRegExp : IdScriptableObject {
         internal const val REOP_END: Byte = 52
 
         private const val ANCHOR_BOL = -2
-        private const val INDEX_LEN = 2
+        // A jump offset or an index takes three bytes, so a program may reach 16 MB, as a long word
+        // list joined with '|' does. Two bytes stopped at 64 KB.
+        private const val INDEX_LEN = 3
+
+        // What parseAtom answers: an error, an assertion that takes no quantifier, or a term that may.
+        private const val ATOM_FAILED = 0
+        private const val ATOM_ASSERTION = 1
+        private const val ATOM_QUANTIFIABLE = 2
 
         // ---- Setup ---------------------------------------------------------------------------
 
@@ -1090,13 +1097,16 @@ public open class NativeRegExp : IdScriptableObject {
                 regexp.namedBackRefs = state.namedCaptureBackRefs
             }
 
-            regexp.program = ByteArray(state.progLength + 1)
+            // The parser counts every index as two bytes. Each node holds at least as many bytes of
+            // its own as of indexes, so three-byte indexes make it at most half as long again.
+            regexp.program = ByteArray(state.progLength + state.progLength / 2 + 1)
             if (state.classCount != 0) {
                 regexp.classList = arrayOfNulls(state.classCount)
                 regexp.classCount = state.classCount
             }
             var endPC = emitREBytecode(state, regexp, 0, state.result)
             regexp.program[endPC++] = REOP_END
+            regexp.program = regexp.program.copyOf(endPC)
 
             regexp.parenCount = state.parenCount
 
@@ -1135,31 +1145,41 @@ public open class NativeRegExp : IdScriptableObject {
                             reportError("msg.duplicate.group.name", name)
                         }
                         entry.add(node.parenIndex)
-                        extractNamedCaptureGroups(node.kid, namedCaptureGroups)
                     }
-                } else if (node.op == REOP_ALT) {
-                    // The same name on both sides of an alternation is allowed; across the whole
-                    // pattern it is not. Merge the two sides before checking.
-                    val groupCaptures1 = HashMap<String, MutableList<Int>>()
-                    extractNamedCaptureGroups(node.kid, groupCaptures1)
-                    if (groupCaptures1.isEmpty()) {
-                        extractNamedCaptureGroups(node.kid2, namedCaptureGroups)
-                    } else {
-                        val groupCaptures2 = HashMap<String, MutableList<Int>>()
-                        extractNamedCaptureGroups(node.kid2, groupCaptures2)
-                        for ((k, v) in groupCaptures2) {
-                            val existing = groupCaptures1[k]
-                            if (existing == null) groupCaptures1[k] = v else existing.addAll(v)
+                    extractNamedCaptureGroups(node.kid, namedCaptureGroups)
+                } else if (isAlternation(node.op)) {
+                    // The same name in two branches of an alternation is allowed; across the whole
+                    // pattern it is not. Merge the branches before checking. `a|b|c` nests to the
+                    // right, so the branches are walked in a loop.
+                    val merged = HashMap<String, MutableList<Int>>()
+                    var alt: RENode = node
+                    while (true) {
+                        mergeNamedCaptureGroups(alt.kid, merged)
+                        val right = alt.kid2!!
+                        if (right.next != null || !isAlternation(right.op)) {
+                            mergeNamedCaptureGroups(right, merged)
+                            break
                         }
-                        for ((k, v) in groupCaptures1) {
-                            if (namedCaptureGroups.put(k, v) != null) reportError("msg.duplicate.group.name", k)
-                        }
+                        alt = right
+                    }
+                    for ((k, v) in merged) {
+                        if (namedCaptureGroups.put(k, v) != null) reportError("msg.duplicate.group.name", k)
                     }
                 } else {
                     extractNamedCaptureGroups(node.kid, namedCaptureGroups)
                 }
                 node = node.next
             }
+        }
+
+        /**
+         * Adds the named groups of one alternation [branch] to [merged]. A name may repeat across
+         * branches, not in one.
+         */
+        private fun mergeNamedCaptureGroups(branch: RENode?, merged: MutableMap<String, MutableList<Int>>) {
+            val own = HashMap<String, MutableList<Int>>()
+            extractNamedCaptureGroups(branch, own)
+            for ((k, v) in own) merged.getOrPut(k) { ArrayList() }.addAll(v)
         }
 
         internal fun isDigit(c: Char): Boolean = c in '0'..'9'
@@ -1194,57 +1214,73 @@ public open class NativeRegExp : IdScriptableObject {
             return if (cl < 128) ch else cl.toChar()
         }
 
+        // The parser recurses once per group, so the functions on that path keep small frames: a
+        // debug Kotlin/Native frame holds the locals of every branch, and a 1 MB thread stack must
+        // fit hundreds of nested groups. The heavy branches live in helpers that return first.
+
         /** A regexp is one or more alternatives separated by `|`. */
         private fun parseDisjunction(state: CompilerState, params: ParserParameters): Boolean {
             if (!parseAlternative(state, params)) return false
-            val source = state.cpbegin
-            val index = state.cp
-            if (index != source.size && source[index] == '|') {
+            if (state.cp == state.cpbegin.size || state.cpbegin[state.cp] != '|') return true
+            // A loop, not a recursion per '|', so a long word list does not grow the stack. The
+            // alternatives nest to the right, as `a|b|c` is `a|(b|c)`.
+            val alternatives = ArrayList<RENode>()
+            alternatives.add(state.result!!)
+            while (state.cp != state.cpbegin.size && state.cpbegin[state.cp] == '|') {
                 ++state.cp
-                val result = RENode(REOP_ALT)
-                result.kid = state.result
-                if (!parseDisjunction(state, params)) return false
-                result.kid2 = state.result
-                state.result = result
-
-                // When both sides start with something the matcher can test cheaply, the
-                // alternation gets a prerequisite check instead of two full attempts.
-                val kid = result.kid!!
-                val kid2 = result.kid2!!
-                if (kid.op == REOP_FLAT && kid2.op == REOP_FLAT && kid.lowSurrogate.code == 0 && kid2.lowSurrogate.code == 0) {
-                    result.op = if ((state.flags and JSREG_FOLD) == 0) REOP_ALTPREREQ else REOP_ALTPREREQi
-                    result.chr = kid.chr
-                    result.index = kid2.chr.code
-                    state.progLength += 13
-                } else if (kid.op == REOP_CLASS && kid.index < 256 && kid2.op == REOP_FLAT &&
-                    kid2.lowSurrogate.code == 0 && (state.flags and JSREG_FOLD) == 0
-                ) {
-                    result.op = REOP_ALTPREREQ2
-                    result.chr = kid2.chr
-                    result.index = kid.index
-                    state.progLength += 13
-                } else if (kid.op == REOP_FLAT && kid2.op == REOP_CLASS && kid2.index < 256 &&
-                    kid.lowSurrogate.code == 0 && (state.flags and JSREG_FOLD) == 0
-                ) {
-                    result.op = REOP_ALTPREREQ2
-                    result.chr = kid.chr
-                    result.index = kid2.index
-                    state.progLength += 13
-                } else {
-                    state.progLength += 9
-                }
+                if (!parseAlternative(state, params)) return false
+                alternatives.add(state.result!!)
             }
+            var tail = alternatives.removeLast()
+            while (alternatives.isNotEmpty()) {
+                val result = RENode(REOP_ALT)
+                result.kid = alternatives.removeLast()
+                result.kid2 = tail
+                addAlternationPrerequisite(state, result)
+                tail = result
+            }
+            state.result = tail
             return true
+        }
+
+        /**
+         * When both sides of [result] start with something the matcher can test cheaply, the
+         * alternation gets a prerequisite check instead of two full attempts.
+         */
+        private fun addAlternationPrerequisite(state: CompilerState, result: RENode) {
+            val kid = result.kid!!
+            val kid2 = result.kid2!!
+            if (kid.op == REOP_FLAT && kid2.op == REOP_FLAT && kid.lowSurrogate.code == 0 && kid2.lowSurrogate.code == 0) {
+                result.op = if ((state.flags and JSREG_FOLD) == 0) REOP_ALTPREREQ else REOP_ALTPREREQi
+                result.chr = kid.chr
+                result.index = kid2.chr.code
+                state.progLength += 13
+            } else if (kid.op == REOP_CLASS && kid.index < 256 && kid2.op == REOP_FLAT &&
+                kid2.lowSurrogate.code == 0 && (state.flags and JSREG_FOLD) == 0
+            ) {
+                result.op = REOP_ALTPREREQ2
+                result.chr = kid2.chr
+                result.index = kid.index
+                state.progLength += 13
+            } else if (kid.op == REOP_FLAT && kid2.op == REOP_CLASS && kid2.index < 256 &&
+                kid.lowSurrogate.code == 0 && (state.flags and JSREG_FOLD) == 0
+            ) {
+                result.op = REOP_ALTPREREQ2
+                result.chr = kid.chr
+                result.index = kid2.index
+                state.progLength += 13
+            } else {
+                state.progLength += 9
+            }
         }
 
         /** An alternative is one or more items concatenated. */
         private fun parseAlternative(state: CompilerState, params: ParserParameters): Boolean {
             var headTerm: RENode? = null
             var tailTerm: RENode? = null
-            val source = state.cpbegin
             while (true) {
-                if (state.cp == state.cpend || source[state.cp] == '|' ||
-                    (state.parenNesting != 0 && source[state.cp] == ')')
+                if (state.cp == state.cpend || state.cpbegin[state.cp] == '|' ||
+                    (state.parenNesting != 0 && state.cpbegin[state.cp] == ')')
                 ) {
                     state.result = headTerm ?: RENode(REOP_EMPTY)
                     return true
@@ -1256,19 +1292,25 @@ public open class NativeRegExp : IdScriptableObject {
                 } else {
                     tailTerm!!.next = state.result
                 }
-                while (tailTerm!!.next != null) {
-                    // Neighbouring literals that are slices of the source merge into one.
-                    val n = tailTerm.next!!
-                    if (tailTerm.op == REOP_FLAT && tailTerm.flatIndex != -1 &&
-                        n.op == REOP_FLAT && n.flatIndex == (tailTerm.flatIndex + tailTerm.length)
-                    ) {
-                        tailTerm.length += n.length
-                        tailTerm.next = n.next
-                    } else {
-                        tailTerm = n
-                    }
+                tailTerm = mergeFlatTail(tailTerm!!)
+            }
+        }
+
+        /** Merges the literals after [tail] that are slices of the source, and returns the new tail. */
+        private fun mergeFlatTail(tail: RENode): RENode {
+            var tailTerm = tail
+            while (tailTerm.next != null) {
+                val n = tailTerm.next!!
+                if (tailTerm.op == REOP_FLAT && tailTerm.flatIndex != -1 &&
+                    n.op == REOP_FLAT && n.flatIndex == (tailTerm.flatIndex + tailTerm.length)
+                ) {
+                    tailTerm.length += n.length
+                    tailTerm.next = n.next
+                } else {
+                    tailTerm = n
                 }
             }
+            return tailTerm
         }
 
         /** How wide the class bitmap has to be, which the highest character in the class decides. */
@@ -1836,13 +1878,8 @@ public open class NativeRegExp : IdScriptableObject {
         // ---- Terms and quantifiers -----------------------------------------------------------
 
         private fun parseTerm(state: CompilerState, params: ParserParameters): Boolean {
-            val src = state.cpbegin
-            var c = src[state.cp++]
+            val c = state.cpbegin[state.cp++]
             val parenBaseCount = state.parenCount
-            var num: Int
-            val term: RENode?
-            var termStart: Int
-
             when (c) {
                 '^' -> {
                     state.result = RENode(REOP_BOL)
@@ -1854,124 +1891,82 @@ public open class NativeRegExp : IdScriptableObject {
                     state.progLength++
                     return true
                 }
-                '\\' -> {
-                    if (state.cp < state.cpend) {
-                        c = src[state.cp++]
-                        when (c) {
-                            'b' -> {
-                                state.result = RENode(REOP_WBDRY)
-                                state.progLength++
-                                return true
-                            }
-                            'B' -> {
-                                state.result = RENode(REOP_WNONBDRY)
-                                state.progLength++
-                                return true
-                            }
-                            '1', '2', '3', '4', '5', '6', '7', '8', '9' -> {
-                                termStart = state.cp - 1
-                                num = getDecimalValue(c, state, "msg.overlarge.backref")
-                                if (!params.unicodeMode && num > state.backReferenceLimit) {
-                                    // Not enough groups for this number, so it is an octal escape.
-                                    reportWarning(state.cx, "msg.bad.backref", "")
-                                    state.cp = termStart
-                                    if (!parseCharacterAndCharacterClassEscape(state, params)) return false
-                                } else {
-                                    state.result = RENode(REOP_BACKREF).apply { parenIndex = num - 1 }
-                                    state.progLength += 3
-                                    if (state.maxBackReference < num) state.maxBackReference = num
-                                }
-                            }
-                            else -> {
-                                var handled = false
-                                if (c == '0' && state.cp < state.cpend && src[state.cp] == '0') {
-                                    if (params.unicodeMode) {
-                                        reportError("msg.invalid.escape", "")
-                                    } else {
-                                        // Deliberately looser than ES5.1, matching SpiderMonkey and
-                                        // what the web actually relies on.
-                                        parseMultipleLeadingZerosAsOctalEscape(state)
-                                        handled = true
-                                    }
-                                }
-                                if (!handled) {
-                                    state.cp--
-                                    if (!parseCharacterAndCharacterClassEscape(state, params)) {
-                                        if (c == 'k' && params.namedCaptureGroups) {
-                                            state.cp++
-                                            val groupNameBuilder = StringBuilder()
-                                            if (extractCaptureGroupName(state, groupNameBuilder)) {
-                                                val groupName = groupNameBuilder.toString()
-                                                if (groupName.isEmpty()) reportError("msg.invalid.group.name", "")
-                                                state.result = RENode(REOP_NAMED_BACKREF).apply {
-                                                    namedCaptureGroupBackRefIndex = state.namedCaptureBackRefs.size
-                                                }
-                                                state.namedCaptureBackRefs.add(groupName)
-                                                state.progLength += 3
-                                            } else {
-                                                reportError("msg.invalid.named.backref", "")
-                                            }
-                                        } else if (c == 'c' && !params.unicodeMode) {
-                                            // With 'c' next, the backslash itself is the literal.
-                                            doFlat(state, '\\')
-                                        } else {
-                                            reportError("msg.invalid.escape", "")
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        // A trailing backslash is an error.
-                        reportError("msg.trail.backslash", "")
-                    }
+                '(' -> if (!parseGroup(state, params)) return false
+                else -> when (parseAtom(state, params, c)) {
+                    ATOM_FAILED -> return false
+                    ATOM_ASSERTION -> return true
                 }
-                '(' -> {
-                    var result: RENode? = null
-                    if (state.cp + 1 < state.cpend && src[state.cp] == '?' &&
-                        (src[state.cp + 1].also { c = it } == '=' || c == '!' || c == ':')
-                    ) {
-                        state.cp += 2
-                        if (c == '=') {
-                            result = RENode(REOP_ASSERT)
-                            state.progLength += 4
-                        } else if (c == '!') {
-                            result = RENode(REOP_ASSERT_NOT)
-                            state.progLength += 4
-                        }
-                    } else if (state.cp + 2 < state.cpend && src[state.cp] == '?' && src[state.cp + 1] == '<' &&
-                        (src[state.cp + 2].also { c = it } == '=' || c == '!')
-                    ) {
-                        state.cp += 3
-                        result = if (c == '=') RENode(REOP_ASSERTBACK) else RENode(REOP_ASSERTBACK_NOT)
-                        state.progLength += 4
-                    } else {
-                        result = RENode(REOP_LPAREN)
-                        if (state.cp + 2 < state.cpend && src[state.cp] == '?' && src[state.cp + 1] == '<') {
-                            state.cp += 1
-                            val nameBuilder = StringBuilder()
-                            if (!extractCaptureGroupName(state, nameBuilder)) reportError("msg.invalid.group.name", "")
-                            result.namedCaptureGroupName = nameBuilder.toString()
-                            if (result.namedCaptureGroupName!!.isEmpty()) reportError("msg.invalid.group.name", "")
-                            state.namedCaptureGroupsFound = true
-                        }
-                        state.progLength += 6
-                        result.parenIndex = state.parenCount++
-                    }
-                    ++state.parenNesting
-                    if (!parseDisjunction(state, params)) return false
-                    if (state.cp == state.cpend || src[state.cp] != ')') reportError("msg.unterm.paren", "")
-                    ++state.cp
-                    --state.parenNesting
-                    if (result != null) {
-                        // A lookbehind matches right to left, so its children are reversed.
-                        if (result.op == REOP_ASSERTBACK || result.op == REOP_ASSERTBACK_NOT) {
-                            state.result = reverseNodeList(state.result)
-                        }
-                        result.kid = state.result
-                        state.result = result
-                    }
+            }
+            return parseQuantifier(state, params, parenBaseCount)
+        }
+
+        /** A group, a lookahead or a lookbehind, after its `(`. */
+        private fun parseGroup(state: CompilerState, params: ParserParameters): Boolean {
+            val result = openGroup(state)
+            ++state.parenNesting
+            if (!parseDisjunction(state, params)) return false
+            closeGroup(state, result)
+            return true
+        }
+
+        /** Reads what follows a `(` and answers the group's node, or null for `(?:`. */
+        private fun openGroup(state: CompilerState): RENode? {
+            val src = state.cpbegin
+            var c = ' '
+            var result: RENode? = null
+            if (state.cp + 1 < state.cpend && src[state.cp] == '?' &&
+                (src[state.cp + 1].also { c = it } == '=' || c == '!' || c == ':')
+            ) {
+                state.cp += 2
+                if (c == '=') {
+                    result = RENode(REOP_ASSERT)
+                    state.progLength += 4
+                } else if (c == '!') {
+                    result = RENode(REOP_ASSERT_NOT)
+                    state.progLength += 4
                 }
+            } else if (state.cp + 2 < state.cpend && src[state.cp] == '?' && src[state.cp + 1] == '<' &&
+                (src[state.cp + 2].also { c = it } == '=' || c == '!')
+            ) {
+                state.cp += 3
+                result = if (c == '=') RENode(REOP_ASSERTBACK) else RENode(REOP_ASSERTBACK_NOT)
+                state.progLength += 4
+            } else {
+                result = RENode(REOP_LPAREN)
+                if (state.cp + 2 < state.cpend && src[state.cp] == '?' && src[state.cp + 1] == '<') {
+                    state.cp += 1
+                    val nameBuilder = StringBuilder()
+                    if (!extractCaptureGroupName(state, nameBuilder)) reportError("msg.invalid.group.name", "")
+                    result.namedCaptureGroupName = nameBuilder.toString()
+                    if (result.namedCaptureGroupName!!.isEmpty()) reportError("msg.invalid.group.name", "")
+                    state.namedCaptureGroupsFound = true
+                }
+                state.progLength += 6
+                result.parenIndex = state.parenCount++
+            }
+            return result
+        }
+
+        /** Reads the `)` of a group and makes [result], if any, hold what the group parsed. */
+        private fun closeGroup(state: CompilerState, result: RENode?) {
+            if (state.cp == state.cpend || state.cpbegin[state.cp] != ')') reportError("msg.unterm.paren", "")
+            ++state.cp
+            --state.parenNesting
+            if (result != null) {
+                // A lookbehind matches right to left, so its children are reversed.
+                if (result.op == REOP_ASSERTBACK || result.op == REOP_ASSERTBACK_NOT) {
+                    state.result = reverseNodeList(state.result)
+                }
+                result.kid = state.result
+                state.result = result
+            }
+        }
+
+        /** Parses a term that is not a group or an anchor, whose first character [c] is already read. */
+        private fun parseAtom(state: CompilerState, params: ParserParameters, c: Char): Int {
+            val src = state.cpbegin
+            when (c) {
+                '\\' -> return parseEscapeTerm(state, params)
                 ')' -> reportError("msg.re.unmatched.right.paren", "")
                 '[' -> {
                     val classContents = parseClassContents(state, params) ?: reportError("msg.unterm.class", "")
@@ -1980,7 +1975,7 @@ public open class NativeRegExp : IdScriptableObject {
                         index = state.classCount++
                     }
                     // Sized now so a bad range is reported while parsing, not while matching.
-                    if (!calculateBitmapSize(state.flags, classContents, state.result!!)) return false
+                    if (!calculateBitmapSize(state.flags, classContents, state.result!!)) return ATOM_FAILED
                     state.progLength += 3
                 }
                 '.' -> {
@@ -2005,8 +2000,86 @@ public open class NativeRegExp : IdScriptableObject {
                     }
                 }
             }
+            return ATOM_QUANTIFIABLE
+        }
 
-            term = state.result
+        /** Parses an escape term after its backslash. `\b` and `\B` are assertions, so take no quantifier. */
+        private fun parseEscapeTerm(state: CompilerState, params: ParserParameters): Int {
+            val src = state.cpbegin
+            // A trailing backslash is an error.
+            if (state.cp >= state.cpend) reportError("msg.trail.backslash", "")
+            val c = src[state.cp++]
+            when (c) {
+                'b' -> {
+                    state.result = RENode(REOP_WBDRY)
+                    state.progLength++
+                    return ATOM_ASSERTION
+                }
+                'B' -> {
+                    state.result = RENode(REOP_WNONBDRY)
+                    state.progLength++
+                    return ATOM_ASSERTION
+                }
+                '1', '2', '3', '4', '5', '6', '7', '8', '9' -> {
+                    val termStart = state.cp - 1
+                    val num = getDecimalValue(c, state, "msg.overlarge.backref")
+                    if (!params.unicodeMode && num > state.backReferenceLimit) {
+                        // Not enough groups for this number, so it is an octal escape.
+                        reportWarning(state.cx, "msg.bad.backref", "")
+                        state.cp = termStart
+                        if (!parseCharacterAndCharacterClassEscape(state, params)) return ATOM_FAILED
+                    } else {
+                        state.result = RENode(REOP_BACKREF).apply { parenIndex = num - 1 }
+                        state.progLength += 3
+                        if (state.maxBackReference < num) state.maxBackReference = num
+                    }
+                }
+                else -> {
+                    var handled = false
+                    if (c == '0' && state.cp < state.cpend && src[state.cp] == '0') {
+                        if (params.unicodeMode) {
+                            reportError("msg.invalid.escape", "")
+                        } else {
+                            // Deliberately looser than ES5.1, matching SpiderMonkey and
+                            // what the web actually relies on.
+                            parseMultipleLeadingZerosAsOctalEscape(state)
+                            handled = true
+                        }
+                    }
+                    if (!handled) {
+                        state.cp--
+                        if (!parseCharacterAndCharacterClassEscape(state, params)) {
+                            if (c == 'k' && params.namedCaptureGroups) {
+                                state.cp++
+                                val groupNameBuilder = StringBuilder()
+                                if (extractCaptureGroupName(state, groupNameBuilder)) {
+                                    val groupName = groupNameBuilder.toString()
+                                    if (groupName.isEmpty()) reportError("msg.invalid.group.name", "")
+                                    state.result = RENode(REOP_NAMED_BACKREF).apply {
+                                        namedCaptureGroupBackRefIndex = state.namedCaptureBackRefs.size
+                                    }
+                                    state.namedCaptureBackRefs.add(groupName)
+                                    state.progLength += 3
+                                } else {
+                                    reportError("msg.invalid.named.backref", "")
+                                }
+                            } else if (c == 'c' && !params.unicodeMode) {
+                                // With 'c' next, the backslash itself is the literal.
+                                doFlat(state, '\\')
+                            } else {
+                                reportError("msg.invalid.escape", "")
+                            }
+                        }
+                    }
+                }
+            }
+            return ATOM_QUANTIFIABLE
+        }
+
+        /** Reads a quantifier after the term in `state.result`, whose groups start at [parenBaseCount]. */
+        private fun parseQuantifier(state: CompilerState, params: ParserParameters, parenBaseCount: Int): Boolean {
+            val src = state.cpbegin
+            val term = state.result
             if (state.cp == state.cpend) return true
 
             var hasQ = false
@@ -2027,13 +2100,15 @@ public open class NativeRegExp : IdScriptableObject {
                     hasQ = true
                 }
                 '{' -> {
+                    var c = '{'
                     var min = 0
                     var max = -1
                     val leftCurl = state.cp
 
                     // Anything that is not exactly {n}, {n,} or {n,m} is not a quantifier at all;
                     // back off and let the braces be literals.
-                    if (++state.cp < src.size && isDigit(src[state.cp].also { c = it })) {
+                    if (++state.cp < src.size && isDigit(src[state.cp])) {
+                        c = src[state.cp]
                         ++state.cp
                         min = getDecimalValue(c, state, "msg.overlarge.min")
                         if (state.cp < src.size) {
@@ -2098,135 +2173,175 @@ public open class NativeRegExp : IdScriptableObject {
 
         private fun addIndex(array: ByteArray, pc: Int, index: Int): Int {
             if (index < 0) throw Kit.codeBug()
-            if (index > 0xFFFF) throw Context.reportRuntimeError("Too complex regexp")
-            array[pc] = (index shr 8).toByte()
-            array[pc + 1] = index.toByte()
-            return pc + 2
+            if (index > 0xFFFFFF) throw Context.reportRuntimeError("Too complex regexp")
+            array[pc] = (index shr 16).toByte()
+            array[pc + 1] = (index shr 8).toByte()
+            array[pc + 2] = index.toByte()
+            return pc + 3
         }
 
         private fun getIndex(array: ByteArray, pc: Int): Int =
-            ((array[pc].toInt() and 0xFF) shl 8) or (array[pc + 1].toInt() and 0xFF)
+            ((array[pc].toInt() and 0xFF) shl 16) or ((array[pc + 1].toInt() and 0xFF) shl 8) or
+                (array[pc + 2].toInt() and 0xFF)
 
+        // Emitting recurses once per nested node, so this loop and the four node kinds that recurse
+        // keep small frames, as the parser does. The other nodes go through emitLeaf.
         private fun emitREBytecode(state: CompilerState, re: RECompiled, pcIn: Int, tIn: RENode?): Int {
             var pc = pcIn
             var t = tIn
-            val program = re.program
-            var nextAlt: RENode?
-            var nextAltFixup: Int
-            var nextTermFixup: Int
-
             while (t != null) {
-                program[pc++] = t.op
-                when (t.op) {
-                    REOP_EMPTY -> --pc
-                    REOP_ALTPREREQ, REOP_ALTPREREQi, REOP_ALTPREREQ2, REOP_ALT -> {
-                        if (t.op == REOP_ALTPREREQ || t.op == REOP_ALTPREREQi || t.op == REOP_ALTPREREQ2) {
-                            val ignoreCase = t.op == REOP_ALTPREREQi
-                            addIndex(program, pc, if (ignoreCase) upcase(t.chr).code else t.chr.code)
-                            pc += INDEX_LEN
-                            addIndex(program, pc, if (ignoreCase) upcase(t.index.toChar()).code else t.index)
-                            pc += INDEX_LEN
-                        }
-                        nextAlt = t.kid2
-                        nextAltFixup = pc // where the other alternative starts
-                        pc += INDEX_LEN
-                        pc = emitREBytecode(state, re, pc, t.kid)
-                        program[pc++] = REOP_JUMP
-                        nextTermFixup = pc // where the term after the alternation starts
-                        pc += INDEX_LEN
-                        resolveForwardJump(program, nextAltFixup, pc)
-                        pc = emitREBytecode(state, re, pc, nextAlt)
-
-                        program[pc++] = REOP_JUMP
-                        nextAltFixup = pc
-                        pc += INDEX_LEN
-
-                        resolveForwardJump(program, nextTermFixup, pc)
-                        resolveForwardJump(program, nextAltFixup, pc)
-                    }
-                    REOP_FLAT -> {
-                        if (t.flatIndex != -1 && t.length > 1) {
-                            program[pc - 1] = if ((state.flags and JSREG_FOLD) != 0) REOP_FLATi else REOP_FLAT
-                            pc = addIndex(program, pc, t.flatIndex)
-                            pc = addIndex(program, pc, t.length)
-                        } else if (t.chr.code < 256) {
-                            program[pc - 1] = if ((state.flags and JSREG_FOLD) != 0) REOP_FLAT1i else REOP_FLAT1
-                            program[pc++] = t.chr.code.toByte()
-                        } else if (t.lowSurrogate.code == 0) {
-                            program[pc - 1] = if ((state.flags and JSREG_FOLD) != 0) REOP_UCFLAT1i else REOP_UCFLAT1
-                            pc = addIndex(program, pc, t.chr.code)
-                        } else {
-                            program[pc - 1] = REOP_UCSPFLAT1
-                            pc = addIndex(program, pc, t.chr.code)
-                            pc = addIndex(program, pc, t.lowSurrogate.code)
-                        }
-                    }
-                    REOP_LPAREN -> {
-                        pc = addIndex(program, pc, t.parenIndex)
-                        pc = emitREBytecode(state, re, pc, t.kid)
-                        program[pc++] = REOP_RPAREN
-                        pc = addIndex(program, pc, t.parenIndex)
-                    }
-                    REOP_BACKREF -> pc = addIndex(program, pc, t.parenIndex)
-                    REOP_NAMED_BACKREF -> {
-                        val names = re.namedBackRefs ?: reportError("msg.invalid.named.backref", "")
-                        val backRefName = names.getOrNull(t.namedCaptureGroupBackRefIndex)
-                            ?: throw Kit.codeBug("emitREBytecode: namedBackRefIndex(${t.namedCaptureGroupBackRefIndex}) out of bounds")
-                        val indices = re.namedCaptureGroups[backRefName]
-                            ?: reportError("msg.invalid.named.backref", "")
-                        if (indices.size == 1) {
-                            // One capture with this name, so a plain back reference will do.
-                            program[pc - 1] = REOP_BACKREF
-                            pc = addIndex(program, pc, indices[0])
-                        } else {
-                            pc = addIndex(program, pc, t.namedCaptureGroupBackRefIndex)
-                        }
-                    }
-                    REOP_ASSERT, REOP_ASSERTBACK -> {
-                        nextTermFixup = pc
-                        pc += INDEX_LEN
-                        pc = emitREBytecode(state, re, pc, t.kid)
-                        program[pc++] = if (t.op == REOP_ASSERT) REOP_ASSERTTEST else REOP_ASSERTBACKTEST
-                        resolveForwardJump(program, nextTermFixup, pc)
-                    }
-                    REOP_ASSERT_NOT, REOP_ASSERTBACK_NOT -> {
-                        nextTermFixup = pc
-                        pc += INDEX_LEN
-                        pc = emitREBytecode(state, re, pc, t.kid)
-                        program[pc++] = if (t.op == REOP_ASSERT_NOT) REOP_ASSERTNOTTEST else REOP_ASSERTBACKNOTTEST
-                        resolveForwardJump(program, nextTermFixup, pc)
-                    }
-                    REOP_QUANT -> {
-                        if (t.min == 0 && t.max == -1) {
-                            program[pc - 1] = if (t.greedy) REOP_STAR else REOP_MINIMALSTAR
-                        } else if (t.min == 0 && t.max == 1) {
-                            program[pc - 1] = if (t.greedy) REOP_OPT else REOP_MINIMALOPT
-                        } else if (t.min == 1 && t.max == -1) {
-                            program[pc - 1] = if (t.greedy) REOP_PLUS else REOP_MINIMALPLUS
-                        } else {
-                            if (!t.greedy) program[pc - 1] = REOP_MINIMALQUANT
-                            pc = addIndex(program, pc, t.min)
-                            // max may be -1, which addIndex refuses, so it is stored plus one.
-                            pc = addIndex(program, pc, t.max + 1)
-                        }
-                        pc = addIndex(program, pc, t.parenCount)
-                        pc = addIndex(program, pc, t.parenIndex)
-                        nextTermFixup = pc
-                        pc += INDEX_LEN
-                        pc = emitREBytecode(state, re, pc, t.kid)
-                        program[pc++] = REOP_ENDCHILD
-                        resolveForwardJump(program, nextTermFixup, pc)
-                    }
-                    REOP_CLASS -> {
-                        val contents = t.classContents!!
-                        if (!contents.sense) program[pc - 1] = REOP_NCLASS
-                        pc = addIndex(program, pc, t.index)
-                        re.classList!![t.index] = RECharSet(contents, t.bmsize)
-                    }
-                    REOP_UPROP, REOP_UPROP_NOT -> pc = addIndex(program, pc, t.unicodeProperty)
-                    else -> {}
+                re.program[pc++] = t.op
+                pc = when (t.op) {
+                    REOP_ALTPREREQ, REOP_ALTPREREQi, REOP_ALTPREREQ2, REOP_ALT -> emitAlternation(state, re, pc, t)
+                    REOP_LPAREN -> emitGroup(state, re, pc, t)
+                    REOP_ASSERT, REOP_ASSERTBACK, REOP_ASSERT_NOT, REOP_ASSERTBACK_NOT -> emitAssertion(state, re, pc, t)
+                    REOP_QUANT -> emitQuantifier(state, re, pc, t)
+                    else -> emitLeaf(state, re, pc, t)
                 }
                 t = t.next
+            }
+            return pc
+        }
+
+        private fun emitAlternation(state: CompilerState, re: RECompiled, pcIn: Int, t: RENode): Int {
+            val program = re.program
+            var pc = emitAlternationPrerequisite(program, pcIn, t)
+            // The right side of an alternation is most often another one, so walk that chain in a
+            // loop and close each level once its right side is out, innermost first.
+            val nextTermFixups = ArrayList<Int>()
+            var alt = t
+            while (true) {
+                val nextAltFixup = pc // where the other alternative starts
+                pc += INDEX_LEN
+                pc = emitREBytecode(state, re, pc, alt.kid)
+                program[pc++] = REOP_JUMP
+                nextTermFixups.add(pc) // where the term after the alternation starts
+                pc += INDEX_LEN
+                resolveForwardJump(program, nextAltFixup, pc)
+                val right = alt.kid2!!
+                if (right.next != null || !isAlternation(right.op)) {
+                    pc = emitREBytecode(state, re, pc, right)
+                    break
+                }
+                program[pc++] = right.op
+                pc = emitAlternationPrerequisite(program, pc, right)
+                alt = right
+            }
+            for (i in nextTermFixups.indices.reversed()) {
+                program[pc++] = REOP_JUMP
+                val nextAltFixup = pc
+                pc += INDEX_LEN
+                resolveForwardJump(program, nextTermFixups[i], pc)
+                resolveForwardJump(program, nextAltFixup, pc)
+            }
+            return pc
+        }
+
+        /** Writes the two characters that a prerequisite alternation [t] checks first, if it has them. */
+        private fun emitAlternationPrerequisite(program: ByteArray, pcIn: Int, t: RENode): Int {
+            if (t.op == REOP_ALT) return pcIn
+            val ignoreCase = t.op == REOP_ALTPREREQi
+            var pc = addIndex(program, pcIn, if (ignoreCase) upcase(t.chr).code else t.chr.code)
+            pc = addIndex(program, pc, if (ignoreCase) upcase(t.index.toChar()).code else t.index)
+            return pc
+        }
+
+        private fun isAlternation(op: Byte): Boolean =
+            op == REOP_ALT || op == REOP_ALTPREREQ || op == REOP_ALTPREREQi || op == REOP_ALTPREREQ2
+
+        private fun emitGroup(state: CompilerState, re: RECompiled, pcIn: Int, t: RENode): Int {
+            var pc = addIndex(re.program, pcIn, t.parenIndex)
+            pc = emitREBytecode(state, re, pc, t.kid)
+            re.program[pc++] = REOP_RPAREN
+            return addIndex(re.program, pc, t.parenIndex)
+        }
+
+        private fun emitAssertion(state: CompilerState, re: RECompiled, pcIn: Int, t: RENode): Int {
+            val nextTermFixup = pcIn
+            var pc = emitREBytecode(state, re, pcIn + INDEX_LEN, t.kid)
+            re.program[pc++] = when (t.op) {
+                REOP_ASSERT -> REOP_ASSERTTEST
+                REOP_ASSERTBACK -> REOP_ASSERTBACKTEST
+                REOP_ASSERT_NOT -> REOP_ASSERTNOTTEST
+                else -> REOP_ASSERTBACKNOTTEST
+            }
+            resolveForwardJump(re.program, nextTermFixup, pc)
+            return pc
+        }
+
+        private fun emitQuantifier(state: CompilerState, re: RECompiled, pcIn: Int, t: RENode): Int {
+            val nextTermFixup = emitQuantifierHeader(re.program, pcIn, t)
+            var pc = emitREBytecode(state, re, nextTermFixup + INDEX_LEN, t.kid)
+            re.program[pc++] = REOP_ENDCHILD
+            resolveForwardJump(re.program, nextTermFixup, pc)
+            return pc
+        }
+
+        /** Writes the bounds and groups of quantifier [t], and answers where its end offset goes. */
+        private fun emitQuantifierHeader(program: ByteArray, pcIn: Int, t: RENode): Int {
+            var pc = pcIn
+            if (t.min == 0 && t.max == -1) {
+                program[pc - 1] = if (t.greedy) REOP_STAR else REOP_MINIMALSTAR
+            } else if (t.min == 0 && t.max == 1) {
+                program[pc - 1] = if (t.greedy) REOP_OPT else REOP_MINIMALOPT
+            } else if (t.min == 1 && t.max == -1) {
+                program[pc - 1] = if (t.greedy) REOP_PLUS else REOP_MINIMALPLUS
+            } else {
+                if (!t.greedy) program[pc - 1] = REOP_MINIMALQUANT
+                pc = addIndex(program, pc, t.min)
+                // max may be -1, which addIndex refuses, so it is stored plus one.
+                pc = addIndex(program, pc, t.max + 1)
+            }
+            pc = addIndex(program, pc, t.parenCount)
+            return addIndex(program, pc, t.parenIndex)
+        }
+
+        /** Emits a node with no children, whose opcode is already written at `pc - 1`. */
+        private fun emitLeaf(state: CompilerState, re: RECompiled, pcIn: Int, t: RENode): Int {
+            val program = re.program
+            var pc = pcIn
+            when (t.op) {
+                REOP_EMPTY -> --pc
+                REOP_FLAT -> {
+                    if (t.flatIndex != -1 && t.length > 1) {
+                        program[pc - 1] = if ((state.flags and JSREG_FOLD) != 0) REOP_FLATi else REOP_FLAT
+                        pc = addIndex(program, pc, t.flatIndex)
+                        pc = addIndex(program, pc, t.length)
+                    } else if (t.chr.code < 256) {
+                        program[pc - 1] = if ((state.flags and JSREG_FOLD) != 0) REOP_FLAT1i else REOP_FLAT1
+                        program[pc++] = t.chr.code.toByte()
+                    } else if (t.lowSurrogate.code == 0) {
+                        program[pc - 1] = if ((state.flags and JSREG_FOLD) != 0) REOP_UCFLAT1i else REOP_UCFLAT1
+                        pc = addIndex(program, pc, t.chr.code)
+                    } else {
+                        program[pc - 1] = REOP_UCSPFLAT1
+                        pc = addIndex(program, pc, t.chr.code)
+                        pc = addIndex(program, pc, t.lowSurrogate.code)
+                    }
+                }
+                REOP_BACKREF -> pc = addIndex(program, pc, t.parenIndex)
+                REOP_NAMED_BACKREF -> {
+                    val names = re.namedBackRefs ?: reportError("msg.invalid.named.backref", "")
+                    val backRefName = names.getOrNull(t.namedCaptureGroupBackRefIndex)
+                        ?: throw Kit.codeBug("emitREBytecode: namedBackRefIndex(${t.namedCaptureGroupBackRefIndex}) out of bounds")
+                    val indices = re.namedCaptureGroups[backRefName]
+                        ?: reportError("msg.invalid.named.backref", "")
+                    if (indices.size == 1) {
+                        // One capture with this name, so a plain back reference will do.
+                        program[pc - 1] = REOP_BACKREF
+                        pc = addIndex(program, pc, indices[0])
+                    } else {
+                        pc = addIndex(program, pc, t.namedCaptureGroupBackRefIndex)
+                    }
+                }
+                REOP_CLASS -> {
+                    val contents = t.classContents!!
+                    if (!contents.sense) program[pc - 1] = REOP_NCLASS
+                    pc = addIndex(program, pc, t.index)
+                    re.classList!![t.index] = RECharSet(contents, t.bmsize)
+                }
+                REOP_UPROP, REOP_UPROP_NOT -> pc = addIndex(program, pc, t.unicodeProperty)
+                else -> {}
             }
             return pc
         }
