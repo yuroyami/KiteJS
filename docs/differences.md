@@ -51,7 +51,6 @@ Reading them gives `undefined`, so `typeof x === 'undefined'` is a safe check.
 | `Intl` | Needs a full locale database. `toLocaleString` formats numbers and dates for en-US; format other locales in Kotlin |
 | `structuredClone` | Use `JSON.parse(JSON.stringify(x))`, or bind your own |
 | `SharedArrayBuffer`, `Atomics` | One thread, so they would mean nothing |
-| `WeakRef`, `FinalizationRegistry` | Not exposed to scripts. `WeakMap` and `WeakSet` are |
 | `Array.fromAsync` | Needs async iteration |
 
 `globalThis` is there and works.

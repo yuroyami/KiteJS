@@ -1490,6 +1490,8 @@ public object ScriptRuntime {
             LazilyLoadedCtor(scope, "BigInt", sealed, Initializable { icx, s, sld -> NativeBigInt.init(icx, s, sld) })
             LazilyLoadedCtor(scope, "WeakMap", sealed, Initializable { icx, s, sld -> NativeWeakMap.init(icx, s, sld) })
             LazilyLoadedCtor(scope, "WeakSet", sealed, Initializable { icx, s, sld -> NativeWeakSet.init(icx, s, sld) })
+            LazilyLoadedCtor(scope, "WeakRef", sealed, Initializable { icx, s, sld -> NativeWeakRef.init(icx, s, sld) })
+            LazilyLoadedCtor(scope, "FinalizationRegistry", sealed, Initializable { icx, s, sld -> NativeFinalizationRegistry.init(icx, s, sld) })
         }
 
         // The intrinsics are cached for every global object, a TopLevel or not, and GeneratorFunction

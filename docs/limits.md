@@ -91,6 +91,11 @@ No script can tell the difference, because a `WeakMap` has no iteration and no s
 WebAssembly is memory, not behaviour. `WeakRef.isWeakSupported` answers false there if your host
 code needs to know.
 
+A script's `WeakRef` and `FinalizationRegistry` follow the same rule. Where the target releases
+weak keys, `deref()` answers `undefined` once the target is collected, and the registry's cleanup
+callback runs when the engine next drains its job queue. Collection is never promised, so a script
+must not depend on either. On WebAssembly a target is never released.
+
 ## Speed
 
 Both engines interpret. QuickJS, being C, ran between 3 and 12 times faster than Rhino on the JVM

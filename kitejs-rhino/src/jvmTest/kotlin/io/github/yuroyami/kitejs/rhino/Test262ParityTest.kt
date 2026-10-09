@@ -40,12 +40,15 @@ class Test262ParityTest {
     )
 
     /**
-     * Folders upstream's properties file skips whole because upstream has no class syntax (D-95)
-     * and no async functions (D-97), which the port runs anyway. Upstream fails to parse every
-     * file in them, so they only add to the port's own outcomes and to the cannot-parse list.
+     * Folders upstream's properties file skips whole because upstream has no class syntax (D-95),
+     * no async functions (D-97) and no WeakRef or FinalizationRegistry (#89), which the port runs
+     * anyway. Upstream fails to parse almost every file in them, so they mostly add to the port's
+     * own outcomes and to the cannot-parse list.
      */
     private val portOnlyFolders = listOf(
         "built-ins/AsyncFunction",
+        "built-ins/FinalizationRegistry",
+        "built-ins/WeakRef",
         "language/expressions/async-function",
         "language/expressions/await",
         "language/expressions/class",

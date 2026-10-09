@@ -45,6 +45,8 @@ class MessageParityTest {
         "msg.async.decl.not.in.block", "msg.async.generator.unsupported", "msg.async.yield", "msg.await.params",
         // Rest elements and the iterator protocol of patterns (#81, #96).
         "msg.rest.not.last", "msg.iterator.result.not.object", "msg.destruct.not.coercible",
+        "msg.weakref.target", "msg.finalization.callback", "msg.finalization.target", "msg.finalization.same",
+        "msg.finalization.token",
     )
 
     private fun portedKeys(): List<String> {

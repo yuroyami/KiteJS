@@ -396,15 +396,58 @@ public open class Context internal constructor(public val factory: ContextFactor
         microtasks.addLast(task)
     }
 
-    /** Runs the queued work, including anything it queues in turn, until the queue is empty. */
+    /**
+     * Runs the queued work, including anything it queues in turn, until the queue is empty. Then
+     * the targets that `WeakRef` kept alive are let go, and a registry whose targets are gone
+     * gets a cleanup job, which runs here too.
+     */
     public open fun processMicrotasks() {
         while (true) {
-            val head = microtasks.firstOrNull() ?: break
+            val head = microtasks.firstOrNull()
+            if (head == null) {
+                keptObjects.clear() // ClearKeptObjects
+                if (!queueFinalizationCleanups()) break
+                continue
+            }
             // Each job is a call, and asks the observer before it runs, so a stop leaves it queued.
             addInstructionCount(MICROTASK_COST)
             microtasks.removeFirst()
             head.run()
         }
+    }
+
+    // ---- WeakRef and FinalizationRegistry ------------------------------------------------------
+
+    /** What `WeakRef` construction and `deref` keep alive until the queue drains (KeepDuringJob). */
+    private val keptObjects = ArrayList<Any>()
+
+    /** The registries with cells, held weakly, which the end of each drain looks through. */
+    private val finalizationRegistries = ArrayList<WeakRef<NativeFinalizationRegistry>>()
+
+    internal fun keepDuringJob(target: Any) {
+        keptObjects.add(target)
+    }
+
+    internal fun watchFinalizationRegistry(registry: NativeFinalizationRegistry) {
+        finalizationRegistries.add(WeakRef(registry))
+    }
+
+    /** Queues a cleanup job for each registry with a collected target. True when it queued one. */
+    private fun queueFinalizationCleanups(): Boolean {
+        if (finalizationRegistries.isEmpty()) return false
+        var queued = false
+        val iterator = finalizationRegistries.iterator()
+        while (iterator.hasNext()) {
+            val registry = iterator.next().get()
+            if (registry == null || !registry.hasCells) {
+                registry?.watched = false
+                iterator.remove()
+            } else if (registry.hasEmptyCells()) {
+                microtasks.addLast(registry.cleanupJob())
+                queued = true
+            }
+        }
+        return queued
     }
 
     /**
@@ -414,6 +457,7 @@ public open class Context internal constructor(public val factory: ContextFactor
      */
     internal fun discardMicrotasks() {
         microtasks.clear()
+        keptObjects.clear()
     }
 
     // ---- Compilation ---------------------------------------------------------------------------
