@@ -46,7 +46,8 @@ class MessageParityTest {
         // Rest elements and the iterator protocol of patterns (#81, #96).
         "msg.rest.not.last", "msg.iterator.result.not.object", "msg.destruct.not.coercible",
         "msg.weakref.target", "msg.finalization.callback", "msg.finalization.target", "msg.finalization.same",
-        "msg.finalization.token", "msg.for.await.of", "msg.iterator.no.throw",
+        "msg.finalization.token", "msg.for.await.of", "msg.iterator.no.throw", "msg.iterator.abstract",
+        "msg.iterator.limit", "msg.empty.iterator.reduce",
     )
 
     private fun portedKeys(): List<String> {

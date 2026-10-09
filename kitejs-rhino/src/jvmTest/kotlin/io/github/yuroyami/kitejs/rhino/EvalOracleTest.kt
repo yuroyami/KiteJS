@@ -608,8 +608,11 @@ class EvalOracleTest {
         "var o = {}; o[Symbol.iterator] = 5; try { [...o] } catch (e) { e.name }",
         "var o = {}; o[Symbol.iterator] = function () { return 5 }; try { [...o] } catch (e) { e.name }",
         "function* g() { yield 1; yield 2; yield 3 } var r = []; for (var v of g()) { if (v == 2) break; r.push(v) } r.join()",
+    ))
 
-        // The iterator built-in and its prototype.
+    /** The legacy Iterator of JavaScript 1.7, which ES6 and later replace with ECMAScript 2025's (#113). */
+    @Test
+    fun legacyIterator() = checkAtVersion(Context.VERSION_1_8, listOf(
         "typeof Iterator", "typeof StopIteration", "Object.prototype.toString.call(StopIteration)",
         "var it = new Iterator({ a: 1, b: 2 }); it.next().join()",
         "var it = new Iterator({ a: 1 }, true); it.next()",
@@ -1732,6 +1735,10 @@ class EvalOracleTest {
             Triple("var closed = false; var o = {}; o[Symbol.iterator] = function () { return { next: function () { return { value: 1, done: false } }, return: function () { closed = true; return { done: true } } } }; for (var v of o) break; closed", "false", "true"),
             Triple("function* g() { try { yield 1; yield 2 } finally { globalThis.fin = 'ran' } } for (var v of g()) break; globalThis.fin", "undefined", "\"ran\""),
             Triple("var [a, ...rest] = [1, 2, 3]; rest.join()", "throws Invalid assignment left-hand side.", "\"2,3\""),
+            // From ES6 on, Iterator is the abstract constructor of ECMAScript 2025 and there is no StopIteration (#113).
+            Triple("typeof StopIteration", "\"object\"", "\"undefined\""),
+            Triple("try { new Iterator({ a: 1 }); 'made' } catch (e) { e.name }", "\"made\"", "\"TypeError\""),
+            Triple("typeof [].values().map", "\"undefined\"", "\"function\""),
         )
         for ((source, legacy, standard) in cases) {
             assertEquals(legacy, upstream(source), source)

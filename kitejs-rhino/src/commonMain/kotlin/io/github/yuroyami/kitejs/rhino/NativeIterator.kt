@@ -42,6 +42,18 @@ public class NativeIterator private constructor(private val objectIterator: Any?
         public const val ITERATOR_PROPERTY_NAME: String = "__iterator__"
 
         internal fun init(cx: Context, scope: ScriptableObject, sealed: Boolean) {
+            if (cx.languageVersion >= Context.VERSION_ES6) {
+                // ECMAScript 2025 makes `Iterator` the abstract constructor of %IteratorPrototype%
+                // and has no StopIteration (#113). The value stays for the engine's own use.
+                IteratorHelpers.init(scope, sealed)
+                ES6Generator.init(scope, sealed)
+                val stop: NativeObject = StopIteration()
+                stop.prototype = getObjectPrototype(scope)
+                stop.parentScope = scope
+                if (sealed) stop.sealObject()
+                scope.associateValue(ITERATOR_TAG, stop)
+                return
+            }
             val constructor = LambdaConstructor(
                 scope,
                 CLASS_NAME,

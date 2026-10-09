@@ -196,6 +196,12 @@ expression syntax including named groups, lookbehind and `\p{...}`.
 Recent library methods are there too, among them `Array.prototype.at`, `flat`, `findLast`,
 `Object.hasOwn`, `Object.groupBy`, `String.prototype.at` and `replaceAll`.
 
+The iterator helpers of ECMAScript 2025 are there. Every built-in iterator and every generator
+has `map`, `filter`, `take`, `drop`, `flatMap`, `reduce`, `toArray`, `forEach`, `some`, `every`
+and `find`, and `Iterator.from` wraps any iterator. So `map.keys().filter(f).toArray()` works.
+The global `Iterator` is the ES2025 abstract constructor. Rhino's legacy `Iterator` and
+`StopIteration` remain only when a host selects a language version before ES6.
+
 ## Source serialization
 
 Rhino's `uneval` and `Object.prototype.toSource` extensions can reconstruct enumerable object

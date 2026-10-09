@@ -78,6 +78,8 @@ public abstract class ES6Iterator : ScriptableObject {
             // A primitive `this` comes back as it was.
             val iterator = LambdaFunction(scope, "[Symbol.iterator]", 0, SerializableCallable { _, _, thisObj, _ -> ScriptRuntime.takeReceiver(thisObj) ?: thisObj })
             proto.defineProperty(SymbolKey.ITERATOR, iterator, DONTENUM)
+            // The helpers of ECMAScript 2025 go on it before it can be sealed (#113).
+            if ((Context.getCurrentContext()?.languageVersion ?: 0) >= Context.VERSION_ES6) IteratorHelpers.installOn(proto, scope)
             if (sealed) proto.sealObject()
             return scope.associateValue(ITERATOR_PROTOTYPE_TAG, proto) as ScriptableObject
         }

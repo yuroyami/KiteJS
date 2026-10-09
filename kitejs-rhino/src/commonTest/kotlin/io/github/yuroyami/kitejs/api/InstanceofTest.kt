@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.api
 
+import io.github.yuroyami.kitejs.rhino.LanguageVersion
 import io.github.yuroyami.kitejs.rhino.Rhino
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,7 +17,8 @@ import kotlin.test.assertEquals
  */
 class InstanceofTest {
 
-    private fun eval(source: String): String = KiteJs(Rhino).use { js -> js.evaluate(source).asString() }
+    private fun eval(source: String, version: LanguageVersion = LanguageVersion.LATEST): String =
+        KiteJs(Rhino) { languageVersion = version }.use { js -> js.evaluate(source).asString() }
 
     private val attempt = "function t(f) { try { return String(f()) } catch (e) { return e.name } }"
 
@@ -153,10 +155,12 @@ class InstanceofTest {
     @Test
     fun the_legacy_stop_iteration_answers_by_its_class() {
         // Rhino's own StopIteration cannot be called and has no Symbol.hasInstance, yet a thrown
-        // string tested against it is false, as upstream answers, rather than a TypeError.
+        // string tested against it is false, as upstream answers, rather than a TypeError. Only
+        // ES5 has it; from ES6 on there is no StopIteration (#113).
         assertEquals(
             "false,false,false",
-            eval("[1 instanceof StopIteration, 'x' instanceof StopIteration, ({}) instanceof StopIteration].join()"),
+            eval("[1 instanceof StopIteration, 'x' instanceof StopIteration, ({}) instanceof StopIteration].join()", LanguageVersion.ES5),
         )
+        assertEquals("undefined", eval("typeof StopIteration"))
     }
 }

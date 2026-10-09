@@ -71,6 +71,7 @@ class Test262ParityTest {
      * counts as a difference.
      */
     private val portFeatureFolders = mapOf(
+        "built-ins/Iterator/" to "#113: the ES2025 Iterator and its helpers run here",
         "built-ins/Array/fromAsync/" to "#91: Array.fromAsync runs here",
     )
 
@@ -1615,6 +1616,8 @@ class Test262ParityTest {
             put(path, "#91: async generators run here")
         }
         put("built-ins/Symbol/asyncIterator/prop-desc.js", "#91: Symbol.asyncIterator is there")
+        // V8 reads each value as it steps, which another test in the folder needs as well.
+        put("built-ins/Iterator/concat/next-method-returns-throwing-value.js", "#113: Iterator.concat reads each value as V8 does")
         // `for (async of` is an early error, which upstream takes as a loop over a name (D-97).
         put("language/statements/for-of/head-lhs-async-invalid.js", "D-97: `for (async of` is an early error here")
         // An async test now runs to the end of its microtasks on both engines, and a resolve
