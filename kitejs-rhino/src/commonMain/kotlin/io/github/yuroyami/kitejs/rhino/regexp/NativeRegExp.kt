@@ -1222,8 +1222,15 @@ public open class NativeRegExp : IdScriptableObject {
         private fun parseDisjunction(state: CompilerState, params: ParserParameters): Boolean {
             if (!parseAlternative(state, params)) return false
             if (state.cp == state.cpbegin.size || state.cpbegin[state.cp] != '|') return true
-            // A loop, not a recursion per '|', so a long word list does not grow the stack. The
-            // alternatives nest to the right, as `a|b|c` is `a|(b|c)`.
+            return parseAlternatives(state, params)
+        }
+
+        /**
+         * Reads the alternatives after the first one, which is in `state.result`. A loop, not a
+         * recursion per '|', so a long word list does not grow the stack. The alternatives nest
+         * to the right, as `a|b|c` is `a|(b|c)`.
+         */
+        private fun parseAlternatives(state: CompilerState, params: ParserParameters): Boolean {
             val alternatives = ArrayList<RENode>()
             alternatives.add(state.result!!)
             while (state.cp != state.cpbegin.size && state.cpbegin[state.cp] == '|') {
