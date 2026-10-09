@@ -51,6 +51,10 @@ occurs twice, and move forward by the gap when a local time does not exist. For 
 America/New_York, `new Date(2024, 10, 3, 1, 30)` means `2024-11-03T05:30:00.000Z`, and
 `new Date(2024, 2, 10, 2, 30)` means `2024-03-10T07:30:00.000Z`.
 
+The zone rules come from the host. On Windows they come from the registry, which holds the
+history of most zones only from the 2000s. So a date before that can read a different offset on
+Windows than in a browser, for example `Asia/Kathmandu` in 1985 or `Africa/Algiers` in 1970.
+
 The non-ISO fallback also accepts common browser formats: `2024-01-15 10:30:00`, `2024-1-5`,
 `Jan 2024` (day 1), and named-month dates with fractional seconds. These are local times unless
 they supply a zone. Fractional digits beyond milliseconds are discarded. Two-digit fallback
