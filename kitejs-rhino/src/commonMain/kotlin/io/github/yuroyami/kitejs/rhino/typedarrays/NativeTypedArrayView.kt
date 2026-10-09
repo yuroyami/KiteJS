@@ -12,6 +12,7 @@ import io.github.yuroyami.kitejs.rhino.Constructable
 import io.github.yuroyami.kitejs.rhino.Context
 import io.github.yuroyami.kitejs.api.KBigInt
 import io.github.yuroyami.kitejs.rhino.ExternalArrayData
+import io.github.yuroyami.kitejs.rhino.Function
 import io.github.yuroyami.kitejs.rhino.Intrinsics
 import io.github.yuroyami.kitejs.rhino.LambdaConstructor
 import io.github.yuroyami.kitejs.rhino.Messages
@@ -277,10 +278,12 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
         }
     }
 
-    private fun getElemForToString(cx: Context, scope: Scriptable, index: Int, useLocale: Boolean): Any? {
+    /** An element as `join` and `toLocaleString` write it: undefined, from a shrunk buffer, is empty. */
+    private fun getElemForToString(cx: Context, scope: Scriptable, index: Int, useLocale: Boolean): String {
         val elem = js_get(index)
-        if (!useLocale) return elem
-        return ScriptRuntime.getPropAndThis(elem, "toLocaleString", cx, scope)!!.call(cx, scope, ScriptRuntime.emptyArgs)
+        if (elem == null || elem === Undefined.instance) return ""
+        if (!useLocale) return ScriptRuntime.toString(elem)
+        return ScriptRuntime.toString(ScriptRuntime.getPropAndThis(elem, "toLocaleString", cx, scope)!!.call(cx, scope, ScriptRuntime.emptyArgs))
     }
 
     /**
@@ -317,7 +320,7 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
             val len = newArray.validateAndGetLength()
             if (args.size == 1 && args[0] is Number) {
                 if (len < (args[0] as Number).toLong()) {
-                    throw ScriptRuntime.rangeErrorById("msg.typed.array.bad.length", len)
+                    throw ScriptRuntime.typeErrorById("msg.typed.array.bad.length", len)
                 }
             }
         } else {
@@ -595,7 +598,7 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
             op: ArrayLikeAbstractOperations.IterativeOperation,
         ): Any? {
             val self = realThis(thisObj)
-            return ArrayLikeAbstractOperations.coercibleIterativeMethod(cx, op, scope, self, args, self.validateAndGetLength())
+            return ArrayLikeAbstractOperations.coercibleIterativeMethod(cx, op, scope, self, args, self.validateAndGetLength(), readEveryIndex = true)
         }
 
         private fun reduce(
@@ -606,7 +609,7 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
             op: ArrayLikeAbstractOperations.ReduceOperation,
         ): Any? {
             val self = realThis(thisObj)
-            return ArrayLikeAbstractOperations.reduceMethodWithLength(cx, op, scope, self, args, self.validateAndGetLength())
+            return ArrayLikeAbstractOperations.reduceMethodWithLength(cx, op, scope, self, args, self.validateAndGetLength(), readEveryIndex = true)
         }
 
         private fun js_iteratorOf(scope: Scriptable, thisObj: Scriptable?, type: NativeArrayIterator.ARRAY_ITERATOR_TYPE): Any {
@@ -619,29 +622,45 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
             val self = realThis(thisObj)
             if (self.isTypedArrayOutOfBounds) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
 
+            val len = self.length
             val builder = StringBuilder()
-            if (self.length > 0) builder.append(ScriptRuntime.toString(self.getElemForToString(cx, scope, 0, useLocale)))
-            for (i in 1 until self.length) {
-                builder.append(',')
-                builder.append(ScriptRuntime.toString(self.getElemForToString(cx, scope, i, useLocale)))
+            for (i in 0 until len) {
+                if (i > 0) builder.append(',')
+                builder.append(self.getElemForToString(cx, scope, i, useLocale))
             }
             return builder.toString()
         }
 
-        private fun js_filter(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val self = realThis(thisObj)
-            val array = ArrayLikeAbstractOperations.coercibleIterativeMethod(
-                cx, ArrayLikeAbstractOperations.IterativeOperation.FILTER, scope, self, args, self.validateAndGetLength(),
-            )
-            return self.typedArraySpeciesCreate(cx, scope, arrayOf<Any?>(array), "filter")
+        /** Calls the callback of `map` or `filter` on element [k], with `thisArg` converted per call (#78). */
+        private fun callback(cx: Context, scope: Scriptable, self: NativeTypedArrayView, f: Function, args: Array<Any?>, value: Any?, k: Int): Any? {
+            val thisArg = if (args.size < 2) Undefined.instance else args[1]
+            val receiver = ScriptRuntime.getApplyOrCallThis(cx, scope, thisArg, 1, f)
+            return f.call(cx, ScriptableObject.getTopLevelScope(f), receiver, arrayOf(value, k, self))
         }
 
+        /** Keeps what the callback selects, then makes the result through species with that count. */
+        private fun js_filter(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
+            val self = realThis(thisObj)
+            val len = self.validateAndGetLength().toInt()
+            val f = ArrayLikeAbstractOperations.getCallbackArg(cx, args.getOrElse(0) { Undefined.instance })
+            val kept = ArrayList<Any?>()
+            for (k in 0 until len) {
+                val value = ScriptableObject.getProperty(self, k)
+                if (ScriptRuntime.toBoolean(callback(cx, scope, self, f, args, value, k))) kept.add(value)
+            }
+            val a = self.typedArraySpeciesCreate(cx, scope, arrayOf<Any?>(kept.size), "filter")
+            kept.forEachIndexed { n, e -> a.put(n, a, e) }
+            return a
+        }
+
+        /** Makes the result through species before the first callback, then writes each mapped value into it. */
         private fun js_map(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val self = realThis(thisObj)
-            val array = ArrayLikeAbstractOperations.coercibleIterativeMethod(
-                cx, ArrayLikeAbstractOperations.IterativeOperation.MAP, scope, thisObj!!, args, self.validateAndGetLength(),
-            )
-            return self.typedArraySpeciesCreate(cx, scope, arrayOf<Any?>(array), "map")
+            val len = self.validateAndGetLength().toInt()
+            val f = ArrayLikeAbstractOperations.getCallbackArg(cx, args.getOrElse(0) { Undefined.instance })
+            val a = self.typedArraySpeciesCreate(cx, scope, arrayOf<Any?>(len), "map")
+            for (k in 0 until len) a.put(k, a, callback(cx, scope, self, f, args, ScriptableObject.getProperty(self, k), k))
+            return a
         }
 
         private fun js_includes(thisObj: Scriptable?, args: Array<Any?>): Boolean {

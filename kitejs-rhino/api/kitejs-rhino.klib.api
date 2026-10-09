@@ -351,10 +351,14 @@ abstract class io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBufferView
         final fun <get-buffer>(): io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBufferView.buffer.<get-buffer>|<get-buffer>(){}[0]
     final val byteLength // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBufferView.byteLength|{}byteLength[0]
         final fun <get-byteLength>(): kotlin/Int // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBufferView.byteLength.<get-byteLength>|<get-byteLength>(){}[0]
+    final val isLengthTracking // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBufferView.isLengthTracking|{}isLengthTracking[0]
+        final fun <get-isLengthTracking>(): kotlin/Boolean // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBufferView.isLengthTracking.<get-isLengthTracking>|<get-isLengthTracking>(){}[0]
     final val offset // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBufferView.offset|{}offset[0]
         final fun <get-offset>(): kotlin/Int // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBufferView.offset.<get-offset>|<get-offset>(){}[0]
     final val outOfRange // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBufferView.outOfRange|{}outOfRange[0]
         final fun <get-outOfRange>(): kotlin/Boolean // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBufferView.outOfRange.<get-outOfRange>|<get-outOfRange>(){}[0]
+
+    open fun trackedByteLength(kotlin/Int): kotlin/Int // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBufferView.trackedByteLength|trackedByteLength(kotlin.Int){}[0]
 
     final object Companion // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBufferView.Companion|null[0]
 }
@@ -394,6 +398,7 @@ abstract class io.github.yuroyami.kitejs.rhino.typedarrays/NativeTypedArrayView 
     open fun put(kotlin/String, io.github.yuroyami.kitejs.rhino/Scriptable, kotlin/Any?) // io.github.yuroyami.kitejs.rhino.typedarrays/NativeTypedArrayView.put|put(kotlin.String;io.github.yuroyami.kitejs.rhino.Scriptable;kotlin.Any?){}[0]
     open fun setArrayElement(kotlin/Int, kotlin/Any?) // io.github.yuroyami.kitejs.rhino.typedarrays/NativeTypedArrayView.setArrayElement|setArrayElement(kotlin.Int;kotlin.Any?){}[0]
     open fun toNumeric(kotlin/Any?): kotlin/Any? // io.github.yuroyami.kitejs.rhino.typedarrays/NativeTypedArrayView.toNumeric|toNumeric(kotlin.Any?){}[0]
+    open fun trackedByteLength(kotlin/Int): kotlin/Int // io.github.yuroyami.kitejs.rhino.typedarrays/NativeTypedArrayView.trackedByteLength|trackedByteLength(kotlin.Int){}[0]
 
     final object Companion { // io.github.yuroyami.kitejs.rhino.typedarrays/NativeTypedArrayView.Companion|null[0]
         abstract fun interface TypedArrayConstructable { // io.github.yuroyami.kitejs.rhino.typedarrays/NativeTypedArrayView.Companion.TypedArrayConstructable|null[0]
@@ -2143,13 +2148,20 @@ final class io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer : io.g
         final fun <get-className>(): kotlin/String // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer.className.<get-className>|<get-className>(){}[0]
     final val isDetached // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer.isDetached|{}isDetached[0]
         final fun <get-isDetached>(): kotlin/Boolean // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer.isDetached.<get-isDetached>|<get-isDetached>(){}[0]
+    final val isResizable // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer.isResizable|{}isResizable[0]
+        final fun <get-isResizable>(): kotlin/Boolean // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer.isResizable.<get-isResizable>|<get-isResizable>(){}[0]
     final val length // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer.length|{}length[0]
         final fun <get-length>(): kotlin/Int // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer.length.<get-length>|<get-length>(){}[0]
 
     final var buffer // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer.buffer|{}buffer[0]
         final fun <get-buffer>(): kotlin/ByteArray? // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer.buffer.<get-buffer>|<get-buffer>(){}[0]
+    final var isShared // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer.isShared|{}isShared[0]
+        final fun <get-isShared>(): kotlin/Boolean // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer.isShared.<get-isShared>|<get-isShared>(){}[0]
+    final var maxByteLength // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer.maxByteLength|{}maxByteLength[0]
+        final fun <get-maxByteLength>(): kotlin/Int // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer.maxByteLength.<get-maxByteLength>|<get-maxByteLength>(){}[0]
 
     final fun detach() // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer.detach|detach(){}[0]
+    final fun resize(kotlin/Int) // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer.resize|resize(kotlin.Int){}[0]
     final fun slice(kotlin/Double, kotlin/Double): io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer.slice|slice(kotlin.Double;kotlin.Double){}[0]
 
     final object Companion { // io.github.yuroyami.kitejs.rhino.typedarrays/NativeArrayBuffer.Companion|null[0]
@@ -2677,6 +2689,13 @@ final class io.github.yuroyami.kitejs.rhino/NativeArrayIterator : io.github.yuro
     final object Companion // io.github.yuroyami.kitejs.rhino/NativeArrayIterator.Companion|null[0]
 }
 
+final class io.github.yuroyami.kitejs.rhino/NativeAsyncGenerator : io.github.yuroyami.kitejs.rhino/ScriptableObject { // io.github.yuroyami.kitejs.rhino/NativeAsyncGenerator|null[0]
+    final val className // io.github.yuroyami.kitejs.rhino/NativeAsyncGenerator.className|{}className[0]
+        final fun <get-className>(): kotlin/String // io.github.yuroyami.kitejs.rhino/NativeAsyncGenerator.className.<get-className>|<get-className>(){}[0]
+
+    final object Companion // io.github.yuroyami.kitejs.rhino/NativeAsyncGenerator.Companion|null[0]
+}
+
 final class io.github.yuroyami.kitejs.rhino/NativeCall : io.github.yuroyami.kitejs.rhino/IdScriptableObject { // io.github.yuroyami.kitejs.rhino/NativeCall|null[0]
     final val className // io.github.yuroyami.kitejs.rhino/NativeCall.className|{}className[0]
         final fun <get-className>(): kotlin/String // io.github.yuroyami.kitejs.rhino/NativeCall.className.<get-className>|<get-className>(){}[0]
@@ -2976,6 +2995,8 @@ final class io.github.yuroyami.kitejs.rhino/SymbolKey : io.github.yuroyami.kitej
     final fun toString(): kotlin/String // io.github.yuroyami.kitejs.rhino/SymbolKey.toString|toString(){}[0]
 
     final object Companion { // io.github.yuroyami.kitejs.rhino/SymbolKey.Companion|null[0]
+        final val ASYNC_ITERATOR // io.github.yuroyami.kitejs.rhino/SymbolKey.Companion.ASYNC_ITERATOR|{}ASYNC_ITERATOR[0]
+            final fun <get-ASYNC_ITERATOR>(): io.github.yuroyami.kitejs.rhino/SymbolKey // io.github.yuroyami.kitejs.rhino/SymbolKey.Companion.ASYNC_ITERATOR.<get-ASYNC_ITERATOR>|<get-ASYNC_ITERATOR>(){}[0]
         final val HAS_INSTANCE // io.github.yuroyami.kitejs.rhino/SymbolKey.Companion.HAS_INSTANCE|{}HAS_INSTANCE[0]
             final fun <get-HAS_INSTANCE>(): io.github.yuroyami.kitejs.rhino/SymbolKey // io.github.yuroyami.kitejs.rhino/SymbolKey.Companion.HAS_INSTANCE.<get-HAS_INSTANCE>|<get-HAS_INSTANCE>(){}[0]
         final val IS_CONCAT_SPREADABLE // io.github.yuroyami.kitejs.rhino/SymbolKey.Companion.IS_CONCAT_SPREADABLE|{}IS_CONCAT_SPREADABLE[0]
@@ -3057,6 +3078,9 @@ open class io.github.yuroyami.kitejs.rhino.ast/ForInLoop : io.github.yuroyami.ki
     final var inPosition // io.github.yuroyami.kitejs.rhino.ast/ForInLoop.inPosition|{}inPosition[0]
         final fun <get-inPosition>(): kotlin/Int // io.github.yuroyami.kitejs.rhino.ast/ForInLoop.inPosition.<get-inPosition>|<get-inPosition>(){}[0]
         final fun <set-inPosition>(kotlin/Int) // io.github.yuroyami.kitejs.rhino.ast/ForInLoop.inPosition.<set-inPosition>|<set-inPosition>(kotlin.Int){}[0]
+    final var isForAwait // io.github.yuroyami.kitejs.rhino.ast/ForInLoop.isForAwait|{}isForAwait[0]
+        final fun <get-isForAwait>(): kotlin/Boolean // io.github.yuroyami.kitejs.rhino.ast/ForInLoop.isForAwait.<get-isForAwait>|<get-isForAwait>(){}[0]
+        final fun <set-isForAwait>(kotlin/Boolean) // io.github.yuroyami.kitejs.rhino.ast/ForInLoop.isForAwait.<set-isForAwait>|<set-isForAwait>(kotlin.Boolean){}[0]
     final var isForOf // io.github.yuroyami.kitejs.rhino.ast/ForInLoop.isForOf|{}isForOf[0]
         final fun <get-isForOf>(): kotlin/Boolean // io.github.yuroyami.kitejs.rhino.ast/ForInLoop.isForOf.<get-isForOf>|<get-isForOf>(){}[0]
         final fun <set-isForOf>(kotlin/Boolean) // io.github.yuroyami.kitejs.rhino.ast/ForInLoop.isForOf.<set-isForOf>|<set-isForOf>(kotlin.Boolean){}[0]
@@ -3450,6 +3474,8 @@ open class io.github.yuroyami.kitejs.rhino/BaseFunction : io.github.yuroyami.kit
         open fun <get-classPrototype>(): io.github.yuroyami.kitejs.rhino/Scriptable? // io.github.yuroyami.kitejs.rhino/BaseFunction.classPrototype.<get-classPrototype>|<get-classPrototype>(){}[0]
     open val functionName // io.github.yuroyami.kitejs.rhino/BaseFunction.functionName|{}functionName[0]
         open fun <get-functionName>(): kotlin/String // io.github.yuroyami.kitejs.rhino/BaseFunction.functionName.<get-functionName>|<get-functionName>(){}[0]
+    open val isAsyncGeneratorFunction // io.github.yuroyami.kitejs.rhino/BaseFunction.isAsyncGeneratorFunction|{}isAsyncGeneratorFunction[0]
+        open fun <get-isAsyncGeneratorFunction>(): kotlin/Boolean // io.github.yuroyami.kitejs.rhino/BaseFunction.isAsyncGeneratorFunction.<get-isAsyncGeneratorFunction>|<get-isAsyncGeneratorFunction>(){}[0]
     open val isConstructor // io.github.yuroyami.kitejs.rhino/BaseFunction.isConstructor|{}isConstructor[0]
         open fun <get-isConstructor>(): kotlin/Boolean // io.github.yuroyami.kitejs.rhino/BaseFunction.isConstructor.<get-isConstructor>|<get-isConstructor>(){}[0]
     open val isGeneratorFunction // io.github.yuroyami.kitejs.rhino/BaseFunction.isGeneratorFunction|{}isGeneratorFunction[0]
@@ -3856,6 +3882,8 @@ open class io.github.yuroyami.kitejs.rhino/JSFunction : io.github.yuroyami.kitej
         open fun <get-descriptor>(): io.github.yuroyami.kitejs.rhino/JSDescriptor<io.github.yuroyami.kitejs.rhino/JSFunction> // io.github.yuroyami.kitejs.rhino/JSFunction.descriptor.<get-descriptor>|<get-descriptor>(){}[0]
     open val functionName // io.github.yuroyami.kitejs.rhino/JSFunction.functionName|{}functionName[0]
         open fun <get-functionName>(): kotlin/String // io.github.yuroyami.kitejs.rhino/JSFunction.functionName.<get-functionName>|<get-functionName>(){}[0]
+    open val isAsyncGeneratorFunction // io.github.yuroyami.kitejs.rhino/JSFunction.isAsyncGeneratorFunction|{}isAsyncGeneratorFunction[0]
+        open fun <get-isAsyncGeneratorFunction>(): kotlin/Boolean // io.github.yuroyami.kitejs.rhino/JSFunction.isAsyncGeneratorFunction.<get-isAsyncGeneratorFunction>|<get-isAsyncGeneratorFunction>(){}[0]
     open val isConstructor // io.github.yuroyami.kitejs.rhino/JSFunction.isConstructor|{}isConstructor[0]
         open fun <get-isConstructor>(): kotlin/Boolean // io.github.yuroyami.kitejs.rhino/JSFunction.isConstructor.<get-isConstructor>|<get-isConstructor>(){}[0]
     open val isGeneratorFunction // io.github.yuroyami.kitejs.rhino/JSFunction.isGeneratorFunction|{}isGeneratorFunction[0]
@@ -4241,6 +4269,7 @@ open class io.github.yuroyami.kitejs.rhino/TopLevel : io.github.yuroyami.kitejs.
         enum entry Array // io.github.yuroyami.kitejs.rhino/TopLevel.Builtins.Array|null[0]
         enum entry ArrayBuffer // io.github.yuroyami.kitejs.rhino/TopLevel.Builtins.ArrayBuffer|null[0]
         enum entry AsyncFunction // io.github.yuroyami.kitejs.rhino/TopLevel.Builtins.AsyncFunction|null[0]
+        enum entry AsyncGeneratorFunction // io.github.yuroyami.kitejs.rhino/TopLevel.Builtins.AsyncGeneratorFunction|null[0]
         enum entry BigInt // io.github.yuroyami.kitejs.rhino/TopLevel.Builtins.BigInt|null[0]
         enum entry BigInt64Array // io.github.yuroyami.kitejs.rhino/TopLevel.Builtins.BigInt64Array|null[0]
         enum entry BigUint64Array // io.github.yuroyami.kitejs.rhino/TopLevel.Builtins.BigUint64Array|null[0]

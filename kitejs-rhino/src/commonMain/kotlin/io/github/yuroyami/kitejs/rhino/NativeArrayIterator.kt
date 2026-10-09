@@ -28,11 +28,14 @@ public class NativeArrayIterator : ES6Iterator {
         get() = "Array Iterator"
 
     override fun isDone(cx: Context, scope: Scriptable): Boolean {
-        val typedArray = arrayLike
-        if (typedArray is NativeTypedArrayView && typedArray.isTypedArrayOutOfBounds) {
+        val array = arrayLike ?: return true
+        if (array is NativeTypedArrayView && array.isTypedArrayOutOfBounds) {
             throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
         }
-        return index >= NativeArray.getLengthProperty(cx, arrayLike!!)
+        if (index < NativeArray.getLengthProperty(cx, array)) return false
+        // An exhausted iterator lets its array go and stays done, whatever the array does next.
+        arrayLike = null
+        return true
     }
 
     override fun nextValue(cx: Context, scope: Scriptable): Any? {

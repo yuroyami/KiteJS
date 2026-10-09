@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.rhino.typedarrays
 
+import io.github.yuroyami.kitejs.api.KBigInt
 import io.github.yuroyami.kitejs.rhino.Context
 import io.github.yuroyami.kitejs.rhino.LambdaConstructor
 import io.github.yuroyami.kitejs.rhino.ScriptRuntime
@@ -108,6 +109,29 @@ public class NativeDataView : NativeArrayBufferView {
         }
     }
 
+    private fun js_getBigInt(signed: Boolean, args: Array<Any?>): Any? {
+        val pos = ScriptRuntime.toIndex(if (isArg(args, 0)) args[0] else Undefined.instance)
+        val littleEndian = isArg(args, 1) && ScriptRuntime.toBoolean(args[1])
+
+        if (isDataViewOutOfBounds) throw ScriptRuntime.typeErrorById("msg.dataview.bounds")
+        if (pos.toLong() + 8 > byteLength) throw ScriptRuntime.rangeErrorById("msg.dataview.offset.range")
+
+        val bits = ByteIo.readUint64Primitive(arrayBuffer.buffer!!, offset + pos, littleEndian)
+        return if (signed) KBigInt.fromLong(bits) else NativeBigUint64Array.unsigned(bits)
+    }
+
+    /** Both setters write the low 64 bits, so one serves `setBigInt64` and `setBigUint64`. */
+    private fun js_setBigInt(args: Array<Any?>) {
+        val pos = ScriptRuntime.toIndex(if (isArg(args, 0)) args[0] else Undefined.instance)
+        val value = ScriptRuntime.toBigInt(if (args.size > 1) args[1] else Undefined.instance)
+        val littleEndian = isArg(args, 2) && ScriptRuntime.toBoolean(args[2])
+
+        if (isDataViewOutOfBounds) throw ScriptRuntime.typeErrorById("msg.dataview.bounds")
+        if (pos.toLong() + 8 > byteLength) throw ScriptRuntime.rangeErrorById("msg.dataview.offset.range")
+
+        ByteIo.writeUint64(arrayBuffer.buffer!!, offset + pos, value.toLong(), littleEndian)
+    }
+
     public companion object {
         public const val CLASS_NAME: String = "DataView"
 
@@ -143,6 +167,8 @@ public class NativeDataView : NativeArrayBufferView {
             constructor.definePrototypeMethod(scope, "getFloat16", 1, SerializableCallable { _, _, t, a -> realThis(t).js_getFloat(2, a) })
             constructor.definePrototypeMethod(scope, "getFloat32", 1, SerializableCallable { _, _, t, a -> realThis(t).js_getFloat(4, a) })
             constructor.definePrototypeMethod(scope, "getFloat64", 1, SerializableCallable { _, _, t, a -> realThis(t).js_getFloat(8, a) })
+            constructor.definePrototypeMethod(scope, "getBigInt64", 1, SerializableCallable { _, _, t, a -> realThis(t).js_getBigInt(true, a) })
+            constructor.definePrototypeMethod(scope, "getBigUint64", 1, SerializableCallable { _, _, t, a -> realThis(t).js_getBigInt(false, a) })
 
             defineSet(constructor, scope, "setInt8", 1, true)
             defineSet(constructor, scope, "setInt16", 2, true)
@@ -160,6 +186,14 @@ public class NativeDataView : NativeArrayBufferView {
             })
             constructor.definePrototypeMethod(scope, "setFloat64", 2, SerializableCallable { _, _, t, a ->
                 realThis(t).js_setFloat(8, a)
+                Undefined.instance
+            })
+            constructor.definePrototypeMethod(scope, "setBigInt64", 2, SerializableCallable { _, _, t, a ->
+                realThis(t).js_setBigInt(a)
+                Undefined.instance
+            })
+            constructor.definePrototypeMethod(scope, "setBigUint64", 2, SerializableCallable { _, _, t, a ->
+                realThis(t).js_setBigInt(a)
                 Undefined.instance
             })
 

@@ -124,6 +124,7 @@ public class io/github/yuroyami/kitejs/rhino/BaseFunction : io/github/yuroyami/k
 	public fun hasInstance (Lio/github/yuroyami/kitejs/rhino/Scriptable;)Z
 	protected fun hasPrototypeProperty ()Z
 	protected fun includeNonStandardProps ()Z
+	protected fun isAsyncGeneratorFunction ()Z
 	public fun isConstructor ()Z
 	protected fun isGeneratorFunction ()Z
 	public fun setHomeObject (Lio/github/yuroyami/kitejs/rhino/Scriptable;)V
@@ -936,6 +937,7 @@ public class io/github/yuroyami/kitejs/rhino/JSFunction : io/github/yuroyami/kit
 	public final fun getRawSource ()Ljava/lang/String;
 	public final fun hasFunctionNamed (Ljava/lang/String;)Z
 	protected fun hasPrototypeProperty ()Z
+	protected fun isAsyncGeneratorFunction ()Z
 	public fun isConstructor ()Z
 	protected fun isGeneratorFunction ()Z
 	public final fun isScript ()Z
@@ -1115,6 +1117,14 @@ public final class io/github/yuroyami/kitejs/rhino/NativeArrayIterator$ARRAY_ITE
 }
 
 public final class io/github/yuroyami/kitejs/rhino/NativeArrayIterator$Companion {
+}
+
+public final class io/github/yuroyami/kitejs/rhino/NativeAsyncGenerator : io/github/yuroyami/kitejs/rhino/ScriptableObject {
+	public static final field Companion Lio/github/yuroyami/kitejs/rhino/NativeAsyncGenerator$Companion;
+	public fun getClassName ()Ljava/lang/String;
+}
+
+public final class io/github/yuroyami/kitejs/rhino/NativeAsyncGenerator$Companion {
 }
 
 public final class io/github/yuroyami/kitejs/rhino/NativeCall : io/github/yuroyami/kitejs/rhino/IdScriptableObject {
@@ -2251,6 +2261,7 @@ public final class io/github/yuroyami/kitejs/rhino/SymbolKey : io/github/yuroyam
 }
 
 public final class io/github/yuroyami/kitejs/rhino/SymbolKey$Companion {
+	public final fun getASYNC_ITERATOR ()Lio/github/yuroyami/kitejs/rhino/SymbolKey;
 	public final fun getHAS_INSTANCE ()Lio/github/yuroyami/kitejs/rhino/SymbolKey;
 	public final fun getIS_CONCAT_SPREADABLE ()Lio/github/yuroyami/kitejs/rhino/SymbolKey;
 	public final fun getIS_REGEXP ()Lio/github/yuroyami/kitejs/rhino/SymbolKey;
@@ -2508,6 +2519,7 @@ public final class io/github/yuroyami/kitejs/rhino/TopLevel$Builtins : java/lang
 	public static final field Array Lio/github/yuroyami/kitejs/rhino/TopLevel$Builtins;
 	public static final field ArrayBuffer Lio/github/yuroyami/kitejs/rhino/TopLevel$Builtins;
 	public static final field AsyncFunction Lio/github/yuroyami/kitejs/rhino/TopLevel$Builtins;
+	public static final field AsyncGeneratorFunction Lio/github/yuroyami/kitejs/rhino/TopLevel$Builtins;
 	public static final field BigInt Lio/github/yuroyami/kitejs/rhino/TopLevel$Builtins;
 	public static final field BigInt64Array Lio/github/yuroyami/kitejs/rhino/TopLevel$Builtins;
 	public static final field BigUint64Array Lio/github/yuroyami/kitejs/rhino/TopLevel$Builtins;
@@ -2969,9 +2981,11 @@ public class io/github/yuroyami/kitejs/rhino/ast/ForInLoop : io/github/yuroyami/
 	public final fun getInPosition ()I
 	public final fun getIteratedObject ()Lio/github/yuroyami/kitejs/rhino/ast/AstNode;
 	public final fun getIterator ()Lio/github/yuroyami/kitejs/rhino/ast/AstNode;
+	public final fun isForAwait ()Z
 	public fun isForEach ()Z
 	public final fun isForOf ()Z
 	public final fun setEachPosition (I)V
+	public final fun setForAwait (Z)V
 	public fun setForEach (Z)V
 	public final fun setForOf (Z)V
 	public final fun setInPosition (I)V
@@ -3871,7 +3885,11 @@ public final class io/github/yuroyami/kitejs/rhino/typedarrays/NativeArrayBuffer
 	public final fun getBuffer ()[B
 	public fun getClassName ()Ljava/lang/String;
 	public final fun getLength ()I
+	public final fun getMaxByteLength ()I
 	public final fun isDetached ()Z
+	public final fun isResizable ()Z
+	public final fun isShared ()Z
+	public final fun resize (I)V
 	public final fun slice (DD)Lio/github/yuroyami/kitejs/rhino/typedarrays/NativeArrayBuffer;
 }
 
@@ -3887,6 +3905,8 @@ public abstract class io/github/yuroyami/kitejs/rhino/typedarrays/NativeArrayBuf
 	public final fun getByteLength ()I
 	public final fun getOffset ()I
 	protected final fun getOutOfRange ()Z
+	public final fun isLengthTracking ()Z
+	protected fun trackedByteLength (I)I
 }
 
 public final class io/github/yuroyami/kitejs/rhino/typedarrays/NativeArrayBufferView$Companion {
@@ -4029,6 +4049,7 @@ public abstract class io/github/yuroyami/kitejs/rhino/typedarrays/NativeTypedArr
 	public fun put (Ljava/lang/String;Lio/github/yuroyami/kitejs/rhino/Scriptable;Ljava/lang/Object;)V
 	public fun setArrayElement (ILjava/lang/Object;)V
 	protected fun toNumeric (Ljava/lang/Object;)Ljava/lang/Object;
+	protected fun trackedByteLength (I)I
 }
 
 public final class io/github/yuroyami/kitejs/rhino/typedarrays/NativeTypedArrayView$Companion {

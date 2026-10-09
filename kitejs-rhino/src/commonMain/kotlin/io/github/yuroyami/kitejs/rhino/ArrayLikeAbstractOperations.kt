@@ -5,6 +5,7 @@
 package io.github.yuroyami.kitejs.rhino
 
 import io.github.yuroyami.kitejs.rhino.ScriptableObject.DescriptorInfo
+import io.github.yuroyami.kitejs.rhino.typedarrays.NativeTypedArrayView
 
 /** The array methods that also work on typed arrays and other array-likes: iteration, reduce, sort. */
 public object ArrayLikeAbstractOperations {
@@ -102,6 +103,17 @@ public object ArrayLikeAbstractOperations {
         o: Scriptable,
         args: Array<Any?>,
         length: Long,
+    ): Any? = coercibleIterativeMethod(cx, operation, scope, o, args, length, readEveryIndex = false)
+
+    /** [readEveryIndex] reads an absent index as undefined, as the `%TypedArray%` methods do; the Array methods skip it. */
+    internal fun coercibleIterativeMethod(
+        cx: Context,
+        operation: IterativeOperation,
+        scope: Scriptable,
+        o: Scriptable,
+        args: Array<Any?>,
+        length: Long,
+        readEveryIndex: Boolean,
     ): Any? {
         if (operation == IterativeOperation.MAP && length > Int.MAX_VALUE) {
             val msg = ScriptRuntime.getMessageById("msg.arraylength.bad")
@@ -125,7 +137,7 @@ public object ArrayLikeAbstractOperations {
         var i = start
         while (i != end) {
             val innerArgs = arrayOfNulls<Any?>(3)
-            var elem = getRawElem(o, i)
+            var elem = if (readEveryIndex) ScriptableObject.getProperty(o, i.toInt()) else getRawElem(o, i)
             if (elem === Scriptable.NOT_FOUND) {
                 if (isFind(operation)) {
                     elem = Undefined.instance
@@ -216,6 +228,8 @@ public object ArrayLikeAbstractOperations {
         if (index < 0 || index > Int.MAX_VALUE) {
             return ScriptableObject.getProperty(target, index.toString())
         }
+        // A typed array reads undefined past its end, but has no such index, as after a shrink (#114).
+        if (target is NativeTypedArrayView && !target.has(index.toInt(), target)) return Scriptable.NOT_FOUND
         return ScriptableObject.getProperty(target, index.toInt())
     }
 
@@ -238,6 +252,17 @@ public object ArrayLikeAbstractOperations {
         o: Scriptable,
         args: Array<Any?>,
         length: Long,
+    ): Any? = reduceMethodWithLength(cx, operation, scope, o, args, length, readEveryIndex = false)
+
+    /** [readEveryIndex] as for [coercibleIterativeMethod]. */
+    internal fun reduceMethodWithLength(
+        cx: Context,
+        operation: ReduceOperation,
+        scope: Scriptable,
+        o: Scriptable,
+        args: Array<Any?>,
+        length: Long,
+        readEveryIndex: Boolean,
     ): Any? {
         val callbackArg = if (args.isNotEmpty()) args[0] else Undefined.instance
         if (callbackArg == null || callbackArg !is Function) {
@@ -248,7 +273,7 @@ public object ArrayLikeAbstractOperations {
         var value: Any? = if (args.size > 1) args[1] else Scriptable.NOT_FOUND
         for (i in 0 until length) {
             val index = if (movingLeft) i else (length - 1 - i)
-            val elem = getRawElem(o, index)
+            val elem = if (readEveryIndex) ScriptableObject.getProperty(o, index.toInt()) else getRawElem(o, index)
             if (elem === Scriptable.NOT_FOUND) continue
             if (value === Scriptable.NOT_FOUND) {
                 value = elem

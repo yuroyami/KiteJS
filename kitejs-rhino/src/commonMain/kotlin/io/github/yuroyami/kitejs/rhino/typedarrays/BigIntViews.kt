@@ -121,11 +121,7 @@ public class NativeBigUint64Array : NativeBigIntArrayView {
             (index * BYTES_PER_ELEMENT) + offset,
             littleEndian,
         )
-        if ((base and Long.MIN_VALUE) == 0L) return KBigInt.fromLong(base)
-        // The top bit is set, so the Long reads as negative. Rebuild it from two halves instead.
-        val low = KBigInt.fromLong(base and 0xFFFFFFFFL)
-        val high = KBigInt.fromLong((base shr 32) and 0xFFFFFFFFL).shiftLeft(32)
-        return high.add(low)
+        return unsigned(base)
     }
 
     override fun js_set(index: Int, c: Any?): Any? {
@@ -143,6 +139,15 @@ public class NativeBigUint64Array : NativeBigIntArrayView {
     public companion object {
         private const val CLASS_NAME = "BigUint64Array"
         private const val BYTES_PER_ELEMENT = 8
+
+        /** The bigint of 64 bits read as unsigned. */
+        internal fun unsigned(bits: Long): KBigInt {
+            if ((bits and Long.MIN_VALUE) == 0L) return KBigInt.fromLong(bits)
+            // The top bit is set, so the Long reads as negative. Rebuild it from two halves instead.
+            val low = KBigInt.fromLong(bits and 0xFFFFFFFFL)
+            val high = KBigInt.fromLong((bits shr 32) and 0xFFFFFFFFL).shiftLeft(32)
+            return high.add(low)
+        }
 
         internal fun init(cx: Context, scope: Scriptable, sealed: Boolean): Any {
             val constructor = LambdaConstructor(
