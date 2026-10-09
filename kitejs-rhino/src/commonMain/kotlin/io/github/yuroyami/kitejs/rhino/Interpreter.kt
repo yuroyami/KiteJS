@@ -199,6 +199,8 @@ public class Interpreter : Evaluator {
         val isStrict: Boolean
         var isContinuationsTopFrame = false
         val thisObj: Scriptable?
+        /** The primitive `this` of strict code called on a primitive, which [thisObj] wraps (#78). */
+        var thisPrimitive: Any? = null
         var result: Any? = Undefined.instance
         var resultDbl = 0.0
         var pc = 0
@@ -235,6 +237,11 @@ public class Interpreter : Evaluator {
             this.fnOrScript = fnOrScript
             varSource = this
             this.thisObj = thisObj
+            // OrdinaryCallBindThis: strict code keeps a primitive receiver, sloppy code keeps its wrapper.
+            val descriptor = fnOrScript.descriptor!!
+            val received = if (descriptor.hasLexicalThis) null else ScriptRuntime.takeReceiver(thisObj)
+            thisPrimitive = if (descriptor.hasLexicalThis) (fnOrScript as? JSFunction)?.lexicalThisPrimitive
+                else received.takeIf { isStrict }
             this.parentFrame = parentFrame
             this.parentPC = if (parentFrame == null) (previousInterpreterFrame?.pcSourceLineStart ?: -1) else parentFrame.pcSourceLineStart
             this.previousInterpreterFrame = previousInterpreterFrame
@@ -266,6 +273,7 @@ public class Interpreter : Evaluator {
             isStrict = original.isStrict
             isContinuationsTopFrame = original.isContinuationsTopFrame
             thisObj = original.thisObj
+            thisPrimitive = original.thisPrimitive
             result = original.result
             resultDbl = original.resultDbl
             pc = original.pc
@@ -303,6 +311,7 @@ public class Interpreter : Evaluator {
             isStrict = original.isStrict
             isContinuationsTopFrame = original.isContinuationsTopFrame
             thisObj = original.thisObj
+            thisPrimitive = original.thisPrimitive
             result = original.result
             resultDbl = original.resultDbl
             pc = original.pc
@@ -1466,7 +1475,8 @@ public class Interpreter : Evaluator {
                     return null
                 }
                 Token.THIS -> {
-                    stack[++state.stackTop] = thisValue(frame)
+                    // The scriptable stand-in for undefined must not reach typeof as an object.
+                    stack[++state.stackTop] = frame.thisPrimitive ?: thisValue(frame).let { if (it === Undefined.SCRIPTABLE_UNDEFINED) Undefined.instance else it }
                     return null
                 }
                 Icode_NEW_TARGET -> {
@@ -2409,7 +2419,10 @@ public class Interpreter : Evaluator {
         /** The `this` direct eval code is handed; its own frame asks the binding, if there is one. */
         private fun callerThis(frame: CallFrame): Scriptable? {
             val binding = frame.thisBinding
-            return if (binding != null) binding.value ?: Undefined.SCRIPTABLE_UNDEFINED else frame.thisObj
+            if (binding != null) return binding.value ?: Undefined.SCRIPTABLE_UNDEFINED
+            // Direct eval code shares the caller's this, so a primitive one stays primitive there.
+            if (frame.thisPrimitive != null) ScriptRuntime.markReceiver(frame.thisObj)
+            return frame.thisObj
         }
 
         private fun enterFrame(cx: Context, frame: CallFrame, args: Array<Any?>, continuationRestart: Boolean) {
@@ -2521,6 +2534,7 @@ public class Interpreter : Evaluator {
             val fn = JSFunction(cx, frame.scope!!, desc, frame.thisObj, homeObject)
             if (isArrow) {
                 fn.lexicalThisBinding = frame.thisBinding
+                fn.lexicalThisPrimitive = frame.thisPrimitive
                 fn.lexicalNewTarget = frame.newTarget
             }
             return fn

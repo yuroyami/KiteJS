@@ -7,7 +7,9 @@ package io.github.yuroyami.kitejs.rhino
 import kotlin.reflect.KClass
 
 /** The JavaScript `Boolean` wrapper object. */
-internal class NativeBoolean internal constructor(private val booleanValue: Boolean) : ScriptableObject() {
+internal class NativeBoolean internal constructor(private val booleanValue: Boolean) : ScriptableObject(), PrimitiveWrapper {
+    override val primitiveValue: Any get() = booleanValue
+    override var isReceiver: Boolean = false
 
     override val className: String
         get() = CLASS_NAME

@@ -48,6 +48,9 @@ public open class JSFunction(
      */
     internal var lexicalThisBinding: ThisBinding? = null
 
+    /** For an arrow function, the primitive `this` of the strict code it was made in, or null. */
+    internal var lexicalThisPrimitive: Any? = null
+
     /** For an arrow function, the new.target of the function it was made in. */
     internal var lexicalNewTarget: Any? = Undefined.instance
 

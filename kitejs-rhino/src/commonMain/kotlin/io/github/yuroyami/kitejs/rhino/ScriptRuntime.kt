@@ -955,7 +955,7 @@ public object ScriptRuntime {
         } else {
             callThis =
                 if (l != 0) {
-                    if (Undefined.isUndefined(arg0)) Undefined.SCRIPTABLE_UNDEFINED else toObjectOrNull(cx, arg0, scope)
+                    if (Undefined.isUndefined(arg0)) Undefined.SCRIPTABLE_UNDEFINED else toReceiver(cx, arg0, scope)
                 } else {
                     Undefined.SCRIPTABLE_UNDEFINED
                 }
@@ -975,7 +975,7 @@ public object ScriptRuntime {
     /** Calls [fun_] the way script would, with [thisArg] converted to an object. */
     public fun call(cx: Context, fun_: Any?, thisArg: Any?, args: Array<Any?>, scope: Scriptable): Any? {
         if (fun_ !is Function) throw notFunctionError(toString(fun_))
-        val thisObj = toObjectOrNull(cx, thisArg, scope) ?: throw undefCallError(null, "function")
+        val thisObj = toReceiver(cx, thisArg, scope) ?: throw undefCallError(null, "function")
         return fun_.call(cx, scope, thisObj, args)
     }
 
@@ -1093,6 +1093,38 @@ public object ScriptRuntime {
         if (obj == null || Undefined.isUndefined(obj)) return null
         if (obj is Scriptable) return obj
         return toObject(cx, scope, obj)
+    }
+
+    /**
+     * ToObject for the receiver of a call. A primitive's wrapper is marked, so that strict code and
+     * the built-ins get the primitive back (#78). An object passed on as a receiver loses its mark.
+     */
+    internal fun toReceiver(cx: Context, obj: Any?, scope: Scriptable): Scriptable? {
+        if (obj is Scriptable) {
+            takeReceiver(obj)
+            return obj
+        }
+        return toObjectOrNull(cx, obj, scope)?.also { markReceiver(it) }
+    }
+
+    internal fun markReceiver(wrapper: Scriptable?) {
+        when (wrapper) {
+            is PrimitiveWrapper -> wrapper.isReceiver = true
+            is NativeSymbol -> wrapper.isReceiver = true
+        }
+    }
+
+    /** The primitive behind a marked receiver, which clears the mark, or null for anything else. */
+    internal fun takeReceiver(thisObj: Any?): Any? = when {
+        thisObj is PrimitiveWrapper && thisObj.isReceiver -> {
+            thisObj.isReceiver = false
+            thisObj.primitiveValue
+        }
+        thisObj is NativeSymbol && thisObj.isReceiver -> {
+            thisObj.isReceiver = false
+            thisObj.key
+        }
+        else -> null
     }
 
     // ---- Small helpers the natives share ---------------------------------------------------------
@@ -2623,7 +2655,7 @@ public object ScriptRuntime {
         val value: Any?
         // `o?.[k]()` with a nullish o, like `o?.k()`, short-circuits to undefined.
         if (isOptionalChainingCall && (obj == null || Undefined.isUndefined(obj))) return null
-        val thisObj = toObjectOrNull(cx, obj, scope) ?: throw undefCallError(obj, elem)
+        val thisObj = toReceiver(cx, obj, scope) ?: throw undefCallError(obj, elem)
         if (elem is PrivateName) {
             value = ClassRuntime.privateGet(cx, thisObj, elem)
         } else if (isSymbol(elem)) {
@@ -2644,7 +2676,7 @@ public object ScriptRuntime {
     public fun getPropAndThisOptional(obj: Any?, property: String, cx: Context, scope: Scriptable): LookupResult? = getPropAndThisInner(obj, property, cx, scope, true)
 
     private fun getPropAndThisInner(obj: Any?, property: String, cx: Context, scope: Scriptable, isOptionalChainingCall: Boolean): LookupResult? =
-        getPropAndThisHelper(obj, property, cx, toObjectOrNull(cx, obj, scope), isOptionalChainingCall)
+        getPropAndThisHelper(obj, property, cx, toReceiver(cx, obj, scope), isOptionalChainingCall)
 
     private fun getPropAndThisHelper(obj: Any?, property: String, cx: Context, thisObj: Scriptable?, isOptionalChainingCall: Boolean): LookupResult? {
         if (thisObj == null) {
@@ -2675,7 +2707,7 @@ public object ScriptRuntime {
     }
 
     public fun getElemFunctionAndThis(obj: Any?, elem: Any?, cx: Context, scope: Scriptable): Callable? {
-        val thisObj = toObjectOrNull(cx, obj, scope) ?: throw undefCallError(obj, elem)
+        val thisObj = toReceiver(cx, obj, scope) ?: throw undefCallError(obj, elem)
         val value: Any?
         if (isSymbol(elem)) {
             value = ScriptableObject.getProperty(thisObj, elem as Symbol)

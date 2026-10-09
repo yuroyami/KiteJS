@@ -516,7 +516,9 @@ public open class BaseFunction : ScriptableObject, Function {
                 boundThis = Undefined.SCRIPTABLE_UNDEFINED
                 boundArgs = ScriptRuntime.emptyArgs
             }
-            return BoundFunction(cx, scope, thisObj, boundThis, boundArgs)
+            return BoundFunction(cx, scope, thisObj, boundThis, boundArgs).also {
+                it.boundPrimitive = argc > 0 && args[0] != null && args[0] !is Scriptable && !Undefined.isUndefined(args[0])
+            }
         }
 
         private fun js_apply(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =

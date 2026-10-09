@@ -8,7 +8,9 @@ import io.github.yuroyami.kitejs.api.dtoa.DecimalFormatter
 import kotlin.math.floor
 
 /** The JavaScript `Number` wrapper object. */
-internal class NativeNumber internal constructor(private val doubleValue: Double) : ScriptableObject() {
+internal class NativeNumber internal constructor(private val doubleValue: Double) : ScriptableObject(), PrimitiveWrapper {
+    override val primitiveValue: Any get() = doubleValue
+    override var isReceiver: Boolean = false
 
     override val className: String
         get() = CLASS_NAME

@@ -12,7 +12,9 @@ import io.github.yuroyami.kitejs.api.KBigInt
  *
  * `new BigInt(...)` is a TypeError, the same as `new Symbol(...)`, because a bigint is a primitive.
  */
-internal class NativeBigInt(private val bigIntValue: KBigInt) : ScriptableObject() {
+internal class NativeBigInt(private val bigIntValue: KBigInt) : ScriptableObject(), PrimitiveWrapper {
+    override val primitiveValue: Any get() = bigIntValue
+    override var isReceiver: Boolean = false
 
     override val className: String
         get() = CLASS_NAME

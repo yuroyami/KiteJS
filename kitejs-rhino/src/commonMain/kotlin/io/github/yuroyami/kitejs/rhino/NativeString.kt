@@ -13,7 +13,9 @@ import io.github.yuroyami.kitejs.rhino.ScriptableObject.DescriptorInfo
  * The regular-expression methods (`match`, `search`, `replace` with a pattern, `split` with a
  * pattern, `matchAll`) go through the [RegExpProxy], which the regexp engine installs.
  */
-internal class NativeString internal constructor(private val string: CharSequence) : ScriptableObject() {
+internal class NativeString internal constructor(private val string: CharSequence) : ScriptableObject(), PrimitiveWrapper {
+    override val primitiveValue: Any get() = string
+    override var isReceiver: Boolean = false
 
     init {
         defineProperty("length", { string.length }, null, DONTENUM or READONLY or PERMANENT)
@@ -191,6 +193,12 @@ internal class NativeString internal constructor(private val string: CharSequenc
             defineProperty(scope, CLASS_NAME, c, DONTENUM)
         }
 
+        /** RequireObjectCoercible(this): a string a method was called on is read as itself, not through its `toString` (#78). */
+        private fun coercibleThis(cx: Context, thisObj: Scriptable?, functionName: String): Any? {
+            val value = requireObjectCoercible(cx, thisObj, CLASS_NAME, functionName)
+            return if (value is NativeString && value.isReceiver) value.string else value
+        }
+
         private fun defConsMethod(c: LambdaConstructor, scope: Scriptable, name: String, length: Int, target: SerializableCallable) {
             c.defineConstructorMethod(scope, name, length, target)
         }
@@ -267,7 +275,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
             charAt(cx, thisObj, args, true)
 
         private fun charAt(cx: Context, thisObj: Scriptable?, args: Array<Any?>, getCode: Boolean): Any? {
-            val target = ScriptRuntime.toCharSequence(requireObjectCoercible(cx, thisObj, CLASS_NAME, "charAt"))
+            val target = ScriptRuntime.toCharSequence(coercibleThis(cx, thisObj, "charAt"))
             val pos = ScriptRuntime.toInteger(args, 0)
             if (pos < 0 || pos >= target.length) {
                 if (!getCode) return ""
@@ -279,7 +287,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_indexOf(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val target = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "indexOf"))
+            val target = ScriptRuntime.toString(coercibleThis(cx, thisObj, "indexOf"))
             val searchStr = ScriptRuntime.toString(args, 0)
             var position = ScriptRuntime.toInteger(args, 1)
             if (searchStr.isEmpty()) {
@@ -291,7 +299,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_startsWith(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val target = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "startsWith"))
+            val target = ScriptRuntime.toString(coercibleThis(cx, thisObj, "startsWith"))
             checkValidRegex(cx, scope, args, 0, "startsWith")
             val searchStr = ScriptRuntime.toString(args, 0)
             var position = ScriptRuntime.toInteger(args, 1)
@@ -300,7 +308,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_endsWith(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val target = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "endsWith"))
+            val target = ScriptRuntime.toString(coercibleThis(cx, thisObj, "endsWith"))
             checkValidRegex(cx, scope, args, 0, "endsWith")
             val searchStr = ScriptRuntime.toString(args, 0)
             var position = ScriptRuntime.toInteger(args, 1)
@@ -310,7 +318,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_includes(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val target = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "includes"))
+            val target = ScriptRuntime.toString(coercibleThis(cx, thisObj, "includes"))
             checkValidRegex(cx, scope, args, 0, "includes")
             val searchStr = ScriptRuntime.toString(args, 0)
             // The spec clamps the start to the string's own length, and that matters for an
@@ -329,7 +337,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_split(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val o = requireObjectCoercible(cx, thisObj, CLASS_NAME, "split")
+            val o = coercibleThis(cx, thisObj, "split")
             if (cx.languageVersion <= Context.VERSION_1_8) {
                 return ScriptRuntime.checkRegExpProxy(cx).js_split(cx, scope, ScriptRuntime.toString(o), args)
             }
@@ -390,7 +398,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
             LambdaConstructor.convertThisObject<NativeString>(thisObj)
 
         private fun js_iterator(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
-            NativeStringIterator(scope, requireObjectCoercible(cx, thisObj, CLASS_NAME, "[Symbol.iterator]"))
+            NativeStringIterator(scope, coercibleThis(cx, thisObj, "[Symbol.iterator]"))
 
         private fun js_toString(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val cs = realThis(thisObj).string
@@ -403,7 +411,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun tagify(cx: Context, thisObj: Scriptable?, functionName: String, tag: String, attribute: String?, args: Array<Any?>): String {
-            val str = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, functionName))
+            val str = ScriptRuntime.toString(coercibleThis(cx, thisObj, functionName))
             val result = StringBuilder()
             result.append('<').append(tag)
             if (!attribute.isNullOrEmpty()) {
@@ -416,7 +424,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_match(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val o = requireObjectCoercible(cx, thisObj, CLASS_NAME, "match")
+            val o = coercibleThis(cx, thisObj, "match")
             val regexp = if (args.isNotEmpty()) args[0] else Undefined.instance
             val regExpProxy = ScriptRuntime.checkRegExpProxy(cx)
             if (regexp != null && !Undefined.isUndefined(regexp)) {
@@ -444,7 +452,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_lastIndexOf(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val target = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "lastIndexOf"))
+            val target = ScriptRuntime.toString(coercibleThis(cx, thisObj, "lastIndexOf"))
             val search = ScriptRuntime.toString(args, 0)
             var end = ScriptRuntime.toNumber(args, 1)
             if (end.isNaN() || end > target.length) end = target.length.toDouble() else if (end < 0) end = 0.0
@@ -452,7 +460,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_substring(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val target = ScriptRuntime.toCharSequence(requireObjectCoercible(cx, thisObj, CLASS_NAME, "substring"))
+            val target = ScriptRuntime.toCharSequence(coercibleThis(cx, thisObj, "substring"))
             val length = target.length
             var start = ScriptRuntime.toInteger(args, 0)
             var end: Double
@@ -477,17 +485,17 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_toLowerCase(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val thisStr = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "toLowerCase"))
+            val thisStr = ScriptRuntime.toString(coercibleThis(cx, thisObj, "toLowerCase"))
             return thisStr.lowercase()
         }
 
         private fun js_toUpperCase(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val thisStr = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "toUpperCase"))
+            val thisStr = ScriptRuntime.toString(coercibleThis(cx, thisObj, "toUpperCase"))
             return thisStr.uppercase()
         }
 
         private fun js_substr(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val target = ScriptRuntime.toCharSequence(requireObjectCoercible(cx, thisObj, CLASS_NAME, "substr"))
+            val target = ScriptRuntime.toCharSequence(coercibleThis(cx, thisObj, "substr"))
             if (args.isEmpty()) return target
             var begin = ScriptRuntime.toInteger(args[0])
             var end: Double
@@ -512,7 +520,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_concat(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val target = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "concat"))
+            val target = ScriptRuntime.toString(coercibleThis(cx, thisObj, "concat"))
             val n = args.size
             if (n == 0) {
                 return target
@@ -537,7 +545,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_slice(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val target = ScriptRuntime.toCharSequence(requireObjectCoercible(cx, thisObj, CLASS_NAME, "slice"))
+            val target = ScriptRuntime.toCharSequence(coercibleThis(cx, thisObj, "slice"))
             var begin = if (args.isEmpty()) 0.0 else ScriptRuntime.toInteger(args[0])
             var end: Double
             val length = target.length
@@ -563,7 +571,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_at(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val str = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "at"))
+            val str = ScriptRuntime.toString(coercibleThis(cx, thisObj, "at"))
             val targetArg = if (args.isNotEmpty()) args[0] else Undefined.instance
             val len = str.length
             val relativeIndex = ScriptRuntime.toInteger(targetArg).toInt()
@@ -585,7 +593,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_search(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val o = requireObjectCoercible(cx, thisObj, CLASS_NAME, "search")
+            val o = coercibleThis(cx, thisObj, "search")
             val regexp = if (args.isNotEmpty()) args[0] else Undefined.instance
             val regExpProxy = ScriptRuntime.checkRegExpProxy(cx)
             if (regexp != null && !Undefined.isUndefined(regexp)) {
@@ -613,7 +621,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_replace(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val o = requireObjectCoercible(cx, thisObj, CLASS_NAME, "replace")
+            val o = coercibleThis(cx, thisObj, "replace")
             if (cx.languageVersion <= Context.VERSION_1_8) {
                 return ScriptRuntime.checkRegExpProxy(cx).action(cx, scope, thisObj, args, RegExpProxy.RA_REPLACE)
             }
@@ -661,7 +669,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_replaceAll(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val o = requireObjectCoercible(cx, thisObj, CLASS_NAME, "replaceAll")
+            val o = coercibleThis(cx, thisObj, "replaceAll")
             val searchValue = if (args.isNotEmpty()) args[0] else Undefined.instance
             val replaceValue = if (args.size > 1) args[1] else Undefined.instance
             if (searchValue != null && !Undefined.isUndefined(searchValue)) {
@@ -726,7 +734,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_matchAll(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val o = requireObjectCoercible(cx, thisObj, CLASS_NAME, "matchAll")
+            val o = coercibleThis(cx, thisObj, "matchAll")
             val regexp = if (args.isNotEmpty()) args[0] else Undefined.instance
             if (regexp != null && !Undefined.isUndefined(regexp)) {
                 val isRegExp = AbstractEcmaObjectOperations.isRegExp(cx, scope, regexp)
@@ -759,25 +767,25 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_localeCompare(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val thisStr = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "localeCompare"))
+            val thisStr = ScriptRuntime.toString(coercibleThis(cx, thisObj, "localeCompare"))
             // Common Kotlin has no collator (D-37), so this is code-unit order, clamped to -1, 0, 1.
             val cmp = thisStr.compareTo(ScriptRuntime.toString(args, 0))
             return if (cmp < 0) -1 else if (cmp > 0) 1 else 0
         }
 
         private fun js_toLocaleLowerCase(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val thisStr = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "toLocaleLowerCase"))
+            val thisStr = ScriptRuntime.toString(coercibleThis(cx, thisObj, "toLocaleLowerCase"))
             // No locale support (D-28), so this is the locale-independent conversion.
             return thisStr.lowercase()
         }
 
         private fun js_toLocaleUpperCase(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val thisStr = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "toLocaleUpperCase"))
+            val thisStr = ScriptRuntime.toString(coercibleThis(cx, thisObj, "toLocaleUpperCase"))
             return thisStr.uppercase()
         }
 
         private fun js_trim(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val str = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "trim"))
+            val str = ScriptRuntime.toString(coercibleThis(cx, thisObj, "trim"))
             var start = 0
             while (start < str.length && ScriptRuntime.isJSWhitespaceOrLineTerminator(str[start].code)) start++
             var end = str.length
@@ -786,14 +794,14 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_trimLeft(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val str = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "trimLeft"))
+            val str = ScriptRuntime.toString(coercibleThis(cx, thisObj, "trimLeft"))
             var start = 0
             while (start < str.length && ScriptRuntime.isJSWhitespaceOrLineTerminator(str[start].code)) start++
             return str.substring(start, str.length)
         }
 
         private fun js_trimRight(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val str = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "trimRight"))
+            val str = ScriptRuntime.toString(coercibleThis(cx, thisObj, "trimRight"))
             var end = str.length
             while (end > 0 && ScriptRuntime.isJSWhitespaceOrLineTerminator(str[end - 1].code)) end--
             return str.substring(0, end)
@@ -803,17 +811,17 @@ internal class NativeString internal constructor(private val string: CharSequenc
             // Common Kotlin has no Unicode normalizer (D-38): the form name is checked, the text
             // comes back as it was.
             if (args.isEmpty() || Undefined.isUndefined(args[0])) {
-                return ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "normalize"))
+                return ScriptRuntime.toString(coercibleThis(cx, thisObj, "normalize"))
             }
             val formStr = ScriptRuntime.toString(args, 0)
             if (formStr != "NFD" && formStr != "NFKC" && formStr != "NFKD" && formStr != "NFC") {
                 throw ScriptRuntime.rangeError("The normalization form should be one of 'NFC', 'NFD', 'NFKC', 'NFKD'.")
             }
-            return ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "normalize"))
+            return ScriptRuntime.toString(coercibleThis(cx, thisObj, "normalize"))
         }
 
         private fun js_repeat(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val str = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "repeat"))
+            val str = ScriptRuntime.toString(coercibleThis(cx, thisObj, "repeat"))
             val cnt = ScriptRuntime.toInteger(args, 0)
             if (cnt < 0.0 || cnt == Double.POSITIVE_INFINITY) {
                 throw ScriptRuntime.rangeError("Invalid count value")
@@ -838,13 +846,13 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_codePointAt(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val str = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, "codePointAt"))
+            val str = ScriptRuntime.toString(coercibleThis(cx, thisObj, "codePointAt"))
             val cnt = ScriptRuntime.toInteger(args, 0)
             return if (cnt < 0 || cnt >= str.length) Undefined.instance else Characters.codePointAt(str, cnt.toInt())
         }
 
         private fun pad(cx: Context, thisObj: Scriptable?, functionName: String, args: Array<Any?>, atStart: Boolean): String {
-            val pad = ScriptRuntime.toString(requireObjectCoercible(cx, thisObj, CLASS_NAME, functionName))
+            val pad = ScriptRuntime.toString(coercibleThis(cx, thisObj, functionName))
             val intMaxLength = ScriptRuntime.toLength(args, 0)
             if (intMaxLength <= pad.length) return pad
             var filler = " "
@@ -908,7 +916,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_isWellFormed(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val str = ScriptRuntime.toCharSequence(requireObjectCoercible(cx, thisObj, CLASS_NAME, "isWellFormed"))
+            val str = ScriptRuntime.toCharSequence(coercibleThis(cx, thisObj, "isWellFormed"))
             val len = str.length
             var foundLeadingSurrogate = false
             for (i in 0 until len) {
@@ -927,7 +935,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_toWellFormed(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            val str = ScriptRuntime.toCharSequence(requireObjectCoercible(cx, thisObj, CLASS_NAME, "toWellFormed"))
+            val str = ScriptRuntime.toCharSequence(coercibleThis(cx, thisObj, "toWellFormed"))
             // true: surrogate pair, false: lone surrogate
             val surrogates = HashMap<Int, Boolean>()
             val len = str.length

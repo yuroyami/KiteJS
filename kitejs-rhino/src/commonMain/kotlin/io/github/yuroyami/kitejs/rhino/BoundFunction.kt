@@ -55,10 +55,18 @@ public class BoundFunction(
     override val functionName: String
         get() = if (targetFunction is BaseFunction) "bound " + targetFunction.functionName else ""
 
-    internal fun getCallThis(cx: Context, scope: Scriptable): Scriptable? =
-        ScriptRuntime.getApplyOrCallThis(
+    /** True when bind wrapped a primitive this, which every call passes on as a primitive receiver. */
+    internal var boundPrimitive: Boolean = false
+
+    internal fun getCallThis(cx: Context, scope: Scriptable): Scriptable? {
+        if (boundPrimitive && !cx.hasFeature(Context.FEATURE_OLD_UNDEF_NULL_THIS)) {
+            ScriptRuntime.markReceiver(boundThis)
+            return boundThis
+        }
+        return ScriptRuntime.getApplyOrCallThis(
             cx, scope, if (Undefined.isUndefined(boundThis)) Undefined.instance else boundThis, 1, targetFunction,
         )
+    }
 
     private companion object {
         fun concat(first: Array<Any?>, second: Array<Any?>): Array<Any?> {

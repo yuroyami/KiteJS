@@ -9,6 +9,8 @@ package io.github.yuroyami.kitejs.rhino
  * `Object(sym)` produces, and it carries the key in an internal slot.
  */
 public class NativeSymbol internal constructor(internal val key: SymbolKey) : ScriptableObject(), Symbol {
+    /** True when the engine made this object for a symbol receiver of a call; see [PrimitiveWrapper]. */
+    internal var isReceiver: Boolean = false
 
     override val kind: Symbol.Kind
         get() = key.kind
