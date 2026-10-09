@@ -36,16 +36,27 @@ import kotlin.math.truncate
  */
 public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArrayData {
 
-    /** How many elements the view holds. */
+    /** The element count given at construction, or -1 for a length-tracking view. */
+    private val fixedLength: Int
+
+    /** How many elements the view holds. A length-tracking view counts what fits in its buffer now. */
     protected val length: Int
+        get() = when {
+            fixedLength >= 0 -> fixedLength
+            isTypedArrayOutOfBounds -> 0
+            else -> (arrayBuffer.length - offset) / bytesPerElement
+        }
 
     protected constructor() : super() {
-        length = 0
+        fixedLength = 0
     }
 
+    /** A negative [len] makes a length-tracking view of the resizable [ab]. */
     protected constructor(ab: NativeArrayBuffer, off: Int, len: Int, byteLen: Int) : super(ab, off, byteLen) {
-        length = len
+        fixedLength = if (len < 0) -1 else len
     }
+
+    override fun trackedByteLength(available: Int): Int = available / bytesPerElement * bytesPerElement
 
     // ---- The exotic index behaviour -------------------------------------------------------------
     //
@@ -488,6 +499,12 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
                 if (arg0.isDetached) throw ScriptRuntime.typeErrorById("msg.arraybuf.detached")
                 val bufferByteLength = arg0.length
 
+                if (!NativeArrayBuffer.isArg(args, 2) && arg0.isResizable) {
+                    // No length on a resizable buffer: the view tracks the buffer's length.
+                    if (byteOff > bufferByteLength) throw ScriptRuntime.rangeErrorById("msg.typed.array.bad.offset", byteOff)
+                    return constructable.construct(arg0, byteOff.toInt(), -1)
+                }
+
                 val newByteLength: Int
                 if (!NativeArrayBuffer.isArg(args, 2)) {
                     val remaining = bufferByteLength.toDouble() - byteOff
@@ -802,6 +819,8 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
             var count = minOf(fin - from, len - to)
             if (count > 0) {
                 if (self.isTypedArrayOutOfBounds) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
+                // A conversion may have shrunk a resizable buffer: only elements still inside move.
+                val limit = self.length.toLong()
                 var direction = 1
                 // Overlapping ranges have to be walked backwards or the copy eats its own source.
                 if (from < to && to < from + count) {
@@ -810,7 +829,7 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
                     to += count - 1
                 }
                 while (count > 0) {
-                    self.js_set(to.toInt(), self.js_get(from.toInt()))
+                    if (from < limit && to < limit) self.js_set(to.toInt(), self.js_get(from.toInt()))
                     from += direction
                     to += direction
                     count--
@@ -849,7 +868,13 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
             val len = maxOf(0, end - start)
             val byteOff = self.offset + start * self.bytesPerElement
 
-            return self.typedArraySpeciesCreate(cx, scope, arrayOf<Any?>(self.arrayBuffer, byteOff, len), "subarray")
+            // A length-tracking source with no end gives a length-tracking result.
+            val viewArgs = if (self.isLengthTracking && !NativeArrayBuffer.isArg(args, 1)) {
+                arrayOf<Any?>(self.arrayBuffer, byteOff)
+            } else {
+                arrayOf<Any?>(self.arrayBuffer, byteOff, len)
+            }
+            return self.typedArraySpeciesCreate(cx, scope, viewArgs, "subarray")
         }
 
         // at, toReversed, toSorted and with follow ES2023 step by step: the receiver is validated

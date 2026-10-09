@@ -31,11 +31,11 @@ class Test262ParityTest {
     private val harnessRoot = File(corpusRoot, "harness")
     private val propertiesFile = File("src/jvmTest/resources/test262.properties")
 
-    /** Upstream's list, except default arguments which this port implements (D-116). */
+    /** Upstream's list, except default arguments (D-116) and resizable buffers (#114), which this port implements. */
     private val unsupportedFeatures = setOf(
         "Atomics", "IsHTMLDDA", "decorators",
         "object-rest", "regexp-dotall", "regexp-unicode-property-escapes",
-        "resizable-arraybuffer", "SharedArrayBuffer", "tail-call-optimization", "Temporal",
+        "SharedArrayBuffer", "tail-call-optimization", "Temporal",
         "upsert", "u180e",
     )
 
@@ -73,6 +73,11 @@ class Test262ParityTest {
     private val portFeatureFolders = mapOf(
         "built-ins/Iterator/" to "#113: the ES2025 Iterator and its helpers run here",
         "built-ins/Array/fromAsync/" to "#91: Array.fromAsync runs here",
+    )
+
+    /** Test262 features the port has and upstream lacks. They follow the same rule as [portFeatureFolders]. */
+    private val portFeatures = mapOf(
+        "resizable-arraybuffer" to "#114: resizable ArrayBuffer runs here",
     )
 
     /**
@@ -1957,6 +1962,7 @@ class Test262ParityTest {
                     (strict && relative in knownStrictDifferences)
                 val feature = if (ported == PASS) {
                     portFeatureFolders.entries.firstOrNull { relative.startsWith(it.key) }?.value
+                        ?: portFeatures.entries.firstOrNull { it.key in meta.features }?.value
                 } else {
                     null
                 }

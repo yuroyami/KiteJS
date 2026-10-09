@@ -402,6 +402,8 @@ internal object Messages {
         "msg.arraybuf.detached" to "Expected ArrayBuffer to not be detached",
         "msg.arraybuf.same" to "Expected different ArrayBuffer",
         "msg.arraybuf.smaller.len" to "Expected ArrayBuffer with at least {0} bytes, but got {1} bytes instead",
+        "msg.arraybuf.not.resizable" to "ArrayBuffer is not resizable",
+        "msg.arraybuf.max.length" to "ArrayBuffer length {0} exceeds its maxByteLength {1}",
         "msg.constructor.expected" to "Expecting the first argument to be a constructor",
         "msg.dataview.bounds" to "DataView is out of bounds",
         "msg.dataview.length.range" to "DataView length is out of range",

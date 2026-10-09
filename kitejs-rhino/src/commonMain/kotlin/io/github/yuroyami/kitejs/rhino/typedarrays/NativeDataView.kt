@@ -27,13 +27,8 @@ public class NativeDataView : NativeArrayBufferView {
     override val className: String
         get() = CLASS_NAME
 
-    public val isDataViewOutOfBounds: Boolean
-
-        get() {
-        if (arrayBuffer.isDetached) return true
-        val bufferByteLength = arrayBuffer.length
-        return offset > bufferByteLength || offset + byteLength > bufferByteLength
-    }
+    /** IsViewOutOfBounds: the buffer is detached, or has shrunk below the view. */
+    public val isDataViewOutOfBounds: Boolean get() = arrayBuffer.isDetached || outOfRange
 
     private fun js_getInt(bytes: Int, signed: Boolean, args: Array<Any?>): Any? {
         val pos = ScriptRuntime.toIndex(if (isArg(args, 0)) args[0] else Undefined.instance)
@@ -201,12 +196,13 @@ public class NativeDataView : NativeArrayBufferView {
             var bufferByteLength = ab.length
             if (pos > bufferByteLength) throw ScriptRuntime.rangeErrorById("msg.dataview.offset.range")
 
+            // No length on a resizable buffer makes a view that tracks the buffer's length (-1).
             val len: Int
             if (isArg(args, 2)) {
                 len = ScriptRuntime.toIndex(args[2])
                 if (pos.toLong() + len > bufferByteLength) throw ScriptRuntime.rangeErrorById("msg.dataview.length.range")
             } else {
-                len = bufferByteLength - pos
+                len = if (ab.isResizable) -1 else bufferByteLength - pos
             }
 
             // Converting the arguments can run script, which could have detached the buffer, so

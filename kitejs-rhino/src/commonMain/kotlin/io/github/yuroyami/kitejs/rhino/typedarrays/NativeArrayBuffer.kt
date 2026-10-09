@@ -8,6 +8,7 @@ import io.github.yuroyami.kitejs.rhino.AbstractEcmaObjectOperations
 import io.github.yuroyami.kitejs.rhino.Context
 import io.github.yuroyami.kitejs.rhino.Intrinsics
 import io.github.yuroyami.kitejs.rhino.LambdaConstructor
+import io.github.yuroyami.kitejs.rhino.NativeNumber
 import io.github.yuroyami.kitejs.rhino.ScriptRuntime
 import io.github.yuroyami.kitejs.rhino.ScriptRuntimeES6
 import io.github.yuroyami.kitejs.rhino.Scriptable
@@ -60,6 +61,24 @@ public class NativeArrayBuffer : ScriptableObject {
 
     public val isDetached: Boolean get() = buffer == null
 
+    /** The most bytes [resize] may grow to, or -1 when the length is fixed. */
+    public var maxByteLength: Int = -1
+        internal set
+
+    /** True for a buffer made with a `maxByteLength` option, whose length [resize] can change. */
+    public val isResizable: Boolean get() = maxByteLength >= 0
+
+    /**
+     * Changes the length of a resizable buffer to [newLength] bytes. Bytes past the old end read as
+     * zero, and every view sees the new length at once.
+     */
+    public fun resize(newLength: Int) {
+        check(isResizable) { "the buffer is not resizable" }
+        require(newLength in 0..maxByteLength) { "length $newLength is outside 0..$maxByteLength" }
+        val old = buffer ?: error("the buffer is detached")
+        buffer = if (newLength == 0) EMPTY_BUF else old.copyOf(newLength)
+    }
+
     /**
      * A copy of the bytes between [s] and [e], with both clamped into range the way the spec says.
      */
@@ -94,10 +113,20 @@ public class NativeArrayBuffer : ScriptableObject {
             // then uses as the species (ECMAScript 2015, 24.1.3.3); upstream has none.
             ScriptRuntimeES6.addSymbolSpecies(cx, scope, constructor)
             constructor.definePrototypeMethod(scope, "slice", 2, SerializableCallable { icx, s, thisObj, args -> js_slice(icx, s, thisObj, args) })
-            constructor.definePrototypeMethod(scope, "transfer", 0, SerializableCallable { icx, s, thisObj, args -> js_transfer(icx, s, thisObj, args) })
-            constructor.definePrototypeMethod(scope, "transferToFixedLength", 0, SerializableCallable { icx, s, thisObj, args -> js_transfer(icx, s, thisObj, args) })
+            constructor.definePrototypeMethod(scope, "resize", 1, SerializableCallable { _, _, thisObj, args -> js_resize(thisObj, args) })
+            constructor.definePrototypeMethod(scope, "transfer", 0, SerializableCallable { icx, s, thisObj, args -> js_transfer(icx, s, thisObj, args, true) })
+            constructor.definePrototypeMethod(scope, "transferToFixedLength", 0, SerializableCallable { icx, s, thisObj, args -> js_transfer(icx, s, thisObj, args, false) })
             constructor.definePrototypeProperty(cx, "byteLength", LambdaGetterFunction { thisObj -> getSelf(thisObj).length })
             constructor.definePrototypeProperty(cx, "detached", LambdaGetterFunction { thisObj -> getSelf(thisObj).isDetached })
+            constructor.definePrototypeProperty(cx, "maxByteLength", LambdaGetterFunction { thisObj ->
+                val self = getSelf(thisObj)
+                when {
+                    self.isDetached -> 0
+                    self.isResizable -> self.maxByteLength
+                    else -> self.length
+                }
+            })
+            constructor.definePrototypeProperty(cx, "resizable", LambdaGetterFunction { thisObj -> getSelf(thisObj).isResizable })
             constructor.definePrototypeProperty(SymbolKey.TO_STRING_TAG, "ArrayBuffer", DONTENUM or READONLY)
 
             if (sealed) {
@@ -110,9 +139,40 @@ public class NativeArrayBuffer : ScriptableObject {
         private fun getSelf(thisObj: Scriptable?): NativeArrayBuffer =
             LambdaConstructor.convertThisObject<NativeArrayBuffer>(thisObj)
 
+        /**
+         * `new ArrayBuffer(length, options)` (ECMAScript 2024, 25.1.4.1). The length is converted
+         * before `options.maxByteLength` is read, and a length over that maximum is a RangeError.
+         */
         private fun js_constructor(cx: Context, scope: Scriptable, args: Array<Any?>): NativeArrayBuffer {
-            val length = if (isArg(args, 0)) ScriptRuntime.toNumber(args[0]) else 0.0
-            return NativeArrayBuffer(length)
+            val number = if (isArg(args, 0)) ScriptRuntime.toNumber(args[0]) else 0.0
+            if (number <= -1) throw ScriptRuntime.rangeError("Negative array length $number")
+            if (number > NativeNumber.MAX_SAFE_INTEGER) throw ScriptRuntime.rangeError("length parameter ($number) is too large ")
+            val length = if (number.isNaN()) 0.0 else kotlin.math.truncate(number)
+            val options = args.getOrElse(1) { Undefined.instance }
+            var max = -1
+            if (options is Scriptable && !Undefined.isUndefined(options) && !ScriptRuntime.isSymbol(options)) {
+                val maxArg = ScriptableObject.getProperty(options, "maxByteLength")
+                if (maxArg !== Scriptable.NOT_FOUND && !Undefined.isUndefined(maxArg)) {
+                    max = ScriptRuntime.toIndex(maxArg)
+                    // toIndex clamps to Int.MAX_VALUE, and no byte array can grow that far.
+                    if (max == Int.MAX_VALUE) throw ScriptRuntime.rangeError("maxByteLength is too large")
+                    if (length > max) throw ScriptRuntime.rangeErrorById("msg.arraybuf.max.length", length.toLong(), max)
+                }
+            }
+            return NativeArrayBuffer(length).also { it.maxByteLength = max }
+        }
+
+        /** ArrayBuffer.prototype.resize (ECMAScript 2024, 25.1.6.6). */
+        private fun js_resize(thisObj: Scriptable?, args: Array<Any?>): Any {
+            val self = getSelf(thisObj)
+            if (!self.isResizable) throw ScriptRuntime.typeErrorById("msg.arraybuf.not.resizable")
+            val newLength = ScriptRuntime.toIndex(args.getOrElse(0) { Undefined.instance })
+            if (self.isDetached) throw ScriptRuntime.typeErrorById("msg.arraybuf.detached")
+            if (newLength > self.maxByteLength) {
+                throw ScriptRuntime.rangeErrorById("msg.arraybuf.max.length", newLength, self.maxByteLength)
+            }
+            self.resize(newLength)
+            return Undefined.instance
         }
 
         private fun js_isView(args: Array<Any?>): Boolean = isArg(args, 0) && args[0] is NativeArrayBufferView
@@ -157,19 +217,24 @@ public class NativeArrayBuffer : ScriptableObject {
         }
 
         /**
-         * `transfer` and `transferToFixedLength`, which are the same here because no buffer is
-         * resizable: ArrayBufferCopyAndDetach (ECMAScript 2024, 25.1.3.3). The new length is
+         * `transfer` and `transferToFixedLength`: ArrayBufferCopyAndDetach (ECMAScript 2024,
+         * 25.1.3.3). Only `transfer` keeps a resizable source resizable. The new length is
          * converted before the source is checked, and the copy is always a plain ArrayBuffer of
-         * the realm that defined the method, so species is never read (issue 25, D-87).
+         * the realm that defined the method, so species is never read.
          */
-        private fun js_transfer(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Scriptable {
+        private fun js_transfer(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>, preserveResizability: Boolean): Scriptable {
             val self = getSelf(thisObj)
             val lengthArg = args.getOrElse(0) { Undefined.instance }
             val newByteLength = if (Undefined.isUndefined(lengthArg)) self.length else ScriptRuntime.toIndex(lengthArg)
             if (self.isDetached) throw ScriptRuntime.typeErrorById("msg.arraybuf.detached")
+            val newMax = if (preserveResizability) self.maxByteLength else -1
+            if (newMax >= 0 && newByteLength > newMax) {
+                throw ScriptRuntime.rangeErrorById("msg.arraybuf.max.length", newByteLength, newMax)
+            }
 
             val newBuffer = Intrinsics.constructor(cx, scope, CLASS_NAME)
                 .construct(cx, scope, arrayOf<Any?>(newByteLength)) as NativeArrayBuffer
+            newBuffer.maxByteLength = newMax
 
             val copyLength = minOf(newByteLength, self.length)
             if (copyLength > 0) self.buffer!!.copyInto(newBuffer.buffer!!, 0, 0, copyLength)
@@ -194,27 +259,54 @@ public abstract class NativeArrayBufferView : ScriptableObject {
     /** Where in the buffer the view starts, in bytes. Upstream's getByteOffset (D-7). */
     public val offset: Int
 
+    /** The byte length given at construction, or -1 when the view follows a resizable buffer. */
+    private val fixedByteLength: Int
+
+    /** Whether the view started outside its buffer, which stays true while the buffer never resizes. */
+    private val startedOutOfRange: Boolean
+
+    /**
+     * True when the view has no length of its own and covers its resizable buffer from [offset]
+     * to the end, however the buffer grows or shrinks.
+     */
+    public val isLengthTracking: Boolean get() = fixedByteLength < 0
+
     /** How much of the buffer the view covers, in bytes. Upstream's getByteLength (D-7). */
     public val byteLength: Int
+        get() = when {
+            fixedByteLength >= 0 -> fixedByteLength
+            outOfRange -> 0
+            else -> trackedByteLength(arrayBuffer.length - offset)
+        }
+
+    /** The part of the [available] bytes that a length-tracking view covers. */
+    protected open fun trackedByteLength(available: Int): Int = available
 
     /** True when the view no longer fits inside its buffer. */
     protected val outOfRange: Boolean
+        get() {
+            if (!arrayBuffer.isResizable) return startedOutOfRange
+            val bufferByteLength = arrayBuffer.length
+            return offset > bufferByteLength ||
+                (fixedByteLength >= 0 && offset.toLong() + fixedByteLength > bufferByteLength)
+        }
 
     protected constructor() : super() {
         arrayBuffer = NativeArrayBuffer()
         offset = 0
-        byteLength = 0
-        outOfRange = false
+        fixedByteLength = 0
+        startedOutOfRange = false
     }
 
+    /** A negative [byteLength] makes a length-tracking view, which needs a resizable [ab]. */
     protected constructor(ab: NativeArrayBuffer, offset: Int, byteLength: Int) : super() {
         this.offset = offset
-        this.byteLength = byteLength
+        this.fixedByteLength = if (byteLength < 0) -1 else byteLength
         this.arrayBuffer = ab
 
         val bufferByteLength = ab.length
-        val byteOffsetEnd = offset + byteLength
-        outOfRange = offset > bufferByteLength || byteOffsetEnd > bufferByteLength
+        startedOutOfRange = offset > bufferByteLength ||
+            (fixedByteLength >= 0 && offset.toLong() + fixedByteLength > bufferByteLength)
     }
 
     public val buffer: NativeArrayBuffer get() = arrayBuffer
