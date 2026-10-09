@@ -14,7 +14,8 @@ public class NativeCall : IdScriptableObject {
     internal val originalArgs: Array<Any?>
     internal val isStrict: Boolean
     internal var parentActivationCall: NativeCall? = null
-    private val uninitializedParameters: MutableSet<String> = mutableSetOf()
+    /** Parameters still in their temporal dead zone; null for the common call that has none, so a name read skips the lookup. */
+    private var uninitializedParameters: MutableSet<String>? = null
     private var rawParameterValues: Array<Any?> = ScriptRuntime.emptyArgs
     internal var isParameterEnvironment: Boolean = false
         private set
@@ -64,7 +65,7 @@ public class NativeCall : IdScriptableObject {
             val names = desc.parameterBindingNames + desc.parameterSlotNames
             for (name in names) defineProperty(name, Undefined.instance, PERMANENT)
             for (name in desc.parameterLocalNames) defineProperty(name, Undefined.instance, PERMANENT)
-            uninitializedParameters.addAll(names)
+            if (names.isNotEmpty()) uninitializedParameters = HashSet(names)
             rawParameterValues = Array(desc.parameterSlotNames.size) { i ->
                 if (argsHasRest && i == desc.parameterSlotNames.lastIndex) {
                     cx.newArray(scope, if (i < a.size) a.copyOfRange(i, a.size) else ScriptRuntime.emptyArgs)
@@ -126,7 +127,7 @@ public class NativeCall : IdScriptableObject {
     internal fun parameterValue(index: Int): Any? = rawParameterValues[index]
 
     internal fun initializeParameter(name: String, value: Any?) {
-        uninitializedParameters.remove(name)
+        uninitializedParameters?.let { if (it.remove(name) && it.isEmpty()) uninitializedParameters = null }
         super.put(name, this, value)
     }
 
@@ -167,12 +168,12 @@ public class NativeCall : IdScriptableObject {
     }
 
     override fun get(name: String, start: Scriptable): Any? {
-        if (name in uninitializedParameters) throw ScriptRuntime.constructError("ReferenceError", "Cannot access '$name' before initialization")
+        if (uninitializedParameters?.contains(name) == true) throw ScriptRuntime.constructError("ReferenceError", "Cannot access '$name' before initialization")
         return super.get(name, start)
     }
 
     override fun put(name: String, start: Scriptable, value: Any?) {
-        if (name in uninitializedParameters) throw ScriptRuntime.constructError("ReferenceError", "Cannot access '$name' before initialization")
+        if (uninitializedParameters?.contains(name) == true) throw ScriptRuntime.constructError("ReferenceError", "Cannot access '$name' before initialization")
         super.put(name, start, value)
     }
 

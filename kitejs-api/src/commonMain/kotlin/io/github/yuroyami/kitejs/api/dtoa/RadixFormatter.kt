@@ -43,8 +43,13 @@ public object RadixFormatter {
         if (negative) d = -d
 
         val dfloor = floor(d)
-        val intPart = KBigInt.fromDouble(dfloor)
-        val intDigits = (if (negative) intPart.negate() else intPart).toString(base)
+        // Below 2^63 the integer part is an exact Long, so the bigint printer is not needed.
+        val intDigits = if (dfloor < 9.223372036854775807E18) {
+            (if (negative) -dfloor.toLong() else dfloor.toLong()).toString(base)
+        } else {
+            val intPart = KBigInt.fromDouble(dfloor)
+            (if (negative) intPart.negate() else intPart).toString(base)
+        }
         if (d == dfloor) return intDigits
 
         val buffer = StringBuilder()

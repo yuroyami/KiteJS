@@ -43,13 +43,14 @@ public open class EmbeddedSlotMap : SlotMap {
 
     override fun iterator(): Iterator<Slot> = Iter(firstAdded)
 
+    // A name the interpreter passes is usually the very string the slot holds, so identity answers first.
     override fun query(key: Any?, index: Int): Slot? {
         val table = slots ?: return null
         if (key == null && !hasIndex) return null
         val indexOrHash = key?.hashCode() ?: index
         var slot = table[getSlotIndex(table.size, indexOrHash)]
         while (slot != null) {
-            if (indexOrHash == slot.indexOrHash && slot.name == key) return slot
+            if (indexOrHash == slot.indexOrHash && (slot.name === key || slot.name == key)) return slot
             slot = slot.next
         }
         return null
@@ -61,7 +62,7 @@ public open class EmbeddedSlotMap : SlotMap {
         if (table != null) {
             var slot = table[getSlotIndex(table.size, indexOrHash)]
             while (slot != null) {
-                if (indexOrHash == slot.indexOrHash && slot.name == key) return slot
+                if (indexOrHash == slot.indexOrHash && (slot.name === key || slot.name == key)) return slot
                 slot = slot.next
             }
         }

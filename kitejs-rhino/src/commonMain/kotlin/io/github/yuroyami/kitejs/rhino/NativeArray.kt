@@ -533,12 +533,16 @@ public class NativeArray : ScriptableObject {
             else -> -1
         }
 
-        // Returns -1 if a string is not an index.
+        // Returns -1 if a string is not an index: an index is written in decimal with no leading zero.
         private fun toArrayIndex(id: String): Long {
-            val index = toArrayIndex(ScriptRuntime.toNumber(id))
-            // Assume that ScriptRuntime.toString(index) is the same as id, since it was a valid index
-            if (index.toString() == id) return index
-            return -1
+            val n = id.length
+            if (n == 0 || n > 10 || (n > 1 && id[0] == '0')) return -1
+            var index = 0L
+            for (c in id) {
+                if (c !in '0'..'9') return -1
+                index = index * 10 + (c - '0')
+            }
+            return if (index < 4294967295L) index else -1
         }
 
         private fun toArrayIndex(d: Double): Long {
