@@ -5,6 +5,9 @@ A JavaScript engine for Kotlin Multiplatform, with two engines behind one API:
 [QuickJS-ng](https://github.com/quickjs-ng/quickjs) compiled into each target. Either one runs the
 same script the same way on every target.
 
+<sub>AI tools wrote much of the code, tests and documentation in this project, under the
+direction and review of its author.</sub>
+
 **[Documentation](https://yuroyami.github.io/KiteJS/)** ·
 [Getting started](https://yuroyami.github.io/KiteJS/getting-started/) ·
 [Choosing an engine](https://yuroyami.github.io/KiteJS/engines/) ·
