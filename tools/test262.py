@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the test262 parity test, or replay its corpus on one platform. TESTING.md describes both.
+"""Run the test262 parity test, or replay its corpus on one platform. CONTRIBUTING.md describes both.
 
   python3 tools/test262.py parity [--filter built-ins/Array]
   python3 tools/test262.py replay --platform jvm|android|js|wasmJs|linuxX64|macosArm64|iosSimulatorArm64|...

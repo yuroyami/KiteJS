@@ -73,7 +73,7 @@ plugins:
     templatesDir: ../dokka-templates
     footerMessage: MPL-2.0 · KiteJS is part of the Kite family.
     sourceLinkUrl: https://github.com/yuroyami/KiteJS/blob/main/kitejs-rhino/src
-  # The test262 parity run and the corpus replay (TESTING.md). They add their sources only when
+  # The test262 parity run and the corpus replay (CONTRIBUTING.md). They add their sources only when
   # KITEJS_TEST262 is set, so an ordinary build and test never see them.
   test262:
     enabled: true

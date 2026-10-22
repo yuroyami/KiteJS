@@ -2095,7 +2095,7 @@ class Test262ParityTest {
         File("build/test262/outcomes.tsv").writeText(outcomes.toString())
         println("recorded $ran outcomes to ${expectationsFile.absolutePath}")
 
-        // A summary PORTING_STATUS can quote, so the numbers there come from a run.
+        // Writes summary.md, so every quoted number comes from a run.
         val summary = File("build/test262/summary.md")
         summary.parentFile.mkdirs()
         summary.writeText(

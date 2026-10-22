@@ -2,7 +2,7 @@ product: jvm/amper-plugin
 
 description: >-
   Adds the test262 parity test or the test262 corpus replay to the tests of kitejs-rhino, when the KITEJS_TEST262
-  environment variable asks for one. TESTING.md describes both runs.
+  environment variable asks for one. CONTRIBUTING.md describes both runs.
 
 settings:
   kotlin:

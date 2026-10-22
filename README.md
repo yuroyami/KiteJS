@@ -103,7 +103,7 @@ Corpus replay is separate from the ordinary test suite and must be requested wit
 `python3 tools/test262.py replay`. Missing or mismatched inputs fail that requested run. The
 dedicated workflow replays one versioned artifact across its platform matrix and records executed
 counts and known differences per target. Coverage is established by those run results; the regular platform tests
-alone do not establish corpus coverage. See [Testing](TESTING.md) for commands and evidence.
+alone do not establish corpus coverage. See [Contributing](CONTRIBUTING.md#tests-and-test262-coverage) for the commands.
 
 ## Building
 
@@ -125,7 +125,7 @@ which the toolchain cannot add to its browser page. `./kotlin check abi klibAbi`
 every platform first.
 
 kitejs-quickjs compiles C code, so it needs [zig](https://ziglang.org) on the `PATH`, and for Android
-an NDK in `ANDROID_NDK_HOME` or in the Android SDK. [Testing](TESTING.md) has the details.
+an NDK in `ANDROID_NDK_HOME` or in the Android SDK. [Contributing](CONTRIBUTING.md#run-the-tests) has the details.
 
 ## Licence
 
