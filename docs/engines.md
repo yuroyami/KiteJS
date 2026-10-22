@@ -109,8 +109,10 @@ uses much more stack than the KiteJS frames around it can still run the browser 
   can write, named for the library's SHA-256. Later processes load that file again, which macOS
   then does not check a second time. For any other platform, build the library yourself from the
   module's `native` folder and set the system property `kitejs.quickjs.library` to its path.
-- **Android**: the AAR carries a JNI library for arm64-v8a, armeabi-v7a, x86_64 and x86, aligned
-  for 16 KB pages, and keep rules so R8 leaves the classes it calls alone.
+- **Android**: the `kitejs-quickjs-android-natives` jar, which kitejs-quickjs depends on for
+  Android, carries a JNI library for arm64-v8a, armeabi-v7a, x86_64 and x86, aligned for 16 KB
+  pages, and keep rules so R8 leaves the classes it calls alone. The Android Gradle plugin packages
+  the libraries into the app as native libraries, as it did from the AAR.
 - **JavaScript and Wasm**: a WebAssembly module embedded in the code, loaded by `QuickJs.load()`.
 
 ### Android host tests

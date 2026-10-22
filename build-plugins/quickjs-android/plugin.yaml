@@ -1,0 +1,10 @@
+tasks:
+  build:
+    action: !io.github.yuroyami.buildplugins.quickjsandroid.buildAndroidLibraries
+      nativeDir: ${pluginSettings.nativeDir}
+      minSdk: ${pluginSettings.minSdk}
+      outputDir: ${taskOutputDir}/resources
+
+generated:
+  resources:
+    - directory: ${tasks.build.action.outputDir}

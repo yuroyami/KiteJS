@@ -2,30 +2,36 @@ name: QuickJS
 
 # kitejs-quickjs on every platform it ships for. It compiles C: zig cross-builds the desktop JNI
 # libraries and the WebAssembly module, the NDK builds Android's, and the clang Kotlin/Native
-# ships builds each native target's static library. It runs when the module, or anything it is
-# built on, changes.
+# ships builds each native target's static library (build-plugins/quickjs-native and
+# build-plugins/quickjs-android). It runs when the module, or anything it is built on, changes.
 
 on:
   push:
     branches: [main]
     paths:
       - 'kitejs-quickjs/**'
+      - 'kitejs-quickjs-android-natives/**'
       - 'kitejs-api/**'
       - 'kitejs-testkit/**'
-      - 'buildSrc/**'
-      - 'gradle/**'
-      - '*.gradle.kts'
-      - 'gradle.properties'
+      - 'build-plugins/**'
+      - 'project.yaml'
+      - '*.module-template.yaml'
+      - 'libs.versions.toml'
+      - 'kotlin'
+      - 'tools/web-tests/**'
       - '.github/workflows/quickjs.yml'
   pull_request:
     paths:
       - 'kitejs-quickjs/**'
+      - 'kitejs-quickjs-android-natives/**'
       - 'kitejs-api/**'
       - 'kitejs-testkit/**'
-      - 'buildSrc/**'
-      - 'gradle/**'
-      - '*.gradle.kts'
-      - 'gradle.properties'
+      - 'build-plugins/**'
+      - 'project.yaml'
+      - '*.module-template.yaml'
+      - 'libs.versions.toml'
+      - 'kotlin'
+      - 'tools/web-tests/**'
       - '.github/workflows/quickjs.yml'
   workflow_dispatch:
 
@@ -33,58 +39,79 @@ concurrency:
   group: quickjs-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  KOTLIN_CLI_NO_WELCOME_BANNER: 1
+
 jobs:
   linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
+      - uses: actions/checkout@v7
+      - name: Cache the Kotlin Toolchain downloads
+        uses: actions/cache@v5
         with:
-          distribution: temurin
-          java-version: 21
+          path: ~/.cache/JetBrains/Kotlin
+          key: kotlin-toolchain-${{ runner.os }}-${{ hashFiles('kotlin', 'project.yaml', '**/module.yaml', 'libs.versions.toml', 'build-plugins/**/plugin.yaml') }}
+          restore-keys: kotlin-toolchain-${{ runner.os }}-
       - uses: mlugg/setup-zig@v2
         with:
-          version: 0.14.1
-      - uses: gradle/actions/setup-gradle@v4
+          version: 0.17.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+      # The static libraries are built with Kotlin/Native's clang, so Kotlin/Native has to be downloaded first.
+      - name: Download Kotlin/Native
+        run: ./kotlin build -m kitejs-api -p linuxX64
       # The runner image carries the NDK and sets ANDROID_NDK_HOME, which the build reads.
-      - name: Build and test (JVM, Android, JS and Wasm on Node and in Chrome, Linux, ABI check)
-        run: >
-          ./gradlew
-          :kitejs-quickjs:jvmTest :kitejs-quickjs:testAndroidHostTest
-          :kitejs-quickjs:jsNodeTest :kitejs-quickjs:jsBrowserTest
-          :kitejs-quickjs:wasmJsNodeTest :kitejs-quickjs:wasmJsBrowserTest
-          :kitejs-quickjs:linuxX64Test
-          :kitejs-quickjs:assemble :kitejs-quickjs:check
+      - name: Build (JVM, Android, JS, Wasm, Linux, Windows)
+        run: ./kotlin build -m kitejs-quickjs -m kitejs-quickjs-android-natives -p jvm -p android -p js -p wasmJs -p linuxX64 -p linuxArm64 -p mingwX64
+      - name: Test (JVM, Android host tests, Linux)
+        run: ./kotlin test -m kitejs-quickjs -p jvm -p android -p linuxX64
+      - name: Test (JavaScript and Wasm on Node)
+        run: python3 tools/web-tests/run.py --module kitejs-quickjs
+      - name: Check the public JVM API
+        run: ./kotlin check abi -m kitejs-quickjs
 
   apple:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
+      - uses: actions/checkout@v7
+      - name: Cache the Kotlin Toolchain downloads
+        uses: actions/cache@v5
         with:
-          distribution: temurin
-          java-version: 21
+          path: ~/Library/Caches/JetBrains/Kotlin
+          key: kotlin-toolchain-${{ runner.os }}-${{ hashFiles('kotlin', 'project.yaml', '**/module.yaml', 'libs.versions.toml', 'build-plugins/**/plugin.yaml') }}
+          restore-keys: kotlin-toolchain-${{ runner.os }}-
       - uses: mlugg/setup-zig@v2
         with:
-          version: 0.14.1
-      - uses: gradle/actions/setup-gradle@v4
+          version: 0.17.0
+      - name: Download Kotlin/Native
+        run: ./kotlin build -m kitejs-api -p macosArm64
       - name: Apple targets, and the JVM on macOS
+        run: ./kotlin test -m kitejs-quickjs -p macosArm64 -p iosSimulatorArm64 -p jvm
+      - name: Check the public klib API
         run: >
-          ./gradlew
-          :kitejs-quickjs:macosArm64Test :kitejs-quickjs:iosSimulatorArm64Test
-          :kitejs-quickjs:jvmTest
+          ./kotlin build -m kitejs-quickjs
+          -p iosArm64 -p iosSimulatorArm64 -p iosX64 -p macosArm64 -p linuxX64 -p linuxArm64 -p mingwX64 -p js -p wasmJs
+          && ./kotlin check klibAbi -m kitejs-quickjs
 
   windows:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
+      - uses: actions/checkout@v7
+      - name: Cache the Kotlin Toolchain downloads
+        uses: actions/cache@v5
         with:
-          distribution: temurin
-          java-version: 21
+          path: ~/AppData/Local/JetBrains/Kotlin
+          key: kotlin-toolchain-${{ runner.os }}-${{ hashFiles('kotlin', 'project.yaml', '**/module.yaml', 'libs.versions.toml', 'build-plugins/**/plugin.yaml') }}
+          restore-keys: kotlin-toolchain-${{ runner.os }}-
       - uses: mlugg/setup-zig@v2
         with:
-          version: 0.14.1
-      - uses: gradle/actions/setup-gradle@v4
+          version: 0.17.0
+      - name: Download Kotlin/Native
+        run: ./kotlin build -m kitejs-api -p mingwX64
       - name: Windows target, and the JVM on Windows
-        run: ./gradlew :kitejs-quickjs:mingwX64Test :kitejs-quickjs:jvmTest
+        run: ./kotlin test -m kitejs-quickjs -p mingwX64 -p jvm

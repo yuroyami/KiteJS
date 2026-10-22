@@ -1,0 +1,118 @@
+product:
+  type: kmp/lib
+  platforms:
+    - jvm
+    - android
+    - iosArm64
+    - iosSimulatorArm64
+    - iosX64
+    - macosArm64
+    - linuxX64
+    - linuxArm64
+    - mingwX64
+    - js
+    - wasmJs
+
+# kitejs-testkit is the contract every engine keeps: what KiteJs, the handles, the host bindings, the promise
+# helpers and the errors do, written once against kitejs-api. Each engine module subclasses these suites in its
+# own tests, so a behaviour that differs between engines fails in the engine that differs, on every target that
+# engine runs on. It is not published; it exists for the engine modules' tests.
+
+apply:
+  - ../common.module-template.yaml
+
+dependencies:
+  - ../kitejs-api: exported
+  - $kotlin.test: exported
+  - $libs.kotlinx.coroutines.test: exported
+
+# A main source set gets no test framework of its own, and the suites' annotations need one where they are
+# compiled: JUnit 4, which the engines' JVM and Android tests run on.
+dependencies@jvm:
+  - $kotlin.test.junit: exported
+
+dependencies@android:
+  - $kotlin.test.junit: exported
+
+settings:
+  kotlin:
+    optIns: [ io.github.yuroyami.kitejs.api.InternalKiteJsApi ]
+  android:
+    namespace: io.github.yuroyami.kitejs.testkit
+
+# Gradle named the klib "io.github.yuroyami:kitejs-testkit". Keep that name, or libraries built against
+# earlier releases fail to link on Kotlin/Native. Set it per platform: on @native, it also
+# renames the klibs of shared native code, which must keep their own names.
+settings@iosArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-testkit, -Xshort-module-name=kitejs-testkit ]
+
+settings@iosSimulatorArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-testkit, -Xshort-module-name=kitejs-testkit ]
+
+settings@iosX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-testkit, -Xshort-module-name=kitejs-testkit ]
+
+settings@macosArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-testkit, -Xshort-module-name=kitejs-testkit ]
+
+settings@linuxX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-testkit, -Xshort-module-name=kitejs-testkit ]
+
+settings@linuxArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-testkit, -Xshort-module-name=kitejs-testkit ]
+
+settings@mingwX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-testkit, -Xshort-module-name=kitejs-testkit ]
+
+settings@js:
+  kotlin:
+    freeCompilerArgs: [ -Xir-module-name=io.github.yuroyami:kitejs-testkit ]
+
+settings@wasmJs:
+  kotlin:
+    freeCompilerArgs: [ -Xir-module-name=io.github.yuroyami:kitejs-testkit ]
+
+# Tests compile into their own klib, which needs a different name. The test blocks name the
+# same platforms as the blocks above, so the toolchain applies them last.
+test-settings@iosArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-testkit_test, -Xshort-module-name=kitejs-testkit_test ]
+
+test-settings@iosSimulatorArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-testkit_test, -Xshort-module-name=kitejs-testkit_test ]
+
+test-settings@iosX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-testkit_test, -Xshort-module-name=kitejs-testkit_test ]
+
+test-settings@macosArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-testkit_test, -Xshort-module-name=kitejs-testkit_test ]
+
+test-settings@linuxX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-testkit_test, -Xshort-module-name=kitejs-testkit_test ]
+
+test-settings@linuxArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-testkit_test, -Xshort-module-name=kitejs-testkit_test ]
+
+test-settings@mingwX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-testkit_test, -Xshort-module-name=kitejs-testkit_test ]
+
+test-settings@js:
+  kotlin:
+    freeCompilerArgs: [ -Xir-module-name=kitejs-testkit_test ]
+
+test-settings@wasmJs:
+  kotlin:
+    freeCompilerArgs: [ -Xir-module-name=kitejs-testkit_test ]

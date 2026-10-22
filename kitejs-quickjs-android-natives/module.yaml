@@ -1,0 +1,30 @@
+product: jvm/lib
+
+description: >-
+  The QuickJS JNI library of kitejs-quickjs for Android, one per ABI. kitejs-quickjs depends on it on Android,
+  so an app never adds it by hand.
+
+# The Android Gradle plugin takes `lib/<abi>/*.so` out of plain jar dependencies and packages them as the
+# app's native libraries, and it reads the R8 keep rules in resources/META-INF/proguard/. The toolchain's
+# Android library (AAR) has no jni/ folder and no keep rules, so both travel in this jar instead.
+
+apply:
+  - ../library.module-template.yaml
+
+settings:
+  # The Kotlin version of common.module-template.yaml, which this module does not apply.
+  kotlin:
+    version: 2.4.21
+  jvm:
+    jdk:
+      version: 21
+    release: 11
+  publishing:
+    pom:
+      name: KiteJS QuickJS Android natives
+
+plugins:
+  quickjs-android:
+    enabled: true
+    nativeDir: ../kitejs-quickjs/native
+    minSdk: 21

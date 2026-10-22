@@ -19,8 +19,20 @@ kotlin {
 [Choosing an engine](engines.md) says which one fits what. The examples in these pages use Rhino,
 and run unchanged on QuickJS unless they use one of Rhino's own settings.
 
-To build from source instead, clone the repository and add `includeBuild("../KiteJS")` to
-`settings.gradle.kts`.
+With the Kotlin Toolchain, the same dependencies go in `module.yaml`:
+
+```yaml
+dependencies:
+  - io.github.yuroyami:kitejs-rhino:0.7.0
+  - io.github.yuroyami:kitejs-quickjs:0.7.0
+```
+
+To build from source instead:
+
+1. Clone the repository.
+2. In `library.module-template.yaml`, set a version of your own and set `signArtifacts` to `false`.
+3. Run `./kotlin publish mavenLocal -m <module> --transitive` for each module you use.
+4. Add `mavenLocal()` to the repositories of your build.
 
 If you also want the suspending API, add the second artifact:
 

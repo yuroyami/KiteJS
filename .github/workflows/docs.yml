@@ -11,7 +11,11 @@ on:
       - 'docs/**'
       - 'mkdocs.yml'
       - '**/*.kt'
-      - '**/build.gradle.kts'
+      - '**/module.yaml'
+      - '**/Module.md'
+      - 'project.yaml'
+      - 'build-plugins/**'
+      - 'dokka-templates/**'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
@@ -29,10 +33,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.x'
 
@@ -42,23 +46,25 @@ jobs:
       - name: Build the docs site
         run: mkdocs build --site-dir site
 
-      - name: Set up JDK
-        uses: actions/setup-java@v5
+      - name: Cache the Kotlin Toolchain downloads
+        uses: actions/cache@v5
         with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+          path: ~/.cache/JetBrains/Kotlin
+          key: kotlin-toolchain-${{ runner.os }}-${{ hashFiles('kotlin', 'project.yaml', '**/module.yaml', 'libs.versions.toml', 'build-plugins/**/plugin.yaml') }}
+          restore-keys: kotlin-toolchain-${{ runner.os }}-
 
       # kitejs-quickjs compiles its WebAssembly module into the web sources Dokka reads.
       - name: Set up zig
         uses: mlugg/setup-zig@v2
         with:
-          version: 0.14.1
+          version: 0.17.0
 
       - name: Generate the Dokka API reference
-        run: ./gradlew dokkaGenerate --no-configuration-cache
+        env:
+          KOTLIN_CLI_NO_WELCOME_BANNER: 1
+        run: |
+          # shellcheck disable=SC1010
+          ./kotlin do dokka && ./kotlin do dokkaSite
 
       - name: Merge the API reference into the site
         run: |
@@ -67,7 +73,7 @@ jobs:
           touch site/.nojekyll
 
       - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
@@ -80,4 +86,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

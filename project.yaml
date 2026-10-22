@@ -1,0 +1,20 @@
+modules:
+  - build-plugins/abi-check
+  - build-plugins/dokka
+  - build-plugins/quickjs-android
+  - build-plugins/quickjs-native
+  - build-plugins/test262
+  - kitejs
+  - kitejs-api
+  - kitejs-coroutines
+  - kitejs-quickjs
+  - kitejs-quickjs-android-natives
+  - kitejs-rhino
+  - kitejs-testkit
+
+plugins:
+  - //build-plugins/abi-check
+  - //build-plugins/dokka
+  - //build-plugins/quickjs-android
+  - //build-plugins/quickjs-native
+  - //build-plugins/test262

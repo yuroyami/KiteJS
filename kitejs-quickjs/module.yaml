@@ -1,0 +1,171 @@
+product:
+  type: kmp/lib
+  platforms:
+    - jvm
+    - android
+    - iosArm64
+    - iosSimulatorArm64
+    - iosX64
+    - macosArm64
+    - linuxX64
+    - linuxArm64
+    - mingwX64
+    - js
+    - wasmJs
+
+description: >-
+  QuickJS-ng, the C JavaScript engine, bound to the KiteJS API for Kotlin Multiplatform. The same engine on
+  Android, iOS, macOS, Linux, Windows, the JVM, JavaScript and WebAssembly, with the whole of ECMAScript 2024 and
+  most of what came after.
+
+# kitejs-quickjs is QuickJS-ng, the C engine, bound to the KiteJS API. The C sources are vendored under
+# native/quickjs with the few changes KiteJS needs (native/kitejs-quickjs.patch), and native/kitejs_quickjs.c is
+# the small surface the Kotlin side drives: an int handle per value, strings as UTF-16, four callbacks into the host.
+#
+# Each platform builds that C its own way (build-plugins/quickjs-native, build-plugins/quickjs-android):
+#   Kotlin/Native   a static library per target from the clang Kotlin/Native ships, through cinterop
+#   JVM             a JNI library per desktop OS and CPU, cross-compiled with zig, inside the jar
+#   Android         a JNI library per ABI from the NDK, in the kitejs-quickjs-android-natives jar
+#   JS and Wasm     one wasm32-wasi module from zig, embedded in the Kotlin code and compiled at load
+#
+# On JavaScript and WebAssembly, kotlinx-datetime reads named zones from the npm package @js-joda/timezone
+# (src@js/JsJodaTimeZone.kt). The toolchain cannot declare npm packages, so applications add it themselves.
+
+apply:
+  - ../common.module-template.yaml
+  - ../library.module-template.yaml
+
+# src@jni holds the JNI bridge that the JVM and Android share.
+aliases:
+  - jni: [ jvm, android ]
+
+dependencies:
+  - ../kitejs-api: exported
+  - $libs.kotlinx.datetime
+
+dependencies@android:
+  - ../kitejs-quickjs-android-natives
+
+test-dependencies:
+  - ../kitejs-testkit
+
+settings:
+  kotlin:
+    optIns:
+      - io.github.yuroyami.kitejs.api.InternalKiteJsApi
+      - kotlin.concurrent.atomics.ExperimentalAtomicApi
+  android:
+    namespace: io.github.yuroyami.kitejs.quickjs
+  publishing:
+    pom:
+      name: KiteJS QuickJS
+
+plugins:
+  quickjs-native:
+    enabled: true
+  abi-check:
+    enabled: true
+    klibPlatforms: [ iosArm64, iosSimulatorArm64, iosX64, js, linuxArm64, linuxX64, macosArm64, mingwX64, wasmJs ]
+  dokka:
+    enabled: true
+    moduleName: kitejs-quickjs
+    includes: [ Module.md ]
+    customStyleSheets: [ ../docs/api-theme/kite.css ]
+    templatesDir: ../dokka-templates
+    footerMessage: MPL-2.0 · KiteJS is part of the Kite family.
+    sourceLinkUrl: https://github.com/yuroyami/KiteJS/blob/main/kitejs-quickjs/src
+
+# Gradle named the JVM and Android module "io.github.yuroyami:kitejs-quickjs". The name is in
+# META-INF/*.kotlin_module and in the JVM names of internal members, so keep it.
+settings@jvm:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-quickjs ]
+
+settings@android:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-quickjs ]
+
+# Gradle named the klib "io.github.yuroyami:kitejs-quickjs". Keep that name, or libraries built against
+# earlier releases fail to link on Kotlin/Native. Set it per platform: on @native, it also
+# renames the klibs of shared native code, which must keep their own names.
+settings@iosArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-quickjs, -Xshort-module-name=kitejs-quickjs ]
+
+settings@iosSimulatorArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-quickjs, -Xshort-module-name=kitejs-quickjs ]
+
+settings@iosX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-quickjs, -Xshort-module-name=kitejs-quickjs ]
+
+settings@macosArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-quickjs, -Xshort-module-name=kitejs-quickjs ]
+
+settings@linuxX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-quickjs, -Xshort-module-name=kitejs-quickjs ]
+
+settings@linuxArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-quickjs, -Xshort-module-name=kitejs-quickjs ]
+
+settings@mingwX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-quickjs, -Xshort-module-name=kitejs-quickjs ]
+
+settings@js:
+  kotlin:
+    freeCompilerArgs: [ -Xir-module-name=io.github.yuroyami:kitejs-quickjs ]
+
+settings@wasmJs:
+  kotlin:
+    freeCompilerArgs: [ -Xir-module-name=io.github.yuroyami:kitejs-quickjs ]
+
+# Tests compile into their own klib or JVM module, which needs a different name. The test blocks name the
+# same platforms as the blocks above, so the toolchain applies them last.
+test-settings@iosArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-quickjs_test, -Xshort-module-name=kitejs-quickjs_test ]
+
+test-settings@iosSimulatorArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-quickjs_test, -Xshort-module-name=kitejs-quickjs_test ]
+
+test-settings@iosX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-quickjs_test, -Xshort-module-name=kitejs-quickjs_test ]
+
+test-settings@macosArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-quickjs_test, -Xshort-module-name=kitejs-quickjs_test ]
+
+test-settings@linuxX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-quickjs_test, -Xshort-module-name=kitejs-quickjs_test ]
+
+test-settings@linuxArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-quickjs_test, -Xshort-module-name=kitejs-quickjs_test ]
+
+test-settings@mingwX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-quickjs_test, -Xshort-module-name=kitejs-quickjs_test ]
+
+test-settings@js:
+  kotlin:
+    freeCompilerArgs: [ -Xir-module-name=kitejs-quickjs_test ]
+
+test-settings@wasmJs:
+  kotlin:
+    freeCompilerArgs: [ -Xir-module-name=kitejs-quickjs_test ]
+
+test-settings@jvm:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-quickjs_test ]
+
+test-settings@android:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-quickjs_test ]

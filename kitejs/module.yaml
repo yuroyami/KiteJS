@@ -1,0 +1,146 @@
+product:
+  type: kmp/lib
+  platforms:
+    - jvm
+    - android
+    - iosArm64
+    - iosSimulatorArm64
+    - iosX64
+    - macosArm64
+    - linuxX64
+    - linuxArm64
+    - mingwX64
+    - js
+    - wasmJs
+
+description: >-
+  KiteJS with the Rhino engine underneath: kitejs-api and kitejs-rhino in one dependency, under the coordinates
+  KiteJS had before it could run more than one engine. Kept for existing builds and removed at 1.0; new code
+  depends on kitejs-api and the engine it wants, kitejs-rhino or kitejs-quickjs.
+
+# kitejs is the artifact KiteJS shipped as before it had more than one engine: kitejs-api with kitejs-rhino
+# underneath. It keeps those coordinates resolving and carries the deprecated `KiteJs { }` that opened Rhino
+# without naming it. It goes away at 1.0.
+
+apply:
+  - ../common.module-template.yaml
+  - ../library.module-template.yaml
+
+dependencies:
+  - ../kitejs-api: exported
+  - ../kitejs-rhino: exported
+
+settings:
+  android:
+    namespace: io.github.yuroyami.kitejs
+  publishing:
+    pom:
+      name: KiteJS
+
+plugins:
+  abi-check:
+    enabled: true
+    klibPlatforms: [ iosArm64, iosSimulatorArm64, iosX64, js, linuxArm64, linuxX64, macosArm64, mingwX64, wasmJs ]
+  dokka:
+    enabled: true
+    moduleName: kitejs
+    includes: [ Module.md ]
+    customStyleSheets: [ ../docs/api-theme/kite.css ]
+    templatesDir: ../dokka-templates
+    footerMessage: MPL-2.0 · KiteJS is part of the Kite family.
+    sourceLinkUrl: https://github.com/yuroyami/KiteJS/blob/main/kitejs/src
+
+# Gradle named the JVM and Android module "io.github.yuroyami:kitejs". The name is in
+# META-INF/*.kotlin_module and in the JVM names of internal members, so keep it.
+settings@jvm:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs ]
+
+settings@android:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs ]
+
+# Gradle named the klib "io.github.yuroyami:kitejs". Keep that name, or libraries built against
+# earlier releases fail to link on Kotlin/Native. Set it per platform: on @native, it also
+# renames the klibs of shared native code, which must keep their own names.
+settings@iosArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs, -Xshort-module-name=kitejs ]
+
+settings@iosSimulatorArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs, -Xshort-module-name=kitejs ]
+
+settings@iosX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs, -Xshort-module-name=kitejs ]
+
+settings@macosArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs, -Xshort-module-name=kitejs ]
+
+settings@linuxX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs, -Xshort-module-name=kitejs ]
+
+settings@linuxArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs, -Xshort-module-name=kitejs ]
+
+settings@mingwX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs, -Xshort-module-name=kitejs ]
+
+settings@js:
+  kotlin:
+    freeCompilerArgs: [ -Xir-module-name=io.github.yuroyami:kitejs ]
+
+settings@wasmJs:
+  kotlin:
+    freeCompilerArgs: [ -Xir-module-name=io.github.yuroyami:kitejs ]
+
+# Tests compile into their own klib or JVM module, which needs a different name. The test blocks name the
+# same platforms as the blocks above, so the toolchain applies them last.
+test-settings@iosArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs_test, -Xshort-module-name=kitejs_test ]
+
+test-settings@iosSimulatorArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs_test, -Xshort-module-name=kitejs_test ]
+
+test-settings@iosX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs_test, -Xshort-module-name=kitejs_test ]
+
+test-settings@macosArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs_test, -Xshort-module-name=kitejs_test ]
+
+test-settings@linuxX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs_test, -Xshort-module-name=kitejs_test ]
+
+test-settings@linuxArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs_test, -Xshort-module-name=kitejs_test ]
+
+test-settings@mingwX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs_test, -Xshort-module-name=kitejs_test ]
+
+test-settings@js:
+  kotlin:
+    freeCompilerArgs: [ -Xir-module-name=kitejs_test ]
+
+test-settings@wasmJs:
+  kotlin:
+    freeCompilerArgs: [ -Xir-module-name=kitejs_test ]
+
+test-settings@jvm:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs_test ]
+
+test-settings@android:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs_test ]

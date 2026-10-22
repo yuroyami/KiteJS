@@ -1,0 +1,36 @@
+# Settings that the five published libraries share. Each module.yaml applies this file next to
+# common.module-template.yaml and adds its own description, POM name and Android namespace.
+
+# `./kotlin publish mavenLocal -m <module>` puts a build into ~/.m2 for tests in other projects.
+repositories:
+  - url: mavenLocal
+    publish: true
+    resolve: false
+
+settings:
+  kotlin:
+    explicitApi: strict
+  publishing:
+    enabled: true
+    group: io.github.yuroyami
+    version: 0.7.0
+    pom:
+      url: https://github.com/yuroyami/KiteJS
+      # KiteJS is a Kotlin port of Mozilla Rhino, a derivative work, so the upstream license carries
+      # over. See NOTICE.
+      licenses:
+        - name: Mozilla Public License, Version 2.0
+          url: https://www.mozilla.org/MPL/2.0/
+      developers:
+        - id: yuroyami
+          name: yuroyami
+          url: https://github.com/yuroyami
+      scm:
+        url: https://github.com/yuroyami/KiteJS
+        connection: scm:git:git://github.com/yuroyami/KiteJS.git
+        developerConnection: scm:git:ssh://git@github.com/yuroyami/KiteJS.git
+    signArtifacts: true
+    publishSources: true
+    mavenCentral:
+      enabled: true
+      publishingMode: auto

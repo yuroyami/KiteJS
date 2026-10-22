@@ -1,0 +1,30 @@
+# Settings that every KiteJS module shares, so the engines, the API they share and the modules on top
+# cannot drift apart. Each module.yaml applies this file and lists the same platforms: Android, the four
+# Apple targets, Linux on x64 and arm64, Windows, the JVM, and JavaScript and WebAssembly.
+
+settings:
+  kotlin:
+    # Keep the same version in build-plugins/*/module.yaml, in kitejs-quickjs-android-natives/module.yaml
+    # and for abi-tools in build-plugins/abi-check/module.yaml. A module without it builds with an older Kotlin.
+    version: 2.4.21
+    # An expect class is still beta to the compiler, and the engines use a few for what each
+    # platform does its own way: weak references, threads, loading native code.
+    freeCompilerArgs: [ -Xexpect-actual-classes ]
+    optIns: [ kotlin.RequiresOptIn ]
+  jvm:
+    jdk:
+      version: 21
+    # Bytecode and standard library calls that an application on Java 11 can load.
+    release: 11
+  android:
+    compileSdk:
+      apiLevel: 37
+      minorApiLevel: 2
+    minSdk: 21
+  # The JUnit 4 runner, which kitejs-testkit's suites are written for (kotlin-test-junit).
+  junit: junit-4
+
+# -Xexport-kdoc keeps the KDoc in the native klibs, so Apple framework headers keep the docs.
+settings@native:
+  kotlin:
+    freeCompilerArgs: [ -Xexport-kdoc ]

@@ -1,0 +1,39 @@
+tasks:
+  sources:
+    action: !io.github.yuroyami.buildplugins.test262.addTest262Sources
+      sourcesDir: ${module.rootDir}/test262
+      defaultBundle: ${module.rootDir}/build/test262/corpus
+      corpusTool: ${project.rootDir}/tools/test262-corpus.py
+      commonDir: ${taskOutputDir}/common
+      jvmDir: ${taskOutputDir}/jvm
+      androidDir: ${taskOutputDir}/android
+      nativeDir: ${taskOutputDir}/native
+      jsDir: ${taskOutputDir}/js
+      wasmJsDir: ${taskOutputDir}/wasmJs
+
+# A fragment modifier starts with "@", as in the folder names (toolchain 0.13.0 compares it as written).
+generated:
+  sources:
+    - directory: ${tasks.sources.action.commonDir}
+      fragment:
+        isTest: true
+    - directory: ${tasks.sources.action.jvmDir}
+      fragment:
+        modifier: "@jvm"
+        isTest: true
+    - directory: ${tasks.sources.action.androidDir}
+      fragment:
+        modifier: "@android"
+        isTest: true
+    - directory: ${tasks.sources.action.nativeDir}
+      fragment:
+        modifier: "@native"
+        isTest: true
+    - directory: ${tasks.sources.action.jsDir}
+      fragment:
+        modifier: "@js"
+        isTest: true
+    - directory: ${tasks.sources.action.wasmJsDir}
+      fragment:
+        modifier: "@wasmJs"
+        isTest: true

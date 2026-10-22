@@ -1,0 +1,12 @@
+product: jvm/amper-plugin
+
+description: >-
+  Builds the QuickJS JNI library for each Android ABI with the NDK, laid out as `lib/<abi>/` resources, so the
+  Android Gradle plugin packages them as native libraries of the app.
+
+pluginInfo:
+  settingsClass: io.github.yuroyami.buildplugins.quickjsandroid.QuickJsAndroidSettings
+
+settings:
+  kotlin:
+    version: 2.4.21

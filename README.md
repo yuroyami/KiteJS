@@ -42,7 +42,8 @@ buffers with `Atomics`, optional chaining and the full regular expression syntax
 modules.
 
 **QuickJS** is QuickJS-ng 0.17.0, the C engine, compiled in: a static library on Kotlin/Native, a
-JNI library inside the jar and the AAR, and a WebAssembly module on JavaScript and Wasm. It runs
+JNI library inside the jar, a JNI library per ABI on Android (in the `kitejs-quickjs-android-natives`
+jar that comes with it), and a WebAssembly module on JavaScript and Wasm. It runs
 ES2023 and most of what came after, it was between 3 and 12 times faster than Rhino on the JVM in
 our measurements, and it can cap the memory a script takes. It adds about 1 MB of native code per
 platform, about 360 KB gzipped on the web.
@@ -70,6 +71,18 @@ commonMain.dependencies {
 }
 ```
 
+With the Kotlin Toolchain (`module.yaml`):
+
+```yaml
+dependencies:
+  - io.github.yuroyami:kitejs-rhino:0.7.0
+  - io.github.yuroyami:kitejs-quickjs:0.7.0
+  - io.github.yuroyami:kitejs-coroutines:0.7.0
+```
+
+On JavaScript and Wasm, add the npm package `@js-joda/timezone` too, or only UTC and fixed offsets
+work in `Date` ([Dates and time zones](https://yuroyami.github.io/KiteJS/dates-and-time-zones/)).
+
 The last artifact puts either engine behind suspending functions: awaiting a promise, handing a
 `Deferred` to a script, host functions that suspend, and cancellation that stops a running
 script. The `kitejs` artifact from earlier releases still works and brings Rhino with it, along
@@ -82,15 +95,37 @@ opens: call `QuickJs.load()` once and await it. Everywhere else it returns at on
 
 Both engines run one contract suite, on every target, that pins down how the API behaves.
 
-Rhino's dedicated `:kitejs-rhino:test262Parity` task compares a pinned test262 corpus with upstream
-Rhino, recording intentional differences separately. Agreement includes tests both engines fail;
-it is a compatibility check, not a claim that every case conforms to ECMAScript.
+Rhino's test262 parity run (`python3 tools/test262.py parity`) compares a pinned test262 corpus
+with upstream Rhino, recording intentional differences separately. Agreement includes tests both
+engines fail; it is a compatibility check, not a claim that every case conforms to ECMAScript.
 
 Corpus replay is separate from the ordinary test suite and must be requested with
-`-Ptest262Replay`. Missing or mismatched inputs fail that requested run. The dedicated workflow
-replays one versioned artifact across its platform matrix and records executed counts and known
-differences per target. Coverage is established by those run results; the regular platform tests
+`python3 tools/test262.py replay`. Missing or mismatched inputs fail that requested run. The
+dedicated workflow replays one versioned artifact across its platform matrix and records executed
+counts and known differences per target. Coverage is established by those run results; the regular platform tests
 alone do not establish corpus coverage. See [Testing](TESTING.md) for commands and evidence.
+
+## Building
+
+KiteJS builds with the [Kotlin Toolchain](https://github.com/JetBrains/kotlin-toolchain). The
+`kotlin` script in the root downloads it on the first run, with the JDK, Kotlin/Native and Node that
+it needs.
+
+```sh
+./kotlin build                       # every platform this machine can build
+./kotlin test -p jvm -p android      # the tests on the platforms you name
+python3 tools/web-tests/run.py       # the JavaScript and Wasm tests, in Node
+./kotlin check abi klibAbi           # the public API against the dumps in each module's api/ folder
+./kotlin do dokka && ./kotlin do dokkaSite   # the API reference, in build/dokka/html
+```
+
+Name the platforms for `./kotlin test`. Without `-p` it also runs the Wasm tests in headless Chrome,
+and there only kitejs-api passes: the other modules import the npm package `@js-joda/timezone`,
+which the toolchain cannot add to its browser page. `./kotlin check abi klibAbi` needs a build of
+every platform first.
+
+kitejs-quickjs compiles C code, so it needs [zig](https://ziglang.org) on the `PATH`, and for Android
+an NDK in `ANDROID_NDK_HOME` or in the Android SDK. [Testing](TESTING.md) has the details.
 
 ## Licence
 

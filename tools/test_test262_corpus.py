@@ -122,6 +122,32 @@ class ReplayArtifactTest(unittest.TestCase):
         with patch.object(corpus, "provenance", return_value=self.expected), self.assertRaisesRegex(ValueError, "Incomplete"):
             corpus.report(self.bundle, directory)
 
+    def write_log(self, exit_code=0, executed=1):
+        directory = self.bundle / "results/linuxX64"
+        directory.mkdir(parents=True, exist_ok=True)
+        result = dict(self.expected, executed=executed, strict=0, sloppy=1, mismatches=0)
+        (directory / "replay.log").write_text(
+            "  stdout: TEST262_RESULT=" + json.dumps(result) + f"\nTEST262_REPLAY_EXIT={exit_code}\n")
+        return directory
+
+    def test_console_log_of_a_successful_replay_produces_a_verified_result(self):
+        directory = self.write_log()
+        with patch.object(corpus, "provenance", return_value=self.expected):
+            corpus.report(self.bundle, directory)
+        result = json.loads((directory / "test262-result.json").read_text())
+        self.assertEqual(1, result["executed"])
+        self.assertEqual("linuxX64", result["target"])
+
+    def test_console_log_of_a_failed_replay_is_not_coverage(self):
+        directory = self.write_log(exit_code=1)
+        with patch.object(corpus, "provenance", return_value=self.expected), self.assertRaisesRegex(ValueError, "failed"):
+            corpus.report(self.bundle, directory)
+
+    def test_console_log_with_an_incomplete_denominator_fails(self):
+        directory = self.write_log(executed=0)
+        with patch.object(corpus, "provenance", return_value=self.expected), self.assertRaisesRegex(ValueError, "Incomplete"):
+            corpus.report(self.bundle, directory)
+
 
 if __name__ == "__main__":
     unittest.main()

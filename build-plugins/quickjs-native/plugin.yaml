@@ -1,0 +1,112 @@
+# Every task reads the C code in native/ of the module that enables this plugin. A task only runs when
+# the build needs its output, so `./kotlin build -p linuxX64` compiles the C code for Linux x64 alone.
+
+tasks:
+  # zig cross-compiles one JNI library per desktop platform. The JVM jar carries them all.
+  jni:
+    action: !io.github.yuroyami.buildplugins.quickjs.buildJniLibraries
+      nativeDir: ${module.rootDir}/native
+      outputDir: ${taskOutputDir}/resources
+
+  # The same library for this machine alone, for the Android host tests.
+  jniHost:
+    action: !io.github.yuroyami.buildplugins.quickjs.buildHostJniLibrary
+      nativeDir: ${module.rootDir}/native
+      outputDir: ${taskOutputDir}/resources
+
+  # zig builds the WebAssembly module, and the task embeds it in Kotlin code for src@web.
+  wasm:
+    action: !io.github.yuroyami.buildplugins.quickjs.buildWasmModule
+      nativeDir: ${module.rootDir}/native
+      wasmFile: ${taskOutputDir}/kitejs_quickjs.wasm
+      sourcesDir: ${taskOutputDir}/kotlin
+
+  # Kotlin/Native's own clang builds a static library per target. The cinterop klib embeds it.
+  konanIosArm64:
+    action: !io.github.yuroyami.buildplugins.quickjs.buildKonanLibrary
+      konanTarget: ios_arm64
+      kotlinVersion: ${module.settings.kotlin.version}
+      nativeDir: ${module.rootDir}/native
+      libraryDir: ${taskOutputDir}/lib
+      defFile: ${taskOutputDir}/def/kitejs_quickjs.def
+  konanIosSimulatorArm64:
+    action: !io.github.yuroyami.buildplugins.quickjs.buildKonanLibrary
+      konanTarget: ios_simulator_arm64
+      kotlinVersion: ${module.settings.kotlin.version}
+      nativeDir: ${module.rootDir}/native
+      libraryDir: ${taskOutputDir}/lib
+      defFile: ${taskOutputDir}/def/kitejs_quickjs.def
+  konanIosX64:
+    action: !io.github.yuroyami.buildplugins.quickjs.buildKonanLibrary
+      konanTarget: ios_x64
+      kotlinVersion: ${module.settings.kotlin.version}
+      nativeDir: ${module.rootDir}/native
+      libraryDir: ${taskOutputDir}/lib
+      defFile: ${taskOutputDir}/def/kitejs_quickjs.def
+  konanMacosArm64:
+    action: !io.github.yuroyami.buildplugins.quickjs.buildKonanLibrary
+      konanTarget: macos_arm64
+      kotlinVersion: ${module.settings.kotlin.version}
+      nativeDir: ${module.rootDir}/native
+      libraryDir: ${taskOutputDir}/lib
+      defFile: ${taskOutputDir}/def/kitejs_quickjs.def
+  konanLinuxX64:
+    action: !io.github.yuroyami.buildplugins.quickjs.buildKonanLibrary
+      konanTarget: linux_x64
+      kotlinVersion: ${module.settings.kotlin.version}
+      nativeDir: ${module.rootDir}/native
+      libraryDir: ${taskOutputDir}/lib
+      defFile: ${taskOutputDir}/def/kitejs_quickjs.def
+  konanLinuxArm64:
+    action: !io.github.yuroyami.buildplugins.quickjs.buildKonanLibrary
+      konanTarget: linux_arm64
+      kotlinVersion: ${module.settings.kotlin.version}
+      nativeDir: ${module.rootDir}/native
+      libraryDir: ${taskOutputDir}/lib
+      defFile: ${taskOutputDir}/def/kitejs_quickjs.def
+  konanMingwX64:
+    action: !io.github.yuroyami.buildplugins.quickjs.buildKonanLibrary
+      konanTarget: mingw_x64
+      kotlinVersion: ${module.settings.kotlin.version}
+      nativeDir: ${module.rootDir}/native
+      libraryDir: ${taskOutputDir}/lib
+      defFile: ${taskOutputDir}/def/kitejs_quickjs.def
+
+# A fragment modifier starts with "@", as in the folder names (toolchain 0.13.0 compares it as written).
+generated:
+  resources:
+    - directory: ${tasks.jni.action.outputDir}
+      fragment:
+        modifier: "@jvm"
+    # Android's host tests run on the desktop JVM, where no Android library loads, so they get
+    # the desktop library for this machine.
+    - directory: ${tasks.jniHost.action.outputDir}
+      fragment:
+        modifier: "@android"
+        isTest: true
+  sources:
+    - directory: ${tasks.wasm.action.sourcesDir}
+      fragment:
+        modifier: "@web"
+  cinteropDefinitions:
+    - defFile: ${tasks.konanIosArm64.action.defFile}
+      fragment:
+        modifier: "@iosArm64"
+    - defFile: ${tasks.konanIosSimulatorArm64.action.defFile}
+      fragment:
+        modifier: "@iosSimulatorArm64"
+    - defFile: ${tasks.konanIosX64.action.defFile}
+      fragment:
+        modifier: "@iosX64"
+    - defFile: ${tasks.konanMacosArm64.action.defFile}
+      fragment:
+        modifier: "@macosArm64"
+    - defFile: ${tasks.konanLinuxX64.action.defFile}
+      fragment:
+        modifier: "@linuxX64"
+    - defFile: ${tasks.konanLinuxArm64.action.defFile}
+      fragment:
+        modifier: "@linuxArm64"
+    - defFile: ${tasks.konanMingwX64.action.defFile}
+      fragment:
+        modifier: "@mingwX64"

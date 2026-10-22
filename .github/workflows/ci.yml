@@ -12,60 +12,81 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  KOTLIN_CLI_NO_WELCOME_BANNER: 1
+
 jobs:
   linux:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
+      - uses: actions/checkout@v7
+      - name: Cache the Kotlin Toolchain downloads
+        uses: actions/cache@v5
         with:
-          distribution: temurin
-          java-version: 21
-      - uses: gradle/actions/setup-gradle@v4
-      - name: Build and test (JVM, Android, JS and Wasm on Node and in Chrome, Linux, ABI check)
+          path: ~/.cache/JetBrains/Kotlin
+          key: kotlin-toolchain-${{ runner.os }}-${{ hashFiles('kotlin', 'project.yaml', '**/module.yaml', 'libs.versions.toml', 'build-plugins/**/plugin.yaml') }}
+          restore-keys: kotlin-toolchain-${{ runner.os }}-
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+      - name: Build (JVM, Android, JS, Wasm, Linux, Windows)
         run: >
-          ./gradlew
-          :kitejs-rhino:jvmTest :kitejs-rhino:testAndroidHostTest
-          :kitejs-rhino:jsNodeTest :kitejs-rhino:jsBrowserTest
-          :kitejs-rhino:wasmJsNodeTest :kitejs-rhino:wasmJsBrowserTest
-          :kitejs-rhino:linuxX64Test
-          :kitejs-coroutines:jvmTest :kitejs-coroutines:testAndroidHostTest
-          :kitejs-coroutines:jsNodeTest :kitejs-coroutines:jsBrowserTest
-          :kitejs-coroutines:wasmJsNodeTest :kitejs-coroutines:wasmJsBrowserTest
-          :kitejs-coroutines:linuxX64Test
-          assemble check
-          -x :kitejs-quickjs:assemble -x :kitejs-quickjs:check
+          ./kotlin build -m kitejs-api -m kitejs-rhino -m kitejs-coroutines -m kitejs -m kitejs-testkit
+          -p jvm -p android -p js -p wasmJs -p linuxX64 -p linuxArm64 -p mingwX64
+      - name: Test (JVM, Android host tests, Linux)
+        run: >
+          ./kotlin test --exclude-module kitejs-quickjs
+          -p jvm -p android -p linuxX64
+      - name: Test (JavaScript and Wasm on Node)
+        run: >
+          python3 tools/web-tests/run.py
+          --module kitejs-api --module kitejs-rhino --module kitejs-coroutines --module kitejs
+      # The other modules import the npm package @js-joda/timezone, which the toolchain's browser page cannot load.
+      - name: Test (Wasm in headless Chrome, kitejs-api)
+        run: ./kotlin test -m kitejs-api -p wasmJs
+      - name: Check the public JVM API
+        run: ./kotlin check abi -m kitejs-api -m kitejs-rhino -m kitejs-coroutines -m kitejs
 
   apple:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
+      - uses: actions/checkout@v7
+      - name: Cache the Kotlin Toolchain downloads
+        uses: actions/cache@v5
         with:
-          distribution: temurin
-          java-version: 21
-      - uses: gradle/actions/setup-gradle@v4
-      - name: Apple targets (macOS and the iOS simulator)
+          path: ~/Library/Caches/JetBrains/Kotlin
+          key: kotlin-toolchain-${{ runner.os }}-${{ hashFiles('kotlin', 'project.yaml', '**/module.yaml', 'libs.versions.toml', 'build-plugins/**/plugin.yaml') }}
+          restore-keys: kotlin-toolchain-${{ runner.os }}-
+      - name: Test (macOS and the iOS simulator)
         run: >
-          ./gradlew
-          :kitejs-rhino:macosArm64Test :kitejs-rhino:iosSimulatorArm64Test
-          :kitejs-coroutines:macosArm64Test :kitejs-coroutines:iosSimulatorArm64Test
+          ./kotlin test -m kitejs-api -m kitejs-rhino -m kitejs-coroutines -m kitejs
+          -p macosArm64 -p iosSimulatorArm64
+      # The klib dump covers every Kotlin/Native and web platform, and only a Mac builds them all.
+      - name: Check the public klib API
+        run: >
+          ./kotlin build -m kitejs-api -m kitejs-rhino -m kitejs-coroutines -m kitejs
+          -p iosArm64 -p iosSimulatorArm64 -p iosX64 -p macosArm64 -p linuxX64 -p linuxArm64 -p mingwX64 -p js -p wasmJs
+          && ./kotlin check klibAbi -m kitejs-api -m kitejs-rhino -m kitejs-coroutines -m kitejs
 
   windows:
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
+      - uses: actions/checkout@v7
+      - name: Cache the Kotlin Toolchain downloads
+        uses: actions/cache@v5
         with:
-          distribution: temurin
-          java-version: 21
-      - uses: gradle/actions/setup-gradle@v4
+          path: ~/AppData/Local/JetBrains/Kotlin
+          key: kotlin-toolchain-${{ runner.os }}-${{ hashFiles('kotlin', 'project.yaml', '**/module.yaml', 'libs.versions.toml', 'build-plugins/**/plugin.yaml') }}
+          restore-keys: kotlin-toolchain-${{ runner.os }}-
       - name: Native stack limits
         run: >
-          ./gradlew :kitejs-rhino:mingwX64Test
-          --tests "*WindowsStackGuardTest.*"
-          --tests "*RhinoErrorsTest.*"
-          --tests "*RhinoRecursionTest.*"
-          --tests "*AsmBudgetTest.*"
+          ./kotlin test -m kitejs-rhino -p mingwX64
+          --include-classes='*WindowsStackGuardTest'
+          --include-classes='*RhinoErrorsTest'
+          --include-classes='*RhinoRecursionTest'
+          --include-classes='*AsmBudgetTest'
       - name: Windows target
-        run: ./gradlew :kitejs-rhino:mingwX64Test :kitejs-coroutines:mingwX64Test
+        run: ./kotlin test -m kitejs-rhino -m kitejs-coroutines -p mingwX64

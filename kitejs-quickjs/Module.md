@@ -5,7 +5,7 @@ and use it the way the `kitejs-api` module describes; `QuickJsConfig` adds what 
 a memory limit and a stack size.
 
 QuickJS is C, compiled into each target: a static library through cinterop on Kotlin/Native, a JNI
-library inside the jar on the JVM and inside the AAR on Android, and a WebAssembly module embedded
-in the code on JavaScript and Wasm. On those last two the module has to be compiled before the
-first engine opens, so call `QuickJs.load()` once and await it; on every other target it returns
-at once.
+library inside the jar on the JVM and inside the `kitejs-quickjs-android-natives` jar on Android,
+and a WebAssembly module embedded in the code on JavaScript and Wasm. On those last two the module
+has to be compiled before the first engine opens, so call `QuickJs.load()` once and await it; on
+every other target it returns at once.

@@ -1,0 +1,174 @@
+product:
+  type: kmp/lib
+  platforms:
+    - jvm
+    - android
+    - iosArm64
+    - iosSimulatorArm64
+    - iosX64
+    - macosArm64
+    - linuxX64
+    - linuxArm64
+    - mingwX64
+    - js
+    - wasmJs
+
+description: >-
+  The Rhino JavaScript engine, ported to Kotlin Multiplatform, behind the KiteJS API. Runs ES5.1 and most of
+  ES2015 and later, including classes, async functions, regular expressions, dates, typed arrays, promises,
+  generators, Proxy and BigInt. The parser, the interpreter, the regular expression engine, the date arithmetic
+  and the number formatting are all written in common Kotlin, so a script gives the same answer on Android, iOS,
+  JVM, JavaScript, WebAssembly, Linux, macOS and Windows, with no native code at all.
+
+# kitejs-rhino is the Rhino engine, ported to Kotlin: lexer, parser, IR, bytecode generator, interpreter and the
+# ECMAScript runtime, all in src. Its only runtime dependencies are kitejs-api, the engine-agnostic API it
+# implements, and kotlinx-datetime for time zone rules. Pure computation: no sockets, no threads, no disk, no JIT.
+#
+# test@jvm carries the upstream Rhino jar as a differential-testing oracle: the same script goes through upstream
+# and through this port, and the outputs must match. The oracle never ships.
+#
+# On JavaScript and WebAssembly, kotlinx-datetime reads named zones from the npm package @js-joda/timezone
+# (src@js/JsJodaTimeZone.kt). The toolchain cannot declare npm packages, so applications add it themselves
+# (docs/dates-and-time-zones.md), and tools/web-tests/run.py installs it for the tests.
+
+apply:
+  - ../common.module-template.yaml
+  - ../library.module-template.yaml
+
+dependencies:
+  # The API this engine implements, which an embedder programs against.
+  - ../kitejs-api: exported
+  # Time zone rules for Date. Everything else the engine computes itself.
+  - $libs.kotlinx.datetime
+
+test-dependencies:
+  # The contract every engine keeps, run here against Rhino.
+  - ../kitejs-testkit
+  # Reading the test262 tree on every target. Test scope only: the engine has no file access.
+  - $libs.kotlinx.io.core
+
+test-dependencies@jvm:
+  - $libs.rhino.oracle
+
+settings:
+  kotlin:
+    optIns:
+      - kotlin.experimental.ExperimentalNativeApi
+      - io.github.yuroyami.kitejs.api.InternalKiteJsApi
+  android:
+    namespace: io.github.yuroyami.kitejs.rhino
+  publishing:
+    pom:
+      name: KiteJS Rhino
+
+plugins:
+  abi-check:
+    enabled: true
+    klibPlatforms: [ iosArm64, iosSimulatorArm64, iosX64, js, linuxArm64, linuxX64, macosArm64, mingwX64, wasmJs ]
+  dokka:
+    enabled: true
+    moduleName: kitejs-rhino
+    includes: [ Module.md ]
+    customStyleSheets: [ ../docs/api-theme/kite.css ]
+    templatesDir: ../dokka-templates
+    footerMessage: MPL-2.0 · KiteJS is part of the Kite family.
+    sourceLinkUrl: https://github.com/yuroyami/KiteJS/blob/main/kitejs-rhino/src
+  # The test262 parity run and the corpus replay (TESTING.md). They add their sources only when
+  # KITEJS_TEST262 is set, so an ordinary build and test never see them.
+  test262:
+    enabled: true
+
+# Gradle named the JVM and Android module "io.github.yuroyami:kitejs-rhino". The name is in
+# META-INF/*.kotlin_module and in the JVM names of internal members, so keep it.
+settings@jvm:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-rhino ]
+
+settings@android:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-rhino ]
+
+# Gradle named the klib "io.github.yuroyami:kitejs-rhino". Keep that name, or libraries built against
+# earlier releases fail to link on Kotlin/Native. Set it per platform: on @native, it also
+# renames the klibs of shared native code, which must keep their own names.
+settings@iosArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-rhino, -Xshort-module-name=kitejs-rhino ]
+
+settings@iosSimulatorArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-rhino, -Xshort-module-name=kitejs-rhino ]
+
+settings@iosX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-rhino, -Xshort-module-name=kitejs-rhino ]
+
+settings@macosArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-rhino, -Xshort-module-name=kitejs-rhino ]
+
+settings@linuxX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-rhino, -Xshort-module-name=kitejs-rhino ]
+
+settings@linuxArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-rhino, -Xshort-module-name=kitejs-rhino ]
+
+settings@mingwX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=io.github.yuroyami:kitejs-rhino, -Xshort-module-name=kitejs-rhino ]
+
+settings@js:
+  kotlin:
+    freeCompilerArgs: [ -Xir-module-name=io.github.yuroyami:kitejs-rhino ]
+
+settings@wasmJs:
+  kotlin:
+    freeCompilerArgs: [ -Xir-module-name=io.github.yuroyami:kitejs-rhino ]
+
+# Tests compile into their own klib or JVM module, which needs a different name. The test blocks name the
+# same platforms as the blocks above, so the toolchain applies them last.
+test-settings@iosArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-rhino_test, -Xshort-module-name=kitejs-rhino_test ]
+
+test-settings@iosSimulatorArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-rhino_test, -Xshort-module-name=kitejs-rhino_test ]
+
+test-settings@iosX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-rhino_test, -Xshort-module-name=kitejs-rhino_test ]
+
+test-settings@macosArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-rhino_test, -Xshort-module-name=kitejs-rhino_test ]
+
+test-settings@linuxX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-rhino_test, -Xshort-module-name=kitejs-rhino_test ]
+
+test-settings@linuxArm64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-rhino_test, -Xshort-module-name=kitejs-rhino_test ]
+
+test-settings@mingwX64:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-rhino_test, -Xshort-module-name=kitejs-rhino_test ]
+
+test-settings@js:
+  kotlin:
+    freeCompilerArgs: [ -Xir-module-name=kitejs-rhino_test ]
+
+test-settings@wasmJs:
+  kotlin:
+    freeCompilerArgs: [ -Xir-module-name=kitejs-rhino_test ]
+
+test-settings@jvm:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-rhino_test ]
+
+test-settings@android:
+  kotlin:
+    freeCompilerArgs: [ -module-name=kitejs-rhino_test ]

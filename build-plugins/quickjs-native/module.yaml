@@ -1,0 +1,10 @@
+product: jvm/amper-plugin
+
+description: >-
+  Builds the QuickJS C code of kitejs-quickjs: a JNI library per desktop platform for the JVM jar, a WebAssembly
+  module for the JavaScript and WebAssembly targets, and a static library with its cinterop definition per
+  Kotlin/Native target.
+
+settings:
+  kotlin:
+    version: 2.4.21

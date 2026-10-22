@@ -79,8 +79,15 @@ between releases.
 ### JavaScript and WebAssembly need one npm package
 
 On those two targets the zone database is a separate npm package, `@js-joda/timezone`. KiteJS
-declares it, so a normal Gradle build picks it up. Without it a named zone throws and only UTC
-and fixed offsets work.
+imports it, but its JavaScript and Wasm libraries cannot declare it, so add it to your build.
+Without it a named zone throws and only UTC and fixed offsets work. With Gradle:
+
+```kotlin
+jsMain.dependencies { implementation(npm("@js-joda/timezone", "2.23.0")) }
+wasmJsMain.dependencies { implementation(npm("@js-joda/timezone", "2.23.0")) }
+```
+
+KiteJS 0.7.0 and earlier declared the package themselves, so their builds picked it up without this.
 
 If you bundle the output yourself, make sure the package survives tree shaking. KiteJS holds an
 eager reference to it for exactly this reason.

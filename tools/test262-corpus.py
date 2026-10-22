@@ -35,7 +35,7 @@ def provenance():
     digest.update(git(ROOT, "diff", "--no-ext-diff", "--binary", "HEAD"))
     for name in sorted(set(git(ROOT, "ls-files", "--others", "--exclude-standard", "-z").split(b"\0")) - {b""}):
         digest.update(name + b"\0" + (ROOT / name.decode()).read_bytes() + b"\0")
-    versions = tomllib.loads((ROOT / "gradle/libs.versions.toml").read_text())
+    versions = tomllib.loads((ROOT / "libs.versions.toml").read_text())
     return {
         "schema": 1,
         "engineCommit": git(ROOT, "rev-parse", "HEAD").decode().strip(),
@@ -198,6 +198,17 @@ def generate(bundle, output):
 def report(bundle, report_dir):
     metadata = validate(bundle, provenance())
     reports = []
+
+    def accept(line, source):
+        result = json.loads(line.removeprefix("TEST262_RESULT="))
+        require(result["executed"] == metadata["caseCount"] and result["mismatches"] == 0,
+                f"Incomplete or failing replay: {source}")
+        require(result["strict"] == metadata["strictCount"] and result["sloppy"] == metadata["sloppyCount"],
+                f"Replay execution modes mismatch: {source}")
+        for key in ("engineCommit", "engineSources", "corpusCommit", "oracleVersion"):
+            require(result[key] == metadata[key], f"Result provenance mismatch: {source}")
+        reports.append(result)
+
     for path in report_dir.rglob("TEST-*.xml"):
         root = ET.parse(path).getroot()
         for output in root.iter("system-out"):
@@ -207,14 +218,16 @@ def report(bundle, report_dir):
                 if line.startswith("TEST262_RESULT="):
                     require(int(root.get("failures", "0")) == 0 and int(root.get("errors", "0")) == 0,
                             f"Replay test failed: {path}")
-                    result = json.loads(line.removeprefix("TEST262_RESULT="))
-                    require(result["executed"] == metadata["caseCount"] and result["mismatches"] == 0,
-                            f"Incomplete or failing replay: {path}")
-                    require(result["strict"] == metadata["strictCount"] and result["sloppy"] == metadata["sloppyCount"],
-                            f"Replay execution modes mismatch: {path}")
-                    for key in ("engineCommit", "engineSources", "corpusCommit", "oracleVersion"):
-                        require(result[key] == metadata[key], f"Result provenance mismatch: {path}")
-                    reports.append(result)
+                    accept(line, path)
+    # tools/test262.py writes the console output of a replay to replay.log, for the platforms without XML.
+    if not reports:
+        for path in report_dir.rglob("replay.log"):
+            lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+            require("TEST262_REPLAY_EXIT=0" in lines, f"Replay test failed: {path}")
+            for line in lines:
+                start = line.find("TEST262_RESULT=")
+                if start >= 0:
+                    accept(line[start:], path)
     require(len(reports) == 1, f"Expected one replay result, found {len(reports)} in {report_dir}")
     reports[0]["target"] = report_dir.name
     target = report_dir / "test262-result.json"
