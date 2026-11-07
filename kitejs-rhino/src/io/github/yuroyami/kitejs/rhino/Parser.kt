@@ -116,6 +116,14 @@ public class Parser(
     private var currentJsDocComment: Comment? = null
 
     internal var nestingOfFunction = 0
+
+    /**
+     * How deep the recursive descent is. Upstream catches `StackOverflowError` and reports "Too
+     * deep recursion while parsing". Common Kotlin cannot catch a stack overflow, and a native
+     * target ends the process on one, so the port counts the depth instead and reports the same
+     * error past [MAX_PARSE_DEPTH] on every target (#139).
+     */
+    private var parseDepth = 0
     internal var nestingOfFunctionParams = 0
     private var currentLabel: LabeledStatement? = null
     private var inDestructuringAssignment = false
@@ -503,6 +511,21 @@ public class Parser(
         currentScope = currentScope!!.parentScope
     }
 
+    private fun tooDeep(): EvaluatorException =
+        Context.reportRuntimeError(lookupMessage("msg.too.deep.parser.recursion"), sourceURI, ts.lineno, null, 0)
+
+    /** Runs [body] one level deeper, and reports the source as too deeply nested past [MAX_PARSE_DEPTH]. */
+    private inline fun <T> nested(body: () -> T): T {
+        if (++parseDepth > MAX_PARSE_DEPTH) {
+            throw tooDeep()
+        }
+        try {
+            return body()
+        } finally {
+            --parseDepth
+        }
+    }
+
     private fun enterLoop(loop: Loop) {
         val loops = loopSet ?: mutableListOf<Loop>().also { loopSet = it }
         loops.add(loop)
@@ -555,6 +578,10 @@ public class Parser(
         currentPos = ts
         try {
             return parse()
+        } catch (t: Throwable) {
+            // As upstream reports a StackOverflowError, where the host lets one be caught.
+            if (isHostStackOverflow(t)) throw tooDeep()
+            throw t
         } finally {
             parseFinished = true
         }
@@ -1448,7 +1475,9 @@ public class Parser(
     /** Whether the statement being parsed is a StatementListItem. */
     private var inStatementListItem = false
 
-    private fun statement(): AstNode {
+    private fun statement(): AstNode = nested { statementAtDepth() }
+
+    private fun statementAtDepth(): AstNode {
         val pos = ts.tokenBeg
         inStatementListItem = listItemPending
         listItemPending = false
@@ -3101,7 +3130,9 @@ public class Parser(
     private fun endsInRest(e: AstNode): Boolean =
         e is Spread || (e is InfixExpression && e.type == Token.COMMA && e.right is Spread)
 
-    private fun assignExpr(): AstNode {
+    private fun assignExpr(): AstNode = nested { assignExprAtDepth() }
+
+    private fun assignExprAtDepth(): AstNode {
         var tt = peekToken()
         if (tt == Token.YIELD) {
             return returnOrYield(tt, true)
@@ -3382,7 +3413,9 @@ public class Parser(
         }
     }
 
-    private fun unaryExpr(): AstNode {
+    private fun unaryExpr(): AstNode = nested { unaryExprAtDepth() }
+
+    private fun unaryExprAtDepth(): AstNode {
         val node: AstNode
         var tt = peekToken()
         if (tt == Token.COMMENT) {
@@ -3566,7 +3599,9 @@ public class Parser(
      *
      * @param allowCallSyntax passed down to [memberExprTail]
      */
-    private fun memberExpr(allowCallSyntax: Boolean): AstNode {
+    private fun memberExpr(allowCallSyntax: Boolean): AstNode = nested { memberExprAtDepth(allowCallSyntax) }
+
+    private fun memberExprAtDepth(allowCallSyntax: Boolean): AstNode {
         val tt = peekToken()
         val pn: AstNode
 
@@ -6407,6 +6442,9 @@ public class Parser(
 
         /** Maximum number of allowed function or constructor arguments, following SpiderMonkey. */
         public const val ARGC_LIMIT: Int = 1 shl 16
+
+        /** The deepest the recursive descent goes before the source is reported as too deeply nested (#139). */
+        internal const val MAX_PARSE_DEPTH: Int = 1000
 
         // TokenInformation flags: currentFlaggedToken stores them together with the token type.
         internal const val CLEAR_TI_MASK = 0xFFFF // mask that clears the token information bits

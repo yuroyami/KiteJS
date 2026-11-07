@@ -227,6 +227,7 @@ internal object Messages {
         "msg.class.init.arguments" to "''arguments'' is not allowed in class field initializer or static initialization block",
         "msg.no.semi.class.field" to "missing ; after class field",
         "msg.syntax.invalid.assignment.lhs" to "syntax error: Invalid left-hand side in assignment",
+        "msg.too.deep.parser.recursion" to "Too deep recursion while parsing",
         "msg.too.many.constructor.args" to "Too many constructor arguments",
         "msg.too.many.function.args" to "Too many function arguments",
         "msg.try.no.catchfinally" to "''try'' without ''catch'' or ''finally''",

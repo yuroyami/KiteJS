@@ -29,3 +29,6 @@ The notes of each release are also on the [releases page](https://github.com/yur
   - The POM has no `inceptionYear`.
   - `./kotlin build` links no Apple frameworks (`tools/apple_frameworks.py` does) and no JavaScript
     distribution of each library. Neither was published.
+- Rhino: deeply nested source ends with the engine's error "Too deep recursion while parsing" on
+  every target, as upstream reports it, instead of the host's stack overflow. The parser counts its
+  own depth, because native code cannot catch a stack overflow (#139).
