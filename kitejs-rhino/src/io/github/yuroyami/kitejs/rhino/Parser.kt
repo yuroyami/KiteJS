@@ -83,7 +83,7 @@ import io.github.yuroyami.kitejs.rhino.ast.Yield
  *
  * A Parser is single use. Calling [parse] twice throws.
  *
- * Not ported: the Reader-based source path (D-2) and the E4X methods, so `defaultXmlNamespace`,
+ * Not ported: the Reader-based source path and the E4X methods, so `defaultXmlNamespace`,
  * `xmlInitializer`, `attributeAccess` and the XML branches of `propertyName` and `memberExprTail`
  * report "XML not available" instead of parsing E4X syntax.
  */
@@ -155,7 +155,7 @@ public class Parser(
      * What `await` is here (ECMAScript 2017, 12.1.1 and 14.7): a name ([AWAIT_NAME]), the operator
      * of an async function body ([AWAIT_OPERATOR]), or a reserved word that no await expression
      * may use, in an async function's parameters ([AWAIT_IN_PARAMS]) and in a class static
-     * block ([AWAIT_IN_STATIC_BLOCK]). A function or a non-async arrow body sets its own (D-97).
+     * block ([AWAIT_IN_STATIC_BLOCK]). A function or a non-async arrow body sets its own.
      */
     private var awaitContext = AWAIT_NAME
 
@@ -177,7 +177,7 @@ public class Parser(
 
     /**
      * Set while the names a `for` head declares with `const` are defined. Such a const belongs to
-     * the loop, as a `let` there does, rather than to the whole function (D-72).
+     * the loop, as a `let` there does, rather than to the whole function.
      */
     internal var blockScopedConst = false
     private var labelSet: MutableMap<String, LabeledStatement>? = null
@@ -691,7 +691,7 @@ public class Parser(
         var isExpressionClosure = false
         if (!matchToken(Token.LC, true)) {
             // An expression closure is JavaScript 1.8's, which SpiderMonkey never took for a
-            // generator or an async function either (D-97).
+            // generator or an async function either.
             if (type != FunctionNode.ARROW_FUNCTION &&
                 (compilerEnv.languageVersion < Context.VERSION_1_8 || fnNode.isAsync || fnNode.isES6Generator)
             ) {
@@ -1907,7 +1907,7 @@ public class Parser(
      * The body of a loop, a `with` or an `if` is a statement, and a function declaration is not
      * one, labelled or not (ECMAScript 2015, 13.6.1 and 13.7.1.1). Annex B.3.4 lets the body of
      * an `if` in sloppy code be a plain function declaration, which is what browsers keep.
-     * Upstream accepts all of these; older language versions still do (D-76).
+     * Upstream accepts all of these; older language versions still do.
      */
     private fun checkControlBody(body: AstNode, isIfBody: Boolean) {
         if (compilerEnv.languageVersion < Context.VERSION_ES6) return
@@ -2692,7 +2692,7 @@ public class Parser(
             }
         }
 
-        // A labelled function is Annex B.3.2's, for sloppy code, and never a generator (D-76).
+        // A labelled function is Annex B.3.2's, for sloppy code, and never a generator.
         if (stmt is FunctionNode && compilerEnv.languageVersion >= Context.VERSION_ES6 &&
             (inUseStrictDirective || stmt.isGenerator)
         ) {
@@ -2715,14 +2715,14 @@ public class Parser(
      */
     private fun variables(declType: Int, pos: Int, isStatement: Boolean): VariableDeclaration {
         // A let below the function or script body can run again, in a loop or a switch, and one
-        // without an initializer must then be reset to undefined (D-98).
+        // without an initializer must then be reset to undefined.
         if (declType == Token.LET && isStatement && currentScope !== currentScriptOrFn &&
             compilerEnv.languageVersion >= Context.VERSION_ES6
         ) {
             return variablesIn(declType, pos, isStatement).also { it.putIntProp(Node.RESET_LET_PROP, 1) }
         }
         // A const in a block belongs to the block, as a let does, and is bound afresh each time
-        // its declaration runs, so one in a loop body takes the value of each pass (D-74).
+        // its declaration runs, so one in a loop body takes the value of each pass.
         val blockConst = declType == Token.CONST && !blockScopedConst && isInLexicalBlockBody()
         if (!blockConst) return variablesIn(declType, pos, isStatement)
         val saved = blockScopedConst
@@ -2927,7 +2927,7 @@ public class Parser(
         val symbol = definingScope?.getSymbol(name)
         val symDeclType = symbol?.declType ?: -1
         // A const a for head or a block declares shadows an outer name the way a let does, but
-        // not a var or function declared inside its own block (D-72, D-74).
+        // not a var or function declared inside its own block.
         val loopConst = declType == Token.CONST && blockScopedConst
         val inBlock = scope !== currentScriptOrFn
         val conflicts =
@@ -3539,7 +3539,7 @@ public class Parser(
 
     /**
      * KMP: E4X is out of scope, so an XML literal is reported as unavailable instead of parsed
-     * (D-16). Upstream builds an `XmlLiteral` here.
+     *. Upstream builds an `XmlLiteral` here.
      */
     private fun xmlInitializer(): AstNode {
         if (currentToken != Token.LT) codeBug()
@@ -3679,7 +3679,7 @@ public class Parser(
                 }
 
                 Token.DOTQUERY -> {
-                    // KMP: the E4X filtering predicate is out of scope (D-16).
+                    // KMP: the E4X filtering predicate is out of scope.
                     consumeToken()
                     mustHaveXML()
                     reportError("msg.XML.not.available")
@@ -3873,7 +3873,7 @@ public class Parser(
         }
 
         // KMP: upstream builds an XmlMemberGet when ref is an XmlRef. E4X is out of scope, so
-        // propertyName never returns one and a PropertyGet is always the right node (D-16).
+        // propertyName never returns one and a PropertyGet is always the right node.
         val result: InfixExpression = PropertyGet()
         if (tt == Token.QUESTION_DOT) {
             result.type = Token.QUESTION_DOT
@@ -3905,7 +3905,7 @@ public class Parser(
     }
 
     /**
-     * KMP: E4X attribute expressions such as `@attr` and `@ns::*` are out of scope (D-16), so
+     * KMP: E4X attribute expressions such as `@attr` and `@ns::*` are out of scope, so
      * this reports the syntax as unavailable instead of parsing it.
      */
     private fun attributeAccess(): AstNode {
@@ -3921,7 +3921,7 @@ public class Parser(
      * @param memberTypeFlags flags tracking whether this is a '.' or '..' child
      * @return a [Name] for a plain name. KMP: upstream returns an XmlRef for a qualified name,
      *     an attribute access or a '..' child; E4X is out of scope, so those report an error and
-     *     return an error node (D-16).
+     *     return an error node.
      */
     private fun propertyName(atPos: Int, memberTypeFlags: Int): AstNode {
         var name = createNameNode(true, currentToken)
@@ -3965,13 +3965,13 @@ public class Parser(
             return name
         }
 
-        // KMP: an XmlPropRef would go here. E4X is out of scope (D-16).
+        // KMP: an XmlPropRef would go here. E4X is out of scope.
         reportError("msg.XML.not.available")
         return makeErrorNode()
     }
 
     /**
-     * KMP: the `[expr]` portion of an E4X element reference is out of scope (D-16).
+     * KMP: the `[expr]` portion of an E4X element reference is out of scope.
      */
     private fun xmlElemRef(): AstNode {
         reportError("msg.XML.not.available")

@@ -30,7 +30,7 @@ class ContractParityTest {
         "Evaluator.getDebuggableScript(Object)DebuggableScript" to "the debugger surface is dropped",
     )
 
-    /** D-119: the object-operation protocol also supports hosts outside ScriptableObject. */
+    /** The object-operation protocol also supports hosts outside ScriptableObject. */
     private val expectedAdditions = setOf(
         "Scriptable.ownPropertyKeys()Object[]",
         "Scriptable.getOwnPropertyDescriptor(Context,Object)DescriptorInfo",
@@ -63,7 +63,7 @@ class ContractParityTest {
         if (type.isArray) return shape(type.componentType) + "[]"
         val simple = type.simpleName
         return when (simple) {
-            // D-20: the port takes a KClass where upstream takes a java.lang.Class.
+            // The port takes a KClass where upstream takes a java.lang.Class.
             "KClass" -> "Class"
             else -> simple
         }

@@ -139,7 +139,7 @@ public class NativeArray : ScriptableObject {
         }
         super.put(index, start, value)
         // The length follows only an element that now exists; a non-extensible array refuses a
-        // new one, and upstream grew the length anyway (D-88).
+        // new one, and upstream grew the length anyway.
         if (start === this && this.length <= index && map.query(null, index) != null) {
             this.length = index.toLong() + 1
             this.modCount++
@@ -243,7 +243,7 @@ public class NativeArray : ScriptableObject {
     /**
      * ArrayDefineOwnProperty (ECMAScript 2015, 9.4.2.1) for an index: one at or past a read-only
      * length is refused, and the length grows only once the element is defined. Upstream grew the
-     * length first, whatever its attributes and whether or not the definition then failed (D-88).
+     * length first, whatever its attributes and whether or not the definition then failed.
      */
     override fun defineOwnProperty(cx: Context, id: Any?, desc: DescriptorInfo, checkValid: Boolean): Boolean {
         val index = toArrayIndex(id)
@@ -265,7 +265,7 @@ public class NativeArray : ScriptableObject {
      * The dense fast paths of push, unshift and the rest grow the array without asking, so an
      * array that may not grow keeps its elements in the slot map, where every write is checked.
      * Upstream left an empty array dense when it was frozen, and any array dense when it was only
-     * made non-extensible, so push still appended to it (D-88).
+     * made non-extensible, so push still appended to it.
      */
     override fun preventExtensions(): Boolean {
         leaveDenseMode()
@@ -618,7 +618,7 @@ public class NativeArray : ScriptableObject {
                 // 3 and 4) and only then lets OrdinaryDefineOwnProperty refuse, which answers
                 // false, so Reflect.defineProperty sees false and Object.defineProperty throws.
                 // Upstream threw from inside the definition, and only its Reflect.defineProperty
-                // catch-all turned that into false (D-89).
+                // catch-all turned that into false.
                 val cx = Context.getContext()
                 val currentDesc = builtIn.getOwnPropertyDescriptor(cx, "length")
                 if (!AbstractEcmaObjectOperations.isCompatiblePropertyDescriptor(cx, builtIn.isExtensible, info, currentDesc)) {
@@ -659,7 +659,7 @@ public class NativeArray : ScriptableObject {
          * What Array.from and Array.of fill: a new `this` when IsConstructor says it is a
          * constructor, otherwise a plain array. Upstream tried every Constructable and took any
          * TypeError for "not a constructor", so a constructor's own TypeError vanished into a
-         * plain array (D-91).
+         * plain array.
          */
         internal fun callConstructorOrCreateArray(cx: Context, scope: Scriptable, arg: Scriptable?, length: Long, lengthAlways: Boolean): Scriptable {
             if (AbstractEcmaObjectOperations.isConstructor(arg)) {
@@ -1582,7 +1582,7 @@ public class NativeArray : ScriptableObject {
             // Otherwise, do the generic thing: HasProperty, then Get and Set or a delete
             // (ECMAScript 2015, 22.1.3.3). Upstream read the element and took NOT_FOUND or
             // undefined for a hole, so a present undefined was deleted and a proxy's `has` trap
-            // was never asked (D-89).
+            // was never asked.
             while (count > 0) {
                 if (ArrayLikeAbstractOperations.hasElem(o, from)) {
                     setElem(cx, o, to, getElem(cx, o, from))

@@ -9,7 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * `Math` gives the same digits on every target, and they are the digits V8 gives (D-73).
+ * `Math` gives the same digits on every target, and they are the digits V8 gives.
  *
  * Each vector is a function, its argument or arguments, and the answer, all as the hexadecimal
  * bits of a double. The answers are what Node 22 (V8) computed, except for `pow`, whose answers

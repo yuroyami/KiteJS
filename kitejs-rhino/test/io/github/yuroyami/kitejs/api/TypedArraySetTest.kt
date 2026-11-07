@@ -9,7 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * `%TypedArray%.prototype.set` (issue 45, D-86): a missing source is undefined and so a TypeError
+ * `%TypedArray%.prototype.set` (issue 45): a missing source is undefined and so a TypeError
  * the script can catch, any other source goes through ToObject, and its elements are read with Get.
  * The offset is converted first and the target checked next, as the spec orders them. Every
  * expected value here is what V8 answers.

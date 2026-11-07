@@ -199,7 +199,7 @@ internal class RhinoKiteJs private constructor(
     /**
      * Runs [body] as one call to the instruction budget: the count starts again, and if the engine
      * stops the script for its budget or its interrupt hook, the Promise reactions still queued
-     * are dropped along with it (D-77).
+     * are dropped along with it.
      */
     private inline fun <T> metered(body: () -> T): T {
         factory.instructionsUsed = 0

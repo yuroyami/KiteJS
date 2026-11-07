@@ -8,7 +8,7 @@ import io.github.yuroyami.kitejs.api.KBigInt
 
 
 /**
- * KMP replacement for the ResourceBundle + MessageFormat pipeline (ledger D-4).
+ * KMP replacement for the ResourceBundle + MessageFormat pipeline.
  *
  * English only. Keys are added as the code that uses them gets ported; values are copied
  * verbatim from upstream Messages.properties.
@@ -428,11 +428,11 @@ internal object Messages {
         "msg.typed.array.index.out.of.bounds" to "index {0} is out of bounds [{1}..{2}]",
         "msg.typed.array.length.too.small" to "Derived TypedArray constructor created an array which was too small",
         "msg.typed.array.receiver.incompatible" to "Method %TypedArray%.{0} called on incompatible receiver",
-        // Two keys upstream uses but never defined. See the ledger: upstream produces a missing
+        // Two keys upstream uses but never defined. Upstream produces a missing
         // resource error at these two points, which is a bug, not behaviour worth copying.
         "msg.missing.argument" to "Missing argument",
         "msg.typed.array.abstract.ctor" to "Abstract class TypedArray not directly constructable",
-        // The port's own: upstream accepts a function declaration as the body of a loop (D-76).
+        // The port's own: upstream accepts a function declaration as the body of a loop.
         "msg.func.decl.not.in.block" to "function declaration not directly within block",
     )
 }

@@ -11,7 +11,7 @@ import io.github.yuroyami.kitejs.api.format.NumberFormatOptionReader
 
 /**
  * `toLocaleString` of Number and BigInt: what `Intl.NumberFormat("en-US", options)` prints, through
- * the formatter every engine shares (D-99). The locales argument is not read; en-US is the only
+ * the formatter every engine shares. The locales argument is not read; en-US is the only
  * locale, as it is for dates.
  */
 internal object LocaleNumbers {

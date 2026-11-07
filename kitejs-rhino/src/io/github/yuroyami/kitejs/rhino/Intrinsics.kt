@@ -8,7 +8,7 @@ package io.github.yuroyami.kitejs.rhino
  * The constructors the spec names as intrinsics, such as `%ArrayBuffer%` and `%Uint8Array%`, kept
  * on the top-level scope as each one is set up. A built-in that makes a new object of one of these
  * types asks here rather than reading the global, so a script that replaces or deletes the global
- * binding does not change what the built-in makes (D-83).
+ * binding does not change what the built-in makes.
  *
  * Upstream finds them through `ScriptRuntime.getExistingCtor`, which is an ordinary property read
  * on the global object.

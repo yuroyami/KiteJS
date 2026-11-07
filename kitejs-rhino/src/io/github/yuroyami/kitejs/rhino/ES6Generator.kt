@@ -274,7 +274,7 @@ public class ES6Generator : ScriptableObject {
         internal fun init(scope: ScriptableObject, sealed: Boolean): ES6Generator {
             val prototype = ES6Generator()
             prototype.parentScope = scope
-            // %GeneratorPrototype% inherits %IteratorPrototype% and its [Symbol.iterator] (D-93).
+            // %GeneratorPrototype% inherits %IteratorPrototype% and its [Symbol.iterator].
             prototype.prototype = ES6Iterator.iteratorPrototype(scope, sealed)
 
             defineProperty(prototype, "next", LambdaFunction(scope, "next", 1, SerializableCallable { cx, s, thisObj, args -> js_next(cx, s, thisObj, args) }), DONTENUM)

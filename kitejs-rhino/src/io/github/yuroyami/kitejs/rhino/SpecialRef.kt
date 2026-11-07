@@ -53,7 +53,7 @@ internal class SpecialRef private constructor(
      * nothing happens unless v is an object or null and o is an object, and o's [[SetPrototypeOf]]
      * refusing is a TypeError. The assignment's value is v either way. Upstream walked the new
      * chain itself, through any proxy's getPrototypeOf trap, and wrote the property, so a proxy's
-     * setPrototypeOf trap was skipped and Object.prototype took a new prototype (D-91).
+     * setPrototypeOf trap was skipped and Object.prototype took a new prototype.
      */
     private fun setProto(cx: Context, value: Any?): Any? {
         if (value != null && (value !is Scriptable || !ScriptRuntime.isObject(value))) return value

@@ -72,7 +72,7 @@ public class AccessorSlot : Slot {
         val s = setter
         // A descriptor's `set: undefined` keeps a setter whose target is not a function, which is
         // no setter at all (ES2015 9.1.9.1): a strict write throws, as it does when `set` is left
-        // out. Upstream ran the empty setter and dropped the write without a word (D-78).
+        // out. Upstream ran the empty setter and dropped the write without a word.
         if (s != null && (s !is FunctionSetter || s.target is Function)) return s.setValue(value, owner, start)
         if (s != null || getter != null) {
             throwNoSetterException(start, value)

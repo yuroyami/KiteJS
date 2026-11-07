@@ -7,7 +7,7 @@ package io.github.yuroyami.kitejs.rhino
 import kotlin.math.abs
 
 /**
- * The doubles upstream prints with two digits where ECMAScript, and V8, print one (D-100): the
+ * The doubles upstream prints with two digits where ECMAScript, and V8, print one: the
  * Schubfach formatter Java's Double.toString uses keeps at least two. All are tiny subnormals.
  */
 internal object ShortestSubnormals {

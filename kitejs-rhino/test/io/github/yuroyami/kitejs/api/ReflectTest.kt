@@ -9,7 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * `Reflect` and the proxy traps it reaches, as D-89 left them. `Reflect.get`, `Reflect.set` and
+ * `Reflect` and the proxy traps it reaches, as the port leaves them. `Reflect.get`, `Reflect.set` and
  * `Reflect.deleteProperty` run the target's own [[Get]], [[Set]] and [[Delete]] with the receiver
  * the caller passed, a proxy's traps receive that receiver, and a write or delete that a trap or a
  * read-only property refuses answers false (a TypeError in strict code). Every expected value here

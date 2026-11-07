@@ -174,7 +174,7 @@ public open class NativeObject : ScriptableObject {
             }
             var result: Boolean
             // A proxy answers through [[GetOwnProperty]], its getOwnPropertyDescriptor trap; upstream
-            // asked the has trap, which also sees inherited properties (D-91).
+            // asked the has trap, which also sees inherited properties.
             if (thisObj is NativeProxy) {
                 return ScriptRuntime.wrapBoolean(AbstractEcmaObjectOperations.isOwnEnumerable(cx, thisObj, key))
             }
@@ -225,11 +225,11 @@ public open class NativeObject : ScriptableObject {
         /**
          * The `__proto__` getter (ES B.2.2.1.1): ToObject(this), then its prototype. An undefined
          * `this` is a TypeError; upstream cast it to an object and crashed with a host
-         * ClassCastException (D-91).
+         * ClassCastException.
          */
         private fun js_protoGetter(thisObj: Scriptable?): Any? {
             // 1. Let O be ? ToObject(this value).  2. Return ? O.[[GetPrototypeOf]](). Upstream
-            // cast without the check, so a null or undefined this crashed with a host exception (D-91).
+            // cast without the check, so a null or undefined this crashed with a host exception.
             if (thisObj == null || Undefined.isUndefined(thisObj)) {
                 throw ScriptRuntime.typeErrorById(if (thisObj == null) "msg.null.to.object" else "msg.undef.to.object")
             }
@@ -306,7 +306,7 @@ public open class NativeObject : ScriptableObject {
          * Object.setPrototypeOf: the object is checked for null and undefined first, then the
          * prototype for being an object or null, and the object's [[SetPrototypeOf]] refusing is a
          * TypeError (ES 20.1.2.23). Upstream checked the prototype first and decided the refusal
-         * itself, missing a proxy's trap answer and Object.prototype's immutable prototype (D-91).
+         * itself, missing a proxy's trap answer and Object.prototype's immutable prototype.
          */
         private fun js_setPrototypeOf(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             if (args.size < 2) {
@@ -342,7 +342,7 @@ public open class NativeObject : ScriptableObject {
          * Object.entries and Object.values: EnumerableOwnProperties, which asks [[GetOwnProperty]]
          * for each key just before reading it. Upstream checked every key with `has` instead, which
          * for a proxy called the has trap the spec never calls and no getOwnPropertyDescriptor trap
-         * at all (D-91).
+         * at all.
          */
         private fun js_entries(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val arg = if (args.isEmpty()) Undefined.instance else args[0]
@@ -436,7 +436,7 @@ public open class NativeObject : ScriptableObject {
             val desc = DescriptorInfo(AbstractEcmaObjectOperations.ensureObject(descArg))
             checkPropertyDefinition(desc)
             // DefinePropertyOrThrow: a refusal, which a typed array or a proxy can answer, is a
-            // TypeError (D-88).
+            // TypeError.
             val defined = if (obj is ScriptableObject) {
                 // Retain the existing detailed diagnostics for ordinary engine objects.
                 obj.defineOwnProperty(cx, key, desc)
@@ -537,7 +537,7 @@ public open class NativeObject : ScriptableObject {
          * each asked [[GetOwnProperty]] and, when enumerable, read and written with Set(to, key,
          * value, true). Upstream walked the strings and then the symbols, asked `has` before the
          * descriptor, and did not throw when a proxy's set trap or an accessor without a setter
-         * refused the write (D-91).
+         * refused the write.
          */
         private fun js_assign(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val targetObj = if (args.isNotEmpty()) {

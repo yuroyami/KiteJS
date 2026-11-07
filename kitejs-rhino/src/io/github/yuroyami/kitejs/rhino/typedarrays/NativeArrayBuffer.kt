@@ -203,7 +203,7 @@ public class NativeArrayBuffer : ScriptableObject {
          * ArrayBuffer.prototype.slice (ECMAScript 2024, 25.1.6.7). The length is read once, before
          * the arguments are converted, and both buffers are checked again once the species
          * constructor has run, because a conversion or the constructor may have detached either of
-         * them (issue 24, D-87).
+         * them (issue 24).
          */
         private fun js_slice(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): NativeArrayBuffer {
             val self = getSelf(thisObj)
@@ -278,7 +278,7 @@ public abstract class NativeArrayBufferView : ScriptableObject {
     /** The buffer this view reads and writes. */
     protected val arrayBuffer: NativeArrayBuffer
 
-    /** Where in the buffer the view starts, in bytes. Upstream's getByteOffset (D-7). */
+    /** Where in the buffer the view starts, in bytes. Upstream's getByteOffset. */
     public val offset: Int
 
     /** The byte length given at construction, or -1 when the view follows a resizable buffer. */
@@ -293,7 +293,7 @@ public abstract class NativeArrayBufferView : ScriptableObject {
      */
     public val isLengthTracking: Boolean get() = fixedByteLength < 0
 
-    /** How much of the buffer the view covers, in bytes. Upstream's getByteLength (D-7). */
+    /** How much of the buffer the view covers, in bytes. Upstream's getByteLength. */
     public val byteLength: Int
         get() = when {
             fixedByteLength >= 0 -> fixedByteLength

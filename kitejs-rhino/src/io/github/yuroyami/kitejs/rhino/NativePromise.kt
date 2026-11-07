@@ -172,7 +172,7 @@ public class NativePromise : ScriptableObject() {
         if (!ScriptRuntime.isObject(resolution)) return fulfillPromise(cx, scope, resolution)
 
         // A `then` getter that throws rejects the promise. Upstream lets the error escape the
-        // resolve function with the promise already marked resolved, so it stays pending (D-81).
+        // resolve function with the promise already marked resolved, so it stays pending.
         val thenObj = try {
             getProperty(ensureScriptable(resolution), "then")
         } catch (re: RhinoException) {
@@ -403,7 +403,7 @@ public class NativePromise : ScriptableObject() {
 
         fun finalRejection(cx: Context, scope: Scriptable) {
             val newArray = cx.newArray(scope, errors.toTypedArray())
-            // %AggregateError%, never the global binding, which a script may have replaced (D-94).
+            // %AggregateError%, never the global binding, which a script may have replaced.
             val error = ScriptRuntime.newNativeError(cx, scope, TopLevel.NativeErrors.AggregateError, arrayOf<Any?>(newArray))
             capability.reject.call(cx, scope, Undefined.SCRIPTABLE_UNDEFINED, arrayOf<Any?>(error))
         }

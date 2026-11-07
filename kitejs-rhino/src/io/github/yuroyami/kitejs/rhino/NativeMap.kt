@@ -110,7 +110,7 @@ public class NativeMap : ScriptableObject() {
         /**
          * `Map.groupBy` makes a Map of its own realm, so it builds one with [map], the constructor
          * it belongs to. Upstream built it with whatever the global `Map` held and cast the result,
-         * which crashed the host with a ClassCastException once a script replaced it (D-94).
+         * which crashed the host with a ClassCastException once a script replaced it.
          */
         private fun jsGroupBy(cx: Context, scope: Scriptable, map: LambdaConstructor, args: Array<Any?>): Any? {
             val items = if (args.isEmpty()) Undefined.instance else args[0]

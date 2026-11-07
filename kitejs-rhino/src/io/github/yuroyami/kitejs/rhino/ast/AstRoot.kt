@@ -15,7 +15,7 @@ import io.github.yuroyami.kitejs.rhino.Token
  *
  * KMP: upstream keeps the comments in a `TreeSet` ordered by [AstNode.PositionComparator].
  * Common Kotlin has no sorted set, so the port keeps an insertion-sorted list with the same
- * ordering and the same drop-on-equal-position behavior a TreeSet has (D-8).
+ * ordering and the same drop-on-equal-position behavior a TreeSet has.
  */
 public class AstRoot(pos: Int = -1) : ScriptNode(pos) {
 

@@ -93,7 +93,7 @@ class ScriptableObjectOracleTest {
 
     /**
      * The message without the source position. Upstream appends `(file#line)` by walking the Java
-     * stack; this port has no interpreter stack to read yet, so it appends nothing (D-18). The
+     * stack; this port has no interpreter stack to read yet, so it appends nothing. The
      * text before that suffix has to match exactly.
      */
     private fun problem(e: Throwable?): String? = when (e) {

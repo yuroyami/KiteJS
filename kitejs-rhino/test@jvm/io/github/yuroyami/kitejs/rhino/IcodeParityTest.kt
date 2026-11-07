@@ -85,13 +85,13 @@ class IcodeParityTest {
             // Spread in an argument list: the number of arguments is a runtime matter, so the
             // call takes them as one array. Upstream's parser rejects that syntax.
             // A const a for head declares, bound afresh on every pass, by name and by frame slot
-            // (D-72). Upstream's parser rejects that syntax too.
+            //. Upstream's parser rejects that syntax too.
             // A class definition, `new.target` and the `super` call of a derived constructor
-            // (D-95), which upstream has no syntax for. The `await` of an async function, and the
-            // generator return whose value was stored before its finally blocks ran (D-97).
+            //, which upstream has no syntax for. The `await` of an async function, and the
+            // generator return whose value was stored before its finally blocks ran.
             // Testing a call reference's callee without losing its receiver (#132).
             // Lexical block initialization, source-position Annex B copies, saved switch
-            // discriminants and per-iteration let environments (D-120).
+            // discriminants and per-iteration let environments.
             // The steps of a destructuring pattern, and closing a for-of loop's iterator on a
             // jump out of it (#81, #83, #96).
             listOf(

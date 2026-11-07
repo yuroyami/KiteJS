@@ -8,7 +8,7 @@ package io.github.yuroyami.kitejs.rhino
  * A lazily flattened rope of two character sequences. Repeated string concatenation builds a tree
  * of these instead of copying, and the tree is flattened once, on the first read.
  *
- * KMP: upstream synchronizes [flatten]. Dropped under the single-thread contract (D-3).
+ * KMP: upstream synchronizes [flatten]. Dropped under the single-thread contract.
  */
 public class ConsString(str1: CharSequence, str2: CharSequence) : CharSequence {
 

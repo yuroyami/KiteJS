@@ -210,7 +210,7 @@ class TokenStreamTest {
     @Test
     fun escapedKeywordScansAsNameInEs6() {
         // A keyword spelled with an escape is a name (ECMAScript 2015, 11.6.2); the parser
-        // decides whether that name may be an identifier where it stands (D-95).
+        // decides whether that name may be an identifier where it stands.
         val ts = lexer("\\u0069f")
         assertEquals(Token.NAME, ts.getToken())
         assertEquals("if", ts.string)

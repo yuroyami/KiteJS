@@ -35,7 +35,7 @@ public open class NativeRegExp : IdScriptableObject {
 
     /**
      * Whether this is `RegExp.prototype`: it carries the methods, but is an ordinary object with
-     * no pattern and no `lastIndex` (ECMAScript 2015, 21.2.5), so they throw on it (D-102).
+     * no pattern and no `lastIndex` (ECMAScript 2015, 21.2.5), so they throw on it.
      */
     internal var isPrototype: Boolean = false
 
@@ -268,7 +268,7 @@ public open class NativeRegExp : IdScriptableObject {
     override val maxInstanceId: Int get() = MAX_INSTANCE_ID
 
     override fun findInstanceIdInfo(s: String): Int {
-        // source, flags and the flag booleans are accessors on RegExp.prototype (D-102).
+        // source, flags and the flag booleans are accessors on RegExp.prototype.
         if (s == "lastIndex" && !isPrototype) return instanceIdInfo(lastIndexAttr, Id_lastIndex)
         return super.findInstanceIdInfo(s)
     }
@@ -3341,7 +3341,7 @@ public open class NativeRegExp : IdScriptableObject {
             return r
         }
 
-        /** A RegExp object with a pattern: any [NativeRegExp] but `RegExp.prototype` (D-102). */
+        /** A RegExp object with a pattern: any [NativeRegExp] but `RegExp.prototype`. */
         internal fun isInstance(o: Any?): Boolean = o is NativeRegExp && !o.isPrototype
 
         /** The spec's RegExpExec: call the object's own `exec` when it has one. */

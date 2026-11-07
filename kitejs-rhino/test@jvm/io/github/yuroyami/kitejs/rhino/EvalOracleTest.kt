@@ -65,8 +65,8 @@ class EvalOracleTest {
         try {
             render(ucx.evaluateString(uscope, source, "test.js", 1, null))
         } catch (e: org.mozilla.javascript.RhinoException) {
-            // The port names classes without the package (D-23), and calls undefined undefined
-            // where upstream printed the Java object in "is not a function" (D-95).
+            // The port names classes without the package, and calls undefined undefined
+            // where upstream printed the Java object in "is not a function".
             "throws " + normalise(e.details().replace("org.mozilla.javascript.", ""))
                 .replace("Undefined@ is not a function", "undefined is not a function")
         }
@@ -80,7 +80,7 @@ class EvalOracleTest {
 
     /**
      * A message that prints an object's identity hash can never match; the hash is dropped. The
-     * `regexp.` sub-package goes too, for the same reason the top-level package does (D-23).
+     * `regexp.` sub-package goes too, for the same reason the top-level package does.
      */
     private fun normalise(details: String): String =
         details.replace(Regex("@[0-9a-f]+"), "@").replace("regexp.", "")
@@ -1635,7 +1635,7 @@ class EvalOracleTest {
 
     @Test
     fun refusedArrayPushThrowsInSloppyCode() {
-        // D-114: mutation methods use Set(..., true), independently of caller strictness.
+        // Mutation methods use Set(..., true), independently of caller strictness.
         for (restriction in listOf("Object.freeze(a)", "Object.defineProperty(a, 'length', { writable: false })")) {
             val source = "var a = [1, 2, 3]; $restriction; try { a.push(4) } catch (e) { e.name }"
             assertEquals("4", upstream(source))
@@ -1685,17 +1685,17 @@ class EvalOracleTest {
                 "CRASH $e"
             }
             if (file.name == "this_binding.js") {
-                // D-112: the extracted strict function gets undefined, independently of its caller.
+                // The extracted strict function gets undefined, independently of its caller.
                 val standard = "\"obj|global|lexical-global|inner-global,arrow-obj,inner-x|strict-obj|strict-undefined|called|applied|bound|first|first|object|true|true|undefined|child|other|1|4\""
                 assertEquals(standard.replace("strict-undefined", "strict-Kite"), expected)
                 assertEquals(standard, actual)
             } else if (file.name == "eval_scoping.js") {
-                // D-115: strict eval's var declaration has its own variable environment.
+                // Strict eval's var declaration has its own variable environment.
                 val standard = "\"localglobal|ReferenceError|number|undefined|true|2|42|2|global||5|1|3|undefined|SyntaxError|RangeError:from eval|3|string|3|true\""
                 assertEquals(standard.replace("number|undefined", "number|number"), expected)
                 assertEquals(standard, actual)
             } else if (file.name == "closures_in_loops.js") {
-                // D-120: classic for(let) creates a fresh environment before each update.
+                // Classic for(let) creates a fresh environment before each update.
                 val standard = "\"3,3,3|0,1,2|0,1,2|0,10,20|1,4,9|3|init:1|init:1\""
                 assertEquals(standard.replaceFirst("|0,1,2", "|3,3,3"), expected)
                 assertEquals(standard, actual)
@@ -1758,7 +1758,7 @@ class EvalOracleTest {
         assertEquals("true", ported(source))
     }
 
-    /** Date.prototype and RegExp.prototype are ordinary objects; upstream makes them a Date and a RegExp (D-102). */
+    /** Date.prototype and RegExp.prototype are ordinary objects; upstream makes them a Date and a RegExp. */
     @Test
     fun ordinaryPrototypesDifferFromTheLegacyOracle() {
         assertEquals("\"[object Date]\"", upstream("Object.prototype.toString.call(Date.prototype)"))
@@ -1772,7 +1772,7 @@ class EvalOracleTest {
         assertEquals("\"lastIndex\"", ported("Object.getOwnPropertyNames(/a/g).join()"))
     }
 
-    /** toLocaleString formats numbers as Intl.NumberFormat("en-US") does; upstream is toString (D-99). */
+    /** toLocaleString formats numbers as Intl.NumberFormat("en-US") does; upstream is toString. */
     @Test
     fun localeNumbersDifferFromTheLegacyOracle() {
         assertEquals("\"1e+21\"", upstream("(1e21).toLocaleString()"))
@@ -2009,7 +2009,7 @@ class EvalOracleTest {
      * Upstream 1.9.1 throws a NullPointerException when a `getOwnPropertyDescriptor` trap answers
      * undefined for a property the target does not have: it reads the target's descriptor without
      * checking for null first. The port returns undefined, which is what the spec asks for and what
-     * every other engine does (D-50). Both halves are pinned here so a change on either side shows.
+     * every other engine does. Both halves are pinned here so a change on either side shows.
      */
     @Test
     fun getOwnPropertyDescriptorTrapMayReturnUndefined() {
@@ -2023,7 +2023,7 @@ class EvalOracleTest {
      * Upstream hands the `construct` trap the raw Java argument array, which script can only read
      * because Java interop wraps it on the way in. There is no interop here, so the trap gets a
      * real JavaScript array, matching what the `apply` trap already did and what the spec says
-     * (D-51). Both halves are pinned so a change on either side shows.
+     *. Both halves are pinned so a change on either side shows.
      */
     @Test
     fun constructTrapGetsARealArray() {
@@ -2149,7 +2149,7 @@ class EvalOracleTest {
 
     /**
      * ToBigInt turns a Number away, integral or not, so a Number cannot be written into a bigint
-     * view or handed to `BigInt.asIntN` (D-84). Upstream converts it the way `BigInt()` does.
+     * view or handed to `BigInt.asIntN`. Upstream converts it the way `BigInt()` does.
      * `BigInt()` itself still takes an integral Number on both.
      */
     @Test
@@ -2162,21 +2162,21 @@ class EvalOracleTest {
         )
         for (source in cases) {
             assertEquals("\"TypeError\"", ported(source), source)
-            assertTrue(upstream(source) != "\"TypeError\"", "upstream now rejects a Number too, D-84 can be retired: $source")
+            assertTrue(upstream(source) != "\"TypeError\"", "upstream now rejects a Number too, so this difference can be retired: $source")
         }
         assertEquals(upstream("String(BigInt(5)) + String(BigInt.asUintN(8, '257'))"), ported("String(BigInt(5)) + String(BigInt.asUintN(8, '257'))"))
     }
 
     /**
      * `set` treats a missing source as undefined, puts any source through ToObject and reads its
-     * elements with Get (D-86). Upstream indexes the missing argument, which escapes as a host
+     * elements with Get. Upstream indexes the missing argument, which escapes as a host
      * ArrayIndexOutOfBoundsException, refuses a string or number source, and reads only own
      * elements.
      */
     @Test
     fun typedArraySetTakesAnyArrayLike() {
         assertEquals("\"TypeError\"", ported("try { new Uint8Array(2).set(); 'returned' } catch (e) { e.name }"))
-        assertFailsWith<ArrayIndexOutOfBoundsException>("upstream catches a missing source now, D-86 can be retired") {
+        assertFailsWith<ArrayIndexOutOfBoundsException>("upstream catches a missing source now, so this difference can be retired") {
             upstream("try { new Uint8Array(2).set(); 'returned' } catch (e) { e.name }")
         }
         val sources = mapOf(
@@ -2185,13 +2185,13 @@ class EvalOracleTest {
         )
         for ((source, expected) in sources) {
             assertEquals(expected, ported(source), source)
-            assertTrue(upstream(source) != expected, "upstream agrees now, D-86 can be retired: $source")
+            assertTrue(upstream(source) != expected, "upstream agrees now, so this difference can be retired: $source")
         }
     }
 
     /**
      * `slice` checks its source again after the conversions and the species constructor, and
-     * `transfer` copies into a plain ArrayBuffer without reading species (D-87). Upstream checks
+     * `transfer` copies into a plain ArrayBuffer without reading species. Upstream checks
      * only on entry, so a conversion that detaches the source escapes as a host
      * NullPointerException, and it transfers through species, so a species answering the source
      * hands back the buffer it has just detached.
@@ -2200,7 +2200,7 @@ class EvalOracleTest {
     fun arrayBufferSliceRechecksAndTransferSkipsSpecies() {
         val slice = "var a = new ArrayBuffer(2); try { a.slice({ valueOf: function () { a.transfer(); return 0 } }); 'returned' } catch (e) { e.name }"
         assertEquals("\"TypeError\"", ported(slice))
-        assertFailsWith<NullPointerException>("upstream re-checks the source now, D-87 can be retired") { upstream(slice) }
+        assertFailsWith<NullPointerException>("upstream re-checks the source now, so this difference can be retired") { upstream(slice) }
         val sources = mapOf(
             "var a = new ArrayBuffer(2); a.constructor = {}; a.constructor[Symbol.species] = function () { return a };" +
                 " var b = a.transfer(); a.detached + ':' + b.detached" to "\"true:false\"",
@@ -2208,14 +2208,14 @@ class EvalOracleTest {
         )
         for ((source, expected) in sources) {
             assertEquals(expected, ported(source), source)
-            assertTrue(upstream(source) != expected, "upstream agrees now, D-87 can be retired: $source")
+            assertTrue(upstream(source) != expected, "upstream agrees now, so this difference can be retired: $source")
         }
     }
 
     /**
      * Typed arrays implement the integer-indexed exotic object methods for every canonical numeric
      * key, Object.defineProperty throws when a definition is refused, and seal and freeze send
-     * partial descriptors through each object's own [[DefineOwnProperty]] (D-88). Upstream has no
+     * partial descriptors through each object's own [[DefineOwnProperty]]. Upstream has no
      * element descriptors, lists either the elements or the ordinary keys, lets an invalid index
      * reach the prototype without converting the value, ignores a refused definition, and turns a
      * computed property into null when a partial descriptor makes it plain.
@@ -2241,14 +2241,14 @@ class EvalOracleTest {
         )
         for ((source, expected) in sources) {
             assertEquals(expected, ported(source), source)
-            assertTrue(upstream(source) != expected, "upstream agrees now, D-88 can be retired: $source")
+            assertTrue(upstream(source) != expected, "upstream agrees now, so this difference can be retired: $source")
         }
     }
 
     /**
      * Reflect.get, Reflect.set and Reflect.deleteProperty run the target's own [[Get]], [[Set]] and
      * [[Delete]] with the caller's receiver, and proxy traps receive that receiver and are believed
-     * when they refuse (D-89). Upstream ignored the receiver, answered true for every write, and
+     * when they refuse. Upstream ignored the receiver, answered true for every write, and
      * deleted along the prototype chain.
      */
     @Test
@@ -2273,7 +2273,7 @@ class EvalOracleTest {
         )
         for ((source, expected) in sources) {
             assertEquals(expected, ported(source), source)
-            assertTrue(upstream(source) != expected, "upstream agrees now, D-89 can be retired: $source")
+            assertTrue(upstream(source) != expected, "upstream agrees now, so this difference can be retired: $source")
         }
     }
 
@@ -2281,7 +2281,7 @@ class EvalOracleTest {
      * [[Construct]] takes a newTarget and IsConstructor is exact; a proxy's descriptor, key and
      * prototype traps are validated and believed; enumeration asks [[GetOwnProperty]] per key; JSON
      * keeps -0, reads toJSON once and sees a proxy for an array as an array; and only a call to the
-     * name `eval` is a direct eval (D-91). Every expected value is what V8 answers.
+     * name `eval` is a direct eval. Every expected value is what V8 answers.
      */
     @Test
     fun constructProxiesEnumerationAndJsonFollowTheInternalMethods() {
@@ -2323,14 +2323,14 @@ class EvalOracleTest {
         )
         for ((source, expected) in sources) {
             assertEquals(expected, ported(source), source)
-            assertTrue(upstream(source) != expected, "upstream agrees now, D-91 can be retired: $source")
+            assertTrue(upstream(source) != expected, "upstream agrees now, so this difference can be retired: $source")
         }
     }
 
     /**
      * `instanceof` asks the target's `Symbol.hasInstance` with the left side as its argument, a
      * primitive one included, throws for a method that cannot be called, and a bound function asks
-     * `instanceof` of its target (D-92). Upstream asks only a plain object, with the target as the
+     * `instanceof` of its target. Upstream asks only a plain object, with the target as the
      * argument, and its `Function.prototype[Symbol.hasInstance]` crashes the host with a
      * ClassCastException for a bound built-in. Every expected value is what V8 answers.
      */
@@ -2351,16 +2351,16 @@ class EvalOracleTest {
         )
         for ((source, expected) in sources) {
             assertEquals(expected, ported(source), source)
-            assertTrue(upstream(source) != expected, "upstream agrees now, D-92 can be retired: $source")
+            assertTrue(upstream(source) != expected, "upstream agrees now, so this difference can be retired: $source")
         }
         val bound = "String(Function.prototype[Symbol.hasInstance].call(Array.bind(), []))"
         assertEquals("\"true\"", ported(bound))
-        assertFailsWith<ClassCastException>("upstream reads a bound built-in now, D-92 can be retired") { upstream(bound) }
+        assertFailsWith<ClassCastException>("upstream reads a bound built-in now, so this difference can be retired") { upstream(bound) }
     }
 
     /**
      * The iterator prototypes inherit one %IteratorPrototype%, which alone holds a
-     * `[Symbol.iterator]` of length 0 (D-93). Upstream gives each its own copy, of length 1, and
+     * `[Symbol.iterator]` of length 0. Upstream gives each its own copy, of length 1, and
      * Object.prototype as its prototype. Every expected value is what V8 answers.
      */
     @Test
@@ -2373,7 +2373,7 @@ class EvalOracleTest {
         )
         for ((source, expected) in sources) {
             assertEquals(expected, ported(source), source)
-            assertTrue(upstream(source) != expected, "upstream agrees now, D-93 can be retired: $source")
+            assertTrue(upstream(source) != expected, "upstream agrees now, so this difference can be retired: $source")
         }
     }
 
@@ -2386,7 +2386,7 @@ class EvalOracleTest {
     /**
      * What the engine makes on its own comes from the realm's intrinsics, in a scope of any class,
      * the one `initStandardObjects()` makes included, never from a global a script replaced
-     * (D-94). Upstream keeps intrinsics for a `TopLevel` only and makes a plain object when given
+     *. Upstream keeps intrinsics for a `TopLevel` only and makes a plain object when given
      * no scope, and its `Map.groupBy`, `Error.captureStackTrace` and `Promise.any` build through
      * the global and crash the host with a ClassCastException once it is replaced. Every expected
      * value is what V8 answers.
@@ -2402,7 +2402,7 @@ class EvalOracleTest {
         for ((source, expected) in sources) {
             freshScopes()
             assertEquals(expected, ported(source), source)
-            assertTrue(upstream(source) != expected, "upstream agrees now, D-94 can be retired: $source")
+            assertTrue(upstream(source) != expected, "upstream agrees now, so this difference can be retired: $source")
         }
         val crashes = mapOf(
             "var MP = Map.prototype, gp = Object.getPrototypeOf; var M = Map; Map = function () {}; String(gp(M.groupBy([1], function () { return 'k' })) === MP)" to "\"true\"",
@@ -2411,12 +2411,12 @@ class EvalOracleTest {
         for ((source, expected) in crashes) {
             freshScopes()
             assertEquals(expected, ported(source), source)
-            assertFailsWith<ClassCastException>("upstream builds the intrinsic now, D-94 can be retired: $source") { upstream(source) }
+            assertFailsWith<ClassCastException>("upstream builds the intrinsic now, so this difference can be retired: $source") { upstream(source) }
         }
     }
 
     /**
-     * A comparator that answers NaN means equal (D-85), so a stable sort keeps such elements in
+     * A comparator that answers NaN means equal, so a stable sort keeps such elements in
      * order. Upstream makes NaN greater, and forty elements are enough for its TimSort to move them.
      */
     @Test
@@ -2425,12 +2425,12 @@ class EvalOracleTest {
             " a.sort(function (x, y) { return x.k === y.k ? NaN : x.k - y.k }).map(function (o) { return o.i }).join()"
         val stable = (0 until 40).sortedBy { it % 3 }.joinToString(",")
         assertEquals("\"$stable\"", ported(source))
-        assertTrue(upstream(source) != "\"$stable\"", "upstream sorts NaN as equal now, D-85 can be retired")
+        assertTrue(upstream(source) != "\"$stable\"", "upstream sorts NaN as equal now, so this difference can be retired")
     }
 
     /**
      * `at`, `toReversed`, `toSorted` and `with` validate their receiver first, so a detached view
-     * is a TypeError, and build their copy with the realm's own constructor (D-83). Upstream skips
+     * is a TypeError, and build their copy with the realm's own constructor. Upstream skips
      * the check, answering undefined from `at`, a copy from `toReversed` and a host
      * ClassCastException from `toSorted`, and makes its copy with whatever the global holds.
      */
@@ -2439,7 +2439,7 @@ class EvalOracleTest {
         for (call in listOf("at(0)", "toReversed()", "with(0, 1)")) {
             val source = "var a = new Uint8Array([1, 2]); a.buffer.transfer(); try { a.$call; 'returned' } catch (e) { e.name }"
             assertEquals("\"TypeError\"", ported(source), call)
-            assertEquals("\"returned\"", upstream(source), "upstream now validates $call, D-83 can be retired")
+            assertEquals("\"returned\"", upstream(source), "upstream now validates $call, so this difference can be retired")
         }
         val global = "var U = Uint8Array; var a = new U([1, 2]); Uint8Array = function () { throw new Error('global') };" +
             " try { a.toReversed().join() } catch (e) { e.message }"
@@ -2451,7 +2451,7 @@ class EvalOracleTest {
      * Upstream's `BigUint64Array` reader masks with `0xffffffff`, a Java int literal, which
      * sign-extends to all ones once it is promoted to a long. Every value with its top bit set
      * therefore reads back as garbage: -1 comes out as -4294967297 rather than 2^64 - 1. The port
-     * returns the value that was written (D-53). Both halves are pinned so a change on either
+     * returns the value that was written. Both halves are pinned so a change on either
      * side shows.
      */
     @Test
@@ -2487,7 +2487,7 @@ class EvalOracleTest {
         check(scripts)
     }
 
-    /** The tiny subnormals print with the fewest digits, as ECMAScript asks; upstream keeps two (D-100). */
+    /** The tiny subnormals print with the fewest digits, as ECMAScript asks; upstream keeps two. */
     @Test
     fun shortestSubnormalsDifferFromTheLegacyOracle() {
         assertEquals("\"4.9e-324\"", upstream("String(Number.MIN_VALUE)"))
@@ -2552,7 +2552,7 @@ class EvalOracleTest {
     /**
      * Spreading a value with no `Symbol.iterator` throws a TypeError here, which is what ECMAScript
      * 2015, 12.2.5.2 asks and what every browser does. Upstream spreads a primitive or a plain
-     * object by its own ids and spreads null and undefined as nothing (D-70). Both halves are
+     * object by its own ids and spreads null and undefined as nothing. Both halves are
      * pinned so a change on either side shows.
      */
     @Test
@@ -2586,7 +2586,7 @@ class EvalOracleTest {
     /**
      * A strict write to an accessor whose descriptor says `set: undefined` is a TypeError here, as
      * it is when `set` is left out: ECMAScript 2015, 9.1.9.1 sees no setter either way. Upstream
-     * runs the empty setter and drops the write (D-78). Both halves are pinned, on the object and
+     * runs the empty setter and drops the write. Both halves are pinned, on the object and
      * through its prototype, and where the two already agree they still do.
      */
     @Test
@@ -2608,7 +2608,7 @@ class EvalOracleTest {
      * In a scope that is not a TopLevel, as `initStandardObjects()` makes, a generator function
      * inherits from %GeneratorFunction.prototype% here, as ECMAScript 2015, 14.4.13 asks.
      * Upstream builds that prototype for a TopLevel only, so its generator functions have a null
-     * prototype and no `call` (D-79). Neither engine lists a hidden name among the globals.
+     * prototype and no `call`. Neither engine lists a hidden name among the globals.
      */
     @Test
     fun aGeneratorFunctionInheritsFromTheGeneratorFunctionPrototype() {
@@ -2625,7 +2625,7 @@ class EvalOracleTest {
      * a strict function throws on a failed write when sloppy code calls it, a sloppy one does not
      * throw when strict code calls it, and an indirect `eval` from strict code runs sloppy code.
      * Upstream asks the current activation, which only a function that needs one pushes, so the
-     * answer follows the caller (D-80).
+     * answer follows the caller.
      */
     @Test
     fun strictModeIsTheModeOfTheCodeThatRuns() {
@@ -2650,7 +2650,7 @@ class EvalOracleTest {
     /**
      * Assigning to a const is a TypeError here in any mode, which is what ECMAScript 2015,
      * 8.1.1.1.5 asks and what every browser does. Upstream lets the write pass silently outside
-     * strict mode, and in strict code run by `eval` (D-71). Both halves are pinned so a change on
+     * strict mode, and in strict code run by `eval`. Both halves are pinned so a change on
      * either side shows.
      */
     @Test
@@ -2678,7 +2678,7 @@ class EvalOracleTest {
      * `a ||= b` on a name writes only when it does not short circuit, as ES2021, 13.15.2 asks.
      * Upstream lowers it to `a = a || b` and writes either way, which a setter on the global
      * notices, and which a truthy const would turn into a TypeError now that writing one throws
-     * (D-71). Both halves are pinned so a change on either side shows.
+     *. Both halves are pinned so a change on either side shows.
      */
     @Test
     fun logicalAssignmentToANameWritesOnlyWhenItMust() {
@@ -2694,7 +2694,7 @@ class EvalOracleTest {
 
     /**
      * The descriptor of a global that has not been built yet holds the built-in, as reading the
-     * property would (D-75). Upstream hands out its `LazilyLoadedCtor` placeholder, which throws a
+     * property would. Upstream hands out its `LazilyLoadedCtor` placeholder, which throws a
      * host error as soon as a script touches it. Each scope here is fresh, so nothing has read
      * the globals before. Both halves are pinned so a change on either side shows.
      */
@@ -2714,7 +2714,7 @@ class EvalOracleTest {
     /**
      * A function declaration as the body of a loop, a `with` or an `if`, or labelled there, is an
      * early SyntaxError here, as ECMAScript 2015, 13.6.1 and 13.7.1.1 ask and V8 reports. Upstream
-     * accepts them all (D-76). Both halves are pinned so a change on either side shows.
+     * accepts them all. Both halves are pinned so a change on either side shows.
      */
     @Test
     fun aFunctionDeclarationIsNotTheBodyOfALoop() {
@@ -2744,7 +2744,7 @@ class EvalOracleTest {
     /**
      * Resolving a promise with an object whose `then` getter throws rejects it with what was
      * thrown, as ECMAScript 2015, 25.4.1.3.2 asks and V8 does. Upstream lets the error escape the
-     * resolve function after marking the promise resolved, so the promise is never settled (D-81).
+     * resolve function after marking the promise resolved, so the promise is never settled.
      */
     @Test
     fun aThrowingThenGetterRejectsThePromise() {
@@ -2764,7 +2764,7 @@ class EvalOracleTest {
      * The own keys of RegExp.prototype and Date.prototype name their symbol methods by the
      * symbols, as ECMAScript 2015, 9.1.12 asks, so each listed key has a descriptor. Upstream
      * lists the description of each symbol as a string, which names no property, and leaves the
-     * symbols out (D-90). Where the two already agree, on a prototype whose symbol keys sit in its
+     * symbols out. Where the two already agree, on a prototype whose symbol keys sit in its
      * slot map, they still do.
      */
     @Test
@@ -2798,7 +2798,7 @@ class EvalOracleTest {
     /**
      * for-in follows EnumerateObjectProperties: a proxy's keys stand on its getOwnPropertyDescriptor
      * trap alone, read as the loop reaches each, every own key hides a prototype's property of the
-     * same name, enumerable or not, and an ES6 loop asks no object for `__iterator__` (D-96).
+     * same name, enumerable or not, and an ES6 loop asks no object for `__iterator__`.
      * Upstream checks each key with `has`, which a proxy answers from its target, remembers only the
      * enumerable keys, and runs the iterator protocol of JavaScript 1.7. Every expected value is
      * what V8 answers.
@@ -2817,7 +2817,7 @@ class EvalOracleTest {
         )
         for ((source, expected) in sources) {
             assertEquals(expected, ported(source), source)
-            assertTrue(upstream(source) != expected, "upstream agrees now, D-96 can be retired: $source")
+            assertTrue(upstream(source) != expected, "upstream agrees now, so this difference can be retired: $source")
         }
     }
 

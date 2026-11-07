@@ -61,7 +61,7 @@ public abstract class NewLiteralStorage protected constructor(ids: Array<Any?>?,
 
     private fun spreadArray(cx: Context, scope: Scriptable, source: Any?) {
         // ES2015 12.2.5.2 and 12.3.6.1: a spread asks GetIterator for the value, which throws a
-        // TypeError when there is no Symbol.iterator to call (D-70).
+        // TypeError when there is no Symbol.iterator to call.
         if (source == null || Undefined.isUndefined(source)) throw notIterable(source)
         // GetMethod reads Symbol.iterator once, and a getter on a primitive sees the primitive (#78).
         val method = ScriptRuntime.getV(cx, scope, source, SymbolKey.ITERATOR)
@@ -80,7 +80,7 @@ public abstract class NewLiteralStorage protected constructor(ids: Array<Any?>?,
         }
         // No Symbol.iterator. An array whose iterator was taken away still spreads by its length,
         // so holes come through as undefined and a non-index own property is left out. Anything
-        // else is not iterable, whatever own properties it has (D-70).
+        // else is not iterable, whatever own properties it has.
         val src = source as? NativeArray ?: throw notIterable(source)
         val newLen = valuesField.size + src.length.toInt()
         getterSettersField = getterSettersField.copyOf(newLen)
@@ -97,7 +97,7 @@ public abstract class NewLiteralStorage protected constructor(ids: Array<Any?>?,
     /**
      * CopyDataProperties: [[GetOwnProperty]] is asked for each key just before its value is read,
      * so a proxy's traps run in the spec's order and a property a getter deletes is left out.
-     * Upstream listed the enumerable keys first and then read them all (D-91).
+     * Upstream listed the enumerable keys first and then read them all.
      */
     private fun spreadObject(cx: Context, scope: Scriptable, source: Any?) {
         if (source == null || Undefined.isUndefined(source)) return

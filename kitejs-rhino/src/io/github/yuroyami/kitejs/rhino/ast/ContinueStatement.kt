@@ -46,7 +46,7 @@ public class ContinueStatement : Jump {
      * only be set once.
      *
      * KMP: upstream calls this `target`, but [Jump.target] is a public field there and a
-     * property here, so the two would collide (D-11).
+     * property here, so the two would collide.
      */
     public var targetLoop: Loop?
         get() = loopTarget

@@ -32,7 +32,7 @@ package io.github.yuroyami.kitejs.rhino
  *   strongly instead.
  *
  * This is the engine's only expect/actual. `WeakMap` and `WeakSet` need it and there is no
- * multiplatform weak reference in the standard library (D-52).
+ * multiplatform weak reference in the standard library.
  */
 public expect class WeakRef<T : Any>(referred: T) {
     /** The referent, or `null` once collected or [clear]ed. */

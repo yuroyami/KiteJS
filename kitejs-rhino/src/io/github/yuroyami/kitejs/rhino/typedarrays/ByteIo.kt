@@ -40,7 +40,7 @@ internal object Conversions {
  * Reads and writes numbers in a byte array, in either endianness.
  *
  * Upstream hands back `Byte` and `Short` boxes; this returns `Int` instead, because that is the
- * integer the rest of the engine speaks (D-48). Anything wider than an `Int` comes back as a
+ * integer the rest of the engine speaks. Anything wider than an `Int` comes back as a
  * `Double`, for the same reason.
  */
 internal object ByteIo {

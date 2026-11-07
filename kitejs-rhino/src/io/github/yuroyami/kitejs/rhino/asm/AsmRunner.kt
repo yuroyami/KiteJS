@@ -543,7 +543,7 @@ internal fun clz32(value: Int): Int {
     return n
 }
 
-/** `Math.pow`, the same fdlibm routine the interpreted `Math.pow` uses (D-73). */
+/** `Math.pow`, the same fdlibm routine the interpreted `Math.pow` uses. */
 internal fun jsPow(base: Double, exponent: Double): Double = FdLibm.pow(base, exponent)
 
 /** `Math.min`, which answers NaN when either side is NaN and tells -0 from 0. */

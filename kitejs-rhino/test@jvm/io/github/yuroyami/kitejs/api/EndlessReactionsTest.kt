@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 
 /**
  * A Promise reaction that queues itself forever, under a budget and under an interrupt hook that
- * always answers stop (D-77). Each runs on a thread of its own with a watchdog, so a regression
+ * always answers stop. Each runs on a thread of its own with a watchdog, so a regression
  * fails the test instead of hanging the suite.
  */
 class EndlessReactionsTest {

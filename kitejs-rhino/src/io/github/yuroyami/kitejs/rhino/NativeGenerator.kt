@@ -83,7 +83,7 @@ public class NativeGenerator : IdScriptableObject {
             throw JavaScriptException(thrown, lineSource, lineNumber)
         }
         try {
-            // Upstream locks here for reentrancy; the port is single-thread confined (D-3), so the
+            // Upstream locks here for reentrancy; the port is single-thread confined, so the
             // flag would only ever be read by the thread that set it.
             return function!!.resumeGenerator(cx, scope, operation, savedState, value)
         } catch (e: GeneratorClosedException) {

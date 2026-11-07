@@ -15,7 +15,7 @@ import kotlin.math.floor
  * This is upstream's `DToA.JS_dtobasestr`. It prints the shortest digit string that still reads
  * back as the same double, which is why the fraction loop compares against the gap to the
  * neighbouring doubles rather than just running out of digits. Radix 10 went its own way in the
- * port (D-33); this one keeps upstream's algorithm because there is nothing simpler that gives the
+ * port; this one keeps upstream's algorithm because there is nothing simpler that gives the
  * same answers.
  */
 @InternalKiteJsApi

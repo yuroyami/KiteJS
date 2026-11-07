@@ -10,7 +10,7 @@ import kotlin.reflect.KClass
  * The interface every JavaScript object implements.
  *
  * KMP: `getDefaultValue` takes a [KClass] rather than a `java.lang.Class`. The hint is only ever
- * compared by identity against the sentinels on [ScriptRuntime], so the mapping is exact (D-20).
+ * compared by identity against the sentinels on [ScriptRuntime], so the mapping is exact.
  */
 public interface Scriptable {
 

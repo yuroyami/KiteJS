@@ -34,7 +34,7 @@ public abstract class ScriptableObject :
     /**
      * Raw storage for the extensible flag. `putImpl` reads it directly, the way upstream reads the
      * field rather than the accessor, so a subclass that overrides [isExtensible] does not change
-     * the hot assignment path (D-8).
+     * the hot assignment path.
      */
     protected var isExtensibleField: Boolean = true
 
@@ -184,14 +184,14 @@ public abstract class ScriptableObject :
 
     public open fun getAttributes(sym: Symbol): Int = getAttributeSlot(sym).attributes and CONST_BINDING.inv()
 
-    /** Makes [name] an initialized const binding holding [value], whatever it held before (D-72). */
+    /** Makes [name] an initialized const binding holding [value], whatever it held before. */
     internal fun initConstBinding(name: String, value: Any?) {
         val slot = map.modify(this, name, 0, CONST)
         slot.value = value
         slot.attributes = CONST and UNINITIALIZED_CONST.inv()
     }
 
-    /** Whether [name] is an own `const` binding here, which no assignment may change (D-71). */
+    /** Whether [name] is an own `const` binding here, which no assignment may change. */
     internal fun isConstBinding(name: String): Boolean {
         val slot = map.query(name, 0) ?: return false
         return (slot.attributes and CONST_BINDING) != 0
@@ -292,7 +292,7 @@ public abstract class ScriptableObject :
      * Attaches data that lives outside the engine, or detaches it with null.
      *
      * KMP: upstream defines `length` through a reflected `getExternalArrayLength` method. There is
-     * no reflection here, so the same property is defined with a lambda getter (D-23). Both give a
+     * no reflection here, so the same property is defined with a lambda getter. Both give a
      * read-only, non-enumerable `length` whose descriptor is an accessor.
      */
     public fun setExternalArrayData(array: ExternalArrayData?) {
@@ -328,7 +328,7 @@ public abstract class ScriptableObject :
      * stops at an object with its own [[GetPrototypeOf]], a proxy, without calling into it; and
      * for %Object.prototype%, an immutable prototype exotic object, SetImmutablePrototype (ES
      * 10.4.7). Upstream threw from inside the check, walked through a proxy's getPrototypeOf trap,
-     * and let Object.prototype take a new prototype (D-91).
+     * and let Object.prototype take a new prototype.
      */
     override fun setPrototypeOf(cx: Context, proto: Scriptable?): Boolean {
         val current = prototype
@@ -387,7 +387,7 @@ public abstract class ScriptableObject :
      * [ScriptRuntime.instanceOf] has already looked for: OrdinaryHasInstance for something that can
      * be called, and a TypeError for anything else. Upstream looked the method up again here and
      * called it with this object as its argument in place of [instance], and walked [instance]'s
-     * chain for this object itself rather than for its `prototype` (D-92).
+     * chain for this object itself rather than for its `prototype`.
      */
     override fun hasInstance(instance: Scriptable): Boolean {
         if (this !is Callable) throw ScriptRuntime.typeErrorById("msg.instanceof.bad.target")
@@ -609,7 +609,7 @@ public abstract class ScriptableObject :
          * 6.2.4.5). Each field is asked for with HasProperty before it is read, in the spec's
          * order, and the three flags become booleans. Upstream read every field with a bare get
          * in its own order and kept the raw values, so a proxy descriptor answering undefined for
-         * `get` looked like an accessor and `{enumerable: 1}` compared unequal to true (D-88).
+         * `get` looked like an accessor and `{enumerable: 1}` compared unequal to true.
          */
         public constructor(desc: ScriptableObject) : this(desc as Scriptable)
 
@@ -729,7 +729,7 @@ public abstract class ScriptableObject :
         }
         // Only the fields the descriptor has are compared (ECMAScript 2015, 9.1.6.3 step 4);
         // upstream read a missing enumerable or value as false or undefined, so sealing or
-        // freezing an object twice, which sends partial descriptors, threw (D-88).
+        // freezing an object twice, which sends partial descriptors, threw.
         if (info.hasEnumerable() && ((current.attributes and DONTENUM) == 0) != isTrue(info.enumerable)) {
             throw ScriptRuntime.typeErrorById("msg.change.enumerable.with.configurable.false", id)
         }
@@ -978,7 +978,7 @@ public abstract class ScriptableObject :
     /**
      * True when this object answers for [name] itself whether or not it has it, so a lookup that
      * reaches it never goes on to the prototype. A typed array does this for every canonical
-     * numeric name (D-88); an ordinary object never does.
+     * numeric name; an ordinary object never does.
      */
     internal open fun endsLookup(name: String): Boolean = false
 
@@ -1014,7 +1014,7 @@ public abstract class ScriptableObject :
         /**
          * The property is a `const` binding, so assigning to it is a TypeError in any mode. It
          * tells a const apart from a property that is only read-only, such as `NaN`, where a
-         * sloppy-mode assignment fails silently. Never reported by [getAttributes] (D-71).
+         * sloppy-mode assignment fails silently. Never reported by [getAttributes].
          */
         internal const val CONST_BINDING: Int = 0x10
 
@@ -1159,7 +1159,7 @@ public abstract class ScriptableObject :
                     // Turn a slot that is not a plain value slot back into one. A computed data
                     // property, such as a String object's length, keeps the value it answers, where
                     // upstream kept the raw field, null for those, so a descriptor without a value,
-                    // like the one freezing uses, lost it (D-88). An accessor turned into data
+                    // like the one freezing uses, lost it. An accessor turned into data
                     // starts out undefined, as the spec says.
                     val computed = if (s is LambdaSlot) s.getValue(owner) else Scriptable.NOT_FOUND
                     s = Slot(s)
@@ -1488,7 +1488,7 @@ public abstract class ScriptableObject :
         /**
          * The object in the chain that has [name], or null. A lookup stops at an object that
          * [endsLookup] the name: there it is absent, unless the lookup is for a write, which that
-         * object then takes itself, as a typed array's [[Set]] does for a numeric name (D-88).
+         * object then takes itself, as a typed array's [[Set]] does for a numeric name.
          */
         private fun getBase(start: Scriptable, name: String, forWrite: Boolean): Scriptable? {
             var obj: Scriptable? = start
@@ -1665,7 +1665,7 @@ public abstract class ScriptableObject :
          * and then the symbols, each of those two in the order they were added. An index above Int
          * range is kept as a string key, so it is recognised by its text. Upstream sorted only the
          * Int keys to the front, which listed 2147483648 through 4294967294 among the strings
-         * (D-91).
+         *.
          */
         private val KEY_COMPARATOR = Comparator<Any?> { o1, o2 ->
             val i1 = arrayIndexKey(o1)

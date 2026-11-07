@@ -47,7 +47,7 @@ public class RegExpImpl : RegExpProxy {
         LazilyLoadedCtor(scope, "RegExp", sealed, Initializable { cx, s, sld -> NativeRegExp.init(cx, s, sld) })
     }
 
-    /** Whether [obj] has a pattern, as a RegExp has and RegExp.prototype has not (D-102). */
+    /** Whether [obj] has a pattern, as a RegExp has and RegExp.prototype has not. */
     override fun isRegExp(obj: Scriptable?): Boolean = NativeRegExp.isInstance(obj)
 
     override fun compileRegExp(cx: Context, source: String, flags: String?): Any =

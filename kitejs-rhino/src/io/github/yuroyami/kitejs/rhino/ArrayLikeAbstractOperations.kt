@@ -307,7 +307,7 @@ public object ArrayLikeAbstractOperations {
                 val ret = compare.call(cx, scope, compareThis, cmpBuf)
                 val d = ScriptRuntime.toNumber(ret)
                 // NaN means equal, as SortCompare says. Upstream's Double.compare makes it greater,
-                // which lets a stable sort reorder elements the comparator calls equal (D-85).
+                // which lets a stable sort reorder elements the comparator calls equal.
                 if (d < 0) -1 else if (d > 0) 1 else 0
             },
         )

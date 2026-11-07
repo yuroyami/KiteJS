@@ -10,22 +10,22 @@ import kotlin.test.assertTrue
 import org.mozilla.javascript.ScriptRuntime as UpstreamScriptRuntime
 
 /**
- * The ported message table is hand-copied from upstream's properties file (ledger D-4). This
+ * The ported message table is hand-copied from upstream's properties file. This
  * checks every key we carry against the upstream bundle, with and without arguments, so a typo
  * or a mangled line continuation cannot slip through.
  */
 class MessageParityTest {
 
     /**
-     * Keys upstream's code uses but its properties file never defines (D-49), and keys for errors
-     * only the port raises, such as a refused definition (D-88), the class syntax and the early
-     * errors upstream never checks (D-95), or async functions (D-97). Asking upstream for one of them raises a missing-resource
+     * Keys upstream's code uses but its properties file never defines, and keys for errors
+     * only the port raises, such as a refused definition, the class syntax and the early
+     * errors upstream never checks, or async functions. Asking upstream for one of them raises a missing-resource
      * error rather than returning text, so there is nothing to compare against and the port writes
      * its own wording, after V8's where V8 has one.
      */
     private val addedByThePort = setOf(
         "msg.missing.argument", "msg.typed.array.abstract.ctor", "msg.func.decl.not.in.block", "msg.define.refused",
-        // D-95: classes, private names, new.target and super.
+        // Classes, private names, new.target and super.
         "msg.class.dup.ctor", "msg.class.extends", "msg.class.extends.proto", "msg.class.field.name",
         "msg.class.init.arguments", "msg.class.name", "msg.class.not.in.block", "msg.class.not.new",
         "msg.class.private.constructor", "msg.class.private.dup", "msg.class.special.ctor",
@@ -36,12 +36,12 @@ class MessageParityTest {
         "msg.private.twice", "msg.private.undeclared", "msg.private.write", "msg.super.alone",
         "msg.super.call", "msg.super.not.ctor", "msg.super.twice", "msg.this.before.super",
         "msg.uninitialized.binding",
-        // D-95: early errors of plain functions that upstream lets through.
+        // Early errors of plain functions that upstream lets through.
         "msg.getter.params", "msg.setter.params", "msg.keyword.escaped", "msg.rest.default",
         "msg.use.strict.non.simple", "msg.no.function.name",
         // Const declarations need an initializer, except in for-in and for-of heads.
         "msg.const.no.init",
-        // D-97: async functions.
+        // Async functions.
         "msg.async.decl.not.in.block", "msg.async.yield", "msg.await.params",
         // Rest elements and the iterator protocol of patterns (#81, #96).
         "msg.rest.not.last", "msg.iterator.result.not.object", "msg.destruct.not.coercible",

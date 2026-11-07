@@ -7,7 +7,7 @@ package io.github.yuroyami.kitejs.rhino
 /**
  * A map whose keys do not keep their entries alive. Upstream builds `WeakMap` and `WeakSet` on
  * `java.util.WeakHashMap`; common Kotlin has no equivalent, so this is the port's own over
- * [WeakRef] (D-55). The collections now keep their entries on the keys instead (D-82, see
+ * [WeakRef]. The collections now keep their entries on the keys instead (see
  * [WeakEntries]) and fall back to this only for a key that has nowhere to keep them.
  *
  * Keys are matched by identity, not by `equals`, which is what JavaScript asks for. `hashCode` is

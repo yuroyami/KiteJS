@@ -88,7 +88,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
      * A character is a read-only, non-configurable own property, so defining it only checks that
      * the descriptor agrees with it (ECMAScript 2015, 9.4.3.2 with 9.1.6.2). Upstream put a new
      * slot beside the character instead, which a non-extensible String object refused, so freezing
-     * one threw, and on an extensible one the definition seemed to work and changed nothing (D-88).
+     * one threw, and on an extensible one the definition seemed to work and changed nothing.
      */
     override fun defineOwnProperty(cx: Context, id: Any?, desc: DescriptorInfo, checkValid: Boolean): Boolean {
         if (id !is Symbol && cx.languageVersion >= Context.VERSION_ES6) {
@@ -768,14 +768,14 @@ internal class NativeString internal constructor(private val string: CharSequenc
 
         private fun js_localeCompare(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val thisStr = ScriptRuntime.toString(coercibleThis(cx, thisObj, "localeCompare"))
-            // Common Kotlin has no collator (D-37), so this is code-unit order, clamped to -1, 0, 1.
+            // Common Kotlin has no collator, so this is code-unit order, clamped to -1, 0, 1.
             val cmp = thisStr.compareTo(ScriptRuntime.toString(args, 0))
             return if (cmp < 0) -1 else if (cmp > 0) 1 else 0
         }
 
         private fun js_toLocaleLowerCase(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val thisStr = ScriptRuntime.toString(coercibleThis(cx, thisObj, "toLocaleLowerCase"))
-            // No locale support (D-28), so this is the locale-independent conversion.
+            // No locale support, so this is the locale-independent conversion.
             return thisStr.lowercase()
         }
 
@@ -808,7 +808,7 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_normalize(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            // Common Kotlin has no Unicode normalizer (D-38): the form name is checked, the text
+            // Common Kotlin has no Unicode normalizer: the form name is checked, the text
             // comes back as it was.
             if (args.isEmpty() || Undefined.isUndefined(args[0])) {
                 return ScriptRuntime.toString(coercibleThis(cx, thisObj, "normalize"))

@@ -9,7 +9,7 @@ package io.github.yuroyami.kitejs.rhino
  * a frozen interpreter frame, as a generator's is: it runs from the call to its first `await`,
  * and each `await` hands its operand here, which waits for it the way the spec's Await does and
  * resumes the body from the microtask queue with the settled value, or throws the reason into it.
- * What the body returns resolves [promise] and what it throws rejects it (D-97).
+ * What the body returns resolves [promise] and what it throws rejects it.
  */
 internal class AsyncFunctionDriver(
     private val savedState: Any?,

@@ -14,8 +14,8 @@ import kotlin.test.assertEquals
 
 /**
  * What the engine makes on its own, a literal, a primitive's wrapper, an error it throws, comes
- * from the realm's intrinsics, never from a global binding a script may have replaced (#77,
- * D-94). Every expected value here is what V8 answers.
+ * from the realm's intrinsics, never from a global binding a script may have replaced
+ * (#77). Every expected value here is what V8 answers.
  */
 class RealmIntrinsicsTest {
 

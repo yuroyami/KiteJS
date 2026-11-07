@@ -9,7 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * The object environment a `with` statement makes, as D-89 left it: a name is bound when the
+ * The object environment a `with` statement makes, as the port leaves it: a name is bound when the
  * object has the property (HasProperty, so a proxy's `has` trap decides) and its @@unscopables does
  * not block the name, and a binding that disappears before it is read or written is undefined, or
  * a ReferenceError in strict code. The expected values are V8's with two exceptions where V8

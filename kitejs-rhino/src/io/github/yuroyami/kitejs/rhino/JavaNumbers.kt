@@ -11,13 +11,13 @@ import kotlin.math.abs
 /**
  * Numbers printed the way Java prints them. Upstream leaks `Double.toString()` and
  * `MessageFormat` into a few error messages, and Kotlin/JS prints doubles differently, so the
- * port formats them itself from the shortest round-trip digits (D-39).
+ * port formats them itself from the shortest round-trip digits.
  */
 internal object JavaNumbers {
 
     /**
      * `Object.toString()` for a script value: Java's double format for doubles, else `toString`.
-     * On Kotlin/JS an Int and a whole Double are the same thing (D-32), so a whole number prints
+     * On Kotlin/JS an Int and a whole Double are the same thing, so a whole number prints
      * as an Int there; on the JVM a Double 5.0 still prints as `5.0`, as upstream does.
      */
     fun toString(value: Any?): String = when {

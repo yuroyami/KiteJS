@@ -30,7 +30,7 @@ import kotlin.math.withSign
  * system libm on the native targets. They disagree in the last bit for some arguments, so the
  * same script gave different numbers on different targets. fdlibm is what the JVM's StrictMath
  * is, and what V8's `ieee754.cc` is derived from, so these are also the digits a browser gives
- * (D-73).
+ *.
  *
  * Each routine follows the C source line by line, with the C names. `hi` and `lo` stand for the
  * `__HI` and `__LO` macros: the high and low 32-bit words of a double.

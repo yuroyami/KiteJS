@@ -11,7 +11,7 @@ package io.github.yuroyami.kitejs.rhino
  * inverted representation the spec's note on WeakMap describes for an engine whose collector has
  * no ephemerons: nothing in a collection leads to a key, so a value that refers back to its own
  * key, or entries that refer to each other's keys, cannot keep themselves alive, and an entry goes
- * when its key does. Upstream keeps a `WeakHashMap`, whose values hold such keys forever (D-82). It
+ * when its key does. Upstream keeps a `WeakHashMap`, whose values hold such keys forever. It
  * also means a key is released on a target with no weak references at all, where the collection
  * stays reachable from its keys instead.
  *

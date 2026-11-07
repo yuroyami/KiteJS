@@ -8,7 +8,7 @@ import io.github.yuroyami.kitejs.rhino.Token
 
 /**
  * An `await` expression (ECMAScript 2017, 14.7). Node type is [Token.AWAIT]. Upstream has no
- * async functions, so no node for it either (D-97).
+ * async functions, so no node for it either.
  */
 public class AwaitExpression : AstNode {
 

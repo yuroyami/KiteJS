@@ -127,9 +127,9 @@ import io.github.yuroyami.kitejs.rhino.ast.ScriptNode
  * unwind them without touching the host stack.
  *
  * Upstream keeps a table of one object per opcode; this port dispatches with a `when` over the same
- * opcodes, which is what older Rhino did. The cases are the same code (D-30).
+ * opcodes, which is what older Rhino did. The cases are the same code.
  *
- * Continuations (`NativeContinuation`, `captureContinuation`) are not ported (D-31).
+ * Continuations (`NativeContinuation`, `captureContinuation`) are not ported.
  */
 public class Interpreter : Evaluator {
 
@@ -197,7 +197,7 @@ public class Interpreter : Evaluator {
         val varSource: CallFrame
         val emptyStackTop: Int
         val useActivation: Boolean
-        /** Whether this frame runs strict code, which is what [Context.isStrictMode] answers while it runs (D-80). */
+        /** Whether this frame runs strict code, which is what [Context.isStrictMode] answers while it runs. */
         val isStrict: Boolean
         var isContinuationsTopFrame = false
         val thisObj: Scriptable?
@@ -438,7 +438,7 @@ public class Interpreter : Evaluator {
      * What a finally block entered by GOSUB keeps in its local: where to go back to, and the
      * result that was pending when it started, which a `return` inside it that a `break` then
      * abandons must not overwrite. Each finally holds its own, as V8 gives each try-finally a
-     * result register of its own (D-97). A throw entering the block leaves the throwable there
+     * result register of its own. A throw entering the block leaves the throwable there
      * instead.
      */
     private class FinallyReturn(val pc: Int, val result: Any?, val resultDbl: Double)
@@ -748,7 +748,7 @@ public class Interpreter : Evaluator {
             val frame = cx.withRealm(ifun.declarationScope ?: scope) {
                 cx.checkInterpreterInvocation()
                 // A call from native code, such as a forEach callback or a Promise reaction, is
-                // charged before any frame exists to unwind (D-77).
+                // charged before any frame exists to unwind.
                 cx.addInstructionCount(INVOCATION_COST)
                 initFrame(cx, scope, thisObj, ifun.homeObject, args, null, null, 0, args.size, ifun, idata, null, newTarget)
             }
@@ -787,7 +787,7 @@ public class Interpreter : Evaluator {
         /**
          * Runs an async body from where it is suspended, with [operation] and [value] as an
          * awaited promise settled. Returns an [AsyncFunctionDriver.AwaitRequest] when the body
-         * reaches an `await`, or what the body returned; a throw comes out as one (D-97).
+         * reaches an `await`, or what the body returned; a throw comes out as one.
          */
         internal fun resumeAsync(cx: Context, operation: Int, savedState: Any?, value: Any?): Any? {
             cx.checkInterpreterInvocation()
@@ -1655,7 +1655,7 @@ public class Interpreter : Evaluator {
         /**
          * The second half of the dispatch. The two exist because HotSpot refuses to JIT-compile a
          * method over 8000 bytecodes, and one `when` over every opcode lands well past that, which
-         * leaves the whole interpreter running interpreted (D-42).
+         * leaves the whole interpreter running interpreted.
          */
         private fun executeCold(cx: Context, frame: CallFrame, state: InterpreterState, op: Int): NewState? {
             if (op == Icode_AWAIT || op == Icode.Icode_AWAIT_SETTLED) {
@@ -1721,7 +1721,7 @@ public class Interpreter : Evaluator {
                     return null
                 }
                 // Class definitions and super() calls run once per class or per construction, so
-                // they live here, out of the hot dispatch method (D-95).
+                // they live here, out of the hot dispatch method.
                 Icode_CLASS_BEGIN -> {
                     // The index is one past the constructor's for a class with a name of its own.
                     val bindingName = if (state.indexReg > 0) frame.fnOrScript.descriptor!!.getFunction(state.indexReg - 1).name else null
@@ -1874,7 +1874,7 @@ public class Interpreter : Evaluator {
                 }
                 Icode_INITCONST -> {
                     // A const a loop declares takes the value of this pass, even if an earlier
-                    // pass already bound it (D-72).
+                    // pass already bound it.
                     var rhs = stack[state.stackTop]
                     if (rhs === DBL_MRK) rhs = ScriptRuntime.wrapNumber(sDbl[state.stackTop])
                     val lhs = stack[state.stackTop - 1] as Scriptable
@@ -2213,7 +2213,7 @@ public class Interpreter : Evaluator {
             }
             val post = (incrDecrMask and Node.POST_FLAG) != 0
             // Only a const is read-only in a frame, and ++ or -- on one is a TypeError once its
-            // operand has been converted (D-71).
+            // operand has been converted.
             if ((varAttributes[state.indexReg].toInt() and ScriptableObject.READONLY) != 0) {
                 throw constVarAssignError(frame, state.indexReg)
             }
@@ -2233,7 +2233,7 @@ public class Interpreter : Evaluator {
 
         /**
          * A frame marks only its consts read-only, so a write that meets one is an assignment to
-         * a const, which ECMAScript 2015, 8.1.1.1.5 makes a TypeError in any mode (D-71).
+         * a const, which ECMAScript 2015, 8.1.1.1.5 makes a TypeError in any mode.
          */
         private fun constVarAssignError(frame: CallFrame, index: Int): EcmaError =
             ScriptRuntime.constAssignError(frame.fnOrScript.descriptor!!.getParamOrVarName(index))
@@ -2476,7 +2476,7 @@ public class Interpreter : Evaluator {
             }
             frame.frozen = true
             // The yielded value leaves through the return value, not frame.result, which may
-            // hold what a return stored before a finally block that yields (D-97).
+            // hold what a return stored before a finally block that yields.
             val yielded = frame.stack[state.stackTop]
             frame.savedStackTop = state.stackTop
             // Back up so the resume lands on the yield again.
@@ -2698,7 +2698,7 @@ public class Interpreter : Evaluator {
         /**
          * A call costs [INVOCATION_COST] and asks the observer, as a branch does. Upstream only
          * adds the cost, so code that calls without branching, such as Promise reactions that
-         * each queue the next, ran without the observer ever hearing of it (D-77).
+         * each queue the next, ran without the observer ever hearing of it.
          */
         private fun addInvocationCount(cx: Context, frame: CallFrame) {
             addInstructionCount(cx, frame, INVOCATION_COST)

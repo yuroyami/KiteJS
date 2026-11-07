@@ -47,7 +47,7 @@ class ContextTest {
             cx.languageVersion = Context.VERSION_1_7
             assertFalse(cx.hasFeature(Context.FEATURE_ENUMERATE_IDS_FIRST))
             assertTrue(cx.hasFeature(Context.FEATURE_OLD_UNDEF_NULL_THIS))
-            assertFalse(cx.hasFeature(Context.FEATURE_THREAD_SAFE_OBJECTS), "always off (D-3)")
+            assertFalse(cx.hasFeature(Context.FEATURE_THREAD_SAFE_OBJECTS), "always off")
             assertFailsWith<IllegalArgumentException> { cx.hasFeature(99) }
         }
     }

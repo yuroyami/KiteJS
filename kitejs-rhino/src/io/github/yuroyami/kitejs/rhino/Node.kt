@@ -833,7 +833,7 @@ public open class Node : Iterable<Node> {
         internal const val OPTIONAL_CHAIN_DELETE: Int = 3
         public const val SUPER_PROPERTY_ACCESS: Int = 31
         public const val NUMBER_OF_SPREAD: Int = 32
-        // The port's own: a const a loop declares, given its value afresh on every pass (D-72).
+        // The port's own: a const a loop declares, given its value afresh on every pass.
         internal const val FRESH_CONST_PROP: Int = 33
 
         /**
@@ -850,11 +850,11 @@ public open class Node : Iterable<Node> {
 
         /**
          * On the name `async` before `(` on the same line, or on the parameter of `async x =>`:
-         * where the `async` starts, for an async arrow function to start there (D-97).
+         * where the `async` starts, for an async arrow function to start there.
          */
         internal const val ASYNC_ARROW_PROP: Int = 37
 
-        /** The port's own: a let that can run more than once, reset to undefined each time (D-98). */
+        /** The port's own: a let that can run more than once, reset to undefined each time. */
         internal const val RESET_LET_PROP: Int = 38
         /** An ENTERWITH created for a declarative lexical scope, rather than a with object. */
         internal const val LEXICAL_SCOPE_PROP: Int = 39

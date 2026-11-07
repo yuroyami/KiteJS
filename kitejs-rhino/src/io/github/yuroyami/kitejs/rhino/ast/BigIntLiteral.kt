@@ -10,7 +10,7 @@ import io.github.yuroyami.kitejs.rhino.Token
 /**
  * A BigInt literal such as `123n`. Node type is [Token.BIGINT].
  *
- * KMP: [bigInt] holds a [KBigInt], the digits-and-radix stand-in for BigInteger (D-5). Its
+ * KMP: [bigInt] holds a [KBigInt], the digits-and-radix stand-in for BigInteger. Its
  * `toString` matches upstream only for decimal literals until Phase 5 lands real arithmetic.
  */
 public class BigIntLiteral : AstNode {

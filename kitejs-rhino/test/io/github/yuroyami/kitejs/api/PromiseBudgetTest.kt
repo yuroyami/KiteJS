@@ -12,7 +12,7 @@ import kotlin.test.assertTrue
 
 /**
  * The instruction budget and the interrupt hook reach Promise reactions and callbacks, which call
- * and return without ever branching (D-77). Every chain here is finite, if long, so a regression
+ * and return without ever branching. Every chain here is finite, if long, so a regression
  * makes the assertions on its length fail rather than hanging the suite; the JVM tests run the
  * endless chain under a watchdog.
  */

@@ -10,7 +10,7 @@ import kotlin.test.assertEquals
 
 /**
  * Class syntax: ECMAScript 2015 classes, `super` and new.target, and the ECMAScript 2022 public
- * and private fields, private methods and accessors, `#x in o` and static blocks (#2, D-95).
+ * and private fields, private methods and accessors, `#x in o` and static blocks (#2).
  * Every expected value here is what V8 answers, error messages included, and each source runs in
  * a fresh engine, since a class declaration may not be repeated in one scope.
  */

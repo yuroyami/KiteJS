@@ -84,7 +84,7 @@ internal class NativeReflect private constructor() : ScriptableObject() {
             }
 
             // CreateListFromArrayLike demands an object even when no argument will be passed, so a
-            // missing list is a TypeError; upstream constructed with no arguments (D-89).
+            // missing list is a TypeError; upstream constructed with no arguments.
             val argumentsList = args.getOrElse(1) { Undefined.instance }
             if (!ScriptRuntime.isObject(argumentsList)) {
                 throw ScriptRuntime.typeErrorById("msg.arg.not.object", ScriptRuntime.typeOf(argumentsList))
@@ -95,7 +95,7 @@ internal class NativeReflect private constructor() : ScriptableObject() {
             // newTarget's prototype and then called the function, which for a built-in that can
             // also be called without `new` returned a fresh object ignoring newTarget and for one
             // that cannot threw; anything else got newTarget's prototype afterwards, a construct
-            // trap's answer included (D-91).
+            // trap's answer included.
             val newTarget = if (args.size > 2) args[2] as Scriptable else ctor as Scriptable
             return AbstractEcmaObjectOperations.construct(cx, scope, ctor, callArgs, newTarget)
         }
@@ -104,7 +104,7 @@ internal class NativeReflect private constructor() : ScriptableObject() {
          * Reflect.defineProperty: the key is converted before the descriptor is read, both may
          * throw, and only the definition itself answers false. Upstream turned every TypeError the
          * engine raised into false, a proxy invariant violation or a `null.x` inside a trap
-         * included, and accepted a getter that is not callable (D-89).
+         * included, and accepted a getter that is not callable.
          */
         private fun defineProperty(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any {
             val target = checkTarget(args)
@@ -117,7 +117,7 @@ internal class NativeReflect private constructor() : ScriptableObject() {
         /**
          * Reflect.deleteProperty: [[Delete]] on the target alone. Upstream searched the prototype
          * chain for the property and deleted it wherever it found it, so
-         * `Reflect.deleteProperty({}, 'toString')` removed Object.prototype.toString (D-89).
+         * `Reflect.deleteProperty({}, 'toString')` removed Object.prototype.toString.
          */
         private fun deleteProperty(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any {
             val target = checkTarget(args)
@@ -128,7 +128,7 @@ internal class NativeReflect private constructor() : ScriptableObject() {
         /**
          * Reflect.get: ToPropertyKey, then the target's [[Get]] with the receiver as `this` for a
          * getter. Upstream ignored the receiver, treated a numeric key as an array index through
-         * ToIndex, and answered undefined for an omitted key instead of reading "undefined" (D-89).
+         * ToIndex, and answered undefined for an omitted key instead of reading "undefined".
          */
         private fun get(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val target = checkTarget(args)
@@ -184,7 +184,7 @@ internal class NativeReflect private constructor() : ScriptableObject() {
          * Reflect.set: the target's [[Set]] with the receiver, answering whether the write was
          * made. Upstream wrote straight to the receiver and answered true whatever happened, read
          * a missing value out of range, and with a separate receiver refused a write for a
-         * non-configurable property where only a read-only one should refuse it (D-89).
+         * non-configurable property where only a read-only one should refuse it.
          */
         private fun set(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any {
             val target = checkTarget(args)
@@ -197,7 +197,7 @@ internal class NativeReflect private constructor() : ScriptableObject() {
         /**
          * Reflect.setPrototypeOf: the target's [[SetPrototypeOf]] answer. Upstream checked for
          * itself and assigned the property, so a proxy's trap result was ignored and a cycle
-         * through a proxy called its getPrototypeOf trap (D-91).
+         * through a proxy called its getPrototypeOf trap.
          */
         private fun setPrototypeOf(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any {
             // A missing prototype is undefined, which is no object either; upstream's message for it stays.

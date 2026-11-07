@@ -12,7 +12,7 @@ import io.github.yuroyami.kitejs.rhino.ast.ScriptNode
  * flags, and the call stack bookkeeping the interpreter needs.
  *
  * Upstream keeps the current context in a `ThreadLocal`, one per thread. This port is single-thread
- * confined (D-3), so there is exactly one slot. Enter a context before running anything and exit it
+ * confined, so there is exactly one slot. Enter a context before running anything and exit it
  * afterwards, or use [ContextFactory.call], which does both.
  *
  * Gone from upstream: class shutters, wrap factories, security controllers, class loaders, the
@@ -48,7 +48,7 @@ public open class Context internal constructor(public val factory: ContextFactor
     /**
      * The registry behind `Symbol.for`, one per context. ECMAScript 2024, 20.4.2.2 shares it
      * across the realms of one agent, and a thread is one agent here, so two engines never write
-     * the same map (D-40).
+     * the same map.
      */
     internal val symbolRegistry: MutableMap<String, SymbolKey> = HashMap()
 
@@ -321,7 +321,7 @@ public open class Context internal constructor(public val factory: ContextFactor
         this.generatingSource = generatingSource
     }
 
-    /** Always true: there is no bytecode compiler in this port (D-15). */
+    /** Always true: there is no bytecode compiler in this port. */
     public val isInterpretedMode: Boolean get() = interpretedMode
 
     public fun setInterpretedMode(interpretedMode: Boolean) {
@@ -373,7 +373,7 @@ public open class Context internal constructor(public val factory: ContextFactor
      * Charges [cost] instructions and asks the observer once the count reaches the threshold.
      * Branches, calls, typed code and microtasks come through here, because code
      * without loops spends its time in them: a chain of Promise reactions that each queue the
-     * next never branches, and upstream never asks its observer while one runs (D-77).
+     * next never branches, and upstream never asks its observer while one runs.
      */
     internal fun addInstructionCount(cost: Int) {
         if (instructionThreshold == 0) return
@@ -485,7 +485,7 @@ public open class Context internal constructor(public val factory: ContextFactor
     /**
      * Drops every queued job. The engine does this when it stops a script for its budget or its
      * interrupt hook, as V8 drops its queue when execution is terminated during a checkpoint, so
-     * the abandoned work does not run on the next call (D-77).
+     * the abandoned work does not run on the next call.
      */
     internal fun discardMicrotasks() {
         microtasks.clear()
@@ -580,7 +580,7 @@ public open class Context internal constructor(public val factory: ContextFactor
      * frame, as strictness belongs to the code and not to its caller, and without a frame the top
      * call. Upstream asked the current activation, which only a function that needs one pushes, so
      * a strict function called from sloppy code ran as sloppy, and a sloppy one called from strict
-     * code ran as strict (D-80).
+     * code ran as strict.
      */
     public val isStrictMode: Boolean
         get() {
@@ -588,12 +588,12 @@ public open class Context internal constructor(public val factory: ContextFactor
             return frame !== sloppyFrame && (frame as Interpreter.CallFrame).isStrict
         }
 
-    /** The frame that the `Function` constructor runs for, which reads as sloppy while it is current, as the code it makes is (D-80). */
+    /** The frame that the `Function` constructor runs for, which reads as sloppy while it is current, as the code it makes is. */
     internal var sloppyFrame: Any? = null
 
     public companion object {
 
-        /** What one microtask costs the instruction count, the same as a call (D-77). */
+        /** What one microtask costs the instruction count, the same as a call. */
         internal const val MICROTASK_COST: Int = 100
 
         /** What `Context.implementationVersion` answers. Upstream reads it from a jar manifest. */
@@ -787,7 +787,7 @@ public open class Context internal constructor(public val factory: ContextFactor
 
         /**
          * The source name and line the interpreter is currently at. The line goes into `linep[0]`.
-         * Upstream falls back to walking the Java stack; there is no such fallback here (D-18).
+         * Upstream falls back to walking the Java stack; there is no such fallback here.
          */
         internal fun getSourcePositionFromStack(linep: IntArray): String? {
             val cx = currentContext ?: return null

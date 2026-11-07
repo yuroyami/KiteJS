@@ -74,7 +74,7 @@ class EvalSmokeTest {
         assertEquals("1e+21", eval("'' + 1e21"))
         assertEquals("1e-7", eval("'' + 1e-7"))
         // Values read back out of an array are boxed. On Kotlin/JS every number passes `is Int`,
-        // and the Int fast paths used to swallow fractions, NaN and infinities (D-32).
+        // and the Int fast paths used to swallow fractions, NaN and infinities.
         assertEquals("1.5", eval("[2.5][0] - 1"))
         assertEquals("NaN", eval("['a'][0] - 1"))
         assertEquals("NaN", eval("[NaN][0] * 2"))
@@ -387,14 +387,14 @@ class EvalSmokeTest {
         assertEquals("a,b", eval("var p = new Proxy({a:1,b:2},{}); var out=[]; for (var k in p) out.push(k); out.join(',')"))
         assertEquals("30", eval("var p = new Proxy(function(a,b){return a+b;}, {apply:function(t,th,args){return t.apply(th,args)*10;}}); p(1,2)"))
         assertEquals("3", eval("function F(x){this.x=x;} var p = new Proxy(F, {construct:function(t,args){return {x:3};}}); (new p(5)).x"))
-        // The construct trap gets a real array, not the raw argument list (D-51).
+        // The construct trap gets a real array, not the raw argument list.
         assertEquals("true,2,7", eval("var p = new Proxy(function(x){this.x=x;}, {construct:function(t,args){return {out: Array.isArray(args) + ',' + args.length + ',' + args[0]};}}); (new p(7,8)).out"))
         assertEquals("function", eval("typeof new Proxy(function(){}, {})"))
         assertEquals("true", eval("Array.isArray(new Proxy([], {}))"))
         assertEquals("true", eval("var proto={z:1}; var p=new Proxy({},{getPrototypeOf:function(){return proto;}}); Object.getPrototypeOf(p) === proto"))
         assertEquals("1:TypeError", eval("var r = Proxy.revocable({a:1},{}); var v = r.proxy.a; r.revoke(); try { r.proxy.a } catch(e) { v + ':' + e.name }"))
         assertEquals("TypeError", eval("var t = Object.freeze({a:1}); var p = new Proxy(t, {get:function(){return 2;}}); try { p.a } catch(e) { e.name }"))
-        // Upstream crashes on this one; the port answers undefined, as the spec says (D-50).
+        // Upstream crashes on this one; the port answers undefined, as the spec says.
         assertEquals("undefined", eval("var p = new Proxy({}, {getOwnPropertyDescriptor:function(){return undefined;}}); String(Object.getOwnPropertyDescriptor(p,'zzz'))"))
     }
 

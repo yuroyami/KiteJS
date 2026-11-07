@@ -13,7 +13,7 @@ package io.github.yuroyami.kitejs.rhino
  *
  * `Context.initStandardObjects` fills this cache, in a field for a `TopLevel` and as an associated
  * value for any other global object, and makes a `TopLevel` when it is given no scope. A scope
- * that inherits its globals from a prototype uses the cache of the global it inherits from (D-94).
+ * that inherits its globals from a prototype uses the cache of the global it inherits from.
  */
 public open class TopLevel : ScriptableObject() {
 
@@ -98,7 +98,7 @@ public open class TopLevel : ScriptableObject() {
     /**
      * A realm's original constructors, taken from its globals once its standard objects are in,
      * so a script that replaces a global does not change what the engine makes. A `TopLevel`
-     * keeps its own in a field; any other global object keeps one as an associated value (D-94).
+     * keeps its own in a field; any other global object keeps one as an associated value.
      */
     internal class Intrinsics {
         var ctors: Map<Builtins, BaseFunction>? = null
@@ -130,7 +130,7 @@ public open class TopLevel : ScriptableObject() {
                     // global scope, so it has to be built here.
                     c[builtin] = BaseFunction.initAsGeneratorFunction(scope, sealed) as BaseFunction
                 } else if (builtin == Builtins.AsyncFunction) {
-                    // So is AsyncFunction (D-97).
+                    // So is AsyncFunction.
                     c[builtin] = BaseFunction.initAsAsyncFunction(scope, sealed) as BaseFunction
                 } else if (builtin == Builtins.AsyncGeneratorFunction) {
                     c[builtin] = BaseFunction.initAsAsyncGeneratorFunction(scope, sealed) as BaseFunction
@@ -160,7 +160,7 @@ public open class TopLevel : ScriptableObject() {
          * Takes [global]'s intrinsics from its globals, whatever class backs it. Upstream kept
          * them for a `TopLevel` only, so in any other global, the one `initStandardObjects()`
          * makes included, a replaced `String`, `Object` or `TypeError` changed the prototype of
-         * every string, literal and engine error that followed (D-94).
+         * every string, literal and engine error that followed.
          */
         internal fun cacheIntrinsics(global: ScriptableObject, sealed: Boolean) {
             if (global is TopLevel) return global.cacheBuiltins(global, sealed)

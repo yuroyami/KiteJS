@@ -22,7 +22,7 @@ public open class BaseFunction : ScriptableObject, Function {
 
     /**
      * Raw storage for the `prototype` property's attributes. Writing it does not touch the slot;
-     * `setPrototypePropertyAttributes` does both, the way upstream's field and setter pair do (D-8).
+     * `setPrototypePropertyAttributes` does both, the way upstream's field and setter pair do.
      */
     protected var prototypePropertyAttributesField: Int = PERMANENT or DONTENUM
 
@@ -118,7 +118,7 @@ public open class BaseFunction : ScriptableObject, Function {
      * OrdinaryHasInstance for this function, which `instanceof` falls back to when there is no
      * `Symbol.hasInstance` to ask: true when this function's `prototype` is somewhere in
      * [instance]'s prototype chain, and for a bound function whatever `instanceof` says of its
-     * target (D-92).
+     * target.
      */
     override fun hasInstance(instance: Scriptable): Boolean =
         ScriptRuntime.ordinaryHasInstance(Context.getContext(), this, instance)
@@ -168,7 +168,7 @@ public open class BaseFunction : ScriptableObject, Function {
     /**
      * IsConstructor for this function: whether [construct] gets past its own check. A home object
      * refuses `new` here, since only a method has one; every function kind that refuses it for
-     * another reason says so in its override (D-91).
+     * another reason says so in its override.
      */
     public open val isConstructor: Boolean get() = homeObject == null
 
@@ -179,7 +179,7 @@ public open class BaseFunction : ScriptableObject, Function {
      * found in newTarget's realm, which is the spec's OrdinaryCreateFromConstructor for every
      * built-in that makes its object in [construct]. Upstream set newTarget's prototype on whatever
      * came back, after calling a constructor that also allows a plain call as a function, so
-     * `Reflect.construct(Array, [], F)` made an array that ignored F and `Map` threw (D-91).
+     * `Reflect.construct(Array, [], F)` made an array that ignored F and `Map` threw.
      */
     internal open fun construct(cx: Context, scope: Scriptable, args: Array<Any?>, newTarget: Scriptable): Scriptable {
         if (newTarget === this) return construct(cx, scope, args)
@@ -289,7 +289,7 @@ public open class BaseFunction : ScriptableObject, Function {
 
         internal const val GENERATOR_FUNCTION_CLASS = "__GeneratorFunction"
 
-        /** Where %AsyncFunction% is parked on the global, which has no such global (D-97). */
+        /** Where %AsyncFunction% is parked on the global, which has no such global. */
         internal const val ASYNC_FUNCTION_CLASS = "__AsyncFunction"
 
         /** Where %AsyncGeneratorFunction% is parked on the global, which has no such global either. */
@@ -453,7 +453,7 @@ public open class BaseFunction : ScriptableObject, Function {
             // %GeneratorFunction.prototype% and %GeneratorPrototype% name each other, read-only,
             // hidden and configurable (ES 25.2.3.2, 25.3.1.1). Upstream put an ordinary
             // `prototype`, which Object.keys listed, and gave %GeneratorPrototype% no
-            // `constructor`, so it inherited Object's (D-93).
+            // `constructor`, so it inherited Object's.
             val generatorPrototype = getTopScopeValue(top, ES6Generator.GENERATOR_TAG)
             proto.defineProperty(PROTOTYPE_PROPERTY_NAME, generatorPrototype, READONLY or DONTENUM)
             (generatorPrototype as? ScriptableObject)?.let {
@@ -467,7 +467,7 @@ public open class BaseFunction : ScriptableObject, Function {
             proto.defineProperty(SymbolKey.TO_STRING_TAG, "GeneratorFunction", READONLY or DONTENUM)
             // Parked on the scope, as %GeneratorPrototype% is, and not a global: upstream put it on
             // the global as an enumerable __GeneratorFunction, which Object.keys and for-in listed
-            // (D-79).
+            //.
             return (scope as? ScriptableObject)?.associateValue(GENERATOR_FUNCTION_CLASS, ctor) ?: ctor
         }
 
@@ -536,7 +536,7 @@ public open class BaseFunction : ScriptableObject, Function {
          * `Function.prototype[Symbol.hasInstance]`, which is OrdinaryHasInstance. Upstream cast a
          * bound function's target to JSFunction, so a bound built-in crashed with a host
          * ClassCastException, and it read the bound target's `prototype` where the spec asks
-         * `instanceof` of the target, so the target's own `Symbol.hasInstance` was skipped (D-92).
+         * `instanceof` of the target, so the target's own `Symbol.hasInstance` was skipped.
          */
         private fun js_hasInstance(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? =
             ScriptRuntime.ordinaryHasInstance(cx, thisObj, args.getOrElse(0) { Undefined.instance })
@@ -596,7 +596,7 @@ public open class BaseFunction : ScriptableObject, Function {
         /**
          * The Function constructor makes sloppy code even when called from strict code. The frame
          * that calls it reads as sloppy until it returns, and code it calls on the way, such as a
-         * `toString` of an argument, still runs as its own code says (D-80).
+         * `toString` of an argument, still runs as its own code says.
          */
         private inline fun withoutStrictMode(cx: Context, block: () -> Scriptable): Scriptable {
             if (!cx.isStrictMode) return block()

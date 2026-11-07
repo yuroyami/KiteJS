@@ -11,7 +11,7 @@ import kotlin.test.assertEquals
 /**
  * A function declaration is not a statement, so it cannot be the body of a loop, a `with` or an
  * `if`, labelled or not (ECMAScript 2015, 13.6.1 and 13.7.1.1). Annex B lets sloppy code keep a
- * plain one as the body of an `if` and as a labelled statement, which is what browsers do (D-76).
+ * plain one as the body of an `if` and as a labelled statement, which is what browsers do.
  */
 class FunctionDeclarationPlacementTest {
 

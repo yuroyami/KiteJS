@@ -29,7 +29,7 @@ public open class ContextFactory {
 
     /**
      * Whether an optional engine behaviour is on. These are the defaults; a subclass changes them
-     * by overriding this. Thread-safe objects are always off (D-3).
+     * by overriding this. Thread-safe objects are always off.
      */
     public open fun hasFeature(cx: Context, featureIndex: Int): Boolean = when (featureIndex) {
         // Kept only for scripts that pin an old language version.

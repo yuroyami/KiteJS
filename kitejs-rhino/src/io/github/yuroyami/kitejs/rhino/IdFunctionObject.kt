@@ -66,7 +66,7 @@ public open class IdFunctionObject : BaseFunction {
     /**
      * Function.prototype, looked up the first time it is needed. Only a prototype nobody set is
      * defaulted, so one set to null stays null; upstream defaulted it again on every read, which
-     * undid `Object.setPrototypeOf(Date.now, null)` (D-91).
+     * undid `Object.setPrototypeOf(Date.now, null)`.
      */
     private var prototypeSet = false
 

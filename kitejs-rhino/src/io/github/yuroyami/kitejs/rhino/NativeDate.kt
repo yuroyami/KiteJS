@@ -27,7 +27,7 @@ internal class NativeDate private constructor() : IdScriptableObject() {
 
     /**
      * Whether this is `Date.prototype`, which carries the methods but is an ordinary object with
-     * no time value (ECMAScript 2015, 20.3.4), so they throw on it (D-102).
+     * no time value (ECMAScript 2015, 20.3.4), so they throw on it.
      */
     private var isPrototype = false
 
@@ -1018,7 +1018,7 @@ internal class NativeDate private constructor() : IdScriptableObject() {
 
         /**
          * The short zone name upstream gets from the JDK's locale data. There is no such data in
-         * common Kotlin, so the zone id stands in (D-45).
+         * common Kotlin, so the zone id stands in.
          */
         private fun zoneName(cx: Context): String = cx.timeZone.id
 
@@ -1048,7 +1048,7 @@ internal class NativeDate private constructor() : IdScriptableObject() {
 
         /**
          * The locale-sensitive formats. Upstream asks `java.time` with the default locale; this
-         * uses the en-US patterns that produces, and ignores the locale argument (D-46).
+         * uses the en-US patterns that produces, and ignores the locale argument.
          */
         private fun toLocale_helper(cx: Context, t: Double, methodId: Int): String {
             val local = LocalTime(cx, t)

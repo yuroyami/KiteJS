@@ -18,7 +18,7 @@ public abstract class SlotMapOwner {
      * The table. It changes shape as the object grows.
      *
      * KMP: upstream reads and writes this through a `VarHandle` when thread-safe objects are on.
-     * This port is single-thread confined (D-3), so it is a plain field.
+     * This port is single-thread confined, so it is a plain field.
      */
     internal var map: SlotMap
 

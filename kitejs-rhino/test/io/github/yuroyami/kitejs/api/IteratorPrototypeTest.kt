@@ -14,7 +14,7 @@ import kotlin.test.assertEquals
 /**
  * The array, map, set, string, regexp string and generator iterator prototypes all inherit one
  * %IteratorPrototype% per realm, which alone holds `[Symbol.iterator]` (ECMAScript 2015, 25.1.2),
- * and %GeneratorFunction.prototype% and %GeneratorPrototype% name each other (#74, D-93). Every
+ * and %GeneratorFunction.prototype% and %GeneratorPrototype% name each other (#74). Every
  * expected value here is what V8 answers, except where a test says it is about a sealed scope.
  */
 class IteratorPrototypeTest {

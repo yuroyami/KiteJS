@@ -7,6 +7,6 @@ package io.github.yuroyami.kitejs.rhino
 /**
  * The [Callable] that `LambdaFunction` and `LambdaConstructor` take. Upstream also requires it to be
  * `Serializable`; there is no serialization here, so the name is kept for parity and the marker is
- * empty (D-22).
+ * empty.
  */
 public fun interface SerializableCallable : Callable

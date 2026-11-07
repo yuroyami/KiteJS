@@ -71,7 +71,7 @@ public open class Delegator : Function, SymbolScriptable {
     /**
      * A write aimed at this wrapper lands on the object behind it. Handing the wrapper on as the
      * receiver is what upstream does, and it loops: the delegee does not own the property, so it
-     * bounces the write back to the receiver, which forwards it to the delegee again (D-65).
+     * bounces the write back to the receiver, which forwards it to the delegee again.
      */
     private fun receiverFor(start: Scriptable, delegee: Scriptable): Scriptable =
         if (start === this) delegee else start

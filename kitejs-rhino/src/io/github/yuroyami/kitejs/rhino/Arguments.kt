@@ -96,7 +96,7 @@ internal open class Arguments(private val activation: NativeCall, cx: Context) :
     /**
      * Whether slot [index] is the same variable as a named parameter. Only the arguments of a
      * sloppy function with simple parameters are mapped, whoever reads them; upstream asked
-     * whether the reading code was strict (D-80).
+     * whether the reading code was strict.
      */
     private fun sharedWithActivation(index: Int): Boolean {
         if (!mapped) return false
@@ -182,7 +182,7 @@ internal open class Arguments(private val activation: NativeCall, cx: Context) :
             // The argument is an own property already, kept outside the slot map, so it gets its
             // slot first and the definition is checked against it. Upstream treated it as a new
             // property, which a non-extensible arguments object refuses, so freezing one threw,
-            // and a partial descriptor took defaults for every field it left out (D-88).
+            // and a partial descriptor took defaults for every field it left out.
             super.defineOwnProperty(cx, id, getOwnPropertyDescriptor(cx, id)!!, false)
         }
         super.defineOwnProperty(cx, id, desc, checkValid)

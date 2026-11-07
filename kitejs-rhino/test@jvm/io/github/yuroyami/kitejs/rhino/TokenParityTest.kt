@@ -72,7 +72,7 @@ class TokenParityTest {
             "DOTDOTDOT" to (Token.DOTDOTDOT to RhinoToken.DOTDOTDOT),
             "NULLISH_COALESCING" to (Token.NULLISH_COALESCING to RhinoToken.NULLISH_COALESCING),
             "QUESTION_DOT" to (Token.QUESTION_DOT to RhinoToken.QUESTION_DOT),
-            // The port's own tokens for class syntax (D-95) start where upstream's list ends.
+            // The port's own tokens for class syntax start where upstream's list ends.
             "LAST_TOKEN" to (Token.CLASS to RhinoToken.LAST_TOKEN),
         )
         for ((name, values) in pairs) {

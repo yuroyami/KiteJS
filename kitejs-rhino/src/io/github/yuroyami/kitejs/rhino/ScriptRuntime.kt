@@ -205,7 +205,7 @@ public object ScriptRuntime {
      * Type sentinels for the getDefaultValue hint and the runtime's type tests.
      *
      * KMP: upstream looks these up reflectively by name and compares java.lang.Class objects. They
-     * are only ever compared by identity, so KClass values map exactly (D-20).
+     * are only ever compared by identity, so KClass values map exactly.
      */
     public val BooleanClass: KClass<*> = Boolean::class
     public val StringClass: KClass<*> = String::class
@@ -640,7 +640,7 @@ public object ScriptRuntime {
 
     /**
      * KMP: upstream puts the Java class name in the message. There is no `Class.getName` in common
-     * Kotlin, so this uses the simple name (D-23).
+     * Kotlin, so this uses the simple name.
      */
     private fun errorWithClassName(msg: String, value: Any): RuntimeException =
         Context.reportRuntimeErrorById(msg, value::class.simpleName ?: "?")
@@ -1004,7 +1004,7 @@ public object ScriptRuntime {
      * CanonicalNumericIndexString (ECMAScript 2024, 7.1.21): the number a property name spells
      * exactly, or null. A typed array owns every such name, and only a valid index among them is an
      * element. "-0" is negative zero and "NaN" is NaN, both of them numeric names that are never a
-     * valid index; upstream answered -Infinity for the first and null for the second (D-88).
+     * valid index; upstream answered -Infinity for the first and null for the second.
      */
     public fun canonicalNumericIndexString(arg: String): Double? {
         if ("-0" == arg) return -0.0
@@ -1419,7 +1419,7 @@ public object ScriptRuntime {
 
     public fun initSafeStandardObjects(cx: Context, scopeIn: ScriptableObject?, sealed: Boolean): ScriptableObject {
         // A TopLevel when none is given, as the doc of Context.initStandardObjects says; upstream
-        // made a plain object (D-94).
+        // made a plain object.
         val scope = scopeIn ?: TopLevel()
         TopLevel.clearIntrinsics(scope)
         scope.put("global", scope, scope)
@@ -1502,8 +1502,8 @@ public object ScriptRuntime {
 
         // The intrinsics are cached for every global object, a TopLevel or not, and GeneratorFunction
         // is built along with them. Upstream did both for a TopLevel only, so in a plain scope
-        // every generator function had a null prototype and no call, apply or bind (D-79), and a
-        // replaced global changed what the engine made (D-94).
+        // every generator function had a null prototype and no call, apply or bind, and a
+        // replaced global changed what the engine made.
         TopLevel.cacheIntrinsics(scope, sealed)
         return scope
     }
@@ -1513,7 +1513,7 @@ public object ScriptRuntime {
     /**
      * The regexp engine, built on first use. Upstream discovers it through a service loader so the
      * regexp package can be left out of a build; there is one implementation here and no service
-     * loader in common Kotlin, so it is simply constructed (D-44).
+     * loader in common Kotlin, so it is simply constructed.
      */
     public fun getRegExpProxy(cx: Context): RegExpProxy? {
         var proxy = cx.regExpProxy
@@ -1556,7 +1556,7 @@ public object ScriptRuntime {
     public fun wrapInt(i: Int): Int = i
 
     /**
-     * `value is Int` that stays true to its name on Kotlin/JS (D-32), where every number passes the
+     * `value is Int` that stays true to its name on Kotlin/JS, where every number passes the
      * `is Int` check. The extra test is free on the JVM, where an Int is always a whole number.
      */
     public fun isInt(value: Any?): Boolean {
@@ -1569,7 +1569,7 @@ public object ScriptRuntime {
 
     /**
      * A number or a bigint, read as a double. This is what upstream got for free from
-     * `Number.doubleValue()` before bigints stopped being [Number] (D-54).
+     * `Number.doubleValue()` before bigints stopped being [Number].
      */
     public fun numericToDouble(value: Any?): Double = when (value) {
         is Double -> value
@@ -1579,7 +1579,7 @@ public object ScriptRuntime {
         else -> toNumber(value)
     }
 
-    /** ToNumeric: a number or a bigint. Not `Number`, because a bigint is not one (D-54). */
+    /** ToNumeric: a number or a bigint. Not `Number`, because a bigint is not one. */
     public fun toNumeric(value: Any?): Any {
         val v = toPrimitive(value, NumberClass)
         if (v is Number || v is KBigInt) return v
@@ -1596,7 +1596,7 @@ public object ScriptRuntime {
         val v = toPrimitive(value, NumberClass)
         if (v is KBigInt) return v
         // A Number is a TypeError here, even an integral one. Upstream converts it the way
-        // BigInt() does, which lets `1` into a BigInt64Array and into BigInt.asIntN (D-84).
+        // BigInt() does, which lets `1` into a BigInt64Array and into BigInt.asIntN.
         if (v == null || Undefined.isUndefined(v) || v is Number) throw typeErrorById("msg.cant.convert.to.bigint", toString(v))
         if (v is CharSequence) return toBigInt(v.toString())
         if (v is Boolean) return if (v) KBigInt.ONE else KBigInt.ZERO
@@ -1974,7 +1974,7 @@ public object ScriptRuntime {
      * and is asked OrdinaryHasInstance. Upstream asked a function its prototype chain whatever it
      * defined, answered false for a primitive before looking, passed an object's method the
      * target itself in place of [a], and passed over a `Symbol.hasInstance` that was not callable
-     * (D-92).
+     *.
      */
     public fun instanceOf(a: Any?, b: Any?, cx: Context): Boolean {
         if (b !is Scriptable || isSymbol(b)) throw typeErrorById("msg.instanceof.not.object")
@@ -2436,7 +2436,7 @@ public object ScriptRuntime {
     /**
      * ECMAScript 2015, 8.1.1.1.5: assigning to an immutable binding is a TypeError whatever the
      * mode. Upstream lets it pass silently outside strict mode, and in strict code run by `eval`
-     * (D-71). The message is the one upstream's strict mode gives for the same write.
+     *. The message is the one upstream's strict mode gives for the same write.
      */
     private fun checkNotConstBinding(bound: Scriptable, id: String) {
         if (isConstBinding(bound, id)) throw constAssignError(id)
@@ -2455,7 +2455,7 @@ public object ScriptRuntime {
 
     /**
      * Binds a const that a loop declares, on each pass: ECMAScript 2015, 13.7.5.13 gives every
-     * iteration a binding of its own, so the value from an earlier pass must not stand (D-72).
+     * iteration a binding of its own, so the value from an earlier pass must not stand.
      */
     internal fun initConst(bound: Scriptable, value: Any?, id: String): Any? {
         if (bound is ScriptableObject) bound.initConstBinding(id, value) else bound.put(id, bound, value)
@@ -2562,7 +2562,7 @@ public object ScriptRuntime {
      * 8.1.1.2.1): the object has the property and its @@unscopables does not block the name.
      * Upstream read the property instead and took anything but NOT_FOUND as a binding, which a
      * proxy answering undefined for a missing name defeats, and never looked at @@unscopables,
-     * so `with ([]) { keys }` found Array.prototype.keys (D-89). Catch and block scopes sit behind
+     * so `with ([]) { keys }` found Array.prototype.keys. Catch and block scopes sit behind
      * a NativeWith too, but their binding objects have no prototype and no @@unscopables, so for
      * them the check is one missed lookup.
      */
@@ -2794,7 +2794,7 @@ public object ScriptRuntime {
     /**
      * Compiles and runs eval code, which is strict when [strictCaller] is or when it starts with
      * its own directive. An indirect `eval` passes false, as no caller makes global code strict;
-     * upstream compiled it strict whenever the code calling it was (D-80).
+     * upstream compiled it strict whenever the code calling it was.
      */
     internal fun performEval(cx: Context, scope: Scriptable, thisArg: Any?, args: Array<Any?>, filenameIn: String?, lineNumberIn: Int, strictCaller: Boolean): Any? {
         if (args.isEmpty()) return Undefined.instance
@@ -2851,7 +2851,7 @@ public object ScriptRuntime {
         do {
             if (cx.useDynamicScope && scopeChain!!.parentScope == null) scopeChain = checkDynamicScope(cx.topCallScope!!, scopeChain)
             if (scopeChain is NativeWith) {
-                // A `with` object holds the name only when HasBinding says so (D-89).
+                // A `with` object holds the name only when HasBinding says so.
                 val withObj = scopeChain.prototype!!
                 if (scopeHasBinding(scopeChain, id)) {
                     value = withGetBindingValue(cx, withObj, id)

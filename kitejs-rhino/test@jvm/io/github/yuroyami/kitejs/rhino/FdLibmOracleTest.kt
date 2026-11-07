@@ -12,7 +12,7 @@ import kotlin.test.assertEquals
  * The port of fdlibm against the JVM's StrictMath, which is fdlibm 5.3: the specification of
  * StrictMath requires its results, and JDK 21 computes them with a Java port of the same C
  * sources. Every answer has to match to the bit, which is the whole point of having the port
- * (D-73): `Math` on the JVM, JavaScript's functions and the native libm each round a few
+ *: `Math` on the JVM, JavaScript's functions and the native libm each round a few
  * arguments differently.
  *
  * The port follows V8 where V8 left fdlibm 5.3, and the oracles below say so: `exp(1)` is

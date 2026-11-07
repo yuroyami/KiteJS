@@ -75,7 +75,7 @@ import io.github.yuroyami.kitejs.rhino.ast.Yield
  * jump table plus labels, comprehensions become nested loops, and destructuring becomes a chain of
  * plain assignments.
  *
- * KMP: the E4X transforms are not ported, following D-16.
+ * KMP: the E4X transforms are not ported, because E4X is out of scope.
  */
 public class IRFactory(
     env: CompilerEnvirons,
@@ -561,7 +561,7 @@ public class IRFactory(
             if (loop.initializer!!.type == Token.LET && parser.compilerEnv.languageVersion >= Context.VERSION_ES6) {
                 loop.iterationBindings = loop.symbolTable?.values?.filter { it.declType == Token.LET }?.map { it.name!! }
             }
-            // The names a const head destructures belong to the loop as well (D-72).
+            // The names a const head destructures belong to the loop as well.
             val savedBlockScopedConst = parser.blockScopedConst
             parser.blockScopedConst = loop.initializer!!.type == Token.CONST
             val init = try {
@@ -1295,7 +1295,7 @@ public class IRFactory(
     private fun transformUnary(node: UnaryExpression): Node {
         val type = node.type
         if (type == Token.DEFAULTNAMESPACE) {
-            // KMP: E4X is out of scope (D-16).
+            // KMP: E4X is out of scope.
             parser.reportError("msg.XML.not.available")
             return node
         }
@@ -1332,7 +1332,7 @@ public class IRFactory(
                     node.addChildToBack(left)
                 } else {
                     astNodePos.push(v)
-                    // The names a block's const destructures belong to the block too (D-74).
+                    // The names a block's const destructures belong to the block too.
                     val freshConst = node.getIntProp(Node.FRESH_CONST_PROP, 0) == 1
                     val savedBlockScopedConst = parser.blockScopedConst
                     if (freshConst) parser.blockScopedConst = true
@@ -1478,7 +1478,7 @@ public class IRFactory(
             // A let or const the head declares gets a binding of its own on every pass, so a
             // closure made in the body keeps the value of its own iteration (ECMAScript 2015,
             // 13.7.5.13). The names move from the loop into a block around the body, which
-            // becomes a fresh scope each time the body is entered (D-72).
+            // becomes a fresh scope each time the body is entered.
             // A comprehension passes LET with a plain name, which this leaves as it was.
             val declares = lhs.type == Token.LET || lhs.type == Token.CONST
             val iterationScope =
@@ -1500,7 +1500,7 @@ public class IRFactory(
                 } else {
                     parser.reportError("msg.bad.for.in.lhs")
                     // KMP: upstream returns null here and the caller dereferences it. Unwinding
-                    // instead abandons the subtree cleanly in IDE mode (D-19).
+                    // instead abandons the subtree cleanly in IDE mode.
                     throw Parser.ParserException()
                 }
             } else if (type == Token.ARRAYLIT || type == Token.OBJECTLIT) {
@@ -1766,7 +1766,7 @@ public class IRFactory(
      * `this.eval(src)` or `other.eval(src)` is an indirect one that runs in the global scope of
      * the eval function's realm. Upstream also made a direct eval of a property call named eval
      * on a global object, which let `this.eval('x')` in a sloppy function read the function's
-     * locals and made another realm's eval run in the caller's realm (D-91).
+     * locals and made another realm's eval run in the caller's realm.
      */
     private fun createCallOrNew(nodeType: Int, child: Node): Node {
         var type = Node.NON_SPECIALCALL
@@ -1905,7 +1905,7 @@ public class IRFactory(
                 ) {
                     // ES2021, 13.15.2: a logical assignment writes only when it does not short
                     // circuit, so `a ||= b` is `a || (a = b)`. Upstream writes either way, which
-                    // a const notices once a write to it throws (D-71).
+                    // a const notices once a write to it throws.
                     val write = Node(Token.SETNAME, Node.newString(Token.BINDNAME, lhs.string!!), right)
                     return propagateSuperFromLhs(Node(assignOp, lhs, write), lhs)
                 }
@@ -2108,7 +2108,7 @@ public class IRFactory(
             }
         }
 
-        /** Marks every const store under [node] as one that binds afresh on each pass (D-72). */
+        /** Marks every const store under [node] as one that binds afresh on each pass. */
         private fun markFreshConsts(node: Node) {
             if (node.type == Token.SETCONST) node.putIntProp(Node.FRESH_CONST_PROP, 1)
             var child = node.firstChild
@@ -2121,7 +2121,7 @@ public class IRFactory(
         private fun createFor(loop: Scope, init: Node, test: Node, incr: Node, body: Node): Node {
             if (init.type == Token.CONST) {
                 // for (const i = s; ...): the const belongs to a block around the loop, and is
-                // bound afresh each time the loop starts (D-72).
+                // bound afresh each time the loop starts.
                 val block = Scope.splitScope(loop)
                 loop.parentScope = block
                 init.putIntProp(Node.FRESH_CONST_PROP, 1)

@@ -17,7 +17,7 @@ import org.mozilla.javascript.Scriptable as UScriptable
  *
  * The point is not a pass rate. It is that the port passes every file upstream passes. A test both
  * engines fail is fine and expected: upstream has no modules either. A test the port fails and
- * upstream passes is either a bug to fix or a ledger entry. A test the port passes and upstream
+ * upstream passes is either a bug to fix or an entry in [knownDifferences]. A test the port passes and upstream
  * fails is a fix the port carries: it goes to `improvements.txt` and does not fail the run.
  *
  * The suite is fetched by `tools/fetch-test262.sh` at the commit upstream pins. This dedicated
@@ -33,7 +33,7 @@ class Test262ParityTest {
     private val propertiesFile = File("testResources@jvm/test262.properties")
 
     /**
-     * Upstream's list, except default arguments (D-116), resizable buffers (#114),
+     * Upstream's list, except default arguments, resizable buffers (#114),
      * `SharedArrayBuffer` and `Atomics` (#72), which this port implements.
      */
     private val unsupportedFeatures = setOf(
@@ -44,8 +44,8 @@ class Test262ParityTest {
     )
 
     /**
-     * Folders upstream's properties file skips whole because upstream has no class syntax (D-95),
-     * no async functions (D-97), no async generators (#91), no WeakRef or FinalizationRegistry
+     * Folders upstream's properties file skips whole because upstream has no class syntax,
+     * no async functions, no async generators (#91), no WeakRef or FinalizationRegistry
      * (#89) and no SharedArrayBuffer or Atomics (#72), which the port runs anyway.
      * Upstream fails to parse almost every file in them, so they mostly add to the port's own
      * outcomes and to the cannot-parse list.
@@ -91,8 +91,8 @@ class Test262ParityTest {
     )
 
     /**
-     * Files where the two engines are known to disagree, with the reason. Each one is a ledger
-     * entry, and each is asserted to still differ: if upstream changes, the entry goes stale and
+     * Files where the two engines are known to disagree, with the reason in words. Each one is
+     * asserted to still differ: if upstream changes, the entry goes stale and
      * this test says so rather than quietly passing.
      */
     private val knownDifferences = buildMap {
@@ -329,13 +329,13 @@ class Test262ParityTest {
             "language/statements/switch/scope-lex-open-case.js",
             "language/statements/switch/scope-lex-open-dflt.js",
         )) {
-            put(path, "D-120: block functions initialize lexically and eligible Annex B copies occur at their declarations here")
+            put(path, "block functions initialize lexically and eligible Annex B copies occur at their declarations here")
         }
         for (path in listOf(
             "built-ins/Object/defineProperty/15.2.3.6-4-254.js",
             "built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-4-250.js",
         )) {
-            put(path, "D-119: setter-only own-property descriptors include get: undefined here")
+            put(path, "setter-only own-property descriptors include get: undefined here")
         }
         for (path in listOf(
             "built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-4-212.js",
@@ -343,13 +343,13 @@ class Test262ParityTest {
             "built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-4-214.js",
             "built-ins/Object/getOwnPropertyDescriptor/15.2.3.3-4-215.js",
         )) {
-            put(path, "D-102: RegExp prototype properties are configurable accessors here")
+            put(path, "RegExp prototype properties are configurable accessors here")
         }
         for (path in listOf(
             "built-ins/Object/prototype/valueOf/S15.2.4.4_A14.js",
             "built-ins/Object/prototype/valueOf/S15.2.4.4_A15.js",
         )) {
-            put(path, "D-117: ToObject rejects an undefined call receiver here")
+            put(path, "ToObject rejects an undefined call receiver here")
         }
         for (path in listOf(
             "built-ins/Function/prototype/arguments/prop-desc.js",
@@ -357,18 +357,18 @@ class Test262ParityTest {
             "built-ins/Function/prototype/caller-arguments/accessor-properties.js",
             "built-ins/Function/prototype/caller/prop-desc.js",
         )) {
-            put(path, "D-109: modern restricted properties share the realm thrower here")
+            put(path, "modern restricted properties share the realm thrower here")
         }
         for (path in listOf(
             "built-ins/Function/call-bind-this-realm-undef.js",
         )) {
-            put(path, "D-112: sloppy calls use the callee's own global here")
+            put(path, "sloppy calls use the callee's own global here")
         }
         for (path in listOf(
             "built-ins/Function/prototype/apply/argarray-not-object-realm.js",
             "built-ins/Function/prototype/apply/this-not-callable-realm.js",
         )) {
-            put(path, "D-117: apply validation errors use the built-in execution realm here")
+            put(path, "apply validation errors use the built-in execution realm here")
         }
         for (path in listOf(
             "language/expressions/arrow-function/ArrowFunction_restricted-properties.js",
@@ -395,7 +395,7 @@ class Test262ParityTest {
             "language/statements/generators/forbidden-ext/b1/gen-func-decl-forbidden-ext-direct-access-prop-arguments.js",
             "language/statements/generators/restricted-properties.js",
         )) {
-            put(path, "D-109: modern function restrictions use the realm thrower here")
+            put(path, "modern function restrictions use the realm thrower here")
         }
         for (path in listOf(
             "language/eval-code/direct/block-decl-eval-source-is-strict-nostrict.js",
@@ -443,7 +443,7 @@ class Test262ParityTest {
             "language/statements/generators/eval-var-scope-syntax-err.js",
             "language/statements/generators/scope-body-lex-distinct.js",
         )) {
-            put(path, "D-115: eval isolates declarations and validates intervening lexical and global conflicts here")
+            put(path, "eval isolates declarations and validates intervening lexical and global conflicts here")
         }
         for (path in listOf(
             "language/eval-code/direct/arrow-fn-a-following-parameter-is-named-arguments-arrow-func-declare-arguments-assign-incl-def-param-arrow-arguments.js",
@@ -590,13 +590,13 @@ class Test262ParityTest {
             "language/statements/generators/dstr/obj-ptrn-prop-obj-value-undef.js",
             "language/statements/generators/scope-paramsbody-var-open.js",
         )) {
-            put(path, "D-116: sequential parameter initialization precedes body declarations and generator creation here")
+            put(path, "sequential parameter initialization precedes body declarations and generator creation here")
         }
         for (path in listOf(
             "language/expressions/function/param-dflt-yield-strict.js",
             "language/statements/function/param-dflt-yield-strict.js",
         )) {
-            put(path, "D-86: yield is reserved in strict parameter initializers here")
+            put(path, "yield is reserved in strict parameter initializers here")
         }
         for (path in listOf(
             "built-ins/Object/defineProperties/15.2.3.7-6-a-164.js",
@@ -604,15 +604,15 @@ class Test262ParityTest {
             "built-ins/Object/defineProperties/15.2.3.7-6-a-175.js",
             "built-ins/Object/defineProperties/15.2.3.7-6-a-176.js",
         )) {
-            put(path, "D-114: ArraySetLength restores length and read-only attributes after refusal here")
+            put(path, "ArraySetLength restores length and read-only attributes after refusal here")
         }
         put("built-ins/Array/length/define-own-prop-length-coercion-order-set.js",
-            "D-114: array length converts through ToUint32 before ToNumber here")
+            "array length converts through ToUint32 before ToNumber here")
         for (path in listOf(
             "built-ins/Object/defineProperty/15.2.3.6-4-168.js",
             "built-ins/Object/defineProperty/15.2.3.6-4-169.js",
         )) {
-            put(path, "D-114: ArraySetLength stops at a refused deletion and restores length here")
+            put(path, "ArraySetLength stops at a refused deletion and restores length here")
         }
         for (path in listOf(
             "built-ins/Array/prototype/concat/create-proxy.js",
@@ -642,41 +642,41 @@ class Test262ParityTest {
             "built-ins/Array/prototype/unshift/set-length-array-length-is-non-writable.js",
             "built-ins/Array/prototype/unshift/set-length-zero-array-length-is-non-writable.js",
         )) {
-            put(path, "D-114: array mutations and species definitions report refused writes and deletions here")
+            put(path, "array mutations and species definitions report refused writes and deletions here")
         }
         for (initializers in listOf("with-initialisers", "without-initialisers")) {
             for (position in listOf("if-expression-statement-else-statement", "if-expression-statement", "label-statement")) {
                 put("language/statements/let/syntax/$initializers-in-statement-positions-$position.js",
-                    "D-113: lexical declarations are rejected in Statement-only contexts here")
+                    "lexical declarations are rejected in Statement-only contexts here")
             }
         }
         put("built-ins/Array/prototype/methods-called-as-functions.js",
-            "D-112: extracted array methods receive undefined here")
+            "extracted array methods receive undefined here")
         for (path in listOf(
             "built-ins/Promise/reject/capability-invocation.js",
             "built-ins/Promise/resolve/resolve-from-promise-capability.js",
         )) {
-            put(path, "D-112: Promise callbacks bind this using the callee's own strictness here")
+            put(path, "Promise callbacks bind this using the callee's own strictness here")
         }
         for (path in listOf(
             "built-ins/TypedArray/prototype/subarray/infinity.js",
             "built-ins/TypedArray/prototype/subarray/BigInt/infinity.js",
         )) {
-            put(path, "D-58: subarray clamps infinite indices here; upstream fails")
+            put(path, "subarray clamps infinite indices here; upstream fails")
         }
         for (number in listOf(62, 63, 64, 65, 76, 77, 78)) {
             for (suffix in listOf("-s", "gs")) {
                 put("language/function-code/10.4.3-1-$number$suffix.js",
-                    "D-112: bare calls preserve undefined for strict callees here")
+                    "bare calls preserve undefined for strict callees here")
             }
         }
         put("built-ins/ThrowTypeError/unique-per-realm-function-proto.js",
-            "D-109: Function.prototype restrictions share the realm intrinsic here")
+            "Function.prototype restrictions share the realm intrinsic here")
         // The test expects a sloppy function's caller to be undefined or the calling function.
         for (number in 2..3) {
             put("language/arguments-object/10.6-13-a-$number.js", "#87: a sloppy function's caller is always null here")
         }
-        // D-111: iterable/array-like dispatch and validation follow ECMAScript here.
+        // Iterable/array-like dispatch and validation follow ECMAScript here.
         for (path in listOf(
             "built-ins/TypedArrayConstructors/ctors-bigint/length-arg/is-infinity-throws-rangeerror.js",
             "built-ins/TypedArrayConstructors/ctors-bigint/length-arg/is-negative-integer-throws-rangeerror.js",
@@ -720,23 +720,23 @@ class Test262ParityTest {
             "built-ins/TypedArrayConstructors/from/BigInt/mapfn-this-without-thisarg-non-strict.js",
             "built-ins/TypedArrayConstructors/from/mapfn-this-without-thisarg-non-strict.js",
         )) {
-            put(path, "D-111: typed array construction/from observe input contracts here; upstream fails")
+            put(path, "typed array construction/from observe input contracts here; upstream fails")
         }
 
-        // ES6 for-in patterns destructure key strings instead of legacy key/value pairs (D-105).
+        // ES6 for-in patterns destructure key strings instead of legacy key/value pairs.
         for (path in listOf("head-var-bound-names-dup.js", "scope-body-lex-close.js")) {
-            put("language/statements/for-in/$path", "D-105: for-in destructures the key here")
+            put("language/statements/for-in/$path", "for-in destructures the key here")
         }
 
         // The port accepts identifier characters upstream rejects. Upstream asks the JDK's
         // Character.isJavaIdentifierStart, which is Java's rule and not JavaScript's; the port
-        // uses its own generated ID_Start tables (D-43, D-57). The port is the correct one.
+        // uses its own generated ID_Start tables. The port is the correct one.
         for (version in listOf("5.2.0", "6.1.0", "7.0.0", "8.0.0", "11.0.0", "13.0.0", "15.0.0")) {
-            put("language/identifiers/start-unicode-$version.js", "D-57: the port follows ID_Start, upstream follows Java identifiers")
+            put("language/identifiers/start-unicode-$version.js", "the port follows ID_Start, upstream follows Java identifiers")
         }
 
         // Tests upstream fails and the port passes. Nothing to fix here, but they are pinned so
-        // that an upstream fix shows up as a stale entry rather than as silence (D-58).
+        // that an upstream fix shows up as a stale entry rather than as silence.
         for (path in listOf(
             "built-ins/Proxy/construct/call-parameters.js",
             "built-ins/TypedArray/prototype/set/BigInt/bigint-tobiguint64.js",
@@ -750,21 +750,21 @@ class Test262ParityTest {
             // test that copies between two views over one buffer only passes here.
             "built-ins/TypedArray/prototype/set/typedarray-arg-set-values-same-buffer-other-type.js",
         )) {
-            put(path, "D-58: upstream fails this and the port passes it")
+            put(path, "upstream fails this and the port passes it")
         }
 
         // Upstream's getOwnPropertyDescriptor trap reads the target descriptor without a null
-        // check and throws a NullPointerException. The port answers undefined (D-50).
+        // check and throws a NullPointerException. The port answers undefined.
         for (path in listOf(
             "built-ins/Object/getOwnPropertyDescriptors/proxy-undefined-descriptor.js",
             "built-ins/Proxy/getOwnPropertyDescriptor/result-is-undefined-targetdesc-is-undefined.js",
             "built-ins/Proxy/getOwnPropertyDescriptor/trap-is-null-target-is-proxy.js",
         )) {
-            put(path, "D-50: upstream crashes where the port answers undefined")
+            put(path, "upstream crashes where the port answers undefined")
         }
 
         // A let or const loop head gives each iteration a binding of its own here. Upstream shares
-        // one binding across the loop, so a closure made in the body sees the last value (D-72).
+        // one binding across the loop, so a closure made in the body sees the last value.
         for (path in listOf(
             "language/block-scope/syntax/for-in/mixed-values-in-iteration.js",
             "language/statements/for-in/head-let-fresh-binding-per-iteration.js",
@@ -772,12 +772,12 @@ class Test262ParityTest {
             "language/statements/for-of/head-let-fresh-binding-per-iteration.js",
             "language/statements/for-of/scope-body-lex-boundary.js",
         )) {
-            put(path, "D-72: each iteration of a let or const loop head binds afresh here")
+            put(path, "each iteration of a let or const loop head binds afresh here")
         }
 
         // A function declaration, labelled or not, as the body of a loop, a with or an if is an
         // early SyntaxError here, and a labelled generator or one in strict code too. Upstream
-        // accepts them all (D-76).
+        // accepts them all.
         for (path in listOf(
             "language/block-scope/syntax/function-declarations/in-statement-position-do-statement-while-expression.js",
             "language/block-scope/syntax/function-declarations/in-statement-position-for-statement.js",
@@ -825,12 +825,12 @@ class Test262ParityTest {
             "language/statements/with/decl-fun.js",
             "language/statements/with/decl-gen.js",
         )) {
-            put(path, "D-76: a function declaration as a statement body is an early error here")
+            put(path, "a function declaration as a statement body is an early error here")
         }
 
         // An accessor defined with `set: undefined` has no setter, so a strict write to it throws
         // here. Upstream calls the empty setter and drops the write, so these strict-only files
-        // fail there (D-78).
+        // fail there.
         for (path in buildList {
             add("language/expressions/assignment/11.13.1-2-s.js")
             for (n in 34..44) add("language/expressions/compound-assignment/11.13.2-$n-s.js")
@@ -839,34 +839,34 @@ class Test262ParityTest {
                 add("language/expressions/logical-assignment/lgcl-$op-assignment-operator-no-set-put.js")
             }
         }) {
-            put(path, "D-78: a strict write to an accessor with set: undefined throws here")
+            put(path, "a strict write to an accessor with set: undefined throws here")
         }
 
         // A const in a block is bound afresh each time here, so the harness that parses native
         // function source, which declares consts in its loops, now works, and the tests that use
-        // it pass. Upstream keeps the first pass's value and its copy of the harness fails (D-74).
+        // it pass. Upstream keeps the first pass's value and its copy of the harness fails.
         for (path in listOf(
             "harness/nativeFunctionMatcher.js",
             "built-ins/Function/prototype/toString/bound-function.js",
             "built-ins/Function/prototype/toString/symbol-named-builtins.js",
         )) {
-            put(path, "D-74: a const in a loop body binds afresh here, so the harness runs")
+            put(path, "a const in a loop body binds afresh here, so the harness runs")
         }
 
         // Math is fdlibm here, as V8 has it. Upstream computes log2 as log(x) * LOG2E, which is a
-        // unit off for powers of two: Math.log2(8) is 2.9999999999999996 (D-73).
-        put("built-ins/Math/log2/log2-basicTests.js", "D-73: log2 is fdlibm's here and exact for powers of two")
+        // unit off for powers of two: Math.log2(8) is 2.9999999999999996.
+        put("built-ins/Math/log2/log2-basicTests.js", "log2 is fdlibm's here and exact for powers of two")
 
         // toReversed and toSorted validate their receiver, and with converts a bigint view's
-        // replacement with ToBigInt. Upstream does neither (D-83).
+        // replacement with ToBigInt. Upstream does neither.
         for (path in listOf(
             "built-ins/TypedArray/prototype/toReversed/this-value-invalid.js",
             "built-ins/TypedArray/prototype/toSorted/this-value-invalid.js",
             "built-ins/TypedArray/prototype/with/BigInt/early-type-coercion-bigint.js",
         )) {
-            put(path, "D-83: the ES2023 typed array methods validate and convert as the spec says here")
+            put(path, "the ES2023 typed array methods validate and convert as the spec says here")
         }
-        // ToBigInt turns a Number away here. Upstream converts it the way BigInt() does (D-84).
+        // ToBigInt turns a Number away here. Upstream converts it the way BigInt() does.
         for (path in listOf(
             "built-ins/TypedArray/prototype/set/BigInt/number-tobigint.js",
             "built-ins/TypedArrayConstructors/ctors-bigint/object-arg/number-tobigint.js",
@@ -874,18 +874,18 @@ class Test262ParityTest {
             "built-ins/TypedArrayConstructors/ctors-bigint/typedarray-arg/src-typedarray-not-big-throws.js",
             "built-ins/TypedArrayConstructors/internals/Set/BigInt/number-tobigint.js",
         )) {
-            put(path, "D-84: a Number written into a bigint view is a TypeError here")
+            put(path, "a Number written into a bigint view is a TypeError here")
         }
-        // set puts a primitive source through ToObject here; upstream demands an object (D-86).
+        // set puts a primitive source through ToObject here; upstream demands an object.
         for (path in listOf(
             "built-ins/TypedArray/prototype/set/array-arg-primitive-toobject.js",
             "built-ins/TypedArray/prototype/set/BigInt/array-arg-primitive-toobject.js",
         )) {
-            put(path, "D-86: TypedArray set takes any array-like here")
+            put(path, "TypedArray set takes any array-like here")
         }
 
         // Typed arrays are integer-indexed exotic objects here: every canonical numeric key stays on the
-        // element path, elements have descriptors and own keys, and a write converts first (D-88).
+        // element path, elements have descriptors and own keys, and a write converts first.
         for (path in listOf(
             "built-ins/TypedArrayConstructors/internals/DefineOwnProperty/BigInt/key-is-not-canonical-index.js",
             "built-ins/TypedArrayConstructors/internals/DefineOwnProperty/BigInt/key-is-numericindex-accessor-desc-throws.js",
@@ -935,11 +935,11 @@ class Test262ParityTest {
             "built-ins/TypedArrayConstructors/internals/Set/tonumber-value-throws.js",
             "language/statements/with/set-mutable-binding-binding-deleted-with-typed-array-in-proto-chain.js",
         )) {
-            put(path, "D-88: typed arrays implement the integer-indexed exotic object methods here")
+            put(path, "typed arrays implement the integer-indexed exotic object methods here")
         }
         // Seal, freeze and defineProperty send partial descriptors through each object's own
         // [[DefineOwnProperty]], a refusal is a TypeError, and only the fields a descriptor has are
-        // compared (D-88).
+        // compared.
         for (path in listOf(
             "built-ins/Object/defineProperties/15.2.3.7-6-a-184.js",
             "built-ins/Object/defineProperties/15.2.3.7-6-a-185.js",
@@ -955,10 +955,10 @@ class Test262ParityTest {
             "built-ins/Proxy/defineProperty/trap-is-missing-target-is-proxy.js",
             "built-ins/Proxy/defineProperty/trap-is-undefined-target-is-proxy.js",
         )) {
-            put(path, "D-88: definitions use partial descriptors and a refusal throws here")
+            put(path, "definitions use partial descriptors and a refusal throws here")
         }
         // An arguments object gives a live argument its slot before a definition is checked, so a
-        // non-configurable or read-only argument keeps the mapping rules the spec gives it (D-88).
+        // non-configurable or read-only argument keeps the mapping rules the spec gives it.
         for (path in listOf(
             "language/arguments-object/mapped/mapped-arguments-nonconfigurable-3.js",
             "language/arguments-object/mapped/mapped-arguments-nonconfigurable-delete-1.js",
@@ -984,31 +984,31 @@ class Test262ParityTest {
             "language/arguments-object/mapped/nonwritable-nonenumerable-nonconfigurable-descriptors-set-by-arguments.js",
             "language/arguments-object/mapped/nonwritable-nonenumerable-nonconfigurable-descriptors-set-by-param.js",
         )) {
-            put(path, "D-88: arguments objects define their mapped properties as the spec says here")
+            put(path, "arguments objects define their mapped properties as the spec says here")
         }
 
-        // Date.prototype[Symbol.toPrimitive] is non-writable here and writable upstream (D-56).
+        // Date.prototype[Symbol.toPrimitive] is non-writable here and writable upstream.
         put(
             "built-ins/Date/prototype/Symbol.toPrimitive/prop-desc.js",
-            "D-56: the port makes the property non-writable, as the spec asks",
+            "the port makes the property non-writable, as the spec asks",
         )
 
         // The two places the port is the weaker one, both for want of Unicode data that common
-        // Kotlin has none of: there is no normalizer (D-38) and no collation (D-37).
+        // Kotlin has none of: there is no normalizer and no collation.
         for (path in listOf(
             "built-ins/String/prototype/normalize/return-normalized-string.js",
             "built-ins/String/prototype/normalize/return-normalized-string-from-coerced-form.js",
             "built-ins/String/prototype/normalize/return-normalized-string-using-default-parameter.js",
         )) {
-            put(path, "D-38: there is no Unicode normalizer in common Kotlin, so normalize returns its input")
+            put(path, "there is no Unicode normalizer in common Kotlin, so normalize returns its input")
         }
         put(
             "built-ins/String/prototype/localeCompare/15.5.4.9_CE.js",
-            "D-37: there is no collation data, so localeCompare falls back to code unit order",
+            "there is no collation data, so localeCompare falls back to code unit order",
         )
 
         // Reflect.get, set, deleteProperty and defineProperty run the target's own internal methods
-        // with the caller's receiver, convert the key first and report a refusal as false (D-89).
+        // with the caller's receiver, convert the key first and report a refusal as false.
         for (path in listOf(
             "built-ins/Reflect/defineProperty/return-abrupt-from-property-key.js",
             "built-ins/Reflect/deleteProperty/return-abrupt-from-result.js",
@@ -1020,12 +1020,12 @@ class Test262ParityTest {
             "built-ins/Reflect/set/return-false-if-receiver-is-not-writable.js",
             "built-ins/Reflect/set/return-false-if-target-is-not-writable.js",
         )) {
-            put(path, "D-89: Reflect follows the target's internal methods with the receiver here")
+            put(path, "Reflect follows the target's internal methods with the receiver here")
         }
 
         // Proxy traps get the receiver and their false answers count, a trapless proxy forwards with
         // itself as the receiver, and no `has` or `getPrototypeOf` trap is called that the spec
-        // never reaches (D-89).
+        // never reaches.
         for (path in listOf(
             "built-ins/Array/prototype/splice/property-traps-order-with-species.js",
             "built-ins/JSON/parse/reviver-array-define-prop-err.js",
@@ -1061,11 +1061,11 @@ class Test262ParityTest {
             "built-ins/Proxy/set/trap-is-null-target-is-proxy.js",
             "built-ins/Proxy/set/trap-is-undefined-target-is-proxy.js",
         )) {
-            put(path, "D-89: proxy traps receive the receiver and are believed when they refuse here")
+            put(path, "proxy traps receive the receiver and are believed when they refuse here")
         }
 
         // A typed array's [[Set]] reached through Reflect.set or a prototype chain keeps the element
-        // semantics only when the typed array is the receiver (D-89).
+        // semantics only when the typed array is the receiver.
         for (path in listOf(
             "built-ins/TypedArrayConstructors/internals/Set/BigInt/key-is-canonical-invalid-index-reflect-set.js",
             "built-ins/TypedArrayConstructors/internals/Set/BigInt/key-is-not-canonical-index.js",
@@ -1081,11 +1081,11 @@ class Test262ParityTest {
             "built-ins/TypedArrayConstructors/internals/Set/key-is-valid-index-prototype-chain-set.js",
             "built-ins/TypedArrayConstructors/internals/Set/key-is-valid-index-reflect-set.js",
         )) {
-            put(path, "D-89: a typed array's [[Set]] honours the receiver here")
+            put(path, "a typed array's [[Set]] honours the receiver here")
         }
 
         // A `with` object binds a name only when it has the property and its @@unscopables does not
-        // block it, and a binding deleted while that is read is undefined or a ReferenceError (D-89).
+        // block it, and a binding deleted while that is read is undefined or a ReferenceError.
         for (path in listOf(
             "language/expressions/arrow-function/unscopables-with-in-nested-fn.js",
             "language/expressions/arrow-function/unscopables-with.js",
@@ -1115,10 +1115,10 @@ class Test262ParityTest {
             "language/statements/with/unscopables-inc-dec.js",
             "language/statements/with/unscopables-prop-get-err.js",
         )) {
-            put(path, "D-89: with environments implement HasBinding and @@unscopables here")
+            put(path, "with environments implement HasBinding and @@unscopables here")
         }
 
-        // Strict code that assigns to a binding the right-hand side deleted is a ReferenceError (D-89).
+        // Strict code that assigns to a binding the right-hand side deleted is a ReferenceError.
         for (path in listOf(
             "language/expressions/assignment/assignment-operator-calls-putvalue-lref--rval--1.js",
             "language/expressions/assignment/assignment-operator-calls-putvalue-lref--rval-.js",
@@ -1145,11 +1145,11 @@ class Test262ParityTest {
             "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--9.js",
             "language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v-.js",
         )) {
-            put(path, "D-89: a strict write to a binding that disappeared is a ReferenceError here")
+            put(path, "a strict write to a binding that disappeared is a ReferenceError here")
         }
 
         // IsConstructor is true only for a function with [[Construct]], so a built-in method, an arrow,
-        // a method or a generator is no constructor and no newTarget (D-91).
+        // a method or a generator is no constructor and no newTarget.
         for (path in listOf(
             "annexB/built-ins/Date/prototype/getYear/not-a-constructor.js",
             "annexB/built-ins/Date/prototype/setYear/not-a-constructor.js",
@@ -1216,11 +1216,11 @@ class Test262ParityTest {
             "built-ins/RegExp/prototype/toString/not-a-constructor.js",
             "harness/isConstructor.js",
         )) {
-            put(path, "D-91: IsConstructor is exact here")
+            put(path, "IsConstructor is exact here")
         }
 
         // [[Construct]] takes a newTarget: the object gets newTarget's `prototype`, or the same intrinsic's
-        // prototype in newTarget's realm when that is not an object, and a proxy passes newTarget on (D-91).
+        // prototype in newTarget's realm when that is not an object, and a proxy passes newTarget on.
         for (path in listOf(
             "built-ins/AggregateError/proto-from-ctor-realm.js",
             "built-ins/Array/proto-from-ctor-realm-one.js",
@@ -1294,11 +1294,11 @@ class Test262ParityTest {
             "built-ins/WeakMap/proto-from-ctor-realm.js",
             "built-ins/WeakSet/proto-from-ctor-realm.js",
         )) {
-            put(path, "D-91: a constructor takes its prototype from newTarget here")
+            put(path, "a constructor takes its prototype from newTarget here")
         }
 
         // A proxy validates its getOwnPropertyDescriptor answer, believes its setPrototypeOf answer, and
-        // hands index keys to its traps as strings (D-91).
+        // hands index keys to its traps as strings.
         for (path in listOf(
             "built-ins/Proxy/getOwnPropertyDescriptor/resultdesc-is-invalid-descriptor.js",
             "built-ins/Proxy/getOwnPropertyDescriptor/resultdesc-is-not-configurable-not-writable-targetdesc-is-writable.js",
@@ -1315,11 +1315,11 @@ class Test262ParityTest {
             "built-ins/Proxy/setPrototypeOf/trap-is-missing-target-is-proxy.js",
             "built-ins/Proxy/setPrototypeOf/trap-is-null-target-is-proxy.js",
         )) {
-            put(path, "D-91: the proxy's internal methods follow the spec here")
+            put(path, "the proxy's internal methods follow the spec here")
         }
 
         // Keys come in [[OwnPropertyKeys]] order with every array index first, and enumeration asks
-        // [[GetOwnProperty]] for each key just before reading it (D-91).
+        // [[GetOwnProperty]] for each key just before reading it.
         for (path in listOf(
             "built-ins/Object/assign/assignment-to-readonly-property-of-target-must-throw-a-typeerror-exception.js",
             "built-ins/Object/assign/source-own-prop-error.js",
@@ -1338,11 +1338,11 @@ class Test262ParityTest {
             "language/expressions/object/object-spread-proxy-no-excluded-keys.js",
             "language/expressions/object/object-spread-proxy-ownkeys-returned-keys-order.js",
         )) {
-            put(path, "D-91: enumeration asks each key for its descriptor here")
+            put(path, "enumeration asks each key for its descriptor here")
         }
 
         // hasOwnProperty, Object.hasOwn and propertyIsEnumerable convert the key before `this`, and a
-        // ToPrimitive that answers a symbol finds the symbol property (D-91).
+        // ToPrimitive that answers a symbol finds the symbol property.
         for (path in listOf(
             "built-ins/Object/hasOwn/length.js",
             "built-ins/Object/hasOwn/symbol_property_toPrimitive.js",
@@ -1356,22 +1356,22 @@ class Test262ParityTest {
             "built-ins/Object/prototype/propertyIsEnumerable/symbol_property_toString.js",
             "built-ins/Object/prototype/propertyIsEnumerable/symbol_property_valueOf.js",
         )) {
-            put(path, "D-91: own-property checks convert the key first here")
+            put(path, "own-property checks convert the key first here")
         }
 
         // The __proto__ accessor and Object.setPrototypeOf go through [[SetPrototypeOf]], whose cycle walk
-        // stops at a proxy and which keeps Object.prototype's prototype null (D-91).
+        // stops at a proxy and which keeps Object.prototype's prototype null.
         for (path in listOf(
             "built-ins/Object/prototype/__proto__/get-to-obj-abrupt.js",
             "built-ins/Object/prototype/__proto__/set-cycle-shadowed.js",
             "built-ins/Object/prototype/setPrototypeOf-with-non-circular-values-__proto__.js",
             "built-ins/Object/prototype/setPrototypeOf-with-non-circular-values.js",
         )) {
-            put(path, "D-91: [[SetPrototypeOf]] follows the spec here")
+            put(path, "[[SetPrototypeOf]] follows the spec here")
         }
 
         // JSON.parse keeps -0 and internalizes with [[Get]], IsArray, CreateDataProperty and [[Delete]];
-        // JSON.stringify reads toJSON once, sees a proxy for an array as an array and passes string keys (D-91).
+        // JSON.stringify reads toJSON once, sees a proxy for an array as an array and passes string keys.
         for (path in listOf(
             "built-ins/JSON/parse/revived-proxy.js",
             "built-ins/JSON/parse/reviver-array-get-prop-from-prototype.js",
@@ -1391,19 +1391,19 @@ class Test262ParityTest {
             "built-ins/JSON/stringify/value-array-abrupt.js",
             "built-ins/JSON/stringify/value-array-proxy.js",
         )) {
-            put(path, "D-91: JSON follows SerializeJSONProperty and InternalizeJSONProperty here")
+            put(path, "JSON follows SerializeJSONProperty and InternalizeJSONProperty here")
         }
 
-        // Only a call to the name eval is a direct eval, so another realm's eval runs in that realm (D-91).
+        // Only a call to the name eval is a direct eval, so another realm's eval runs in that realm.
         for (path in listOf(
             "language/types/reference/get-value-prop-base-primitive-realm.js",
             "language/types/reference/put-value-prop-base-primitive-realm.js",
         )) {
-            put(path, "D-91: a property call of eval is an indirect eval here")
+            put(path, "a property call of eval is an indirect eval here")
         }
 
         // instanceof asks the target's Symbol.hasInstance, primitive left side and all, and throws
-        // for one that cannot be called (D-92).
+        // for one that cannot be called.
         for (path in listOf(
             "language/expressions/instanceof/S11.8.6_A6_T2.js",
             "language/expressions/instanceof/symbol-hasinstance-get-err.js",
@@ -1411,11 +1411,11 @@ class Test262ParityTest {
             "language/expressions/instanceof/symbol-hasinstance-not-callable.js",
             "language/expressions/instanceof/symbol-hasinstance-to-boolean.js",
         )) {
-            put(path, "D-92: instanceof is InstanceofOperator here")
+            put(path, "instanceof is InstanceofOperator here")
         }
 
         // The iterator prototypes inherit one %IteratorPrototype%, and the generator prototypes
-        // name each other (D-93).
+        // name each other.
         for (path in listOf(
             "built-ins/GeneratorFunction/prototype/prototype.js",
             "built-ins/GeneratorPrototype/constructor.js",
@@ -1424,18 +1424,18 @@ class Test262ParityTest {
             "built-ins/Iterator/prototype/Symbol.iterator/name.js",
             "built-ins/Iterator/prototype/Symbol.iterator/prop-desc.js",
         )) {
-            put(path, "D-93: the iterator prototypes inherit %IteratorPrototype% here")
+            put(path, "the iterator prototypes inherit %IteratorPrototype% here")
         }
 
-        // Class syntax runs here; upstream cannot parse it (D-95).
+        // Class syntax runs here; upstream cannot parse it.
         for (path in listOf(
             "language/statements/switch/scope-lex-class.js",
             "staging/sm/fields/bug1587574.js",
         )) {
-            put(path, "D-95: classes run here")
+            put(path, "classes run here")
         }
         // A method, getter or setter of an object literal keeps its source text from its name on,
-        // which upstream cuts short (D-95).
+        // which upstream cuts short.
         for (path in listOf(
             "built-ins/Function/prototype/toString/generator-method.js",
             "built-ins/Function/prototype/toString/getter-object.js",
@@ -1443,12 +1443,12 @@ class Test262ParityTest {
             "built-ins/Function/prototype/toString/method-object.js",
             "built-ins/Function/prototype/toString/setter-object.js",
         )) {
-            put(path, "D-95: a method's source text is the whole definition here")
+            put(path, "a method's source text is the whole definition here")
         }
         // A let conflicts with a var or function of its scope, with a var in a block inside it and
         // with a parameter, a var with the let, const, class or block function of every block it
         // hoists out of, and a catch parameter with a lexical name of its block; upstream lets them
-        // all through (D-95).
+        // all through.
         for (path in listOf(
             "language/block-scope/syntax/redeclaration/fn-scope-var-name-redeclaration-attempt-with-function.js",
             "language/block-scope/syntax/redeclaration/fn-scope-var-name-redeclaration-attempt-with-generator.js",
@@ -1483,17 +1483,17 @@ class Test262ParityTest {
             "language/statements/try/early-catch-function.js",
             "language/statements/try/early-catch-lex.js",
         )) {
-            put(path, "D-95: lexical declarations conflict with vars, functions and parameters here")
+            put(path, "lexical declarations conflict with vars, functions and parameters here")
         }
-        // A strict function has no own arguments property, which upstream gives every function (D-95).
+        // A strict function has no own arguments property, which upstream gives every function.
         for (path in listOf(
             "language/expressions/function/forbidden-ext/b1/func-expr-strict-forbidden-ext-direct-access-prop-arguments.js",
             "language/statements/function/forbidden-ext/b1/cls-expr-meth-forbidden-ext-direct-access-prop-arguments.js",
         )) {
-            put(path, "D-95: a strict function has no own arguments here")
+            put(path, "a strict function has no own arguments here")
         }
         // A destructuring default names the anonymous function it gets, as a plain initializer
-        // does; upstream leaves it nameless (D-95). Each pattern comes as an arrow, a
+        // does; upstream leaves it nameless. Each pattern comes as an arrow, a
         // parenthesized function, a function and a generator.
         for ((folder, stems) in listOf(
             "language/expressions/arrow-function/dstr" to listOf("ary-ptrn-elem-id-init", "dflt-ary-ptrn-elem-id-init", "dflt-obj-ptrn-id-init"),
@@ -1512,20 +1512,20 @@ class Test262ParityTest {
         )) {
             for (stem in stems) {
                 for (kind in listOf("arrow", "cover", "fn", "gen")) {
-                    put("$folder/$stem-fn-name-$kind.js", "D-95: a destructuring default names its function here")
+                    put("$folder/$stem-fn-name-$kind.js", "a destructuring default names its function here")
                 }
             }
         }
-        // ArrayBuffer has its Symbol.species getter, which upstream lacks (D-95).
+        // ArrayBuffer has its Symbol.species getter, which upstream lacks.
         for (path in listOf(
             "built-ins/ArrayBuffer/Symbol.species/length.js",
             "built-ins/ArrayBuffer/Symbol.species/return-value.js",
             "built-ins/ArrayBuffer/Symbol.species/symbol-species-name.js",
             "built-ins/ArrayBuffer/Symbol.species/symbol-species.js",
         )) {
-            put(path, "D-95: ArrayBuffer[Symbol.species] is there here")
+            put(path, "ArrayBuffer[Symbol.species] is there here")
         }
-        // A "use strict" body needs a simple parameter list, which upstream checks for defaults only (D-95).
+        // A "use strict" body needs a simple parameter list, which upstream checks for defaults only.
         for (path in listOf(
             "language/expressions/arrow-function/array-destructuring-param-strict-body.js",
             "language/expressions/arrow-function/object-destructuring-param-strict-body.js",
@@ -1548,9 +1548,9 @@ class Test262ParityTest {
             "language/statements/generators/object-destructuring-param-strict-body.js",
             "language/statements/generators/rest-param-strict-body.js",
         )) {
-            put(path, "D-95: \"use strict\" needs a simple parameter list here")
+            put(path, "\"use strict\" needs a simple parameter list here")
         }
-        // A rest parameter takes no default, which upstream allows (D-95).
+        // A rest parameter takes no default, which upstream allows.
         for (path in listOf(
             "language/expressions/function/dflt-params-rest.js",
             "language/expressions/generators/dflt-params-rest.js",
@@ -1559,16 +1559,16 @@ class Test262ParityTest {
             "language/statements/function/dflt-params-rest.js",
             "language/statements/generators/dflt-params-rest.js",
         )) {
-            put(path, "D-95: a rest parameter has no default here")
+            put(path, "a rest parameter has no default here")
         }
-        // A generator function's prototype has no constructor, which upstream gives it (D-95).
+        // A generator function's prototype has no constructor, which upstream gives it.
         for (path in listOf(
             "language/expressions/generators/prototype-own-properties.js",
             "language/statements/generators/prototype-own-properties.js",
         )) {
-            put(path, "D-95: a generator's prototype has no constructor here")
+            put(path, "a generator's prototype has no constructor here")
         }
-        // `yield *` may go on after a line break, and `yield` then a line break then `*` is no `yield*`; upstream gets both wrong (D-95).
+        // `yield *` may go on after a line break, and `yield` then a line break then `*` is no `yield*`; upstream gets both wrong.
         for (path in listOf(
             "language/expressions/generators/yield-star-after-newline.js",
             "language/expressions/generators/yield-star-before-newline.js",
@@ -1577,9 +1577,9 @@ class Test262ParityTest {
             "language/statements/generators/yield-star-after-newline.js",
             "language/statements/generators/yield-star-before-newline.js",
         )) {
-            put(path, "D-95: yield* follows the line break rules here")
+            put(path, "yield* follows the line break rules here")
         }
-        // A reserved word spelled with an escape is no keyword, which upstream takes as the keyword itself (D-95).
+        // A reserved word spelled with an escape is no keyword, which upstream takes as the keyword itself.
         for (path in listOf(
             "language/expressions/object/method-definition/escaped-get-e.js",
             "language/expressions/object/method-definition/escaped-get-g.js",
@@ -1594,30 +1594,30 @@ class Test262ParityTest {
             "language/literals/null/null-with-unicode.js",
             "language/statements/for-of/escaped-of.js",
         )) {
-            put(path, "D-95: an escaped keyword is no keyword here")
+            put(path, "an escaped keyword is no keyword here")
         }
-        // A getter takes no parameter, which upstream allows (D-95).
+        // A getter takes no parameter, which upstream allows.
         for (path in listOf(
             "language/expressions/object/getter-param-dflt.js",
         )) {
-            put(path, "D-95: a getter takes no parameter here")
+            put(path, "a getter takes no parameter here")
         }
-        // Format-control characters stay in the source, which upstream drops outside strings (D-95).
+        // Format-control characters stay in the source, which upstream drops outside strings.
         for (path in listOf(
             "language/literals/regexp/S7.8.5_A1.1_T2.js",
             "language/literals/regexp/S7.8.5_A2.1_T2.js",
         )) {
-            put(path, "D-95: format-control characters are kept here")
+            put(path, "format-control characters are kept here")
         }
         // for-in remembers every own key of an object it passed, so a non-enumerable property hides
-        // an inherited enumerable one of the same name (D-96).
+        // an inherited enumerable one of the same name.
         for (path in listOf(
             "language/statements/for-in/12.6.4-2.js",
             "language/statements/for-in/order-enumerable-shadowed.js",
         )) {
-            put(path, "D-96: for-in follows EnumerateObjectProperties here")
+            put(path, "for-in follows EnumerateObjectProperties here")
         }
-        // Async functions, which upstream cannot parse inside a test that otherwise runs (D-97).
+        // Async functions, which upstream cannot parse inside a test that otherwise runs.
         for (path in listOf(
             "built-ins/AsyncFunction/is-a-constructor.js",
             "built-ins/Function/prototype/toString/async-function-expression.js",
@@ -1626,7 +1626,7 @@ class Test262ParityTest {
             "fn-body-cntns-arguments-func-decl", "fn-body-cntns-arguments-lex-bind",
             "fn-body-cntns-arguments-var-bind", "no-pre-existing-arguments-bindings-are-present",
         ).flatMap { listOf("language/eval-code/direct/async-func-expr-nameless-$it-declare-arguments.js", "language/eval-code/direct/async-func-expr-nameless-$it-declare-arguments-and-assign.js") }) {
-            put(path, "D-97: async functions run here")
+            put(path, "async functions run here")
         }
         // Async generators, which upstream cannot parse inside a test that otherwise runs (#91).
         for (path in listOf(
@@ -1637,10 +1637,10 @@ class Test262ParityTest {
         put("built-ins/Symbol/asyncIterator/prop-desc.js", "#91: Symbol.asyncIterator is there")
         // V8 reads each value as it steps, which another test in the folder needs as well.
         put("built-ins/Iterator/concat/next-method-returns-throwing-value.js", "#113: Iterator.concat reads each value as V8 does")
-        // `for (async of` is an early error, which upstream takes as a loop over a name (D-97).
-        put("language/statements/for-of/head-lhs-async-invalid.js", "D-97: `for (async of` is an early error here")
+        // `for (async of` is an early error, which upstream takes as a loop over a name.
+        put("language/statements/for-of/head-lhs-async-invalid.js", "`for (async of` is an early error here")
         // An async test now runs to the end of its microtasks on both engines, and a resolve
-        // function whose `then` getter throws rejects its promise only here (D-81).
+        // function whose `then` getter throws rejects its promise only here.
         for (path in listOf(
             "built-ins/Promise/all/resolve-poisoned-then.js",
             "built-ins/Promise/allSettled/resolve-poisoned-then.js",
@@ -1654,10 +1654,10 @@ class Test262ParityTest {
             "built-ins/Promise/resolve/arg-poisoned-then.js",
             "built-ins/Promise/resolve/resolve-poisoned-then.js",
         )) {
-            put(path, "D-81: a resolution whose then getter throws rejects the promise here")
+            put(path, "a resolution whose then getter throws rejects the promise here")
         }
         // A "use strict" body makes its own function's name and parameters strict too, which
-        // upstream checks only in code that was strict already (D-97).
+        // upstream checks only in code that was strict already.
         for (path in listOf(
             "built-ins/Function/15.3.2.1-10-6gs.js",
             "built-ins/Function/15.3.2.1-11-1-s.js",
@@ -1679,25 +1679,25 @@ class Test262ParityTest {
             "language/statements/function/param-duplicated-strict-body-3.js",
             "language/statements/function/param-eval-strict-body.js",
         )) {
-            put(path, "D-97: a use strict body reaches back to the name and parameters here")
+            put(path, "a use strict body reaches back to the name and parameters here")
         }
         // A block takes two functions of one name only when both are plain ones in sloppy code;
-        // upstream takes any two (D-97).
+        // upstream takes any two.
         for (scope in listOf("block-scope", "statements/switch")) {
             for (pair in listOf("function-name-redeclaration-attempt-with-function", "function-name-redeclaration-attempt-with-generator", "generator-name-redeclaration-attempt-with-function", "generator-name-redeclaration-attempt-with-generator")) {
-                put("language/$scope/syntax/redeclaration/$pair.js", "D-97: a block takes two functions of one name only when both are plain sloppy ones here")
+                put("language/$scope/syntax/redeclaration/$pair.js", "a block takes two functions of one name only when both are plain sloppy ones here")
             }
         }
-        // Duplicate names in an arrow's destructured parameters are an early error in any mode (D-97).
+        // Duplicate names in an arrow's destructured parameters are an early error in any mode.
         for (path in listOf("array-1", "array-2", "object-1", "object-2", "object-3", "object-6")) {
-            put("language/expressions/arrow-function/syntax/early-errors/arrowparameters-cover-no-duplicates-binding-$path.js", "D-97: duplicate parameters are an early error where the list is not plain here")
+            put("language/expressions/arrow-function/syntax/early-errors/arrowparameters-cover-no-duplicates-binding-$path.js", "duplicate parameters are an early error where the list is not plain here")
         }
-        // A parenthesized object literal is no assignment target (D-97).
+        // A parenthesized object literal is no assignment target.
         for (path in listOf(
             "language/expressions/assignmenttargettype/direct-arrowfunction-1.js",
             "language/expressions/assignmenttargettype/parenthesized-primaryexpression-objectliteral.js",
         )) {
-            put(path, "D-97: a parenthesized literal is no assignment target here")
+            put(path, "a parenthesized literal is no assignment target here")
         }
         // Async generators are a SyntaxError here until async iteration lands (#91), and upstream
         // cannot parse them either; the two fail differently.
@@ -1708,8 +1708,8 @@ class Test262ParityTest {
         ).flatMap { listOf("language/eval-code/direct/async-gen-func-expr-$it-declare-arguments.js", "language/eval-code/direct/async-gen-func-expr-$it-declare-arguments-and-assign.js") }) {
             put(path, "#91: async generators are not supported yet here, and upstream cannot parse them")
         }
-        // D-120: an async declaration is lexical in the CaseBlock; upstream cannot parse it.
-        put("language/statements/switch/scope-lex-async-function.js", "D-120: async block functions initialize lexically here")
+        // An async declaration is lexical in the CaseBlock; upstream cannot parse it.
+        put("language/statements/switch/scope-lex-async-function.js", "async block functions initialize lexically here")
     }
 
     /**
@@ -1720,7 +1720,7 @@ class Test262ParityTest {
         for (path in listOf(
             "language/eval-code/indirect/non-definable-global-var.js",
         )) {
-            put(path, "D-115: eval isolates declarations and validates intervening lexical and global conflicts here")
+            put(path, "eval isolates declarations and validates intervening lexical and global conflicts here")
         }
         for (path in listOf(
             "built-ins/Object/defineProperties/15.2.3.7-6-a-112.js",
@@ -1732,7 +1732,7 @@ class Test262ParityTest {
             "built-ins/Object/defineProperties/15.2.3.7-6-a-172.js",
             "built-ins/Object/defineProperties/15.2.3.7-6-a-173.js",
         )) {
-            put(path, "D-114: ArraySetLength restores length and read-only attributes after refusal here")
+            put(path, "ArraySetLength restores length and read-only attributes after refusal here")
         }
         for (path in listOf(
             "built-ins/Object/defineProperty/15.2.3.6-4-116.js",
@@ -1744,7 +1744,7 @@ class Test262ParityTest {
             "built-ins/Object/defineProperty/15.2.3.6-4-176.js",
             "built-ins/Object/defineProperty/15.2.3.6-4-177.js",
         )) {
-            put(path, "D-114: ArraySetLength stops at a refused deletion and restores length here")
+            put(path, "ArraySetLength stops at a refused deletion and restores length here")
         }
         for (path in listOf(
             "built-ins/Array/prototype/copyWithin/return-abrupt-from-delete-target.js",
@@ -1761,15 +1761,15 @@ class Test262ParityTest {
             "built-ins/Array/prototype/unshift/set-length-zero-array-is-frozen.js",
             "built-ins/Array/prototype/unshift/throws-with-string-receiver.js",
         )) {
-            put(path, "D-114: array mutation refusal throws independently of caller strictness here")
+            put(path, "array mutation refusal throws independently of caller strictness here")
         }
         for (loop in listOf("for", "for-in", "for-of")) {
             put("language/statements/$loop/let-array-with-newline.js",
-                "D-113: let [ remains forbidden as an expression statement across a newline here")
+                "let [ remains forbidden as an expression statement across a newline here")
         }
         for (state in listOf("fulfilled", "rejected")) {
             put("built-ins/Promise/prototype/then/rxn-handler-$state-invoke-nonstrict.js",
-                "D-112: sloppy Promise handlers substitute their own global here")
+                "sloppy Promise handlers substitute their own global here")
         }
         for (path in listOf(
             "built-ins/Array/prototype/every/15.4.4.16-5-1-s.js",
@@ -1781,12 +1781,12 @@ class Test262ParityTest {
             "built-ins/Array/prototype/some/15.4.4.17-5-1-s.js",
             "built-ins/Array/prototype/sort/S15.4.4.11_A8.js",
         )) {
-            put(path, "D-112: callbacks use the callee's own strictness and realm here")
+            put(path, "callbacks use the callee's own strictness and realm here")
         }
         put("built-ins/ThrowTypeError/unique-per-realm-non-simple.js",
-            "D-109: non-simple parameters use unmapped arguments and the realm intrinsic here")
+            "non-simple parameters use unmapped arguments and the realm intrinsic here")
         // Assigning to a const throws a TypeError here in any mode. Upstream ignores the write
-        // outside strict mode, so these destructuring assignments pass only here (D-71).
+        // outside strict mode, so these destructuring assignments pass only here.
         for (path in listOf(
             "language/expressions/assignment/dstr/array-elem-put-const.js",
             "language/expressions/assignment/dstr/obj-id-put-const.js",
@@ -1795,21 +1795,21 @@ class Test262ParityTest {
             "language/statements/for-of/dstr/obj-id-put-const.js",
             "language/statements/for-of/dstr/obj-prop-put-const.js",
         )) {
-            put(path, "D-71: a write to a const throws here and is ignored upstream")
+            put(path, "a write to a const throws here and is ignored upstream")
         }
-        // A labelled function as the body of a with is an early error here (D-76). In strict code
+        // A labelled function as the body of a with is an early error here. In strict code
         // the with is an error already, in both engines.
-        put("language/statements/with/labelled-fn-stmt.js", "D-76: a function declaration as a statement body is an early error here")
+        put("language/statements/with/labelled-fn-stmt.js", "a function declaration as a statement body is an early error here")
         // A trapless proxy's define answers false, and a proxy prototype's set trap sees an
-        // assignment to a primitive. In strict mode the two engines agree (D-89).
+        // assignment to a primitive. In strict mode the two engines agree.
         for (path in listOf(
             "built-ins/Proxy/defineProperty/targetdesc-undefined-target-is-not-extensible-realm.js",
             "language/types/reference/put-value-prop-base-primitive.js",
         )) {
-            put(path, "D-89: proxy traps receive the receiver and are believed when they refuse here")
+            put(path, "proxy traps receive the receiver and are believed when they refuse here")
         }
         // Duplicate parameters are an early error where the list is not plain, in any mode; in
-        // strict code they are one on both engines (D-97).
+        // strict code they are one on both engines.
         for (path in listOf(
             "language/expressions/arrow-function/dflt-params-duplicates.js",
             "language/expressions/arrow-function/params-duplicate.js",
@@ -1822,7 +1822,7 @@ class Test262ParityTest {
             "language/statements/function/dflt-params-duplicates.js",
             "language/statements/generators/dflt-params-duplicates.js",
         )) {
-            put(path, "D-97: duplicate parameters are an early error where the list is not plain here")
+            put(path, "duplicate parameters are an early error where the list is not plain here")
         }
     }
 
@@ -1860,32 +1860,32 @@ class Test262ParityTest {
             "built-ins/Function/15.3.5.4_2-9gs.js",
             "built-ins/Function/StrictFunction_restricted-properties.js",
         )) {
-            put(path, "D-109: strict functions inherit the realm restricted-property accessors here")
+            put(path, "strict functions inherit the realm restricted-property accessors here")
         }
         put("language/statements/for-of/dstr/array-elem-target-simple-strict.js",
-            "D-95: arguments is not a strict destructuring assignment target here")
+            "arguments is not a strict destructuring assignment target here")
         for (method in listOf("find", "findIndex", "findLast", "findLastIndex")) {
             put("built-ins/Array/prototype/$method/predicate-call-this-strict.js",
-                "D-112: callbacks use the callee's own strictness and realm here")
+                "callbacks use the callee's own strictness and realm here")
             for (folder in listOf("", "BigInt/")) {
                 put("built-ins/TypedArray/prototype/$method/${folder}predicate-call-this-strict.js",
-                    "D-112: callbacks use the callee's own strictness and realm here")
+                    "callbacks use the callee's own strictness and realm here")
             }
         }
         put("language/function-code/S10.4.3_A1.js",
-            "D-112: bare calls preserve undefined for strict callees here")
+            "bare calls preserve undefined for strict callees here")
         // A refused delete through Reflect or a trapless proxy answers false. Upstream throws a
         // TypeError instead when the calling code is strict; outside strict mode both answer
-        // false (D-89).
+        // false.
         for (path in listOf(
             "built-ins/Proxy/deleteProperty/trap-is-missing-target-is-proxy.js",
             "built-ins/Reflect/deleteProperty/return-boolean.js",
         )) {
-            put(path, "D-89: a refused delete answers false here")
+            put(path, "a refused delete answers false here")
         }
         // A reviver's undefined answer for a non-configurable property is a [[Delete]] that answers
-        // false. Upstream deletes with the calling code's strictness, so strict code throws (D-91).
-        put("built-ins/JSON/parse/reviver-object-non-configurable-prop-delete.js", "D-91: the reviver's refused delete answers false here")
+        // false. Upstream deletes with the calling code's strictness, so strict code throws.
+        put("built-ins/JSON/parse/reviver-object-non-configurable-prop-delete.js", "the reviver's refused delete answers false here")
     }
 
     /**
@@ -1964,7 +1964,7 @@ class Test262ParityTest {
                 continue
             }
             // Neither engine has modules. An async test runs to the end of its microtasks and
-            // reports through $DONE on both (D-97).
+            // reports through $DONE on both.
             if (meta.hasFlag("module")) {
                 exclusions.append(relative).append("\tmodule\n")
                 skipped++

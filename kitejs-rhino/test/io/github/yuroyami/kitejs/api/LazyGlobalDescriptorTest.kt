@@ -11,7 +11,7 @@ import kotlin.test.assertEquals
 /**
  * Many globals are built the first time something reads them. Their property descriptors have to
  * build them too, or the descriptor's value is the engine's placeholder, which no script can touch
- * (D-75, issue 66). Each engine here is fresh, so nothing has read the globals before.
+ * (issue 66). Each engine here is fresh, so nothing has read the globals before.
  */
 class LazyGlobalDescriptorTest {
 

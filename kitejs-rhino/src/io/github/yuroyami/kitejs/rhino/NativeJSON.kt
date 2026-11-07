@@ -95,7 +95,7 @@ public class NativeJSON private constructor() : ScriptableObject() {
          * only, recognised only a real array, wrote back with a put that ran a setter the reviver
          * had defined and wrote into an array the reviver had frozen, deleted with a delete that
          * threw in strict code when refused, and passed array indices to the reviver as numbers
-         * (D-91).
+         *.
          */
         private fun walk(cx: Context, scope: Scriptable, reviver: Callable, holder: Scriptable, name: Any): Any? {
             val property = getValue(holder, name)
@@ -153,7 +153,7 @@ public class NativeJSON private constructor() : ScriptableObject() {
             } else if (NativeArray.isArray(replacer)) {
                 // The property list comes from every index up to LengthOfArrayLike, read with
                 // [[Get]], so a proxy for an array works and a hole reads its prototype. Upstream
-                // took only the own indices of a real array (D-91).
+                // took only the own indices of a real array.
                 val replacerObj = replacer as Scriptable
                 val len = AbstractEcmaObjectOperations.lengthOfArrayLike(cx, replacerObj)
                 val propertySet = LinkedHashSet<Any?>()
@@ -199,7 +199,7 @@ public class NativeJSON private constructor() : ScriptableObject() {
          * SerializeJSONProperty (ES 25.5.2.2). `toJSON` is read once with GetV and called when it is
          * callable, and both it and the replacer get the key as a string. Upstream asked HasProperty
          * first and then read the method twice, and handed array indices to the replacer as numbers
-         * (D-91).
+         *.
          */
         private fun str(key: Any, holder: Scriptable, state: StringifyState): Any? {
             val keyString = key.toString()
@@ -230,7 +230,7 @@ public class NativeJSON private constructor() : ScriptableObject() {
             if (value == true) return "true"
             if (value == false) return "false"
             if (value is CharSequence) return quote(value.toString())
-            // A bigint is checked on its own, because it is not a Number here (D-54).
+            // A bigint is checked on its own, because it is not a Number here.
             if (value is KBigInt) {
                 throw ScriptRuntime.typeErrorById("msg.json.cant.serialize", "BigInt")
             }
@@ -309,7 +309,7 @@ public class NativeJSON private constructor() : ScriptableObject() {
             state.indent = state.indent + state.gap
             val partial = ArrayList<Any?>()
             // SerializeJSONArray walks to LengthOfArrayLike, so a proxy for an array is read
-            // through its traps (D-91).
+            // through its traps.
             val len = AbstractEcmaObjectOperations.lengthOfArrayLike(state.cx, value)
             for (index in 0 until len) {
                 val strP: Any? = str(indexKey(index), value, state)

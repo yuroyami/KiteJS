@@ -9,7 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * The ES2023 typed array methods `at`, `toReversed`, `toSorted` and `with` (issues 23 and 44, D-83).
+ * The ES2023 typed array methods `at`, `toReversed`, `toSorted` and `with` (issues 23 and 44).
  * Each validates its receiver before anything else, makes its copy with the realm's own constructor,
  * and converts a replacement the way the view's element type asks. Every expected value here is
  * what V8 answers.

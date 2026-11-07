@@ -12,7 +12,7 @@ import kotlin.test.assertEquals
 /**
  * `instanceof` is InstanceofOperator (ECMAScript 2015, 12.9.4): the target's `Symbol.hasInstance`
  * decides, and only a target without one has to be callable and is asked OrdinaryHasInstance
- * (#75, D-92). Every expected value here is what V8 answers, except the one test on the legacy
+ * (#75). Every expected value here is what V8 answers, except the one test on the legacy
  * StopIteration, which V8 does not have.
  */
 class InstanceofTest {

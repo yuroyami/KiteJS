@@ -11,7 +11,7 @@ import kotlin.test.assertEquals
 /**
  * Parser and runtime rules that the class and async function tests of test262 turned up, which
  * apply to plain functions as much as to classes and async functions, and which upstream Rhino
- * gets wrong (#2, D-95; #12, D-97). Every expected value is what V8 answers. An early error is
+ * gets wrong (#2, #12). Every expected value is what V8 answers. An early error is
  * checked through `eval`, whose SyntaxError a script can catch.
  */
 class SyntaxConformanceTest {

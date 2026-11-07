@@ -13,7 +13,7 @@ import io.github.yuroyami.kitejs.rhino.ast.FunctionNode
  *
  * It is based on the C source files jsscan.c and jsscan.h in the jsref package.
  *
- * Ported with a String-only source (the Reader path is not ported, ledger D-2) and
+ * Ported with a String-only source (the Reader path is not ported) and
  * without the E4X/XML tokenizer methods (E4X is out of scope).
  */
 internal class TokenStream(
@@ -162,7 +162,7 @@ internal class TokenStream(
                 "yield" -> Token.YIELD
                 // 11.6.2.2 Future Reserved Words. `await` is not one in a script: it is a name
                 // the parser takes as the operator in an async function or a class static block
-                // (ECMAScript 2017, 12.1.1), where ES6's table had it reserved everywhere (D-97).
+                // (ECMAScript 2017, 12.1.1), where ES6's table had it reserved everywhere.
                 "enum" -> Token.RESERVED
                 // 11.6.2.2 NOTE Strict Future Reserved Words
                 "implements" -> if (isStrict) Token.RESERVED else 0
@@ -1653,7 +1653,7 @@ internal class TokenStream(
         private set
 
     private fun markCommentStart(prefix: String = "") {
-        // KMP: only meaningful with the Reader source path, which is not ported (D-2).
+        // KMP: only meaningful with the Reader source path, which is not ported.
     }
 
     private val isMarkingComment: Boolean get() = commentCursor != -1

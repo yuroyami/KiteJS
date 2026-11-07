@@ -67,7 +67,7 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
     // written to one is still converted. Names that only look numeric, such as "01", are ordinary
     // properties. Upstream let the invalid ones fall through to ordinary lookup, truncated a
     // fraction to an element, and kept elements out of the descriptor and own-key operations
-    // (D-88).
+    //.
 
     override fun get(index: Int, start: Scriptable): Any? = js_get(index)
 
@@ -260,7 +260,7 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
     /**
      * The spec's SetTypedArrayFromArrayLike, for a [source] that is not a typed array: whatever it
      * is goes through ToObject, so a string sets its characters and undefined or null is a
-     * TypeError, and each element is read with Get, so one the source inherits counts (D-86).
+     * TypeError, and each element is read with Get, so one the source inherits counts.
      */
     private fun setRange(cx: Context, scope: Scriptable, source: Any?, dbloff: Double) {
         if (isTypedArrayOutOfBounds) throw ScriptRuntime.typeErrorById("msg.typed.array.out.of.bounds")
@@ -908,7 +908,7 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
         }
 
         // at, toReversed, toSorted and with follow ES2023 step by step: the receiver is validated
-        // and its length taken before anything a script supplies is converted (D-83).
+        // and its length taken before anything a script supplies is converted.
 
         private fun js_at(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val self = realThis(thisObj)

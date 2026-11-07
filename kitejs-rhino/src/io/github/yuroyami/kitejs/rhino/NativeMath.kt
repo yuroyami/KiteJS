@@ -16,7 +16,7 @@ import kotlin.random.Random
 
 /**
  * The JavaScript `Math` object. The transcendental functions come from [FdLibm] rather than
- * `kotlin.math`, so they give the same digits on every target (D-73).
+ * `kotlin.math`, so they give the same digits on every target.
  */
 internal class NativeMath private constructor() : ScriptableObject() {
 
@@ -186,7 +186,7 @@ internal class NativeMath private constructor() : ScriptableObject() {
          * The nearest 32-bit float, as a double.
          *
          * `Double.toFloat()` cannot be used for this: on Kotlin/JS it does nothing at all, because
-         * JavaScript has only doubles, so `Math.fround` would answer its own argument (D-59). The
+         * JavaScript has only doubles, so `Math.fround` would answer its own argument. The
          * rounding is done here so that every target gives the same answer.
          */
         internal fun froundToDouble(x: Double): Double {

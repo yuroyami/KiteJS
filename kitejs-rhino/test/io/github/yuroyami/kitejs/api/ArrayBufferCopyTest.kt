@@ -9,7 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * `ArrayBuffer.prototype.slice`, `transfer` and `transferToFixedLength` (issues 24 and 25, D-87).
+ * `ArrayBuffer.prototype.slice`, `transfer` and `transferToFixedLength` (issues 24 and 25).
  * Slice checks both buffers again after every piece of user code it runs, and transfer copies into
  * a plain ArrayBuffer of its own realm without asking species. Every expected value here is what
  * V8 answers.

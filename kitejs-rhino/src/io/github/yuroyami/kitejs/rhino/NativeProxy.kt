@@ -81,7 +81,7 @@ internal open class NativeProxy protected constructor(target: Scriptable, handle
      * enumerable property, so a getOwnPropertyDescriptor trap decides what Object.keys, for-in and
      * JSON.stringify see. Upstream handed the trap's list back unfiltered, so Object.keys of a
      * proxy listed non-enumerable keys and threw on a symbol, and JSON.stringify crashed with a
-     * host ClassCastException (D-91).
+     * host ClassCastException.
      */
     override fun getIds(map: CompoundOperationMap, getNonEnumerable: Boolean, getSymbols: Boolean): Array<Any?> {
         val keys = ownPropertyKeys()
@@ -112,7 +112,7 @@ internal open class NativeProxy protected constructor(target: Scriptable, handle
      * against the target. Keys are compared as property keys, so an index the target lists as a
      * number matches the string the trap returns; upstream compared the two kinds as they came,
      * which made every non-configurable index look skipped, and after the checks for a
-     * non-extensible target it answered with the target's own keys in place of the trap's (D-91).
+     * non-extensible target it answered with the target's own keys in place of the trap's.
      */
     override fun ownPropertyKeys(): Array<Any?> {
         val target = getTargetThrowIfRevoked()
@@ -182,7 +182,7 @@ internal open class NativeProxy protected constructor(target: Scriptable, handle
      * [[Get]] (ECMAScript 2015, 9.5.8). The trap is handed the receiver the read started from,
      * which is the proxy only when the proxy itself was read, and without a trap the target's own
      * [[Get]] runs with that receiver, through the target's whole prototype chain. Upstream handed
-     * the trap the proxy every time and read the target with the target as `this` (D-89).
+     * the trap the proxy every time and read the target with the target as `this`.
      */
     internal fun get(cx: Context, key: Any, receiver: Any?): Any? {
         val target = getTargetThrowIfRevoked()
@@ -223,7 +223,7 @@ internal open class NativeProxy protected constructor(target: Scriptable, handle
      * that receiver, so a write through a proxy with no traps still asks the proxy for the
      * receiver's descriptor and defines through it. Upstream called the trap without a receiver,
      * ignored a false answer even in strict code, and wrote to the target as its own receiver
-     * (D-89).
+     *.
      */
     internal fun set(cx: Context, key: Any, value: Any?, receiver: Any?): Boolean {
         val target = getTargetThrowIfRevoked()
@@ -262,7 +262,7 @@ internal open class NativeProxy protected constructor(target: Scriptable, handle
     /**
      * The `delete` operator: [[Delete]], whose false answer is a TypeError in strict code. The
      * answer is the result, so nothing asks the proxy afterwards whether the property is still
-     * there; upstream did, which called a `has` trap after every delete (D-89).
+     * there; upstream did, which called a `has` trap after every delete.
      */
     internal fun deleteOrThrow(key: Any): Boolean {
         val cx = Context.getContext()
@@ -284,7 +284,7 @@ internal open class NativeProxy protected constructor(target: Scriptable, handle
 
     /**
      * A proxy answers [[HasProperty]], [[Get]] and [[Set]] for its whole chain, so a lookup that
-     * reaches it never goes on to the proxy's own prototype (D-89).
+     * reaches it never goes on to the proxy's own prototype.
      */
     override fun endsLookup(name: String): Boolean = true
 
@@ -313,7 +313,7 @@ internal open class NativeProxy protected constructor(target: Scriptable, handle
      * CompletePropertyDescriptor and is checked against the target's own property before it is
      * believed. Upstream read only `value` and the three flags out of it, so an accessor came back
      * as a data property holding undefined, an invalid descriptor was accepted, and a trap could
-     * report a property non-configurable or read-only that the target does not have as such (D-91).
+     * report a property non-configurable or read-only that the target does not have as such.
      */
     override fun getOwnPropertyDescriptor(cx: Context, id: Any?): DescriptorInfo? {
         val target = getTargetThrowIfRevoked()
@@ -406,7 +406,7 @@ internal open class NativeProxy protected constructor(target: Scriptable, handle
 
         // [[DefineOwnProperty]] answers false for a refused definition, and a trapless proxy
         // passes that answer on; the target's own define throws instead, which upstream let
-        // through, so a write that should only fail threw (D-89).
+        // through, so a write that should only fail threw.
         return AbstractEcmaObjectOperations.defineOwnPropertyOrFalse(cx, target, id!!, desc)
     }
 
@@ -470,7 +470,7 @@ internal open class NativeProxy protected constructor(target: Scriptable, handle
      * [[SetPrototypeOf]] (ES 10.5.2): false when the trap says so, and a TypeError when it claims
      * success on a non-extensible target whose prototype is not the one asked for. Upstream threw
      * the trap's answer away, so Object.setPrototypeOf succeeded and Reflect.setPrototypeOf
-     * answered true whatever the trap said, and nothing was checked against the target (D-91).
+     * answered true whatever the trap said, and nothing was checked against the target.
      */
     override fun setPrototypeOf(cx: Context, proto: Scriptable?): Boolean {
         val target = getTargetThrowIfRevoked()
@@ -543,7 +543,7 @@ internal open class NativeProxy protected constructor(target: Scriptable, handle
         if (trap != null) {
             // Upstream hands the raw argument array to the trap, which only reads as an array
             // in script because Java interop wraps it. There is no interop here, so the trap
-            // gets a real JavaScript array, the same way the apply trap does (D-51).
+            // gets a real JavaScript array, the same way the apply trap does.
             val result = callTrap(trap, arrayOf(target, cx.newArray(scope, args), newTarget))
             if (!ScriptRuntime.isObject(result)) {
                 throw ScriptRuntime.typeError("Constructor trap has to return a scriptable.")
@@ -664,7 +664,7 @@ internal open class NativeProxy protected constructor(target: Scriptable, handle
 
             revocable.put("proxy", revocable, proxy)
             // A built-in function that is not a constructor has no `prototype` (ES 10.3); upstream
-            // gave the revoke function one (D-91).
+            // gave the revoke function one.
             revocable.put("revoke", revocable, LambdaFunction(scope, "", 0, Revoker(proxy), false))
             return revocable
         }

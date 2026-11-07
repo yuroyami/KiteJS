@@ -14,7 +14,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * A `WeakMap` entry goes when its key does, whatever its value refers to (issue 22, D-82). Upstream
+ * A `WeakMap` entry goes when its key does, whatever its value refers to (issue 22). Upstream
  * keeps a `WeakHashMap`, so a value that leads back to its own key keeps both alive for as long as
  * the map lives. Only the JVM can watch a collection, so this is where it is checked.
  */
@@ -132,7 +132,7 @@ class WeakMapGcTest {
             val control = upstream("(function () { var k = {}; map.set(k, {}); return k })()")
             collect()
             assertNull(control.get())
-            assertNotNull(owner.get(), "upstream let the key go; D-82 can be retired")
+            assertNotNull(owner.get(), "upstream let the key go; this difference can be retired")
         } finally {
             org.mozilla.javascript.Context.exit()
         }

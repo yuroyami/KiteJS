@@ -9,7 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * Async functions and `await` (ECMAScript 2017, 14.7 and 25.5; #12, D-97). Every expected value is
+ * Async functions and `await` (ECMAScript 2017, 14.7 and 25.5; #12). Every expected value is
  * what V8 answers. Evaluating runs the microtasks a script queued before it returns, so [logged]
  * reads what the async code wrote to `log` once it has all run.
  */

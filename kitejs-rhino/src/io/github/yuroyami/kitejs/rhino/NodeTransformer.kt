@@ -192,7 +192,7 @@ public open class NodeTransformer {
                                 // The value is computed before the finally blocks run and the
                                 // scopes close, a generator's too. Upstream left a generator's
                                 // return expression after them, so it saw the finally blocks'
-                                // effects and no block-scoped name (D-97).
+                                // effects and no block-scoped name.
                                 val store = Node(Token.EXPR_RESULT, returnExpr)
                                 unwindBlock.addChildToFront(store)
                                 returnNode = Node(Token.RETURN_RESULT)
@@ -280,7 +280,7 @@ public open class NodeTransformer {
                             var v = cursor
                             cursor = cursor.next
                             if (v.type == Token.NAME) {
-                                // A let without an initializer that can run again is reset to undefined (D-98).
+                                // A let without an initializer that can run again is reset to undefined.
                                 if (!v.hasChildren() && n.getIntProp(Node.RESET_LET_PROP, 0) == 0) continue
                                 val init = v.firstChild?.also { v.removeChild(it) } ?: Node(Token.UNDEFINED)
                                 v.type = Token.BINDNAME
@@ -289,7 +289,7 @@ public open class NodeTransformer {
                                     v,
                                     init,
                                 )
-                                // A const a for head declares is bound afresh each time (D-72).
+                                // A const a for head declares is bound afresh each time.
                                 if (type == Token.CONST && n.getIntProp(Node.FRESH_CONST_PROP, 0) == 1) {
                                     v.putIntProp(Node.FRESH_CONST_PROP, 1)
                                 }

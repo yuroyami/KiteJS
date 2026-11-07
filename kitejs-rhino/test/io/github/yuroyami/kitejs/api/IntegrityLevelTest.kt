@@ -10,7 +10,7 @@ import kotlin.test.assertEquals
 
 /**
  * `Object.seal`, `Object.freeze` and `Object.defineProperty` as the typed array work left them
- * (D-88). Sealing and freezing go through each object's own [[DefineOwnProperty]] with partial
+ *. Sealing and freezing go through each object's own [[DefineOwnProperty]] with partial
  * descriptors, so exotic objects and proxies see the same requests V8 sends them, and a refused
  * definition is a TypeError. Every expected value here is what V8 answers.
  */

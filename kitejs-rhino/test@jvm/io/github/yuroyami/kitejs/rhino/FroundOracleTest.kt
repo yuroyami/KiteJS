@@ -10,7 +10,7 @@ import kotlin.test.assertEquals
 
 /**
  * The port's float rounding against the JVM's, which is a real IEEE 754 conversion. Kotlin/JS has
- * none, which is why the port does the rounding itself (D-59); this is what says it does it right.
+ * none, which is why the port does the rounding itself; this is what says it does it right.
  */
 class FroundOracleTest {
 

@@ -53,7 +53,7 @@ public abstract class ES6Iterator : ScriptableObject {
         /**
          * Installs [prototype] as the shared prototype for iterators tagged [tag]. It inherits
          * %IteratorPrototype%, which holds `[Symbol.iterator]`; upstream gave each iterator
-         * prototype a copy of its own and Object.prototype as its prototype (D-93).
+         * prototype a copy of its own and Object.prototype as its prototype.
          */
         internal fun init(scope: ScriptableObject, sealed: Boolean, prototype: ScriptableObject, tag: String) {
             prototype.parentScope = scope

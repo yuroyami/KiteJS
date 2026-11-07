@@ -454,7 +454,7 @@ internal fun intLiteralOf(node: AstNode): Long? {
 
 /**
  * Rounds to the nearest value a 32 bit float can hold, which is what `Math.fround` answers. Not
- * through `toFloat()`, which does nothing on Kotlin/JS, where a Float is a double (D-59).
+ * through `toFloat()`, which does nothing on Kotlin/JS, where a Float is a double.
  */
 internal fun froundOf(value: Double): Double = NativeMath.froundToDouble(value)
 

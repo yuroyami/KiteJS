@@ -104,7 +104,7 @@ class IcodeOracleTest {
     private fun renderPorted(desc: JSDescriptor<*>, sb: StringBuilder, depth: Int) {
         val code = desc.code as InterpreterData<*>?
         val pad = "  ".repeat(depth)
-        // D-109 adds parameter-shape metadata for unmapped arguments; upstream has no such bit.
+        // The port adds parameter-shape metadata for unmapped arguments; upstream has no such bit.
         // Compare every shared flag and all generated instructions and pools below.
         val sharedFlags = (field(desc, "flags") as Int) and (1 shl 18).inv()
         sb.append(pad).append("fn=").append(desc.name).append(" type=").append(desc.functionType)
@@ -227,7 +227,7 @@ class IcodeOracleTest {
             val e = expected.getOrThrow()
             val a = actual.getOrThrow()
             if (file.name == "let-const.js") {
-                // D-120 adds exactly two iteration-environment instructions and their names.
+                // The port's fresh environment for each pass of a classic for(let) adds exactly two iteration-environment instructions and their names.
                 // The IR oracle checks their positions; fixed V8 controls check the closures.
                 fun metadata(text: String) = text.lines().filterNot { it.startsWith("icode=") || it.startsWith("literals=") }
                 assertEquals(metadata(e), metadata(a))
@@ -236,13 +236,13 @@ class IcodeOracleTest {
                 continue
             }
             if (file.name == "destructuring.js") {
-                // D-116 and the iterator lowering of patterns (#81, #96) change its temporaries and instructions.
+                // The port's ordered parameter initialization and the iterator lowering of patterns (#81, #96) change its temporaries and instructions.
                 assertTrue(destructures(a))
                 assertTrue(e != a)
                 continue
             }
             if (file.name == "spread.js") {
-                // D-116 deliberately changes activation, temporaries and parameter instructions.
+                // The port's ordered parameter initialization deliberately changes activation, temporaries and parameter instructions.
                 assertEquals(parameterMetadata(e), parameterMetadata(a))
                 assertTrue(e != a)
                 continue
@@ -346,7 +346,7 @@ class IcodeOracleTest {
             val e = expected.getOrThrow()
             val a = actual.getOrThrow()
             if (source == "if (a) { function f() {} }") {
-                // D-120: initialize the lexical binding on entry and copy at the declaration.
+                // Initialize the lexical binding on entry and copy at the declaration.
                 assertEquals(
                     "icode=-31,0,1,-48,44,7,0,17,-39,-34,0,-58,-4,-57,-36,73,2,-39,-107,-49,-108,3,71",
                     a.lines().first { it.startsWith("icode=") },
@@ -394,7 +394,7 @@ class IcodeOracleTest {
         )
     }
 
-    /** Syntax the port added, which upstream still rejects: class definitions (D-95) and async functions (D-97). */
+    /** Syntax the port added, which upstream still rejects: class definitions and async functions. */
     @Test
     fun syntaxOnlyThePortHasCompiles() {
         val sources = listOf(

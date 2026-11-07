@@ -620,7 +620,7 @@ public abstract class IdScriptableObject : ScriptableObject, IdFunctionCall {
             // A method named by a symbol, such as RegExp.prototype[Symbol.split], is a prototype id
             // as a named one is, so it is redefined in place. Upstream sent it to the slot map,
             // which does not hold it: a non-extensible prototype refused the change as a new
-            // property, and an extensible one got a second copy over the id (D-90).
+            // property, and an extensible one got a second copy over the id.
             val key = if (id is NativeSymbol) id.key else id as Symbol
             prototypeValues?.let { pv ->
                 val pid = pv.findId(key)

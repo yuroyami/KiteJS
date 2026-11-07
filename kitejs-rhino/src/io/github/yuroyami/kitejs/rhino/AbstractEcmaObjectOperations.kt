@@ -25,7 +25,7 @@ public object AbstractEcmaObjectOperations {
      * HasOwnProperty(O, P) for a key that is already a property key. A proxy answers through
      * [[GetOwnProperty]]; upstream asked its has trap, which also reports inherited properties,
      * and converted the key without ToPrimitive, so a key object whose @@toPrimitive returns a
-     * symbol threw (D-91).
+     * symbol threw.
      */
     internal fun hasOwnPropertyKey(cx: Context, obj: Scriptable, key: Any): Boolean = when {
         obj is NativeProxy || obj !is ScriptableObject -> obj.getOwnPropertyDescriptor(cx, key) != null
@@ -51,7 +51,7 @@ public object AbstractEcmaObjectOperations {
      * cannot be made non-extensible. Each key gets DefinePropertyOrThrow with only the fields the
      * level changes, so an object that refuses, as a typed array refuses for its elements, makes it
      * a TypeError; sealing reads no descriptors at all. Upstream redefined every key from its full
-     * current descriptor and ignored a refusal (D-88).
+     * current descriptor and ignored a refusal.
      */
     internal fun setIntegrityLevel(cx: Context, o: Any?, level: INTEGRITY_LEVEL): Boolean {
         val obj = ensureObject(o)
@@ -106,7 +106,7 @@ public object AbstractEcmaObjectOperations {
     // enough for an assignment but not for Reflect, whose methods take a separate receiver and
     // report whether the target agreed, nor for a proxy forwarding to its target. These follow the
     // spec's algorithms on top of each object's own descriptor methods, so every exotic object
-    // takes part through the overrides it already has (D-89). A key is what ToPropertyKey gives:
+    // takes part through the overrides it already has. A key is what ToPropertyKey gives:
     // a Symbol, an array index as an Int, or a String.
 
     /** O.[[Get]](P, Receiver): [key] looked up from [o], with [receiver] as `this` for a getter. */
@@ -525,7 +525,7 @@ public object AbstractEcmaObjectOperations {
      * IsConstructor: does [argument] have a [[Construct]] method. Every Rhino function implements
      * [Constructable], so each function kind says for itself whether `new` would get past its own
      * check; upstream took the interface at its word, which made `Date.now`, arrow functions,
-     * generators, methods and accessors constructors to Reflect.construct and species lookups (D-91).
+     * generators, methods and accessors constructors to Reflect.construct and species lookups.
      */
     public fun isConstructor(cx: Context, argument: Any?): Boolean = isConstructor(argument)
 

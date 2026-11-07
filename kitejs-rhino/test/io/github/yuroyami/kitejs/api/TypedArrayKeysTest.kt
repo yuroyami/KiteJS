@@ -9,7 +9,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * The integer-indexed exotic object methods of typed arrays (issues 39, 40 and 41, D-88). Every
+ * The integer-indexed exotic object methods of typed arrays (issues 39, 40 and 41). Every
  * canonical numeric property name stays on the element path whether or not it names a real
  * element, elements answer for themselves in descriptors and key lists, and a value is converted
  * for the element type before an invalid index is ignored. Every expected value here is what V8

@@ -10,7 +10,7 @@ import kotlin.test.assertEquals
 
 /**
  * [[Construct]] with a newTarget, IsConstructor, a proxy's own internal methods, the enumeration
- * that asks [[GetOwnProperty]] per key, [[SetPrototypeOf]] and JSON, as D-91 left them. Every
+ * that asks [[GetOwnProperty]] per key, [[SetPrototypeOf]] and JSON, as the port leaves them. Every
  * expected value here is what V8 answers.
  */
 class ConstructAndProxyInternalsTest {

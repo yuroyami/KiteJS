@@ -219,7 +219,7 @@ public class JsonParser(private val cx: Context, private val scope: Scriptable) 
         val num = src.substring(numberStart, pos)
         val dval = num.toDouble()
         val ival = dval.toInt()
-        // -0 compares equal to 0, so it is kept as a double; upstream turned "-0" into 0 (D-91).
+        // -0 compares equal to 0, so it is kept as a double; upstream turned "-0" into 0.
         if (ival.toDouble() == dval && (ival != 0 || 1.0 / dval > 0)) return ival
         return dval
     }

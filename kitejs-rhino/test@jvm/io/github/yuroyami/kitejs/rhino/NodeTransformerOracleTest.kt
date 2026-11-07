@@ -109,7 +109,7 @@ class NodeTransformerOracleTest {
                 continue
             }
             if (portedVersion >= Context.VERSION_ES6 && file.name == "spread.js") {
-                // D-116 changes these parameter bodies. Compare the enclosing script exactly;
+                // The port initializes parameters in order, which changes these parameter bodies. Compare the enclosing script exactly;
                 // ParameterEnvironmentTest checks their binding behavior against fixed V8 results.
                 assertEquals(expected.getOrThrow().substringBefore("--- function"), actual.getOrThrow().substringBefore("--- function"))
                 assertTrue(expected.getOrThrow() != actual.getOrThrow())

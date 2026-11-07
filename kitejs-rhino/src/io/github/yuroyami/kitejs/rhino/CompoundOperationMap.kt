@@ -8,7 +8,7 @@ package io.github.yuroyami.kitejs.rhino
  * A sequence of operations run against one map. It does as little as possible: no locking, just a
  * note of whether the map was changed, so the map underneath knows when to hand work off.
  *
- * Upstream also has a locking variant for thread-safe objects. This port has none (D-3).
+ * Upstream also has a locking variant for thread-safe objects. This port has none.
  */
 public open class CompoundOperationMap(protected val owner: SlotMapOwner) : SlotMap, AutoCloseable {
 

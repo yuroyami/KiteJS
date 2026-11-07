@@ -10,7 +10,7 @@ import kotlin.math.absoluteValue
  * An arbitrary-precision integer: what `BigInt` values are made of.
  *
  * Upstream uses `java.math.BigInteger`, which common Kotlin has no equal of, so this is the port's
- * own (D-5). Sign and magnitude, with the magnitude a little-endian [IntArray] of base 2^32 limbs
+ * own. Sign and magnitude, with the magnitude a little-endian [IntArray] of base 2^32 limbs
  * and no trailing zero limbs, so a value has exactly one representation and equality is a plain
  * array comparison.
  *
@@ -19,7 +19,7 @@ import kotlin.math.absoluteValue
  *
  * It deliberately does NOT extend [Number], even though upstream's `BigInteger` does: on
  * Kotlin/JS `Number` is the JS primitive number type, so a class extending it fails `is Number`
- * and throws on `as Number`. The runtime tells a bigint apart with `is KBigInt` instead (D-54).
+ * and throws on `as Number`. The runtime tells a bigint apart with `is KBigInt` instead.
  */
 public class KBigInt private constructor(
     private val sign: Int,

@@ -7,7 +7,7 @@ package io.github.yuroyami.kitejs.rhino
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 
-/** Exact D-120 additions in corpus/let-const.js; the rest of its IR still matches upstream. */
+/** The port's exact additions for block functions and classic for(let) in corpus/let-const.js; the rest of its IR still matches upstream. */
 internal object BlockFunctionOracleExpectations {
     fun assertIterationMarkers(root: Node) {
         val iterations = mutableListOf<Node>()

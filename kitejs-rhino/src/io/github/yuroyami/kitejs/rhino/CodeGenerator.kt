@@ -167,7 +167,7 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
                 }
             }
             // An async function's frame starts the way a plain function's does, function
-            // declarations included, and its body runs from the call on (D-97).
+            // declarations included, and its body runs from the call on.
             val functionCount = if (theFunction.isAsyncFunction || theFunction.hasParameterInitialization) 0 else theFunction.functionCount
             for (i in 0 until functionCount) {
                 val fn = theFunction.getFunctionNode(i)
