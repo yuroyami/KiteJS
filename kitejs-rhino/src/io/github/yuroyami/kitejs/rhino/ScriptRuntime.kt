@@ -2403,6 +2403,7 @@ public object ScriptRuntime {
 
     public fun setName(bound: Scriptable?, value: Any?, cx: Context, scope: Scriptable, id: String): Any? {
         if (bound != null) {
+            checkInitialized(bound, id)
             checkNotConstBinding(bound, id)
             // SetMutableBinding asks HasProperty before the write (ECMAScript 2015, 8.1.1.2.5);
             // outside strict code only a proxy can observe that.
@@ -2422,6 +2423,7 @@ public object ScriptRuntime {
 
     public fun strictSetName(bound: Scriptable?, value: Any?, cx: Context, scope: Scriptable, id: String): Any? {
         if (bound != null) {
+            checkInitialized(bound, id)
             checkNotConstBinding(bound, id)
             // A binding that disappeared after it was resolved, deleted by the right-hand side or
             // by an @@unscopables getter, is a ReferenceError in strict code (ECMAScript 2015,
@@ -2431,6 +2433,30 @@ public object ScriptRuntime {
             return value
         }
         throw constructError("ReferenceError", "Assignment to undefined \"$id\" in strict mode")
+    }
+
+    /**
+     * The temporal dead zone of a `let`, `const` or class binding (ECMAScript 2015, 13.3.1): its
+     * name cannot be read or written until its declaration has run, and GetBindingValue and
+     * SetMutableBinding throw a ReferenceError until then (8.1.1.1.5, 8.1.1.1.6; #137).
+     */
+    internal fun uninitializedError(name: String): EcmaError =
+        constructError("ReferenceError", "Cannot access '$name' before initialization")
+
+    private fun checkInitialized(bound: Scriptable, id: String) {
+        if (bound is ScriptableObject && bound.isUninitializedBinding(id)) throw uninitializedError(id)
+    }
+
+    /** The declaration's own initialization of a lexical binding, which its dead zone lets through. */
+    internal fun initLexical(bound: Scriptable?, value: Any?, cx: Context, scope: Scriptable, id: String): Any? {
+        if (bound == null) return setName(null, value, cx, scope, id)
+        ScriptableObject.putProperty(bound, id, value)
+        return value
+    }
+
+    /** Starts the dead zone of the lexical binding [id] that [bound] holds, as entering its scope does. */
+    internal fun resetLexical(bound: Scriptable?, id: String) {
+        if (bound is ScriptableObject) bound.resetLexicalBinding(id)
     }
 
     /**
@@ -2500,6 +2526,7 @@ public object ScriptRuntime {
                 break
             }
         }
+        if (result === UniqueTag.UNINITIALIZED) throw uninitializedError(name)
         if (asFunctionCall) {
             if (result !is Callable) {
                 if (isOptionalChainingCall && (result === Scriptable.NOT_FOUND || result == null || Undefined.isUndefined(result))) {
@@ -2545,6 +2572,7 @@ public object ScriptRuntime {
                 break
             }
         }
+        if (result === UniqueTag.UNINITIALIZED) throw uninitializedError(name)
         if (result !is Callable && isOptionalChainingCall && (result === Scriptable.NOT_FOUND || result == null || Undefined.isUndefined(result))) {
             return null
         }
@@ -2622,7 +2650,9 @@ public object ScriptRuntime {
         val cx = Context.getContext()
         val v = bind(cx, scope, id) ?: return "undefined"
         if (v is NativeProxy) return typeOf(withGetBindingValue(cx, v, id))
-        return typeOf(getObjectProp(v, id, cx))
+        val value = getObjectProp(v, id, cx)
+        if (value === UniqueTag.UNINITIALIZED) throw uninitializedError(id)
+        return typeOf(value)
     }
 
     // ---- Function lookups for calls ------------------------------------------------------------
@@ -2855,6 +2885,7 @@ public object ScriptRuntime {
                 val withObj = scopeChain.prototype!!
                 if (scopeHasBinding(scopeChain, id)) {
                     value = withGetBindingValue(cx, withObj, id)
+                    if (value === UniqueTag.UNINITIALIZED) throw uninitializedError(id)
                     if (isConstBinding(withObj, id)) {
                         if (value !is Number && value !is KBigInt) toNumeric(value)
                         throw constAssignError(id)
@@ -2868,6 +2899,7 @@ public object ScriptRuntime {
             do {
                 value = target!!.get(id, scopeChain!!)
                 if (value !== Scriptable.NOT_FOUND) {
+                    if (value === UniqueTag.UNINITIALIZED) throw uninitializedError(id)
                     if (isConstBinding(target, id)) {
                         // The operand is still converted first, as the spec's order asks.
                         if (value !is Number && value !is KBigInt) toNumeric(value)

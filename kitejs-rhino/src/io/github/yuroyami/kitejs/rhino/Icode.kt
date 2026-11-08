@@ -182,7 +182,14 @@ internal abstract class Icode {
         // close of a `for await` loop after a throw can ignore it.
         const val Icode_AWAIT_SETTLED = Icode_ENUM_CLOSE - 1
 
-        const val MIN_ICODE = Icode_AWAIT_SETTLED
+        // A lexical binding's own initialization and the store that starts its dead zone, by name
+        // and by frame slot (#137).
+        const val Icode_INIT_LEXICAL = Icode_AWAIT_SETTLED - 1
+        const val Icode_INIT_LEXICAL_VAR = Icode_INIT_LEXICAL - 1
+        const val Icode_RESET_LEXICAL = Icode_INIT_LEXICAL_VAR - 1
+        const val Icode_RESET_LEXICAL_VAR = Icode_RESET_LEXICAL - 1
+
+        const val MIN_ICODE = Icode_RESET_LEXICAL_VAR
 
         // The steps of Icode_DESTRUCTURE.
         const val DESTRUCTURE_OPEN = 0
@@ -340,6 +347,10 @@ internal abstract class Icode {
             Icode_CREATE_ITERATION_SCOPE -> "CREATE_ITERATION_SCOPE"
             Icode_DESTRUCTURE -> "DESTRUCTURE"
             Icode_AWAIT_SETTLED -> "AWAIT_SETTLED"
+            Icode_INIT_LEXICAL -> "INIT_LEXICAL"
+            Icode_INIT_LEXICAL_VAR -> "INIT_LEXICAL_VAR"
+            Icode_RESET_LEXICAL -> "RESET_LEXICAL"
+            Icode_RESET_LEXICAL_VAR -> "RESET_LEXICAL_VAR"
             Icode_ENUM_CLOSE -> "ENUM_CLOSE"
                 // An icode with no name.
                 else -> throw IllegalStateException(bytecode.toString())

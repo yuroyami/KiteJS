@@ -5967,7 +5967,10 @@ public class Parser(
     ) {
         if (target.type == Token.NAME) {
             val name = target.string!!
-            parent.addChildToBack(Node(setOp, createName(Token.BINDNAME, name, null), value))
+            val store = Node(setOp, createName(Token.BINDNAME, name, null), value)
+            // A let the pattern declares is initialized here, past its dead zone (#137).
+            if (variableType == Token.LET && compilerEnv.hasLexicalDeadZones) store.putIntProp(Node.LEXICAL_BINDING_PROP, Node.LEXICAL_INIT)
+            parent.addChildToBack(store)
             if (variableType != -1) {
                 defineSymbol(variableType, name, true)
                 destructuringNames.add(name)

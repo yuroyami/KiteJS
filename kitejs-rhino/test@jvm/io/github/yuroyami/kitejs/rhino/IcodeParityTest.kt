@@ -93,12 +93,12 @@ class IcodeParityTest {
             // Lexical block initialization, source-position Annex B copies, saved switch
             // discriminants and per-iteration let environments.
             // The steps of a destructuring pattern, and closing a for-of loop's iterator on a
-            // jump out of it (#81, #83, #96).
+            // jump out of it (#81, #83, #96). The stores of a lexical binding's dead zone (#137).
             listOf(
                 "Icode_ANNEX_B_COPY", "Icode_AWAIT", "Icode_AWAIT_SETTLED", "Icode_CALL_SPREAD", "Icode_CLASS_BEGIN", "Icode_CLASS_CTOR", "Icode_CLASS_ELEMENT",
                 "Icode_CLASS_END", "Icode_CLASS_PRIVATE_NAMES", "Icode_CREATE_ITERATION_SCOPE", "Icode_DESTRUCTURE", "Icode_ENTER_FUNCTION_BODY", "Icode_ENUM_CLOSE",
                 "Icode_GENERATOR_RETURN_RESULT", "Icode_INITCONST", "Icode_INITCONSTVAR",
-                "Icode_INITIALIZE_PARAMETER", "Icode_INIT_BLOCK_FUNCTION", "Icode_LOCAL_STORE", "Icode_NEW_SPREAD", "Icode_NEW_TARGET", "Icode_OPTIONAL_CALL_LOOKUP", "Icode_PARAMETER_VALUE", "Icode_SUPER_CALL", "Icode_SUPER_CALL_SPREAD",
+                "Icode_INITIALIZE_PARAMETER", "Icode_INIT_BLOCK_FUNCTION", "Icode_INIT_LEXICAL", "Icode_INIT_LEXICAL_VAR", "Icode_LOCAL_STORE", "Icode_NEW_SPREAD", "Icode_NEW_TARGET", "Icode_OPTIONAL_CALL_LOOKUP", "Icode_PARAMETER_VALUE", "Icode_RESET_LEXICAL", "Icode_RESET_LEXICAL_VAR", "Icode_SUPER_CALL", "Icode_SUPER_CALL_SPREAD",
                 "Icode_SUPER_CTOR",
             ),
             extras.keys.toList(),

@@ -118,12 +118,23 @@ await Atomics.waitAsync(i32, 0, 0, 10).value      // "timed-out", with no 10 ms 
 ignore their locale argument. `Date.prototype.toString` prints the zone's id rather than its
 abbreviation. See [Dates and time zones](dates-and-time-zones.md).
 
-### A `let`, `const` or class is readable before its declaration
+### A script's own `let`, `const` or class is readable before its declaration
 
-A browser throws a `ReferenceError` when code reaches a `let`, `const` or class binding before
-its declaration has run. Here the binding is there from the start of its block and holds
-`undefined` until then, so `new C()` above `class C {}` throws a `TypeError` for calling
-`undefined` rather than a `ReferenceError`. Code that runs in a browser runs the same here.
+A `let`, `const` or class inside a function or a block has its temporal dead zone: reading or
+assigning it before its declaration has run throws a `ReferenceError`, as in a browser, from a
+closure and through `typeof` too. Two kinds of binding still have none:
+
+- one declared at the top level of a script, which is a property of the global object here and
+  holds `undefined` until its declaration runs;
+- the names a `for (let x of ...)` or `for (let x in ...)` head declares, while its own
+  expression runs: `for (let x of [x])` reads an outer `x` rather than throwing.
+
+```js
+try { a } catch (e) { e.name }   // undefined here, 'ReferenceError' in a browser
+let a = 1
+```
+
+Code that runs in a browser runs the same here.
 
 ### Block, parameter and eval scopes
 

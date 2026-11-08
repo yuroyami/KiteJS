@@ -50,6 +50,8 @@ class NodeTransformerOracleTest {
     private fun portedTransformed(source: String, version: Int, optionalChainFixture: Boolean = false, iterationFixture: Boolean = false): String {
         val env = CompilerEnvirons()
         env.languageVersion = version
+        // Upstream has no temporal dead zone, so the port transforms without its stores (#137).
+        env.lexicalDeadZones = false
         val ast = Parser(env).parse(source, "corpus.js", 1)
         val tree = IRFactory(env, "corpus.js", source, env.errorReporter).transformTree(ast)!!
         NodeTransformer().transform(tree, env)

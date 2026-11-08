@@ -1579,6 +1579,11 @@ public class IRFactory(
             val builtLoop = createLoop(loop as Jump, LOOP_WHILE, newBody, cond, null, null)
             builtLoop.addChildToFront(init)
             if (type == Token.VAR || type == Token.LET) builtLoop.addChildToFront(lhs)
+            if (iterationScope != null && parser.compilerEnv.hasLexicalDeadZones) {
+                // The body binds the head's names on each pass; the head itself initializes none.
+                lhs.putIntProp(Node.LEXICAL_BINDING_PROP, Node.LEXICAL_HEAD)
+                if (declType == Token.LET && destructuring == -1) assign.putIntProp(Node.LEXICAL_BINDING_PROP, Node.LEXICAL_INIT)
+            }
             if (awaitIterator != null) return builtLoop
             localBlock.addChildToBack(builtLoop)
 

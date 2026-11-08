@@ -40,3 +40,8 @@ The notes of each release are also on the [releases page](https://github.com/yur
   own Unicode 16.0 tables, and passes the whole NormalizationTest.txt conformance file. It used to
   return its input unchanged. `localeCompare` puts both strings in NFC first, so canonically
   equivalent strings compare equal (#135).
+- Rhino: a `let`, `const` or class binding in a function or a block has its temporal dead zone,
+  so reading, assigning or `typeof` before its declaration throws a `ReferenceError`, as in a
+  browser, where it used to read `undefined`. Each entry to a block, a loop pass or a switch
+  starts it again. A script's top-level bindings, which live on the global object, still have
+  none (#137).

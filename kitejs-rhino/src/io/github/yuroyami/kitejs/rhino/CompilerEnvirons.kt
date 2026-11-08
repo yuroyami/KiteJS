@@ -110,7 +110,13 @@ public class CompilerEnvirons {
         generatingSource = cx.isGeneratingSource
         activationNames = cx.activationNames
         generateObserverCount = cx.isGenerateObserverCount
+        lexicalDeadZones = cx.lexicalDeadZones
     }
+
+    /** Whether lexical bindings get a temporal dead zone: from ES6 on, unless an oracle test turns it off (#137). */
+    internal var lexicalDeadZones: Boolean = true
+
+    internal val hasLexicalDeadZones: Boolean get() = lexicalDeadZones && languageVersion >= Context.VERSION_ES6
 
     public fun reportWarningAsError(): Boolean = warningAsError
 

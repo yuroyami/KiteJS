@@ -731,7 +731,15 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
                 visitExpression(child, 0)
                 child = child.next!!
                 visitExpression(child, 0)
-                addStringOp(if (node.getIntProp(Node.INITIALIZE_PARAMETER_PROP, 0) != 0) Icode_INITIALIZE_PARAMETER else type, name)
+                val op = when {
+                    node.getIntProp(Node.INITIALIZE_PARAMETER_PROP, 0) != 0 -> Icode_INITIALIZE_PARAMETER
+                    else -> when (node.getIntProp(Node.LEXICAL_BINDING_PROP, 0)) {
+                        Node.LEXICAL_INIT -> Icode.Icode_INIT_LEXICAL
+                        Node.LEXICAL_RESET -> Icode.Icode_RESET_LEXICAL
+                        else -> type
+                    }
+                }
+                addStringOp(op, name)
                 stackChange(-1)
             }
             Token.SETCONST -> {
@@ -772,14 +780,20 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
                 val index = scriptOrFn.getIndexForNameNode(child!!)
                 child = child.next!!
                 visitExpression(child, 0)
-                addVarOp(Token.SETVAR, index)
+                when (node.getIntProp(Node.LEXICAL_BINDING_PROP, 0)) {
+                    Node.LEXICAL_INIT -> addIndexOp(Icode.Icode_INIT_LEXICAL_VAR, index)
+                    Node.LEXICAL_RESET -> addIndexOp(Icode.Icode_RESET_LEXICAL_VAR, index)
+                    else -> addVarOp(Token.SETVAR, index)
+                }
             }
             Token.SETCONSTVAR -> {
                 if (builder.requiresActivationFrame) throw Kit.codeBug()
                 val index = scriptOrFn.getIndexForNameNode(child!!)
                 child = child.next!!
                 visitExpression(child, 0)
-                if (node.getIntProp(Node.FRESH_CONST_PROP, 0) == 1) {
+                if (node.getIntProp(Node.LEXICAL_BINDING_PROP, 0) == Node.LEXICAL_RESET) {
+                    addIndexOp(Icode.Icode_RESET_LEXICAL_VAR, index)
+                } else if (node.getIntProp(Node.FRESH_CONST_PROP, 0) == 1) {
                     addIndexOp(Icode_INITCONSTVAR, index)
                 } else {
                     addVarOp(Token.SETCONSTVAR, index)

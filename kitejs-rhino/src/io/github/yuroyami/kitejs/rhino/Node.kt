@@ -866,7 +866,17 @@ public open class Node : Iterable<Node> {
         internal const val DESTRUCTURE_PROP: Int = 44
         // An await that resumes with a rejection as a value instead of throwing it.
         internal const val AWAIT_SETTLED_PROP: Int = 45
-        public const val LAST_PROP: Int = AWAIT_SETTLED_PROP
+        /**
+         * On an assignment to a lexical binding: [LEXICAL_INIT] for the declaration's own
+         * initialization, which the dead zone does not stop, [LEXICAL_RESET] for the store that
+         * puts the binding in its dead zone when its scope is entered (#137).
+         */
+        internal const val LEXICAL_BINDING_PROP: Int = 46
+        public const val LAST_PROP: Int = LEXICAL_BINDING_PROP
+        internal const val LEXICAL_INIT: Int = 1
+        internal const val LEXICAL_RESET: Int = 2
+        /** On the declaration in a for-in or for-of head, whose names the loop body binds. */
+        internal const val LEXICAL_HEAD: Int = 3
 
         internal const val CLASS_HAS_HERITAGE: Int = 1
         internal const val CLASS_HAS_BINDING: Int = 2
@@ -974,6 +984,7 @@ public open class Node : Iterable<Node> {
             FUNCTION_BODY_START_PROP -> "function_body_start"
             DESTRUCTURE_PROP -> "destructure"
             AWAIT_SETTLED_PROP -> "await_settled"
+            LEXICAL_BINDING_PROP -> "lexical_binding"
             else -> throw Kit.codeBug()
         }
 

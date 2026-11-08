@@ -180,6 +180,9 @@ public open class Scope(pos: Int = -1, len: Int = 1) : Jump() {
             val result = Scope(scope.position, scope.length)
             result.symbolTable = scope.symbolTable
             scope.symbolTable = null
+            // Shared, not moved: the switch still checks its case functions against it, and the
+            // block needs it to tell them from its lets (#137).
+            result.functionNamesWithin = scope.functionNamesWithin
             result.parentField = scope.parentField
             result.parentScope = scope.parentScope
             scope.parentField = result

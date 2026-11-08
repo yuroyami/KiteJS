@@ -27,6 +27,12 @@ public open class Context internal constructor(public val factory: ContextFactor
     private var sealKey: Any? = null
 
     internal var topCallScope: Scriptable? = null
+
+    /**
+     * Whether code compiled here gives lexical bindings their temporal dead zone (#137). Only the
+     * oracle tests that compare the compiler's output with upstream Rhino, which has none, turn it off.
+     */
+    internal var lexicalDeadZones: Boolean = true
     /** Realm of the running script or built-in, independently of the outermost caller. */
     internal var currentRealm: Scriptable? = null
 

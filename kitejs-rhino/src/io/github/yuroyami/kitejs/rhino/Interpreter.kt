@@ -1597,6 +1597,7 @@ public class Interpreter : Evaluator {
                 Icode_SETVAR1, Token.SETVAR -> {
                     if (op == Icode_SETVAR1) state.indexReg = frame.idata.itsICode[frame.pc++].toInt()
                     val varAttributes = frame.varSource.stackAttributes
+                    if (frame.varSource.stack[state.indexReg] === UniqueTag.UNINITIALIZED) throw uninitializedVarError(frame, state.indexReg)
                     if ((varAttributes[state.indexReg].toInt() and ScriptableObject.READONLY) == 0) {
                         frame.varSource.stack[state.indexReg] = stack[state.stackTop]
                         frame.varSource.sDbl[state.indexReg] = sDbl[state.stackTop]
@@ -1607,8 +1608,10 @@ public class Interpreter : Evaluator {
                 }
                 Icode_GETVAR1, Token.GETVAR -> {
                     if (op == Icode_GETVAR1) state.indexReg = frame.idata.itsICode[frame.pc++].toInt()
+                    val value = frame.varSource.stack[state.indexReg]
+                    if (value === UniqueTag.UNINITIALIZED) throw uninitializedVarError(frame, state.indexReg)
                     ++state.stackTop
-                    stack[state.stackTop] = frame.varSource.stack[state.indexReg]
+                    stack[state.stackTop] = value
                     sDbl[state.stackTop] = frame.varSource.sDbl[state.indexReg]
                     return null
                 }
@@ -1880,6 +1883,35 @@ public class Interpreter : Evaluator {
                     val lhs = stack[state.stackTop - 1] as Scriptable
                     stack[state.stackTop - 1] = ScriptRuntime.initConst(lhs, rhs, state.stringReg!!)
                     --state.stackTop
+                    return null
+                }
+                Icode.Icode_INIT_LEXICAL, Icode.Icode_RESET_LEXICAL -> {
+                    var rhs = stack[state.stackTop]
+                    if (rhs === DBL_MRK) rhs = ScriptRuntime.wrapNumber(sDbl[state.stackTop])
+                    val lhs = stack[state.stackTop - 1] as Scriptable?
+                    if (op == Icode.Icode_INIT_LEXICAL) {
+                        stack[state.stackTop - 1] = ScriptRuntime.initLexical(lhs, rhs, cx, frame.scope!!, state.stringReg!!)
+                    } else {
+                        ScriptRuntime.resetLexical(lhs, state.stringReg!!)
+                        stack[state.stackTop - 1] = Undefined.instance
+                    }
+                    --state.stackTop
+                    return null
+                }
+                Icode.Icode_INIT_LEXICAL_VAR -> {
+                    val source = frame.varSource
+                    source.stack[state.indexReg] = stack[state.stackTop]
+                    source.sDbl[state.indexReg] = sDbl[state.stackTop]
+                    return null
+                }
+                Icode.Icode_RESET_LEXICAL_VAR -> {
+                    // The value the reset was compiled with stays on the stack, as a SETVAR's does.
+                    val source = frame.varSource
+                    source.stack[state.indexReg] = UniqueTag.UNINITIALIZED
+                    val attributes = source.stackAttributes[state.indexReg].toInt()
+                    if ((attributes and ScriptableObject.READONLY) != 0) {
+                        source.stackAttributes[state.indexReg] = (attributes or ScriptableObject.UNINITIALIZED_CONST).toByte()
+                    }
                     return null
                 }
                 Icode_INITCONSTVAR -> {
@@ -2203,6 +2235,7 @@ public class Interpreter : Evaluator {
             ++state.stackTop
             val incrDecrMask = frame.idata.itsICode[frame.pc].toInt()
             val varValue = vars[state.indexReg]
+            if (varValue === UniqueTag.UNINITIALIZED) throw uninitializedVarError(frame, state.indexReg)
             var d = 0.0
             var bi: KBigInt? = null
             if (varValue === DBL_MRK) {
@@ -2235,6 +2268,9 @@ public class Interpreter : Evaluator {
          * A frame marks only its consts read-only, so a write that meets one is an assignment to
          * a const, which ECMAScript 2015, 8.1.1.1.5 makes a TypeError in any mode.
          */
+        private fun uninitializedVarError(frame: CallFrame, index: Int): EcmaError =
+            ScriptRuntime.uninitializedError(frame.fnOrScript.descriptor!!.getParamOrVarName(index))
+
         private fun constVarAssignError(frame: CallFrame, index: Int): EcmaError =
             ScriptRuntime.constAssignError(frame.fnOrScript.descriptor!!.getParamOrVarName(index))
 

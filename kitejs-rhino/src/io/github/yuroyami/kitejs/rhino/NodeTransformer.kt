@@ -24,6 +24,9 @@ public open class NodeTransformer {
     private var loopEnds: ArrayDeque<Node> = ArrayDeque()
     private var hasFinally = false
 
+    /** Whether lexical bindings have a temporal dead zone: from ES6 on (#137). */
+    private var deadZones = false
+
     /** For a for-of loop, a node that closes its iterator on a jump out of it (#83); null for anything else. */
     private fun forOfClose(loop: Node): Node? {
         if (loop.type != Token.LOOP) return null
@@ -45,6 +48,7 @@ public open class NodeTransformer {
         if (env.languageVersion >= Context.VERSION_ES6 && tree.isInStrictMode) {
             useStrictMode = true
         }
+        deadZones = env.hasLexicalDeadZones
         transformCompilationUnit(tree, useStrictMode)
         for (i in 0 until tree.functionCount) {
             transform(tree.getFunctionNode(i), useStrictMode, env)
@@ -57,6 +61,8 @@ public open class NodeTransformer {
 
         // Saves the up-checks when no finally block is used.
         hasFinally = false
+
+        if (deadZones) insertDeadZones(tree)
 
         // Flatten everything only when block scopes are not becoming scope objects.
         val createScopeObjects =
@@ -281,7 +287,12 @@ public open class NodeTransformer {
                             cursor = cursor.next
                             if (v.type == Token.NAME) {
                                 // A let without an initializer that can run again is reset to undefined.
-                                if (!v.hasChildren() && n.getIntProp(Node.RESET_LET_PROP, 0) == 0) continue
+                                // With dead zones every one is, as its declaration ends its dead
+                                // zone, except in a for-in or for-of head, whose body binds it.
+                                if (!v.hasChildren()) {
+                                    if (n.getIntProp(Node.LEXICAL_BINDING_PROP, 0) == Node.LEXICAL_HEAD) continue
+                                    if (!(deadZones && type == Token.LET) && n.getIntProp(Node.RESET_LET_PROP, 0) == 0) continue
+                                }
                                 val init = v.firstChild?.also { v.removeChild(it) } ?: Node(Token.UNDEFINED)
                                 v.type = Token.BINDNAME
                                 v = Node(
@@ -289,6 +300,7 @@ public open class NodeTransformer {
                                     v,
                                     init,
                                 )
+                                if (type == Token.LET && deadZones) v.putIntProp(Node.LEXICAL_BINDING_PROP, Node.LEXICAL_INIT)
                                 // A const a for head declares is bound afresh each time.
                                 if (type == Token.CONST && n.getIntProp(Node.FRESH_CONST_PROP, 0) == 1) {
                                     v.putIntProp(Node.FRESH_CONST_PROP, 1)
@@ -424,6 +436,79 @@ public open class NodeTransformer {
             )
         }
     }
+
+    /**
+     * Starts the temporal dead zone of every `let`, `const` and class binding when its scope is
+     * entered (ECMAScript 2015, 13.3.1; #137): the first statements of each block, loop and
+     * function body store [UniqueTag.UNINITIALIZED] in its bindings, and the declaration's own
+     * initialization replaces it. Doing it on every entry, not once per frame, gives a block in a
+     * loop or a switch case a fresh dead zone each time. A script's own lexical bindings are left
+     * out: they are properties of the global object here, where the marker would show.
+     */
+    private fun insertDeadZones(tree: ScriptNode) {
+        fun names(scope: Scope): List<String> {
+            val table = scope.symbolTable ?: return emptyList()
+            // A function declared in a block is a let symbol too, but it is bound on entry.
+            val functions = scope.functionNamesWithin
+            return table.values.filter { s ->
+                (s.declType == Token.LET || s.declType == Token.CONST) && !isTemporary(s.name!!) &&
+                    (functions == null || s.name !in functions)
+            }.map { it.name!! }
+        }
+        fun resets(names: List<String>): List<Node> = names.map { name ->
+            val store = Node(Token.SETNAME, Node.newString(Token.BINDNAME, name), Node(Token.UNDEFINED))
+            store.putIntProp(Node.LEXICAL_BINDING_PROP, Node.LEXICAL_RESET)
+            Node(Token.EXPR_VOID, store)
+        }
+        fun visit(node: Node) {
+            var child = node.firstChild
+            while (child != null) {
+                val next = child.next
+                if (child !is FunctionNode) {
+                    if (child is Scope && (child.type == Token.BLOCK || child.type == Token.LOOP)) {
+                        val list = names(child)
+                        // Prepended in reverse, so they run in declaration order.
+                        for (r in resets(list).asReversed()) child.addChildToFront(r)
+                    }
+                    visit(child)
+                }
+                child = next
+            }
+        }
+        if (tree is FunctionNode) {
+            val list = resets(names(tree))
+            if (list.isNotEmpty()) {
+                // After the parameters are bound, where the body's own scope begins.
+                val bodyStart = tree.lastChild?.let { findBodyStart(it) }
+                if (bodyStart != null) {
+                    var after = bodyStart.second
+                    for (r in list) {
+                        bodyStart.first.addChildAfter(r, after)
+                        after = r
+                    }
+                } else {
+                    // The code of a function is its last child, the body.
+                    val body = tree.lastChild ?: tree
+                    for (r in list.asReversed()) body.addChildToFront(r)
+                }
+            }
+        }
+        visit(tree)
+    }
+
+    /** The marker where a function body starts after its parameters, and the node holding it. */
+    private fun findBodyStart(node: Node): Pair<Node, Node>? {
+        var child = node.firstChild
+        while (child != null) {
+            if (child.getIntProp(Node.FUNCTION_BODY_START_PROP, 0) != 0) return node to child
+            if (child !is FunctionNode && child !is Scope) findBodyStart(child)?.let { return it }
+            child = child.next
+        }
+        return null
+    }
+
+    /** A name the compiler made up for a temporary, `$` and digits, which no declaration wrote. */
+    private fun isTemporary(name: String): Boolean = name.length > 1 && name[0] == '$' && name.substring(1).all { it in '0'..'9' }
 
     protected open fun visitNew(node: Node, tree: ScriptNode) {}
 

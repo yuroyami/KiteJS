@@ -5,7 +5,7 @@
 package io.github.yuroyami.kitejs.rhino
 
 /**
- * A marker value that is only ever compared by identity. Three of them exist and no more can be
+ * A marker value that is only ever compared by identity. Four of them exist and no more can be
  * made.
  */
 public class UniqueTag private constructor(private val tagId: Int) {
@@ -16,6 +16,7 @@ public class UniqueTag private constructor(private val tagId: Int) {
             ID_NOT_FOUND -> "NOT_FOUND"
             ID_NULL_VALUE -> "NULL_VALUE"
             ID_DOUBLE_MARK -> "DOUBLE_MARK"
+            ID_UNINITIALIZED -> "UNINITIALIZED"
             else -> throw Kit.codeBug()
         }
         return super.toString() + ": " + name
@@ -25,6 +26,7 @@ public class UniqueTag private constructor(private val tagId: Int) {
         private const val ID_NOT_FOUND = 1
         private const val ID_NULL_VALUE = 2
         private const val ID_DOUBLE_MARK = 3
+        private const val ID_UNINITIALIZED = 4
 
         /** Returned when a property is absent, as opposed to present and undefined. */
         public val NOT_FOUND: UniqueTag = UniqueTag(ID_NOT_FOUND)
@@ -34,5 +36,12 @@ public class UniqueTag private constructor(private val tagId: Int) {
 
         /** Marks a slot in the interpreter stack whose real value lives in the parallel doubles. */
         public val DOUBLE_MARK: UniqueTag = UniqueTag(ID_DOUBLE_MARK)
+
+        /**
+         * The value of a `let`, `const` or class binding in its temporal dead zone (ECMAScript
+         * 2015, 8.1.1.1.6). It lives only in a frame slot or a scope object, and every read of a
+         * name throws a ReferenceError on it, so a script never sees it (#137).
+         */
+        internal val UNINITIALIZED: UniqueTag = UniqueTag(ID_UNINITIALIZED)
     }
 }

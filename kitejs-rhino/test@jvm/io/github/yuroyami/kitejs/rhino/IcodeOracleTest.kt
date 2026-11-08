@@ -156,7 +156,14 @@ class IcodeOracleTest {
     }
 
     private fun portedIcode(source: String): String {
-        val script = Context.getContext().compileString(source, "corpus.js", 1) as JSScript
+        // Upstream has no temporal dead zone, so the port compiles without its stores (#137).
+        val cx = Context.getContext()
+        cx.lexicalDeadZones = false
+        val script = try {
+            cx.compileString(source, "corpus.js", 1) as JSScript
+        } finally {
+            cx.lexicalDeadZones = true
+        }
         val sb = StringBuilder()
         renderPorted(script.descriptor, sb, 0)
         return sb.toString()

@@ -191,6 +191,23 @@ public abstract class ScriptableObject :
         slot.attributes = CONST and UNINITIALIZED_CONST.inv()
     }
 
+    /** Whether [name] is an own binding here still in its temporal dead zone (#137). */
+    internal fun isUninitializedBinding(name: String): Boolean = map.query(name, 0)?.value === UniqueTag.UNINITIALIZED
+
+    /**
+     * Puts the lexical binding [name] in its dead zone, as entering its scope does. A const
+     * becomes uninitialized again, so its declaration can bind it.
+     */
+    internal fun resetLexicalBinding(name: String) {
+        val slot = map.query(name, 0)
+        if (slot == null) {
+            put(name, this, UniqueTag.UNINITIALIZED)
+            return
+        }
+        slot.value = UniqueTag.UNINITIALIZED
+        if ((slot.attributes and READONLY) != 0) slot.attributes = slot.attributes or UNINITIALIZED_CONST
+    }
+
     /** Whether [name] is an own `const` binding here, which no assignment may change. */
     internal fun isConstBinding(name: String): Boolean {
         val slot = map.query(name, 0) ?: return false
