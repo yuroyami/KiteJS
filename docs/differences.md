@@ -80,12 +80,6 @@ engine does not carry.
 
 If you compare user text for equality, normalise it in Kotlin before handing it over.
 
-### `toLowerCase` differs by target for one letter
-
-Case conversion is the one operation still borrowed from the platform, and the platforms disagree
-about the Greek final sigma. On the JVM, `'ΑΣ'.toLowerCase()` gives `'ας'`. On JavaScript,
-WebAssembly and the native targets it gives `'ασ'`. Every other character agrees.
-
 ### `Math.pow` can differ from Chrome in the last digit
 
 `Math` gives the same digits on every target, and they are the digits V8 gives, with one

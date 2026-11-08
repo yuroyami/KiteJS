@@ -13,4 +13,3 @@ Things a previous change taught the hard way. One line each. Delete a line when 
 - Kotlin/Wasm's `String.toDouble` returns a neighbouring double for about one string in a hundred. Script numbers go through `dtoa/DecimalParser`, never through the platform parser (624cdca).
 - Wasm has no weak reference. `WeakRef` holds strongly there and reports `isWeakSupported` as false, so a test that needs a real collection runs on the JVM only (624cdca).
 - The JVM parity run cannot see a platform difference. Only the test262 replay on JS, Wasm and the native targets finds one (5e1882c).
-- Case conversion is the one Unicode operation that still comes from the platform, so the targets disagree on it (#136).

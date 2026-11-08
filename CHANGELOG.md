@@ -32,3 +32,7 @@ The notes of each release are also on the [releases page](https://github.com/yur
 - Rhino: deeply nested source ends with the engine's error "Too deep recursion while parsing" on
   every target, as upstream reports it, instead of the host's stack overflow. The parser counts its
   own depth, because native code cannot catch a stack overflow (#139).
+- Rhino: `toLowerCase`, `toUpperCase` and their locale variants use the engine's own case tables
+  from the Unicode Character Database 16.0, SpecialCasing included, with the final sigma rule, so
+  every target gives one answer. They came from the platform, which disagreed on the final sigma
+  and, on the JVM, had no Garay letters (#136).

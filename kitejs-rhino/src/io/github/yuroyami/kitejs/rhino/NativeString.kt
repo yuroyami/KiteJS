@@ -486,12 +486,12 @@ internal class NativeString internal constructor(private val string: CharSequenc
 
         private fun js_toLowerCase(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val thisStr = ScriptRuntime.toString(coercibleThis(cx, thisObj, "toLowerCase"))
-            return thisStr.lowercase()
+            return CaseMapping.toLowerCase(thisStr)
         }
 
         private fun js_toUpperCase(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val thisStr = ScriptRuntime.toString(coercibleThis(cx, thisObj, "toUpperCase"))
-            return thisStr.uppercase()
+            return CaseMapping.toUpperCase(thisStr)
         }
 
         private fun js_substr(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
@@ -776,12 +776,12 @@ internal class NativeString internal constructor(private val string: CharSequenc
         private fun js_toLocaleLowerCase(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val thisStr = ScriptRuntime.toString(coercibleThis(cx, thisObj, "toLocaleLowerCase"))
             // No locale support, so this is the locale-independent conversion.
-            return thisStr.lowercase()
+            return CaseMapping.toLowerCase(thisStr)
         }
 
         private fun js_toLocaleUpperCase(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val thisStr = ScriptRuntime.toString(coercibleThis(cx, thisObj, "toLocaleUpperCase"))
-            return thisStr.uppercase()
+            return CaseMapping.toUpperCase(thisStr)
         }
 
         private fun js_trim(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {

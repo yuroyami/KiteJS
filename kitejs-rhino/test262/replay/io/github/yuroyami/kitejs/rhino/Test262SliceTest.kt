@@ -18,11 +18,6 @@ internal expect fun markTest262Case(name: String)
 /** Explicit corpus replay. Missing, stale, truncated or inaccessible inputs are failures. */
 class Test262SliceTest {
     private val knownPlatformDifferences = setOf(
-        "built-ins/String/prototype/toLowerCase/special_casing_conditional.js",
-        "built-ins/String/prototype/toLocaleLowerCase/special_casing_conditional.js",
-        // Case mapping comes from the host's Unicode tables, and JDK 21 has no Garay letters
-        // (Unicode 16), which Node 26 maps.
-        "staging/sm/String/string-code-point-upper-lower-mapping.js",
         // Runs out of memory everywhere, and each platform names that crash differently.
         "staging/sm/String/replace-math.js",
         // Two files whose outcome is not a property of the engine.
