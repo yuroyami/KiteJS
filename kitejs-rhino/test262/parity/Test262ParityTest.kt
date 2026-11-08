@@ -993,20 +993,6 @@ class Test262ParityTest {
             "the port makes the property non-writable, as the spec asks",
         )
 
-        // The two places the port is the weaker one, both for want of Unicode data that common
-        // Kotlin has none of: there is no normalizer and no collation.
-        for (path in listOf(
-            "built-ins/String/prototype/normalize/return-normalized-string.js",
-            "built-ins/String/prototype/normalize/return-normalized-string-from-coerced-form.js",
-            "built-ins/String/prototype/normalize/return-normalized-string-using-default-parameter.js",
-        )) {
-            put(path, "there is no Unicode normalizer in common Kotlin, so normalize returns its input")
-        }
-        put(
-            "built-ins/String/prototype/localeCompare/15.5.4.9_CE.js",
-            "there is no collation data, so localeCompare falls back to code unit order",
-        )
-
         // Reflect.get, set, deleteProperty and defineProperty run the target's own internal methods
         // with the caller's receiver, convert the key first and report a refusal as false.
         for (path in listOf(

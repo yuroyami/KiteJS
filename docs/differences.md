@@ -61,24 +61,15 @@ your purpose rather than obviously broken.
 
 ### Text comparison ignores locale
 
-`localeCompare` compares by UTF-16 code unit, not by any collation order.
+`localeCompare` compares by UTF-16 code unit, not by any collation order. It puts both strings in
+NFC first, so canonically equivalent strings compare equal, as the specification asks.
 
 ```js
-'a'.localeCompare('B')   //  1 here, -1 in a browser
+'a'.localeCompare('B')             //  1 here, -1 in a browser
+'\u00E9'.localeCompare('e\u0301')  //  0 here and in a browser
 ```
 
 Sort user-visible text in Kotlin, where you have the platform's collator.
-
-### `normalize` does nothing
-
-`String.prototype.normalize` returns its input unchanged. Unicode normalisation needs tables the
-engine does not carry.
-
-```js
-'é'.normalize('NFC').length   // 2 here, 1 in a browser
-```
-
-If you compare user text for equality, normalise it in Kotlin before handing it over.
 
 ### `Math.pow` can differ from Chrome in the last digit
 

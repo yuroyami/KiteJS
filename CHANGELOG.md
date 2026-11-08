@@ -36,3 +36,7 @@ The notes of each release are also on the [releases page](https://github.com/yur
   from the Unicode Character Database 16.0, SpecialCasing included, with the final sigma rule, so
   every target gives one answer. They came from the platform, which disagreed on the final sigma
   and, on the JVM, had no Garay letters (#136).
+- Rhino: `String.prototype.normalize` gives the four Unicode normalization forms from the engine's
+  own Unicode 16.0 tables, and passes the whole NormalizationTest.txt conformance file. It used to
+  return its input unchanged. `localeCompare` puts both strings in NFC first, so canonically
+  equivalent strings compare equal (#135).

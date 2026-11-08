@@ -768,8 +768,12 @@ internal class NativeString internal constructor(private val string: CharSequenc
 
         private fun js_localeCompare(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
             val thisStr = ScriptRuntime.toString(coercibleThis(cx, thisObj, "localeCompare"))
-            // Common Kotlin has no collator, so this is code-unit order, clamped to -1, 0, 1.
-            val cmp = thisStr.compareTo(ScriptRuntime.toString(args, 0))
+            // Common Kotlin has no collator, so this is code-unit order, clamped to -1, 0, 1. Both
+            // strings are put in NFC first, so canonically equivalent strings compare equal, as
+            // ECMAScript 2015, 21.1.3.10 requires (#135).
+            val that = ScriptRuntime.toString(args, 0)
+            val cmp = Normalizer.normalize(thisStr, Normalizer.Form.NFC)
+                .compareTo(Normalizer.normalize(that, Normalizer.Form.NFC))
             return if (cmp < 0) -1 else if (cmp > 0) 1 else 0
         }
 
@@ -808,16 +812,20 @@ internal class NativeString internal constructor(private val string: CharSequenc
         }
 
         private fun js_normalize(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
-            // Common Kotlin has no Unicode normalizer: the form name is checked, the text
-            // comes back as it was.
-            if (args.isEmpty() || Undefined.isUndefined(args[0])) {
-                return ScriptRuntime.toString(coercibleThis(cx, thisObj, "normalize"))
+            // ECMAScript 2015, 21.1.3.12: the string first, then the form, NFC when it is undefined.
+            val str = ScriptRuntime.toString(coercibleThis(cx, thisObj, "normalize"))
+            val form = if (args.isEmpty() || Undefined.isUndefined(args[0])) {
+                Normalizer.Form.NFC
+            } else {
+                when (ScriptRuntime.toString(args, 0)) {
+                    "NFC" -> Normalizer.Form.NFC
+                    "NFD" -> Normalizer.Form.NFD
+                    "NFKC" -> Normalizer.Form.NFKC
+                    "NFKD" -> Normalizer.Form.NFKD
+                    else -> throw ScriptRuntime.rangeError("The normalization form should be one of 'NFC', 'NFD', 'NFKC', 'NFKD'.")
+                }
             }
-            val formStr = ScriptRuntime.toString(args, 0)
-            if (formStr != "NFD" && formStr != "NFKC" && formStr != "NFKD" && formStr != "NFC") {
-                throw ScriptRuntime.rangeError("The normalization form should be one of 'NFC', 'NFD', 'NFKC', 'NFKD'.")
-            }
-            return ScriptRuntime.toString(coercibleThis(cx, thisObj, "normalize"))
+            return Normalizer.normalize(str, form)
         }
 
         private fun js_repeat(cx: Context, scope: Scriptable, thisObj: Scriptable?, args: Array<Any?>): Any? {
