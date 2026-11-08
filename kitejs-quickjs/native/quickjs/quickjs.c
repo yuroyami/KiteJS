@@ -43125,6 +43125,9 @@ static int JS_CopySubArray(JSContext *ctx,
             }
             i += l;
         } else {
+            /* KiteJS: a generic object can claim a length of 2**53 - 1 */
+            if (js_poll_interrupts(ctx))
+                goto exception;
             fromPresent = JS_TryGetPropertyInt64(ctx, obj, from, &val);
             if (fromPresent < 0)
                 goto exception;
@@ -43869,6 +43872,9 @@ static JSValue js_array_fill(JSContext *ctx, JSValueConst this_val,
 
     /* XXX: should special case fast arrays */
     while (start < end) {
+        /* KiteJS: a generic object can claim a length of 2**53 - 1 */
+        if (js_poll_interrupts(ctx))
+            goto exception;
         if (JS_SetPropertyInt64(ctx, obj, start, js_dup(argv[0])) < 0)
             goto exception;
         start++;
@@ -44163,6 +44169,9 @@ static JSValue js_array_join(JSContext *ctx, JSValueConst this_val,
     string_buffer_init(ctx, b, 0);
 
     for(i = 0; i < n; i++) {
+        /* KiteJS: a generic object can claim a length of 2**53 - 1 */
+        if (js_poll_interrupts(ctx))
+            goto fail;
         if (i > 0) {
             if (c >= 0) {
                 string_buffer_putc8(b, c);
@@ -44341,6 +44350,9 @@ static JSValue js_array_reverse(JSContext *ctx, JSValueConst this_val,
     }
 
     for (l = 0, h = len - 1; l < h; l++, h--) {
+        /* KiteJS: a generic object can claim a length of 2**53 - 1 */
+        if (js_poll_interrupts(ctx))
+            goto exception;
         l_present = JS_TryGetPropertyInt64(ctx, obj, l, &lval);
         if (l_present < 0)
             goto exception;

@@ -961,6 +961,8 @@ public class NativeArray : ScriptableObject {
             val len = getLengthProperty(cx, o)
             val half = len / 2
             for (i in 0 until half) {
+                // A generic object may claim a length of 2**53 - 1: each step counts, so the budget and the interrupt hook reach this loop.
+                cx.addInstructionCount(1)
                 val j = len - i - 1
                 val lowerExists = ArrayLikeAbstractOperations.hasElem(o, i)
                 val lower = if (lowerExists) getElem(cx, o, i) else Undefined.instance
@@ -1540,6 +1542,8 @@ public class NativeArray : ScriptableObject {
             val fin = if (relativeEnd < 0) maxOf(len + relativeEnd, 0) else minOf(relativeEnd, len)
             val value = if (args.isNotEmpty()) args[0] else Undefined.instance
             for (i in k until fin) {
+                // A generic object may claim a length of 2**53 - 1: each step counts, so the budget and the interrupt hook reach this loop.
+                cx.addInstructionCount(1)
                 setRawElem(cx, thisObj!!, i, value)
             }
             return thisObj
@@ -1584,6 +1588,8 @@ public class NativeArray : ScriptableObject {
             // undefined for a hole, so a present undefined was deleted and a proxy's `has` trap
             // was never asked.
             while (count > 0) {
+                // A generic object may claim a length of 2**53 - 1: each step counts, so the budget and the interrupt hook reach this loop.
+                cx.addInstructionCount(1)
                 if (ArrayLikeAbstractOperations.hasElem(o, from)) {
                     setElem(cx, o, to, getElem(cx, o, from))
                 } else {

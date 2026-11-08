@@ -45,3 +45,7 @@ The notes of each release are also on the [releases page](https://github.com/yur
   browser, where it used to read `undefined`. Each entry to a block, a loop pass or a switch
   starts it again. A script's top-level bindings, which live on the global object, still have
   none (#137).
+- Both engines: `Array.prototype.join`, `reverse`, `fill` and `copyWithin` on an object that
+  claims a length of `2**53 - 1` now reach the instruction budget and the interrupt hook while
+  they loop. QuickJS asks the hook from these loops, and Rhino counts each step, so one such call
+  no longer holds its thread past every deadline.

@@ -12,6 +12,7 @@ import io.github.yuroyami.kitejs.api.JsEngineError
 import io.github.yuroyami.kitejs.api.KiteJsConfig
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFails
 import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -194,6 +195,24 @@ public abstract class ConfigContract<C : KiteJsConfig>(engine: JsEngine<C>) : En
         open { interruptWhen = { ++asked > 2 } }.use { js ->
             assertFailsWith<JsEngineError> { js.evaluate("while (true) {}") }
             assertTrue(asked > 2, "the hook was asked $asked times")
+        }
+    }
+
+    @Test
+    public fun theInterruptHookStopsOneLongBuiltInCall(): TestResult = test {
+        // A generic object may claim a length of 2**53 - 1, and each of these built-ins then loops
+        // over every index. The call must end: through the hook, which an engine asks while one
+        // call runs, or with an error of its own, as Rhino gives for a length past its capacity.
+        for (call in listOf(
+            "Array.prototype.join.call({length: 2**53 - 1}, '')",
+            "Array.prototype.reverse.call({length: 2**53 - 1})",
+            "Array.prototype.fill.call({length: 2**53 - 1}, 0)",
+            "Array.prototype.copyWithin.call({length: 2**53 - 1}, 1, 0)",
+        )) {
+            var asked = 0
+            open { interruptWhen = { ++asked > 50 } }.use { js ->
+                assertFails(call) { js.evaluate(call) }
+            }
         }
     }
 
