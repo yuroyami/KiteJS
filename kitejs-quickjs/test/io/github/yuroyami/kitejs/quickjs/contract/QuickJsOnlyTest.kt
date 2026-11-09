@@ -62,6 +62,33 @@ class QuickJsOnlyTest : EngineContract<QuickJsConfig>(QuickJs) {
         assertEquals(2, js.evaluate("1 + 1").asInt())
     }
 
+    /**
+     * A FinalizationRegistry holds its unregister token weakly (ECMA-262, 26.2.3.2: the cell's
+     * [[UnregisterToken]] does not keep it alive), so a target that is its own token still goes.
+     * QuickJS held the token strongly, and the common `register(o, v, o)` kept every `o`.
+     */
+    @Test
+    fun aRegistryHoldsItsUnregisterTokenWeakly() = withEngine { js ->
+        js.evaluate(
+            """
+            var fired = [];
+            var registry = new FinalizationRegistry(function (v) { fired.push(v); });
+            var keptToken = {};
+            (function () {
+              var a = {}; registry.register(a, 'its own token', a);
+              var b = {}, t = {}; registry.register(b, 'a token that went first', t); t = null;
+              var c = {}; registry.register(c, 'unregistered', c); registry.unregister(c);
+              var d = {}; registry.register(d, 'a token still held', keptToken);
+            })();
+            """.trimIndent(),
+        )
+        assertEquals(
+            "a token still held,a token that went first,its own token",
+            js.evaluate("fired.sort().join()").asString(),
+        )
+        assertEquals(false, js.evaluate("registry.unregister(keptToken)").asBoolean())
+    }
+
     @Test
     fun asyncIterationRuns() = withEngine { js ->
         js.evaluate(

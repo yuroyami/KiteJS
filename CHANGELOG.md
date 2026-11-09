@@ -45,6 +45,9 @@ The notes of each release are also on the [releases page](https://github.com/yur
   browser, where it used to read `undefined`. Each entry to a block, a loop pass or a switch
   starts it again. A script's top-level bindings, which live on the global object, still have
   none (#137).
+- QuickJS: a `FinalizationRegistry` holds its unregister token weakly, as ECMA-262 asks. It held the
+  token strongly, so the common `registry.register(o, value, o)` kept every `o` alive and its
+  callback never ran.
 - QuickJS: the handles of wrappers that the collector took are freed in time that grows with their
   number. They waited in a list copied on each one added, so 200,000 found in one collection held
   the engine's next call for 30 seconds, and a chapter that made DOM nodes on a timer slowed down

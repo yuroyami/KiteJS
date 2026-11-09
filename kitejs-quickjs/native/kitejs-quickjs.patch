@@ -618,6 +618,8 @@
      int start, len, pos;
  
      if (lre_check_stack_overflow(s->opaque, 0))
+--- a/quickjs.c
++++ b/quickjs.c
 @@ -43125,6 +43125,9 @@ static int JS_CopySubArray(JSContext *ctx,
              }
              i += l;
@@ -658,3 +660,121 @@
          l_present = JS_TryGetPropertyInt64(ctx, obj, l, &lval);
          if (l_present < 0)
              goto exception;
+--- a/quickjs.c
++++ b/quickjs.c
+@@ -634,6 +634,8 @@
+     JS_WEAK_REF_KIND_MAP,
+     JS_WEAK_REF_KIND_WEAK_REF,
+     JS_WEAK_REF_KIND_FINALIZATION_REGISTRY_ENTRY,
++    /* KiteJS: the unregister token of a registry entry, which the entry holds weakly */
++    JS_WEAK_REF_KIND_FINALIZATION_REGISTRY_TOKEN,
+ } JSWeakRefKindEnum;
+ 
+ typedef struct JSWeakRefRecord {
+@@ -63298,10 +63300,31 @@
+     js_free_rt(rt, wr);
+ }
+ 
++/* KiteJS: the entry holds its unregister token weakly (ECMA-262, 26.2.3.2). Forget the record that
++   tells the token's owner about the entry, if the token is still alive. */
++static void delete_finrec_token_weakref(JSRuntime *rt, JSFinRecEntry *fre)
++{
++    JSWeakRefRecord **pwr, *wr;
++
++    if (JS_IsUndefined(fre->token))
++        return;
++    pwr = get_first_weak_ref(fre->token);
++    for(;;) {
++        wr = *pwr;
++        assert(wr != NULL);
++        if (wr->kind == JS_WEAK_REF_KIND_FINALIZATION_REGISTRY_TOKEN && wr->u.fin_rec_entry == fre)
++            break;
++        pwr = &wr->next_weak_ref;
++    }
++    *pwr = wr->next_weak_ref;
++    js_free_rt(rt, wr);
++    fre->token = JS_UNDEFINED;
++}
++
+ static void js_finrec_free(JSRuntime *rt, JSFinRecEntry *fre)
+ {
+     JS_FreeValueRT(rt, fre->held_val);
+-    JS_FreeValueRT(rt, fre->token);
++    delete_finrec_token_weakref(rt, fre);
+     JS_FreeValueRT(rt, fre->cb);
+     JS_FreeContext(fre->ctx);
+     js_free_rt(rt, fre);
+@@ -63317,6 +63340,7 @@
+         list_for_each_safe(el, el1, &frd->entries) {
+             JSFinRecEntry *fre = list_entry(el, JSFinRecEntry, link);
+             delete_finrec_weakref(rt, fre);
++            delete_finrec_token_weakref(rt, fre);
+         }
+         /* second pass to actually free all objects. */
+         list_for_each_safe(el, el1, &frd->entries) {
+@@ -63339,7 +63363,7 @@
+         list_for_each(el, &frd->entries) {
+             JSFinRecEntry *fre = list_entry(el, JSFinRecEntry, link);
+             JS_MarkValue(rt, fre->held_val, mark_func);
+-            JS_MarkValue(rt, fre->token, mark_func);
++            /* KiteJS: the token is held weakly, so it is not marked */
+             JS_MarkValue(rt, fre->cb, mark_func);
+             mark_func(rt, &fre->ctx->header);
+         }
+@@ -63398,15 +63422,30 @@
+         js_free(ctx, fre);
+         return JS_EXCEPTION;
+     }
++    /* KiteJS: a record on the token, so the entry can hold it weakly */
++    JSWeakRefRecord *twr = NULL;
++    if (!JS_IsUndefined(token)) {
++        twr = js_malloc(ctx, sizeof(*twr));
++        if (!twr) {
++            js_free(ctx, wr);
++            js_free(ctx, fre);
++            return JS_EXCEPTION;
++        }
++    }
+     fre->cb = js_dup(frd->cb);
+     fre->ctx = JS_DupContext(frd->ctx);
+     fre->target = target;
+     fre->held_val = js_dup(held_val);
+-    fre->token = js_dup(token);
++    fre->token = token;
+     list_add_tail(&fre->link, &frd->entries);
+     wr->kind = JS_WEAK_REF_KIND_FINALIZATION_REGISTRY_ENTRY;
+     wr->u.fin_rec_entry = fre;
+     insert_weakref_record(target, wr);
++    if (twr) {
++        twr->kind = JS_WEAK_REF_KIND_FINALIZATION_REGISTRY_TOKEN;
++        twr->u.fin_rec_entry = fre;
++        insert_weakref_record(token, twr);
++    }
+ 
+     return JS_UNDEFINED;
+ }
+@@ -63518,6 +63557,14 @@
+         case JS_WEAK_REF_KIND_FINALIZATION_REGISTRY_ENTRY:
+             fre = wr->u.fin_rec_entry;
+             list_del(&fre->link);
++            /* KiteJS: a target that is its own token loses its token record in this pass,
++               which frees no record of the list being walked */
++            if (!JS_IsUndefined(fre->token) && get_first_weak_ref(fre->token) == first_weak_ref)
++                fre->token = JS_UNDEFINED;
++            break;
++        case JS_WEAK_REF_KIND_FINALIZATION_REGISTRY_TOKEN:
++            /* KiteJS: the token goes, and the entry can no longer be unregistered */
++            wr->u.fin_rec_entry->token = JS_UNDEFINED;
+             break;
+         default:
+             abort();
+@@ -63568,6 +63615,9 @@
+             js_finrec_free(rt, fre);
+             break;
+         }
++        case JS_WEAK_REF_KIND_FINALIZATION_REGISTRY_TOKEN:
++            /* KiteJS: nothing else to free; the entry may be gone already */
++            break;
+         default:
+             abort();
+         }
