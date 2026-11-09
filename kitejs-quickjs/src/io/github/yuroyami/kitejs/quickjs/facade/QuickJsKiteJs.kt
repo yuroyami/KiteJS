@@ -99,12 +99,17 @@ internal class QuickJsKiteJs private constructor(
     private val functions = HashMap<Int, (JsValue, List<JsValue>) -> Any?>()
     private var nextFunction = 0
 
-    /** Handles whose wrappers the collector took, from whichever thread it runs on. */
-    private val collected = AtomicReference<List<Int>>(emptyList())
+    /**
+     * Handles whose wrappers the collector took, from whichever thread it runs on: a stack of
+     * links, so each one costs one push. A list copied on each append cost the square of their
+     * number, and 300,000 at once held the engine thread for minutes.
+     */
+    private class Collected(val handle: Int, val next: Collected?)
+    private val collected = AtomicReference<Collected?>(null)
     private val cleaner = HandleCleaner { h ->
         while (true) {
             val now = collected.load()
-            if (collected.compareAndSet(now, now + h)) break
+            if (collected.compareAndSet(now, Collected(h, now))) break
         }
     }
 
@@ -280,8 +285,11 @@ internal class QuickJsKiteJs private constructor(
     /** Frees what the collector took and forgets the host functions QuickJS let go of. */
     private fun sweep() {
         cleaner.poll()
-        val dead = collected.exchange(emptyList())
-        for (h in dead) bridge.release(ptr, h)
+        var dead = collected.exchange(null)
+        while (dead != null) {
+            bridge.release(ptr, dead.handle)
+            dead = dead.next
+        }
         while (true) {
             val fn = bridge.deadFunction(ptr)
             if (fn < 0) break
