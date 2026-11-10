@@ -60,6 +60,10 @@ def replay(args):
 
 
 def main():
+    # A Windows console encodes as cp1252, which has no "✓" for the toolchain's test lines, so
+    # the replay stopped on the first one it echoed. Write UTF-8 here and in the scripts it runs.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    os.environ.setdefault("PYTHONIOENCODING", "utf-8")
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest="command", required=True)
     p = commands.add_parser("parity", help="compare both engines on test262 and package the corpus")
