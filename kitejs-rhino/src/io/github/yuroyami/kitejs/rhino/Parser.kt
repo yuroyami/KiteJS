@@ -514,9 +514,18 @@ public class Parser(
     private fun tooDeep(): EvaluatorException =
         Context.reportRuntimeError(lookupMessage("msg.too.deep.parser.recursion"), sourceURI, ts.lineno, null, 0)
 
-    /** Runs [body] one level deeper, and reports the source as too deeply nested past [MAX_PARSE_DEPTH]. */
+    /**
+     * Runs [body] one level deeper, and reports the source as too deeply nested past [MAX_PARSE_DEPTH],
+     * or sooner where the native stack runs short. A level of parentheses goes through the whole
+     * precedence chain, so [MAX_PARSE_DEPTH] levels took about 4 MB of stack in a debug native build,
+     * and the main thread of a Windows program has 1 MB: the depth test ended the mingwX64 run with
+     * STATUS_STACK_OVERFLOW. So every [STACK_CHECK_INTERVAL] levels the parser also asks the context's
+     * stack probe, which leaves room for the error on the platforms that have one.
+     */
     private inline fun <T> nested(body: () -> T): T {
-        if (++parseDepth > MAX_PARSE_DEPTH) {
+        if (++parseDepth > MAX_PARSE_DEPTH ||
+            (parseDepth % STACK_CHECK_INTERVAL == 0 && Context.getCurrentContext()?.hasNativeStackSpace() == false)
+        ) {
             throw tooDeep()
         }
         try {
@@ -6448,6 +6457,9 @@ public class Parser(
 
         /** The deepest the recursive descent goes before the source is reported as too deeply nested (#139). */
         internal const val MAX_PARSE_DEPTH: Int = 1000
+
+        /** How many levels of [MAX_PARSE_DEPTH] go by between two checks of the native stack. */
+        private const val STACK_CHECK_INTERVAL: Int = 16
 
         // TokenInformation flags: currentFlaggedToken stores them together with the token type.
         internal const val CLEAR_TI_MASK = 0xFFFF // mask that clears the token information bits
