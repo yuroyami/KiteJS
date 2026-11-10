@@ -214,7 +214,9 @@ private fun runDokkaCli(configuration: DokkaConfiguration, outputDir: Path, work
     configFile.writeText(json.encodeToString(configuration))
 
     // Dokka's analysis uses sun.misc.Unsafe, which JDK 24 and later report with four warning lines.
-    val jvmOptions = if (Runtime.version().feature() >= 24) listOf("--sun-misc-unsafe-memory-access=allow") else emptyList()
+    val unsafeOptions = if (Runtime.version().feature() >= 24) listOf("--sun-misc-unsafe-memory-access=allow") else emptyList()
+    // Dokka's analysis recurses deeper than the 1 MB default thread stack of a Linux JVM on the larger source files.
+    val jvmOptions = unsafeOptions + "-Xss16m"
     val command = listOf(ProcessHandle.current().info().command().orElse("java")) + jvmOptions + listOf(
         "-jar",
         dokkaCli.resolvedFiles.single { it.fileName.toString().startsWith("dokka-cli") }.pathString,
