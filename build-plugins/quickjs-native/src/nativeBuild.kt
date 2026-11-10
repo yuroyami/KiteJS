@@ -4,8 +4,13 @@
 
 package io.github.yuroyami.buildplugins.quickjs
 
+import java.nio.channels.FileChannel
+import java.nio.channels.FileLock
+import java.nio.channels.OverlappingFileLockException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardOpenOption
+import java.util.Properties
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.io.path.createDirectories
@@ -14,6 +19,7 @@ import kotlin.io.path.isRegularFile
 import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.name
 import kotlin.io.path.readText
+import kotlin.io.path.writeText
 
 /** The C files of the engine, relative to native/. kitejs_quickjs.c is the surface the Kotlin side drives. */
 internal val engineSources = listOf(
@@ -94,12 +100,98 @@ internal fun konanHome(kotlinVersion: String): Path {
             .firstOrNull { it.isDirectory() && it.resolve("bin").isDirectory() }
             ?.let { return it }
     }
-    val konanData = System.getenv("KONAN_DATA_DIR")?.let(Path::of) ?: Path.of(System.getProperty("user.home"), ".konan")
-    konanData.resolve("kotlin-native-prebuilt-$host-$kotlinVersion").takeIf { it.resolve("bin").isDirectory() }?.let { return it }
+    konanDataDir().resolve("kotlin-native-prebuilt-$host-$kotlinVersion").takeIf { it.resolve("bin").isDirectory() }?.let { return it }
     error(
         "Kotlin/Native $kotlinVersion is not downloaded yet. Build one native platform of kitejs-api first, " +
             "for example `./kotlin build -m kitejs-api -p linuxX64`, then build again.",
     )
+}
+
+/** `KONAN_DATA_DIR`, else `~/.konan`. Kotlin/Native keeps its LLVM and sysroots there, under `dependencies/`. */
+internal fun konanDataDir(): Path =
+    System.getenv("KONAN_DATA_DIR")?.takeIf { it.isNotBlank() }?.let(Path::of) ?: Path.of(System.getProperty("user.home"), ".konan")
+
+/** This machine, named as konan.properties names a host. */
+private val konanHost: String = when {
+    hostOs.startsWith("mac") -> if (hostArch == "aarch64") "macos_arm64" else "macos_x64"
+    isWindows -> "mingw_x64"
+    else -> if (hostArch == "aarch64") "linux_arm64" else "linux_x64"
+}
+
+/**
+ * Makes Kotlin/Native download the LLVM and the sysroot that `run_konan clang` needs for [konanTarget].
+ * Kotlin/Native downloads them only when it links a program, and `run_konan` never does that. So on a
+ * fresh machine this links an empty program for the target. konan.properties names the folders it needs.
+ */
+internal fun ensureKonanDependencies(konanHome: Path, konanTarget: String) {
+    val properties = Properties().apply { Files.newInputStream(konanHome.resolve("konan/konan.properties")).use { load(it) } }
+    fun expand(value: String?): List<String> = value.orEmpty().split(Regex("\\s+")).filter { it.isNotEmpty() }
+        .flatMap { if (it.startsWith('$')) expand(properties.getProperty(it.drop(1))) else listOf(it) }
+    val key = if (konanTarget == konanHost) "dependencies.$konanHost" else "dependencies.$konanHost-$konanTarget"
+    val needed = expand(properties.getProperty("llvm.$konanHost.user")) + expand(properties.getProperty(key))
+    val dependencies = konanDataDir().resolve("dependencies")
+    fun missing() = needed.filterNot { dependencies.resolve(it).isDirectory() }
+    if (missing().isEmpty()) return
+    // Another task may have downloaded them while this one waited for the lock.
+    withKonanLock(konanDataDir()) {
+        if (missing().isNotEmpty()) linkWarmupProgram(konanHome, konanTarget)
+    }
+    val left = missing()
+    check(left.isEmpty()) {
+        "Kotlin/Native linked a program for $konanTarget, but $dependencies still has no ${left.joinToString()}. The log above shows the link."
+    }
+}
+
+/** Links an empty program for [konanTarget], which makes Kotlin/Native download what the target needs. */
+private fun linkWarmupProgram(konanHome: Path, konanTarget: String) {
+    val konanc = konanHome.resolve("bin/" + if (isWindows) "konanc.bat" else "konanc").toString()
+    val work = Files.createTempDirectory("kitejs-konan-warmup")
+    try {
+        val source = work.resolve("main.kt").apply { writeText("fun main() {}\n") }
+        println("[quickjs-native] downloading the Kotlin/Native dependencies for $konanTarget")
+        val process = ProcessBuilder(konanc, "-target", konanTarget, "-o", work.resolve("warmup").toString(), source.toString())
+            .redirectErrorStream(true)
+            .apply { environment()["JAVA_HOME"] = System.getProperty("java.home") }
+            .start()
+        val output = process.inputStream.bufferedReader().readText()
+        // The downloads can be complete even when the link fails, so the caller checks the folders.
+        if (process.waitFor() != 0) println("[quickjs-native] the warm-up link for $konanTarget failed:\n$output")
+    } finally {
+        work.toFile().deleteRecursively()
+    }
+}
+
+/** The lock file of [withKonanLock]. KitePlayer and KiteFFmpeg use the same name, so their builds wait too. */
+internal const val KONAN_LOCK_FILE: String = ".kite-konan-provision.lock"
+
+/**
+ * Runs [block] while this process holds the provisioning lock of [konanDataDir]. Two tasks of one
+ * build, or two builds on one machine, then never download the same Kotlin/Native files at once.
+ * Never call it again from inside [block]: the second call waits for the first for ever.
+ */
+internal fun <T> withKonanLock(konanDataDir: Path, block: () -> T): T {
+    konanDataDir.createDirectories()
+    FileChannel.open(konanDataDir.resolve(KONAN_LOCK_FILE), StandardOpenOption.CREATE, StandardOpenOption.WRITE).use { channel ->
+        val lock = acquireLock(channel)
+        try {
+            return block()
+        } finally {
+            lock.release()
+        }
+    }
+}
+
+private fun acquireLock(channel: FileChannel): FileLock {
+    while (true) {
+        // Another thread of this JVM gets OverlappingFileLockException, another process gets null.
+        val lock = try {
+            channel.tryLock()
+        } catch (_: OverlappingFileLockException) {
+            null
+        }
+        if (lock != null) return lock
+        Thread.sleep(250)
+    }
 }
 
 /** The functions that native/kitejs_quickjs.h declares, which the WebAssembly module exports. */

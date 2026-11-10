@@ -125,7 +125,9 @@ fun buildKonanLibrary(
     @Output libraryDir: Path,
     @Output defFile: Path,
 ) {
-    val runKonan = konanHome(kotlinVersion).resolve("bin/" + if (isWindows) "run_konan.bat" else "run_konan").toString()
+    val home = konanHome(kotlinVersion)
+    ensureKonanDependencies(home, konanTarget)
+    val runKonan = home.resolve("bin/" + if (isWindows) "run_konan.bat" else "run_konan").toString()
     val objects = libraryDir.resolve("obj")
     libraryDir.deleteRecursively()
     objects.createDirectories()
