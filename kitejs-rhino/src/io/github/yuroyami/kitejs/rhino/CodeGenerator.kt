@@ -287,6 +287,39 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
     private fun badTree(node: Node): RuntimeException = RuntimeException(node.toString())
 
     private fun visitStatement(node: Node, initialStackDepth: Int) {
+        if (visitStatementPrologue(node)) return
+        // Only the statements that hold statements are here, each in a few lines; the rest are
+        // out of line, so that the frame every level of nested statements leaves on the stack
+        // stays small: a debug native build gives every local of a function its own stack slot,
+        // and the main thread of Windows has 1 MB (#139).
+        val type = node.type
+        when (type) {
+            Token.LABEL, Token.LOOP, Token.BLOCK, Token.EMPTY, Token.WITH, Token.SCRIPT -> {
+                if (type != Token.SCRIPT) updateLineNumber(node)
+                visitStatements(node, initialStackDepth)
+            }
+            Token.LOCAL_BLOCK -> visitLocalBlock(node, initialStackDepth)
+            Token.FINALLY -> visitFinally(node, initialStackDepth)
+            Token.TRY -> visitTry(node, initialStackDepth)
+            else -> visitSimpleStatement(node, type)
+        }
+        if (stackDepth != initialStackDepth) throw Kit.codeBug()
+    }
+
+    /** The children of [node], each a statement. */
+    private fun visitStatements(node: Node, initialStackDepth: Int) {
+        var child = node.firstChild
+        while (child != null) {
+            visitStatement(child, initialStackDepth)
+            child = child.next
+        }
+    }
+
+    /**
+     * What [visitStatement] emits for [node] before its own code. True when that is all of it,
+     * and [visitStatement] returns without its stack check.
+     */
+    private fun visitStatementPrologue(node: Node): Boolean {
         node.iterationBindings?.takeIf { it.isNotEmpty() }?.let {
             if (!itsInFunctionFlag || (scriptOrFn as FunctionNode).requiresActivation) {
                 val index = literalIds.size
@@ -297,13 +330,59 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
         node.blockFunctionInitializers?.forEach { addIndexOp(Icode_INIT_BLOCK_FUNCTION, it) }
         node.annexBFunctionName?.let {
             addStringOp(Icode_ANNEX_B_COPY, it)
-            return
+            return true
         }
         if (node.getIntProp(Node.FUNCTION_BODY_START_PROP, 0) != 0) {
             addIcode(Icode_ENTER_FUNCTION_BODY)
-            return
+            return true
         }
-        val type = node.type
+        return false
+    }
+
+    private fun visitLocalBlock(node: Node, initialStackDepth: Int) {
+        val local = allocLocal()
+        node.putIntProp(Node.LOCAL_PROP, local)
+        updateLineNumber(node)
+        visitStatements(node, initialStackDepth)
+        addIndexOp(Icode_LOCAL_CLEAR, local)
+        releaseLocal(local)
+    }
+
+    private fun visitFinally(node: Node, initialStackDepth: Int) {
+        stackChange(1)
+        val finallyRegister = getLocalBlockRef(node)
+        addIndexOp(Icode_STARTSUB, finallyRegister)
+        stackChange(-1)
+        visitStatements(node, initialStackDepth)
+        addIndexOp(Icode_RETSUB, finallyRegister)
+    }
+
+    private fun visitTry(node: Node, initialStackDepth: Int) {
+        val tryNode = node as Jump
+        val exceptionObjectLocal = getLocalBlockRef(tryNode)
+        val scopeLocal = allocLocal()
+        addIndexOp(Icode_SCOPE_SAVE, scopeLocal)
+        val tryStart = iCodeTop
+        val savedFlag = itsInTryFlag
+        itsInTryFlag = true
+        visitStatements(node, initialStackDepth)
+        itsInTryFlag = savedFlag
+        val catchTarget = tryNode.target
+        if (catchTarget != null) {
+            val catchStartPC = labelTable!![getTargetLabel(catchTarget)]
+            addExceptionHandler(tryStart, catchStartPC, catchStartPC, false, exceptionObjectLocal, scopeLocal)
+        }
+        val finallyTarget = tryNode.finallyTarget
+        if (finallyTarget != null) {
+            val finallyStartPC = labelTable!![getTargetLabel(finallyTarget)]
+            addExceptionHandler(tryStart, finallyStartPC, finallyStartPC, true, exceptionObjectLocal, scopeLocal)
+        }
+        addIndexOp(Icode_LOCAL_CLEAR, scopeLocal)
+        releaseLocal(scopeLocal)
+    }
+
+    /** A statement of [visitStatement] that holds no statements. */
+    private fun visitSimpleStatement(node: Node, type: Int) {
         var child = node.firstChild
         when (type) {
             Token.FUNCTION -> {
@@ -321,13 +400,6 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
                     stackChange(-1)
                 }
             }
-            Token.LABEL, Token.LOOP, Token.BLOCK, Token.EMPTY, Token.WITH, Token.SCRIPT -> {
-                if (type != Token.SCRIPT) updateLineNumber(node)
-                while (child != null) {
-                    visitStatement(child, initialStackDepth)
-                    child = child.next
-                }
-            }
             Token.ENTERWITH -> {
                 visitExpression(child!!, 0)
                 if (node.getIntProp(Node.LEXICAL_SCOPE_PROP, 0) != 0) itsData.lexicalScopePcs.add(iCodeTop)
@@ -335,17 +407,6 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
                 stackChange(-1)
             }
             Token.LEAVEWITH -> addToken(Token.LEAVEWITH)
-            Token.LOCAL_BLOCK -> {
-                val local = allocLocal()
-                node.putIntProp(Node.LOCAL_PROP, local)
-                updateLineNumber(node)
-                while (child != null) {
-                    visitStatement(child, initialStackDepth)
-                    child = child.next
-                }
-                addIndexOp(Icode_LOCAL_CLEAR, local)
-                releaseLocal(local)
-            }
             Token.DEBUGGER -> addIcode(Icode_DEBUGGER)
             Token.SWITCH -> {
                 updateLineNumber(node)
@@ -375,48 +436,11 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
             }
             Token.GOTO -> addGoto((node as Jump).target!!, type)
             Token.JSR -> addGoto((node as Jump).target!!, Icode_GOSUB)
-            Token.FINALLY -> {
-                stackChange(1)
-                val finallyRegister = getLocalBlockRef(node)
-                addIndexOp(Icode_STARTSUB, finallyRegister)
-                stackChange(-1)
-                while (child != null) {
-                    visitStatement(child, initialStackDepth)
-                    child = child.next
-                }
-                addIndexOp(Icode_RETSUB, finallyRegister)
-            }
             Token.EXPR_VOID, Token.EXPR_RESULT -> {
                 updateLineNumber(node)
                 visitExpression(child!!, 0)
                 addIcode(if (type == Token.EXPR_VOID) Icode_POP else Icode_POP_RESULT)
                 stackChange(-1)
-            }
-            Token.TRY -> {
-                val tryNode = node as Jump
-                val exceptionObjectLocal = getLocalBlockRef(tryNode)
-                val scopeLocal = allocLocal()
-                addIndexOp(Icode_SCOPE_SAVE, scopeLocal)
-                val tryStart = iCodeTop
-                val savedFlag = itsInTryFlag
-                itsInTryFlag = true
-                while (child != null) {
-                    visitStatement(child, initialStackDepth)
-                    child = child.next
-                }
-                itsInTryFlag = savedFlag
-                val catchTarget = tryNode.target
-                if (catchTarget != null) {
-                    val catchStartPC = labelTable!![getTargetLabel(catchTarget)]
-                    addExceptionHandler(tryStart, catchStartPC, catchStartPC, false, exceptionObjectLocal, scopeLocal)
-                }
-                val finallyTarget = tryNode.finallyTarget
-                if (finallyTarget != null) {
-                    val finallyStartPC = labelTable!![getTargetLabel(finallyTarget)]
-                    addExceptionHandler(tryStart, finallyStartPC, finallyStartPC, true, exceptionObjectLocal, scopeLocal)
-                }
-                addIndexOp(Icode_LOCAL_CLEAR, scopeLocal)
-                releaseLocal(scopeLocal)
             }
             Token.CATCH_SCOPE -> {
                 val localIndex = getLocalBlockRef(node)
@@ -483,7 +507,6 @@ internal class CodeGenerator<T : ScriptOrFn<T>> {
             Icode_GENERATOR -> {}
             else -> throw badTree(node)
         }
-        if (stackDepth != initialStackDepth) throw Kit.codeBug()
     }
 
     private fun visitExpression(node: Node, contextFlags: Int) {

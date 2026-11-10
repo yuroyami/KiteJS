@@ -33,6 +33,11 @@ The notes of each release are also on the [releases page](https://github.com/yur
   every target, as upstream reports it, instead of the host's stack overflow. The parser counts its
   own depth, because native code cannot catch a stack overflow (#139). On Windows it also asks the
   stack probe, so the error comes before the 1 MB main thread runs out.
+- Rhino: the parser and the compiler passes after it take less native stack for each level of
+  nesting. 200 nested blocks overflowed the 1 MB main thread of a Windows program in a debug build
+  (#139). In a linuxX64 debug build a level of blocks went from 6.9 KB to 592 bytes in the node
+  transformer and from 3.3 KB to 416 bytes in the code generator, and a level of parentheses from
+  10.6 KB to 6.5 KB in the parser, so the depth test now passes there with 768 KB of stack.
 - Rhino: `toLowerCase`, `toUpperCase` and their locale variants use the engine's own case tables
   from the Unicode Character Database 16.0, SpecialCasing included, with the final sigma rule, so
   every target gives one answer. They came from the platform, which disagreed on the final sigma

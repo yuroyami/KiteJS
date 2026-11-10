@@ -180,12 +180,22 @@ public class IRFactory(
             Token.WHILE -> return transformWhileLoop(node as WhileLoop)
             Token.WITH -> return transformWith(node as WithStatement)
             Token.YIELD, Token.YIELD_STAR -> return transformYield(node as Yield)
-            Token.AWAIT -> {
-                val await = node as AwaitExpression
-                return Node(Token.AWAIT, transform(await.operand!!), node.lineno, node.column)
-            }
+            Token.AWAIT -> return transformAwait(node as AwaitExpression)
         }
 
+        return transformByClass(node)
+    }
+
+    private fun transformAwait(node: AwaitExpression): Node =
+        Node(Token.AWAIT, transform(node.operand!!), node.lineno, node.column)
+
+    /**
+     * The nodes of [transformNode] that its token type does not tell apart. Out of line, as the
+     * [Token.AWAIT] case is, so that the frame [transformNode] leaves on the stack at every level
+     * of nesting stays small: a debug native build gives every local of a function its own stack
+     * slot, and the main thread of Windows has 1 MB (#139).
+     */
+    private fun transformByClass(node: AstNode): Node {
         return when (node) {
             is ExpressionStatement -> transformExprStmt(node)
             is Assignment -> transformAssignment(node)
@@ -433,35 +443,49 @@ public class IRFactory(
             parser.pushScope(node)
         }
         try {
-            val kids = mutableListOf<Node>()
-            // Function declarations inside blocks are hoisted to the top of the block, so the
-            // statements above them can still refer to them.
-            val functions = mutableListOf<Node>()
-
-            for (kid in node) {
-                if (kid is FunctionNode &&
-                    kid.functionType == FunctionNode.FUNCTION_EXPRESSION_STATEMENT && kid.blockDeclarationScope == null
-                ) {
-                    functions.add(transform(kid))
-                } else {
-                    kids.add(transform(kid as AstNode))
-                }
-            }
-            node.removeChildren()
-
-            for (function in functions) {
-                node.addChildToBack(function)
-            }
-            for (kid in kids) {
-                node.addChildToBack(kid)
-            }
-            if (node is Scope) node.blockFunctionInitializers = blockFunctionInitializers(node)
-            return node
+            return transformBlockChildren(node)
         } finally {
             if (node is Scope) {
                 parser.popScope()
             }
         }
+    }
+
+    /**
+     * The children of [transformBlock], in its scope. The rebuilding of the block is out of line,
+     * so that the frame every level of nested blocks leaves on the stack stays small, as
+     * [transformByClass] is.
+     */
+    private fun transformBlockChildren(node: AstNode): Node {
+        val kids = mutableListOf<Node>()
+        // Function declarations inside blocks are hoisted to the top of the block, so the
+        // statements above them can still refer to them.
+        val functions = mutableListOf<Node>()
+
+        for (kid in node) {
+            if (kid is FunctionNode &&
+                kid.functionType == FunctionNode.FUNCTION_EXPRESSION_STATEMENT && kid.blockDeclarationScope == null
+            ) {
+                functions.add(transform(kid))
+            } else {
+                kids.add(transform(kid as AstNode))
+            }
+        }
+        return replaceBlockChildren(node, functions, kids)
+    }
+
+    /** Gives [node] its transformed children, the hoisted [functions] first. */
+    private fun replaceBlockChildren(node: AstNode, functions: List<Node>, kids: List<Node>): Node {
+        node.removeChildren()
+
+        for (function in functions) {
+            node.addChildToBack(function)
+        }
+        for (kid in kids) {
+            node.addChildToBack(kid)
+        }
+        if (node is Scope) node.blockFunctionInitializers = blockFunctionInitializers(node)
+        return node
     }
 
     private fun transformBreak(node: BreakStatement): Node = node

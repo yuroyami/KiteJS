@@ -84,7 +84,7 @@ public open class NodeTransformer {
         inStrictMode: Boolean,
     ) {
         var node: Node? = null
-        siblingLoop@ while (true) {
+        while (true) {
             var previous: Node? = null
             if (node == null) {
                 node = parent.firstChild
@@ -93,340 +93,13 @@ public open class NodeTransformer {
                 node = node.next
             }
             val current = node ?: break
-
-            var type = current.type
-            if (createScopeObjects &&
-                (type == Token.BLOCK || type == Token.LOOP || type == Token.ARRAYCOMP) &&
-                current is Scope
-            ) {
-                val symbolTable = current.symbolTable
-                if (symbolTable != null) {
-                    // Turn it into a let statement, so a "with" gets created to hold the scoped
-                    // let variables.
-                    val let = Node(if (type == Token.ARRAYCOMP) Token.LETEXPR else Token.LET)
-                    val innerLet = Node(Token.LET)
-                    let.addChildToBack(innerLet)
-                    for (name in symbolTable.keys) {
-                        innerLet.addChildToBack(Node.newString(Token.NAME, name))
-                    }
-                    current.symbolTable = null // so this does not run again
-                    node = replaceCurrent(parent, previous, current, let)
-                    type = node.type
-                    let.addChildToBack(current)
-                }
+            val n = transformNode(tree, parent, previous, current, scope, createScopeObjects, inStrictMode)
+            node = n
+            if (skipChildren) {
+                // Skip the recursive call below, to avoid an infinite loop.
+                skipChildren = false
+                continue
             }
-
-            var n = node
-
-            when (type) {
-                Token.LABEL, Token.SWITCH, Token.LOOP -> {
-                    loops.addFirst(n)
-                    loopEnds.addFirst((n as Jump).target!!)
-                    // A return out of a for-of loop closes its iterator, as a finally block runs.
-                    if (forOfClose(n) != null) hasFinally = true
-                }
-
-                Token.WITH -> {
-                    loops.addFirst(n)
-                    val leave = n.next
-                    if (leave == null || leave.type != Token.LEAVEWITH) {
-                        Kit.codeBug()
-                    }
-                    loopEnds.addFirst(leave!!)
-                }
-
-                Token.TRY -> {
-                    val finallyTarget = (n as Jump).finallyTarget
-                    if (finallyTarget != null) {
-                        hasFinally = true
-                        loops.addFirst(n)
-                        loopEnds.addFirst(finallyTarget)
-                    }
-                }
-
-                Token.TARGET, Token.LEAVEWITH -> {
-                    if (loopEnds.isNotEmpty() && loopEnds.first() === n) {
-                        loopEnds.removeFirst()
-                        loops.removeFirst()
-                    }
-                }
-
-                Token.YIELD, Token.YIELD_STAR, Token.AWAIT -> (tree as FunctionNode).addResumptionPoint(n)
-
-                Token.RETURN -> {
-                    val isGenerator =
-                        tree.type == Token.FUNCTION && (tree as FunctionNode).isGenerator
-                    if (isGenerator) {
-                        n.putIntProp(Node.GENERATOR_END_PROP, 1)
-                    }
-                    /*
-                     * Without try/finally the LEAVEWITH nodes here would be unnecessary. But a
-                     * series of JSR FINALLY nodes has to run before each RETURN, and every finally
-                     * block needs the right scope, which can mean some LEAVEWITH nodes.
-                     */
-                    if (hasFinally) {
-                        var unwindBlock: Node? = null
-                        // Walk from the top of the stack, most recently pushed first.
-                        for (loopNode in loops) {
-                            val elemtype = loopNode.type
-                            val close = forOfClose(loopNode)
-                            if (elemtype == Token.TRY || elemtype == Token.WITH || close != null) {
-                                val unwind: Node
-                                if (close != null) {
-                                    unwind = close
-                                } else if (elemtype == Token.TRY) {
-                                    val jsrnode = Jump(Token.JSR)
-                                    jsrnode.target = (loopNode as Jump).finallyTarget
-                                    unwind = jsrnode
-                                } else {
-                                    unwind = Node(Token.LEAVEWITH)
-                                }
-                                if (unwindBlock == null) {
-                                    unwindBlock = Node(Token.BLOCK)
-                                    unwind.setLineColumnNumber(n.lineno, n.column)
-                                }
-                                unwindBlock.addChildToBack(unwind)
-                            }
-                        }
-                        if (unwindBlock != null) {
-                            var returnNode = n
-                            val returnExpr = returnNode.firstChild
-                            node = replaceCurrent(parent, previous, n, unwindBlock)
-                            if (returnExpr == null) {
-                                unwindBlock.addChildToBack(returnNode)
-                            } else {
-                                // The value is computed before the finally blocks run and the
-                                // scopes close, a generator's too. Upstream left a generator's
-                                // return expression after them, so it saw the finally blocks'
-                                // effects and no block-scoped name.
-                                val store = Node(Token.EXPR_RESULT, returnExpr)
-                                unwindBlock.addChildToFront(store)
-                                returnNode = Node(Token.RETURN_RESULT)
-                                if (isGenerator) returnNode.putIntProp(Node.GENERATOR_END_PROP, 1)
-                                unwindBlock.addChildToBack(returnNode)
-                                // Transform the return expression.
-                                transformCompilationUnitR(
-                                    tree,
-                                    store,
-                                    scope,
-                                    createScopeObjects,
-                                    inStrictMode,
-                                )
-                            }
-                            // Skip the recursive call below, to avoid an infinite loop.
-                            continue@siblingLoop
-                        }
-                    }
-                }
-
-                Token.BREAK, Token.CONTINUE -> {
-                    val jump = n as Jump
-                    val jumpStatement = jump.jumpStatement
-                    if (jumpStatement == null) Kit.codeBug()
-
-                    if (loops.isEmpty()) {
-                        // The parser and IR factory guarantee that break and continue always carry
-                        // a jump statement, so it should have been found.
-                        throw Kit.codeBug()
-                    }
-                    // Walk from the top of the stack, most recently pushed first.
-                    for (loopNode in loops) {
-                        if (loopNode === jumpStatement) {
-                            // A break leaves the loop it names; a continue stays in it.
-                            if (type == Token.BREAK) forOfClose(loopNode)?.let { previous = addBeforeCurrent(parent, previous, n, it) }
-                            break
-                        }
-
-                        val elemtype = loopNode.type
-                        val close = forOfClose(loopNode)
-                        if (close != null) {
-                            previous = addBeforeCurrent(parent, previous, n, close)
-                        } else if (elemtype == Token.WITH) {
-                            val leave = Node(Token.LEAVEWITH)
-                            previous = addBeforeCurrent(parent, previous, n, leave)
-                        } else if (elemtype == Token.TRY) {
-                            val jsrFinally = Jump(Token.JSR)
-                            jsrFinally.target = (loopNode as Jump).finallyTarget
-                            previous = addBeforeCurrent(parent, previous, n, jsrFinally)
-                        }
-                    }
-
-                    if (type == Token.BREAK) {
-                        jump.target = jumpStatement!!.target
-                    } else {
-                        jump.target = jumpStatement!!.continueTarget
-                    }
-                    jump.type = Token.GOTO
-                }
-
-                Token.CALL -> visitCall(n, tree)
-
-                Token.NEW -> visitNew(n, tree)
-
-                Token.LETEXPR, Token.LET, Token.CONST, Token.VAR -> {
-                    var handled = false
-                    if (type == Token.LETEXPR || type == Token.LET) {
-                        val child = n.firstChild!!
-                        if (child.type == Token.LET) {
-                            // A let statement or expression, rather than a let declaration.
-                            val createWith =
-                                tree.type != Token.FUNCTION ||
-                                    (tree as FunctionNode).requiresActivation
-                            node = visitLet(createWith, parent, previous, n)
-                            n = node
-                            handled = true
-                        }
-                        // Otherwise fall through and process it as a let declaration.
-                    }
-                    if (!handled) {
-                        val result = Node(Token.BLOCK)
-                        var cursor = n.firstChild
-                        while (cursor != null) {
-                            // Move the cursor on before createAssignment can change n.next.
-                            var v = cursor
-                            cursor = cursor.next
-                            if (v.type == Token.NAME) {
-                                // A let without an initializer that can run again is reset to undefined.
-                                // With dead zones every one is, as its declaration ends its dead
-                                // zone, except in a for-in or for-of head, whose body binds it.
-                                if (!v.hasChildren()) {
-                                    if (n.getIntProp(Node.LEXICAL_BINDING_PROP, 0) == Node.LEXICAL_HEAD) continue
-                                    if (!(deadZones && type == Token.LET) && n.getIntProp(Node.RESET_LET_PROP, 0) == 0) continue
-                                }
-                                val init = v.firstChild?.also { v.removeChild(it) } ?: Node(Token.UNDEFINED)
-                                v.type = Token.BINDNAME
-                                v = Node(
-                                    if (type == Token.CONST) Token.SETCONST else Token.SETNAME,
-                                    v,
-                                    init,
-                                )
-                                if (type == Token.LET && deadZones) v.putIntProp(Node.LEXICAL_BINDING_PROP, Node.LEXICAL_INIT)
-                                // A const a for head declares is bound afresh each time.
-                                if (type == Token.CONST && n.getIntProp(Node.FRESH_CONST_PROP, 0) == 1) {
-                                    v.putIntProp(Node.FRESH_CONST_PROP, 1)
-                                }
-                            } else {
-                                // May be a destructuring assignment already turned into a LETEXPR.
-                                if (v.type != Token.LETEXPR) throw Kit.codeBug()
-                            }
-                            val pop = Node(Token.EXPR_VOID, v)
-                            pop.setLineColumnNumber(n.lineno, n.column)
-                            result.addChildToBack(pop)
-                        }
-                        node = replaceCurrent(parent, previous, n, result)
-                        n = node
-                    }
-                }
-
-                Token.TYPEOFNAME -> {
-                    val defining = scope.getDefiningScope(n.string!!)
-                    if (defining != null) {
-                        n.scope = defining
-                    }
-                }
-
-                Token.TYPEOF, Token.IFNE -> {
-                    /*
-                     * Suppress the undefined-property warning for o.p in these shapes:
-                     * typeof o.p, if (o.p), if (!o.p), if (o.p == undefined), if (undefined == o.p)
-                     */
-                    var child = n.firstChild!!
-                    if (type == Token.IFNE) {
-                        while (child.type == Token.NOT) {
-                            child = child.firstChild!!
-                        }
-                        if (child.type == Token.EQ || child.type == Token.NE) {
-                            val first = child.firstChild!!
-                            val last = child.lastChild!!
-                            if (first.type == Token.UNDEFINED) {
-                                child = last
-                            } else if (last.type == Token.UNDEFINED) {
-                                child = first
-                            }
-                        }
-                    }
-                    if (child.type == Token.GETPROP) {
-                        child.type = Token.GETPROPNOWARN
-                    }
-                }
-
-                Token.SETNAME, Token.NAME, Token.SETCONST, Token.DELPROP -> {
-                    if (type == Token.SETNAME && inStrictMode) {
-                        n.type = Token.STRICT_SETNAME
-                        if (n.firstChild!!.type == Token.BINDNAME) {
-                            val name = n.firstChild!!
-                            if (name is Name && "eval" == name.identifier) {
-                                // Assigning to eval is not allowed in strict mode.
-                                Context.reportError("syntax error")
-                            }
-                        }
-                    }
-
-                    // Turn the name into a variable slot for faster access when possible.
-                    if (!createScopeObjects) {
-                        val nameSource: Node?
-                        if (type == Token.NAME) {
-                            nameSource = n
-                        } else {
-                            val first = n.firstChild!!
-                            if (first.type != Token.BINDNAME) {
-                                if (type == Token.DELPROP) {
-                                    nameSource = null
-                                } else {
-                                    throw Kit.codeBug()
-                                }
-                            } else {
-                                nameSource = first
-                            }
-                        }
-                        if (nameSource != null && nameSource.scope == null) {
-                            val name = nameSource.string!!
-                            val defining = scope.getDefiningScope(name)
-                            if (defining != null) {
-                                nameSource.scope = defining
-                                when (type) {
-                                    Token.NAME -> n.type = Token.GETVAR
-                                    Token.SETNAME -> {
-                                        n.type = Token.SETVAR
-                                        nameSource.type = Token.STRING
-                                    }
-                                    Token.SETCONST -> {
-                                        n.type = Token.SETCONSTVAR
-                                        nameSource.type = Token.STRING
-                                    }
-                                    Token.DELPROP -> {
-                                        // A local variable is permanent by definition.
-                                        node = replaceCurrent(
-                                            parent,
-                                            previous,
-                                            n,
-                                            Node(Token.FALSE),
-                                        )
-                                        n = node
-                                    }
-                                    else -> throw Kit.codeBug()
-                                }
-                            }
-                        }
-                    }
-                }
-
-                Token.OBJECTLIT -> {
-                    val propertyIds = n.getProp(Node.OBJECT_IDS_PROP) as Array<*>?
-                    propertyIds?.forEach { propertyId ->
-                        if (propertyId is Node) {
-                            transformCompilationUnitR(
-                                tree,
-                                propertyId,
-                                if (n is Scope) n else scope,
-                                createScopeObjects,
-                                inStrictMode,
-                            )
-                        }
-                    }
-                }
-            }
-
             transformCompilationUnitR(
                 tree,
                 n,
@@ -435,6 +108,363 @@ public open class NodeTransformer {
                 inStrictMode,
             )
         }
+    }
+
+    /** Set by [transformNode] when the node it returns must not be walked into. */
+    private var skipChildren = false
+
+    /**
+     * Transforms one node of [transformCompilationUnitR]'s walk and returns the node that took its
+     * place in [parent], which the walk goes on from. This is the body of upstream's loop, moved
+     * out so the recursive frame holds only what the recursion needs: a debug native build gives
+     * every local of every branch its own stack slot, and the loop's frame was 6.9 KB a level,
+     * so 200 nested blocks overflowed the 1 MB main thread of Windows (#139).
+     */
+    private fun transformNode(
+        tree: ScriptNode,
+        parent: Node,
+        initialPrevious: Node?,
+        current: Node,
+        scope: Scope,
+        createScopeObjects: Boolean,
+        inStrictMode: Boolean,
+    ): Node {
+        var previous = initialPrevious
+        var node: Node = current
+        var type = current.type
+        if (createScopeObjects &&
+            (type == Token.BLOCK || type == Token.LOOP || type == Token.ARRAYCOMP) &&
+            current is Scope
+        ) {
+            val symbolTable = current.symbolTable
+            if (symbolTable != null) {
+                // Turn it into a let statement, so a "with" gets created to hold the scoped
+                // let variables.
+                val let = Node(if (type == Token.ARRAYCOMP) Token.LETEXPR else Token.LET)
+                val innerLet = Node(Token.LET)
+                let.addChildToBack(innerLet)
+                for (name in symbolTable.keys) {
+                    innerLet.addChildToBack(Node.newString(Token.NAME, name))
+                }
+                current.symbolTable = null // so this does not run again
+                node = replaceCurrent(parent, previous, current, let)
+                type = node.type
+                let.addChildToBack(current)
+            }
+        }
+
+        var n = node
+
+        when (type) {
+            Token.LABEL, Token.SWITCH, Token.LOOP -> {
+                loops.addFirst(n)
+                loopEnds.addFirst((n as Jump).target!!)
+                // A return out of a for-of loop closes its iterator, as a finally block runs.
+                if (forOfClose(n) != null) hasFinally = true
+            }
+
+            Token.WITH -> {
+                loops.addFirst(n)
+                val leave = n.next
+                if (leave == null || leave.type != Token.LEAVEWITH) {
+                    Kit.codeBug()
+                }
+                loopEnds.addFirst(leave!!)
+            }
+
+            Token.TRY -> {
+                val finallyTarget = (n as Jump).finallyTarget
+                if (finallyTarget != null) {
+                    hasFinally = true
+                    loops.addFirst(n)
+                    loopEnds.addFirst(finallyTarget)
+                }
+            }
+
+            Token.TARGET, Token.LEAVEWITH -> {
+                if (loopEnds.isNotEmpty() && loopEnds.first() === n) {
+                    loopEnds.removeFirst()
+                    loops.removeFirst()
+                }
+            }
+
+            Token.YIELD, Token.YIELD_STAR, Token.AWAIT -> (tree as FunctionNode).addResumptionPoint(n)
+
+            Token.RETURN -> {
+                val isGenerator =
+                    tree.type == Token.FUNCTION && (tree as FunctionNode).isGenerator
+                if (isGenerator) {
+                    n.putIntProp(Node.GENERATOR_END_PROP, 1)
+                }
+                /*
+                 * Without try/finally the LEAVEWITH nodes here would be unnecessary. But a
+                 * series of JSR FINALLY nodes has to run before each RETURN, and every finally
+                 * block needs the right scope, which can mean some LEAVEWITH nodes.
+                 */
+                if (hasFinally) {
+                    var unwindBlock: Node? = null
+                    // Walk from the top of the stack, most recently pushed first.
+                    for (loopNode in loops) {
+                        val elemtype = loopNode.type
+                        val close = forOfClose(loopNode)
+                        if (elemtype == Token.TRY || elemtype == Token.WITH || close != null) {
+                            val unwind: Node
+                            if (close != null) {
+                                unwind = close
+                            } else if (elemtype == Token.TRY) {
+                                val jsrnode = Jump(Token.JSR)
+                                jsrnode.target = (loopNode as Jump).finallyTarget
+                                unwind = jsrnode
+                            } else {
+                                unwind = Node(Token.LEAVEWITH)
+                            }
+                            if (unwindBlock == null) {
+                                unwindBlock = Node(Token.BLOCK)
+                                unwind.setLineColumnNumber(n.lineno, n.column)
+                            }
+                            unwindBlock.addChildToBack(unwind)
+                        }
+                    }
+                    if (unwindBlock != null) {
+                        var returnNode = n
+                        val returnExpr = returnNode.firstChild
+                        node = replaceCurrent(parent, previous, n, unwindBlock)
+                        if (returnExpr == null) {
+                            unwindBlock.addChildToBack(returnNode)
+                        } else {
+                            // The value is computed before the finally blocks run and the
+                            // scopes close, a generator's too. Upstream left a generator's
+                            // return expression after them, so it saw the finally blocks'
+                            // effects and no block-scoped name.
+                            val store = Node(Token.EXPR_RESULT, returnExpr)
+                            unwindBlock.addChildToFront(store)
+                            returnNode = Node(Token.RETURN_RESULT)
+                            if (isGenerator) returnNode.putIntProp(Node.GENERATOR_END_PROP, 1)
+                            unwindBlock.addChildToBack(returnNode)
+                            // Transform the return expression.
+                            transformCompilationUnitR(
+                                tree,
+                                store,
+                                scope,
+                                createScopeObjects,
+                                inStrictMode,
+                            )
+                        }
+                        // The walk must not go into the unwind block.
+                        skipChildren = true
+                        return node
+                    }
+                }
+            }
+
+            Token.BREAK, Token.CONTINUE -> {
+                val jump = n as Jump
+                val jumpStatement = jump.jumpStatement
+                if (jumpStatement == null) Kit.codeBug()
+
+                if (loops.isEmpty()) {
+                    // The parser and IR factory guarantee that break and continue always carry
+                    // a jump statement, so it should have been found.
+                    throw Kit.codeBug()
+                }
+                // Walk from the top of the stack, most recently pushed first.
+                for (loopNode in loops) {
+                    if (loopNode === jumpStatement) {
+                        // A break leaves the loop it names; a continue stays in it.
+                        if (type == Token.BREAK) forOfClose(loopNode)?.let { previous = addBeforeCurrent(parent, previous, n, it) }
+                        break
+                    }
+
+                    val elemtype = loopNode.type
+                    val close = forOfClose(loopNode)
+                    if (close != null) {
+                        previous = addBeforeCurrent(parent, previous, n, close)
+                    } else if (elemtype == Token.WITH) {
+                        val leave = Node(Token.LEAVEWITH)
+                        previous = addBeforeCurrent(parent, previous, n, leave)
+                    } else if (elemtype == Token.TRY) {
+                        val jsrFinally = Jump(Token.JSR)
+                        jsrFinally.target = (loopNode as Jump).finallyTarget
+                        previous = addBeforeCurrent(parent, previous, n, jsrFinally)
+                    }
+                }
+
+                if (type == Token.BREAK) {
+                    jump.target = jumpStatement!!.target
+                } else {
+                    jump.target = jumpStatement!!.continueTarget
+                }
+                jump.type = Token.GOTO
+            }
+
+            Token.CALL -> visitCall(n, tree)
+
+            Token.NEW -> visitNew(n, tree)
+
+            Token.LETEXPR, Token.LET, Token.CONST, Token.VAR -> {
+                var handled = false
+                if (type == Token.LETEXPR || type == Token.LET) {
+                    val child = n.firstChild!!
+                    if (child.type == Token.LET) {
+                        // A let statement or expression, rather than a let declaration.
+                        val createWith =
+                            tree.type != Token.FUNCTION ||
+                                (tree as FunctionNode).requiresActivation
+                        node = visitLet(createWith, parent, previous, n)
+                        n = node
+                        handled = true
+                    }
+                    // Otherwise fall through and process it as a let declaration.
+                }
+                if (!handled) {
+                    val result = Node(Token.BLOCK)
+                    var cursor = n.firstChild
+                    while (cursor != null) {
+                        // Move the cursor on before createAssignment can change n.next.
+                        var v = cursor
+                        cursor = cursor.next
+                        if (v.type == Token.NAME) {
+                            // A let without an initializer that can run again is reset to undefined.
+                            // With dead zones every one is, as its declaration ends its dead
+                            // zone, except in a for-in or for-of head, whose body binds it.
+                            if (!v.hasChildren()) {
+                                if (n.getIntProp(Node.LEXICAL_BINDING_PROP, 0) == Node.LEXICAL_HEAD) continue
+                                if (!(deadZones && type == Token.LET) && n.getIntProp(Node.RESET_LET_PROP, 0) == 0) continue
+                            }
+                            val init = v.firstChild?.also { v.removeChild(it) } ?: Node(Token.UNDEFINED)
+                            v.type = Token.BINDNAME
+                            v = Node(
+                                if (type == Token.CONST) Token.SETCONST else Token.SETNAME,
+                                v,
+                                init,
+                            )
+                            if (type == Token.LET && deadZones) v.putIntProp(Node.LEXICAL_BINDING_PROP, Node.LEXICAL_INIT)
+                            // A const a for head declares is bound afresh each time.
+                            if (type == Token.CONST && n.getIntProp(Node.FRESH_CONST_PROP, 0) == 1) {
+                                v.putIntProp(Node.FRESH_CONST_PROP, 1)
+                            }
+                        } else {
+                            // May be a destructuring assignment already turned into a LETEXPR.
+                            if (v.type != Token.LETEXPR) throw Kit.codeBug()
+                        }
+                        val pop = Node(Token.EXPR_VOID, v)
+                        pop.setLineColumnNumber(n.lineno, n.column)
+                        result.addChildToBack(pop)
+                    }
+                    node = replaceCurrent(parent, previous, n, result)
+                    n = node
+                }
+            }
+
+            Token.TYPEOFNAME -> {
+                val defining = scope.getDefiningScope(n.string!!)
+                if (defining != null) {
+                    n.scope = defining
+                }
+            }
+
+            Token.TYPEOF, Token.IFNE -> {
+                /*
+                 * Suppress the undefined-property warning for o.p in these shapes:
+                 * typeof o.p, if (o.p), if (!o.p), if (o.p == undefined), if (undefined == o.p)
+                 */
+                var child = n.firstChild!!
+                if (type == Token.IFNE) {
+                    while (child.type == Token.NOT) {
+                        child = child.firstChild!!
+                    }
+                    if (child.type == Token.EQ || child.type == Token.NE) {
+                        val first = child.firstChild!!
+                        val last = child.lastChild!!
+                        if (first.type == Token.UNDEFINED) {
+                            child = last
+                        } else if (last.type == Token.UNDEFINED) {
+                            child = first
+                        }
+                    }
+                }
+                if (child.type == Token.GETPROP) {
+                    child.type = Token.GETPROPNOWARN
+                }
+            }
+
+            Token.SETNAME, Token.NAME, Token.SETCONST, Token.DELPROP -> {
+                if (type == Token.SETNAME && inStrictMode) {
+                    n.type = Token.STRICT_SETNAME
+                    if (n.firstChild!!.type == Token.BINDNAME) {
+                        val name = n.firstChild!!
+                        if (name is Name && "eval" == name.identifier) {
+                            // Assigning to eval is not allowed in strict mode.
+                            Context.reportError("syntax error")
+                        }
+                    }
+                }
+
+                // Turn the name into a variable slot for faster access when possible.
+                if (!createScopeObjects) {
+                    val nameSource: Node?
+                    if (type == Token.NAME) {
+                        nameSource = n
+                    } else {
+                        val first = n.firstChild!!
+                        if (first.type != Token.BINDNAME) {
+                            if (type == Token.DELPROP) {
+                                nameSource = null
+                            } else {
+                                throw Kit.codeBug()
+                            }
+                        } else {
+                            nameSource = first
+                        }
+                    }
+                    if (nameSource != null && nameSource.scope == null) {
+                        val name = nameSource.string!!
+                        val defining = scope.getDefiningScope(name)
+                        if (defining != null) {
+                            nameSource.scope = defining
+                            when (type) {
+                                Token.NAME -> n.type = Token.GETVAR
+                                Token.SETNAME -> {
+                                    n.type = Token.SETVAR
+                                    nameSource.type = Token.STRING
+                                }
+                                Token.SETCONST -> {
+                                    n.type = Token.SETCONSTVAR
+                                    nameSource.type = Token.STRING
+                                }
+                                Token.DELPROP -> {
+                                    // A local variable is permanent by definition.
+                                    node = replaceCurrent(
+                                        parent,
+                                        previous,
+                                        n,
+                                        Node(Token.FALSE),
+                                    )
+                                    n = node
+                                }
+                                else -> throw Kit.codeBug()
+                            }
+                        }
+                    }
+                }
+            }
+
+            Token.OBJECTLIT -> {
+                val propertyIds = n.getProp(Node.OBJECT_IDS_PROP) as Array<*>?
+                propertyIds?.forEach { propertyId ->
+                    if (propertyId is Node) {
+                        transformCompilationUnitR(
+                            tree,
+                            propertyId,
+                            if (n is Scope) n else scope,
+                            createScopeObjects,
+                            inStrictMode,
+                        )
+                    }
+                }
+            }
+        }
+        return n
     }
 
     /**
@@ -460,16 +490,19 @@ public open class NodeTransformer {
             store.putIntProp(Node.LEXICAL_BINDING_PROP, Node.LEXICAL_RESET)
             Node(Token.EXPR_VOID, store)
         }
+        fun prependResets(scope: Scope) {
+            val list = names(scope)
+            // Prepended in reverse, so they run in declaration order.
+            for (r in resets(list).asReversed()) scope.addChildToFront(r)
+        }
+        // The resets are out of line, so that the frame every level of nesting leaves on the
+        // stack stays small, as [transformNode] is.
         fun visit(node: Node) {
             var child = node.firstChild
             while (child != null) {
                 val next = child.next
                 if (child !is FunctionNode) {
-                    if (child is Scope && (child.type == Token.BLOCK || child.type == Token.LOOP)) {
-                        val list = names(child)
-                        // Prepended in reverse, so they run in declaration order.
-                        for (r in resets(list).asReversed()) child.addChildToFront(r)
-                    }
+                    if (child is Scope && (child.type == Token.BLOCK || child.type == Token.LOOP)) prependResets(child)
                     visit(child)
                 }
                 child = next

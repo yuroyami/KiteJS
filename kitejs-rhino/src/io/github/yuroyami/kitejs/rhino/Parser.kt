@@ -523,15 +523,20 @@ public class Parser(
      * stack probe, which leaves room for the error on the platforms that have one.
      */
     private inline fun <T> nested(body: () -> T): T {
-        if (++parseDepth > MAX_PARSE_DEPTH ||
-            (parseDepth % STACK_CHECK_INTERVAL == 0 && Context.getCurrentContext()?.hasNativeStackSpace() == false)
-        ) {
-            throw tooDeep()
-        }
+        enterNested()
         try {
             return body()
         } finally {
             --parseDepth
+        }
+    }
+
+    /** The check of [nested], out of line so that every frame it is inlined into stays small. */
+    private fun enterNested() {
+        if (++parseDepth > MAX_PARSE_DEPTH ||
+            (parseDepth % STACK_CHECK_INTERVAL == 0 && Context.getCurrentContext()?.hasNativeStackSpace() == false)
+        ) {
+            throw tooDeep()
         }
     }
 
@@ -1492,32 +1497,44 @@ public class Parser(
         listItemPending = false
         try {
             val pn = statementHelper()
-            if (pn != null) {
-                if (compilerEnv.strictMode && !pn.hasSideEffects()) {
-                    var beg = pn.position
-                    beg = maxOf(beg, lineBeginningFor(beg))
-                    addStrictWarning(
-                        if (pn is EmptyStatement) {
-                            "msg.extra.trailing.semi"
-                        } else {
-                            "msg.no.side.effects"
-                        },
-                        "",
-                        beg,
-                        nodeEnd(pn) - beg,
-                    )
-                }
-                val ntt = peekToken()
-                if (ntt == Token.COMMENT && pn.lineno == lastScannedComment().lineno) {
-                    pn.inlineComment = lastScannedComment()
-                    consumeToken()
-                }
-                return pn
-            }
+            if (pn != null) return finishStatement(pn)
         } catch (e: ParserException) {
             // An ErrorNode was added to the ErrorReporter.
         }
+        return skipStatement(pos)
+    }
 
+    /**
+     * The checks of [statementAtDepth] on a statement it parsed. They and [skipStatement] are out
+     * of line so that the frame every level of nested statements leaves on the stack stays small:
+     * a debug native build gives every local of a function its own stack slot, and the main
+     * thread of Windows has 1 MB (#139).
+     */
+    private fun finishStatement(pn: AstNode): AstNode {
+        if (compilerEnv.strictMode && !pn.hasSideEffects()) {
+            var beg = pn.position
+            beg = maxOf(beg, lineBeginningFor(beg))
+            addStrictWarning(
+                if (pn is EmptyStatement) {
+                    "msg.extra.trailing.semi"
+                } else {
+                    "msg.no.side.effects"
+                },
+                "",
+                beg,
+                nodeEnd(pn) - beg,
+            )
+        }
+        val ntt = peekToken()
+        if (ntt == Token.COMMENT && pn.lineno == lastScannedComment().lineno) {
+            pn.inlineComment = lastScannedComment()
+            consumeToken()
+        }
+        return pn
+    }
+
+    /** After a statement [statementAtDepth] could not parse, which started at [pos]. */
+    private fun skipStatement(pos: Int): AstNode {
         // Error: skip ahead to a probable statement boundary.
         guessingStatementEnd@ while (true) {
             val tt = peekTokenOrEOL()
@@ -1534,12 +1551,10 @@ public class Parser(
         // If the statement is set, it has been told its label by now.
         if (currentLabel != null && currentLabel!!.statement != null) currentLabel = null
 
-        var pn: AstNode? = null
+        // The statements that hold statements are here; the rest are out of line, so that the
+        // frame every level of nested statements leaves on the stack stays small, as
+        // [finishStatement] is.
         val tt = peekToken()
-        var pos = ts.tokenBeg
-        val lineno: Int
-        val column: Int
-
         when (tt) {
             Token.IF -> return ifStatement()
 
@@ -1553,18 +1568,32 @@ public class Parser(
 
             Token.TRY -> return tryStatement()
 
-            Token.THROW -> pn = throwStatement()
-
-            Token.BREAK -> pn = breakStatement()
-
-            Token.CONTINUE -> pn = continueStatement()
-
             Token.WITH -> {
                 if (this.inUseStrictDirective) {
                     reportError("msg.no.with.strict")
                 }
                 return withStatement()
             }
+
+            Token.LC -> return block()
+
+            else -> return simpleStatement(tt)
+        }
+    }
+
+    /** A statement of [statementHelper] that starts with [tt] and is not a compound statement. */
+    private fun simpleStatement(tt: Int): AstNode {
+        var pn: AstNode? = null
+        var pos = ts.tokenBeg
+        val lineno: Int
+        val column: Int
+
+        when (tt) {
+            Token.THROW -> pn = throwStatement()
+
+            Token.BREAK -> pn = breakStatement()
+
+            Token.CONTINUE -> pn = continueStatement()
 
             Token.CONST, Token.VAR -> {
                 consumeToken()
@@ -1597,8 +1626,6 @@ public class Parser(
                 pn = KeywordLiteral(ts.tokenBeg, ts.tokenEnd - ts.tokenBeg, tt)
                 pn.setLineColumnNumber(lineNumber(), columnNumber())
             }
-
-            Token.LC -> return block()
 
             Token.ERROR -> {
                 consumeToken()
@@ -3094,7 +3121,17 @@ public class Parser(
     }
 
     private fun expr(allowTrailingComma: Boolean, allowRest: Boolean = false): AstNode {
-        var pn = if (allowRest && peekToken() == Token.DOTDOTDOT) return restElement() else assignExpr()
+        val pn = if (allowRest && peekToken() == Token.DOTDOTDOT) return restElement() else assignExpr()
+        return exprTail(pn, allowTrailingComma, allowRest)
+    }
+
+    /**
+     * The rest of [expr] after its first operand. Each level of parentheses has [expr] on the
+     * stack, so the work after the operand is out of line: a debug native build gives every local
+     * of a function its own stack slot, and the main thread of Windows has 1 MB (#139).
+     */
+    private fun exprTail(first: AstNode, allowTrailingComma: Boolean, allowRest: Boolean): AstNode {
+        var pn = first
         val pos = pn.position
         while (matchToken(Token.COMMA, true)) {
             val opPos = ts.tokenBeg
@@ -3142,7 +3179,7 @@ public class Parser(
     private fun assignExpr(): AstNode = nested { assignExprAtDepth() }
 
     private fun assignExprAtDepth(): AstNode {
-        var tt = peekToken()
+        val tt = peekToken()
         if (tt == Token.YIELD) {
             return returnOrYield(tt, true)
         }
@@ -3152,9 +3189,14 @@ public class Parser(
         val startLine = ts.lineno
         val startColumn = ts.tokenColumn
 
-        var pn = condExpr()
+        return assignExprTail(condExpr(), startLine, startColumn)
+    }
+
+    /** The rest of [assignExpr] after the conditional expression, out of line as [exprTail] is. */
+    private fun assignExprTail(left: AstNode, startLine: Int, startColumn: Int): AstNode {
+        var pn = left
         var hasEOL = false
-        tt = peekTokenOrEOL()
+        var tt = peekTokenOrEOL()
         if (tt == Token.EOL) {
             hasEOL = true
             tt = peekToken()
@@ -3199,34 +3241,36 @@ public class Parser(
     }
 
     private fun condExpr(): AstNode {
-        var pn = nullishCoalescingExpr()
-        if (matchToken(Token.HOOK, true)) {
-            val qmarkPos = ts.tokenBeg
-            var colonPos = -1
-            // Always accept the 'in' operator in the middle clause of a ternary, where it is
-            // unambiguous, even while parsing the init of a for statement.
-            val wasInForInit = inForInit
-            inForInit = false
-            val ifTrue: AstNode
-            try {
-                ifTrue = assignExpr()
-            } finally {
-                inForInit = wasInForInit
-            }
-            if (mustMatchToken(Token.COLON, "msg.no.colon.cond", true)) colonPos = ts.tokenBeg
-            val ifFalse = assignExpr()
-            val beg = pn.position
-            val len = getNodeEnd(ifFalse) - beg
-            val ce = ConditionalExpression(beg, len)
-            ce.setLineColumnNumber(pn.lineno, pn.column)
-            ce.testExpression = pn
-            ce.trueExpression = ifTrue
-            ce.falseExpression = ifFalse
-            ce.questionMarkPosition = qmarkPos - beg
-            ce.colonPosition = colonPos - beg
-            pn = ce
+        val pn = nullishCoalescingExpr()
+        return if (matchToken(Token.HOOK, true)) conditionalTail(pn) else pn
+    }
+
+    /** The `? :` of [condExpr] after its test, which has been matched; out of line as [exprTail] is. */
+    private fun conditionalTail(pn: AstNode): AstNode {
+        val qmarkPos = ts.tokenBeg
+        var colonPos = -1
+        // Always accept the 'in' operator in the middle clause of a ternary, where it is
+        // unambiguous, even while parsing the init of a for statement.
+        val wasInForInit = inForInit
+        inForInit = false
+        val ifTrue: AstNode
+        try {
+            ifTrue = assignExpr()
+        } finally {
+            inForInit = wasInForInit
         }
-        return pn
+        if (mustMatchToken(Token.COLON, "msg.no.colon.cond", true)) colonPos = ts.tokenBeg
+        val ifFalse = assignExpr()
+        val beg = pn.position
+        val len = getNodeEnd(ifFalse) - beg
+        val ce = ConditionalExpression(beg, len)
+        ce.setLineColumnNumber(pn.lineno, pn.column)
+        ce.testExpression = pn
+        ce.trueExpression = ifTrue
+        ce.falseExpression = ifFalse
+        ce.questionMarkPosition = qmarkPos - beg
+        ce.colonPosition = colonPos - beg
+        return ce
     }
 
     private fun nullishCoalescingExpr(): AstNode {
@@ -3425,14 +3469,11 @@ public class Parser(
     private fun unaryExpr(): AstNode = nested { unaryExprAtDepth() }
 
     private fun unaryExprAtDepth(): AstNode {
-        val node: AstNode
         var tt = peekToken()
         if (tt == Token.COMMENT) {
             consumeToken()
             tt = peekUntilNonComment(tt)
         }
-        val line: Int
-        val column: Int
 
         if (tt == Token.NAME && "await" == ts.string && awaitContext != AWAIT_NAME &&
             awaitContext != AWAIT_IN_STATIC_BLOCK
@@ -3440,77 +3481,76 @@ public class Parser(
             return awaitExpression()
         }
 
-        when (tt) {
-            Token.VOID, Token.NOT, Token.BITNOT, Token.TYPEOF -> {
-                consumeToken()
-                line = lineNumber()
-                column = columnNumber()
-                node = UnaryExpression(tt, ts.tokenBeg, unaryExpr())
-                node.setLineColumnNumber(line, column)
-                return node
-            }
+        // Every branch is a function of its own, so that the frame each level of nesting leaves
+        // on the stack stays small: a debug native build gives every local of a function its own
+        // stack slot, and the main thread of Windows has 1 MB (#139).
+        return when (tt) {
+            Token.VOID, Token.NOT, Token.BITNOT, Token.TYPEOF -> prefixUnaryExpr(tt)
 
-            Token.ADD -> {
-                consumeToken()
-                line = lineNumber()
-                column = columnNumber()
-                // Convert to the special POS token in the parse tree.
-                node = UnaryExpression(Token.POS, ts.tokenBeg, unaryExpr())
-                node.setLineColumnNumber(line, column)
-                return node
-            }
+            // Convert to the special POS token in the parse tree.
+            Token.ADD -> prefixUnaryExpr(Token.POS)
 
-            Token.SUB -> {
-                consumeToken()
-                line = lineNumber()
-                column = columnNumber()
-                // Convert to the special NEG token in the parse tree.
-                node = UnaryExpression(Token.NEG, ts.tokenBeg, unaryExpr())
-                node.setLineColumnNumber(line, column)
-                return node
-            }
+            // Convert to the special NEG token in the parse tree.
+            Token.SUB -> prefixUnaryExpr(Token.NEG)
 
-            Token.INC, Token.DEC -> {
-                consumeToken()
-                line = lineNumber()
-                column = columnNumber()
-                val expr = UpdateExpression(tt, ts.tokenBeg, memberExpr(true))
-                expr.setLineColumnNumber(line, column)
-                checkBadIncDec(expr)
-                return expr
-            }
+            Token.INC, Token.DEC -> prefixUpdateExpr(tt)
 
-            Token.DELPROP -> {
-                consumeToken()
-                line = lineNumber()
-                column = columnNumber()
-                val opPos = ts.tokenBeg
-                val operand = unaryExpr()
-                var target = operand
-                while (target is ParenthesizedExpression) target = target.expression!!
-                if (target is ElementGet && isPrivateNameNode(target.element)) reportError("msg.private.delete")
-                node = UnaryExpression(tt, opPos, operand)
-                node.setLineColumnNumber(line, column)
-                return node
-            }
+            Token.DELPROP -> deleteExpr(tt)
 
             Token.ERROR -> {
                 consumeToken()
-                return makeErrorNode()
+                makeErrorNode()
             }
 
             Token.LT -> {
                 // An XML stream in expression position.
                 if (compilerEnv.xmlAvailable) {
                     consumeToken()
-                    return memberExprTail(true, xmlInitializer())
+                    memberExprTail(true, xmlInitializer())
+                } else {
+                    // Otherwise fall through to the default handling of RELOP.
+                    unaryExprTail()
                 }
-                // Otherwise fall through to the default handling of RELOP.
-                return unaryExprTail()
             }
 
-            else -> return unaryExprTail()
+            else -> unaryExprTail()
         }
+    }
+
+    /** A prefix operator of [unaryExpr] that makes a [UnaryExpression] of [type]. */
+    private fun prefixUnaryExpr(type: Int): AstNode {
+        consumeToken()
+        val line = lineNumber()
+        val column = columnNumber()
+        val node = UnaryExpression(type, ts.tokenBeg, unaryExpr())
+        node.setLineColumnNumber(line, column)
+        return node
+    }
+
+    /** A prefix `++` or `--` of [unaryExpr]. */
+    private fun prefixUpdateExpr(tt: Int): AstNode {
+        consumeToken()
+        val line = lineNumber()
+        val column = columnNumber()
+        val expr = UpdateExpression(tt, ts.tokenBeg, memberExpr(true))
+        expr.setLineColumnNumber(line, column)
+        checkBadIncDec(expr)
+        return expr
+    }
+
+    /** A `delete` of [unaryExpr]. */
+    private fun deleteExpr(tt: Int): AstNode {
+        consumeToken()
+        val line = lineNumber()
+        val column = columnNumber()
+        val opPos = ts.tokenBeg
+        val operand = unaryExpr()
+        var target = operand
+        while (target is ParenthesizedExpression) target = target.expression!!
+        if (target is ElementGet && isPrivateNameNode(target.element)) reportError("msg.private.delete")
+        val node = UnaryExpression(tt, opPos, operand)
+        node.setLineColumnNumber(line, column)
+        return node
     }
 
     /**
@@ -3611,58 +3651,59 @@ public class Parser(
     private fun memberExpr(allowCallSyntax: Boolean): AstNode = nested { memberExprAtDepth(allowCallSyntax) }
 
     private fun memberExprAtDepth(allowCallSyntax: Boolean): AstNode {
-        val tt = peekToken()
-        val pn: AstNode
+        if (peekToken() == Token.NEW) return newExpr(allowCallSyntax)
+        return memberExprTail(allowCallSyntax, primaryExpr())
+    }
 
-        if (tt != Token.NEW) {
-            pn = primaryExpr()
-        } else {
+    /**
+     * The `new` branch of [memberExpr], out of line so that the frame of every other member
+     * expression stays small, as [exprTail] is.
+     */
+    private fun newExpr(allowCallSyntax: Boolean): AstNode {
+        consumeToken()
+        val pos = ts.tokenBeg
+        val lineno = lineNumber()
+        val column = columnNumber()
+        if (peekToken() == Token.DOT) {
+            // new.target (ECMAScript 2015, 12.3.8), which only a function gives a meaning.
             consumeToken()
-            val pos = ts.tokenBeg
-            val lineno = lineNumber()
-            val column = columnNumber()
-            if (peekToken() == Token.DOT) {
-                // new.target (ECMAScript 2015, 12.3.8), which only a function gives a meaning.
-                consumeToken()
-                if (!(matchToken(Token.NAME, true) && "target" == ts.string && !ts.identifierEscaped)) {
-                    reportError("msg.new.target.name")
-                }
-                if (!newTargetAllowed) reportError("msg.new.target")
-                val target = KeywordLiteral(pos, ts.tokenEnd - pos, Token.NEW_TARGET)
-                target.setLineColumnNumber(lineno, column)
-                return memberExprTail(allowCallSyntax, target)
+            if (!(matchToken(Token.NAME, true) && "target" == ts.string && !ts.identifierEscaped)) {
+                reportError("msg.new.target.name")
             }
-            val nx = NewExpression(pos)
-
-            val target = memberExpr(false)
-            var end = getNodeEnd(target)
-            nx.target = target
-            nx.setLineColumnNumber(lineno, column)
-
-            if (matchToken(Token.LP, true)) {
-                val lp = ts.tokenBeg
-                val args = argumentList()
-                if (args != null && args.size > ARGC_LIMIT) {
-                    reportError("msg.too.many.constructor.args")
-                }
-                val rp = ts.tokenBeg
-                end = ts.tokenEnd
-                if (args != null) nx.setArguments(args)
-                nx.setParens(lp - pos, rp - pos)
-            }
-
-            // Experimental syntax: an object literal may follow a new expression, which means a
-            // kind of anonymous class built with the JavaAdapter. The literal is passed as an
-            // extra argument to the constructor.
-            if (matchToken(Token.LC, true)) {
-                val initializer = objectLiteral()
-                end = getNodeEnd(initializer)
-                nx.initializer = initializer
-            }
-            nx.length = end - pos
-            pn = nx
+            if (!newTargetAllowed) reportError("msg.new.target")
+            val target = KeywordLiteral(pos, ts.tokenEnd - pos, Token.NEW_TARGET)
+            target.setLineColumnNumber(lineno, column)
+            return memberExprTail(allowCallSyntax, target)
         }
-        return memberExprTail(allowCallSyntax, pn)
+        val nx = NewExpression(pos)
+
+        val target = memberExpr(false)
+        var end = getNodeEnd(target)
+        nx.target = target
+        nx.setLineColumnNumber(lineno, column)
+
+        if (matchToken(Token.LP, true)) {
+            val lp = ts.tokenBeg
+            val args = argumentList()
+            if (args != null && args.size > ARGC_LIMIT) {
+                reportError("msg.too.many.constructor.args")
+            }
+            val rp = ts.tokenBeg
+            end = ts.tokenEnd
+            if (args != null) nx.setArguments(args)
+            nx.setParens(lp - pos, rp - pos)
+        }
+
+        // Experimental syntax: an object literal may follow a new expression, which means a
+        // kind of anonymous class built with the JavaAdapter. The literal is passed as an
+        // extra argument to the constructor.
+        if (matchToken(Token.LC, true)) {
+            val initializer = objectLiteral()
+            end = getNodeEnd(initializer)
+            nx.initializer = initializer
+        }
+        nx.length = end - pos
+        return memberExprTail(allowCallSyntax, nx)
     }
 
     /**
@@ -4008,9 +4049,10 @@ public class Parser(
     private fun primaryExpr(): AstNode {
         val ttFlagged = peekFlaggedToken()
         val tt = ttFlagged and CLEAR_TI_MASK
-        val pos: Int
-        val end: Int
 
+        // The tokens that start no nested expression are out of line, so that the frame every
+        // level of parentheses leaves on the stack stays small: a debug native build gives every
+        // local of a function its own stack slot, and the main thread of Windows has 1 MB (#139).
         when (tt) {
             Token.FUNCTION -> {
                 consumeToken()
@@ -4059,6 +4101,26 @@ public class Parser(
                 return createStringLiteral()
             }
 
+            Token.CLASS -> {
+                consumeToken()
+                return classDefinition(false)
+            }
+
+            Token.TEMPLATE_LITERAL -> {
+                consumeToken()
+                return allowingIn { templateLiteral(false) }
+            }
+
+            else -> return primaryToken(tt)
+        }
+    }
+
+    /** A [primaryExpr] that starts no nested expression: a literal, a keyword or an error. */
+    private fun primaryToken(tt: Int): AstNode {
+        val pos: Int
+        val end: Int
+
+        when (tt) {
             Token.DIV, Token.ASSIGN_DIV -> {
                 consumeToken()
                 // Got / or /=, which in this context means a regexp.
@@ -4117,16 +4179,6 @@ public class Parser(
                 return keywordLiteral
             }
 
-            Token.CLASS -> {
-                consumeToken()
-                return classDefinition(false)
-            }
-
-            Token.TEMPLATE_LITERAL -> {
-                consumeToken()
-                return allowingIn { templateLiteral(false) }
-            }
-
             Token.RESERVED -> {
                 consumeToken()
                 reportError("msg.reserved.id", ts.string)
@@ -4171,50 +4223,59 @@ public class Parser(
         val wasInForInit = inForInit
         inForInit = false
         try {
-            var jsdocNode = getAndResetJsDoc()
+            val jsdocNode = getAndResetJsDoc()
             val lineno = lineNumber()
             val column = columnNumber()
             val begin = ts.tokenBeg
             val es6 = compilerEnv.languageVersion >= Context.VERSION_ES6
             val e = if (peekToken() == Token.RP) EmptyExpression(begin) else expr(true, allowRest = es6)
-            if (peekToken() == Token.FOR) {
-                return generatorExpression(e, begin)
-            }
-            mustMatchToken(Token.RP, "msg.no.paren", true)
-            // A rest element makes the list arrow parameters, so an arrow has to follow, on the
-            // same line.
-            if (endsInRest(e) && peekTokenOrEOL() != Token.ARROW) {
-                reportError("msg.syntax")
-                return makeErrorNode()
-            }
-
-            val length = ts.tokenEnd - begin
-
-            val hasObjectLiteralDestructuring =
-                e.getIntProp(Node.OBJECT_LITERAL_DESTRUCTURING, 0) == 1
-            val hasTrailingComma = e.getIntProp(Node.TRAILING_COMMA, 0) == 1
-            if ((hasTrailingComma || hasObjectLiteralDestructuring || e.type == Token.EMPTY) &&
-                peekToken() != Token.ARROW
-            ) {
-                reportError("msg.syntax")
-                return makeErrorNode()
-            }
-
-            val pn = ParenthesizedExpression(begin, length, e)
-            pn.setLineColumnNumber(lineno, column)
-            if (jsdocNode == null) {
-                jsdocNode = getAndResetJsDoc()
-            }
-            if (jsdocNode != null) {
-                pn.jsDocNode = jsdocNode
-            }
-            if (hasTrailingComma) {
-                pn.putIntProp(Node.TRAILING_COMMA, 1)
-            }
-            return pn
+            return parenExprTail(e, begin, lineno, column, jsdocNode)
         } finally {
             inForInit = wasInForInit
         }
+    }
+
+    /**
+     * The rest of [parenExpr] after the expression [e] in the parentheses, which still runs with
+     * the `in` operator on. It is out of line as [exprTail] is.
+     */
+    private fun parenExprTail(e: AstNode, begin: Int, lineno: Int, column: Int, firstJsDoc: Comment?): AstNode {
+        var jsdocNode = firstJsDoc
+        if (peekToken() == Token.FOR) {
+            return generatorExpression(e, begin)
+        }
+        mustMatchToken(Token.RP, "msg.no.paren", true)
+        // A rest element makes the list arrow parameters, so an arrow has to follow, on the
+        // same line.
+        if (endsInRest(e) && peekTokenOrEOL() != Token.ARROW) {
+            reportError("msg.syntax")
+            return makeErrorNode()
+        }
+
+        val length = ts.tokenEnd - begin
+
+        val hasObjectLiteralDestructuring =
+            e.getIntProp(Node.OBJECT_LITERAL_DESTRUCTURING, 0) == 1
+        val hasTrailingComma = e.getIntProp(Node.TRAILING_COMMA, 0) == 1
+        if ((hasTrailingComma || hasObjectLiteralDestructuring || e.type == Token.EMPTY) &&
+            peekToken() != Token.ARROW
+        ) {
+            reportError("msg.syntax")
+            return makeErrorNode()
+        }
+
+        val pn = ParenthesizedExpression(begin, length, e)
+        pn.setLineColumnNumber(lineno, column)
+        if (jsdocNode == null) {
+            jsdocNode = getAndResetJsDoc()
+        }
+        if (jsdocNode != null) {
+            pn.jsDocNode = jsdocNode
+        }
+        if (hasTrailingComma) {
+            pn.putIntProp(Node.TRAILING_COMMA, 1)
+        }
+        return pn
     }
 
     private fun name(ttFlagged: Int, tt: Int): AstNode {
