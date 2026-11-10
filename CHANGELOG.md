@@ -4,9 +4,11 @@ The notes of each release are also on the [releases page](https://github.com/yur
 
 ## Unreleased
 
+## 0.8.0 - 2026-11-10
+
 - Build. KiteJS now builds with the Kotlin Toolchain (`./kotlin`) instead of Gradle, with Kotlin
-  2.4.21 (up from 2.4.20) and Android compileSdk 37.2 (up from 36). The group, the version and the
-  klib names do not change. What changes for consumers:
+  2.4.21 (up from 2.4.20) and Android compileSdk 37.2 (up from 36). The group and the klib names
+  do not change. What changes for consumers:
   - Android: the QuickJS JNI libraries moved out of the `kitejs-quickjs` AAR into a new artifact,
     `io.github.yuroyami:kitejs-quickjs-android-natives`, which `kitejs-quickjs` depends on for
     Android. The Android Gradle plugin packages them into the app as before, aligned for 16 KB

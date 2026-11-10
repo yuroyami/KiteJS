@@ -13,7 +13,7 @@ settings:
   publishing:
     enabled: true
     group: io.github.yuroyami
-    version: 0.7.0
+    version: 0.8.0
     pom:
       url: https://github.com/yuroyami/KiteJS
       # KiteJS is a Kotlin port of Mozilla Rhino, a derivative work, so the upstream license carries

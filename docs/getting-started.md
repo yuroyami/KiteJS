@@ -9,8 +9,8 @@ KiteJS is on Maven Central, one artifact per engine. Add the one you want, or bo
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            implementation("io.github.yuroyami:kitejs-rhino:0.7.0")    // KiteJs(Rhino)
-            implementation("io.github.yuroyami:kitejs-quickjs:0.7.0")  // KiteJs(QuickJs)
+            implementation("io.github.yuroyami:kitejs-rhino:0.8.0")    // KiteJs(Rhino)
+            implementation("io.github.yuroyami:kitejs-quickjs:0.8.0")  // KiteJs(QuickJs)
         }
     }
 }
@@ -23,8 +23,8 @@ With the Kotlin Toolchain, the same dependencies go in `module.yaml`:
 
 ```yaml
 dependencies:
-  - io.github.yuroyami:kitejs-rhino:0.7.0
-  - io.github.yuroyami:kitejs-quickjs:0.7.0
+  - io.github.yuroyami:kitejs-rhino:0.8.0
+  - io.github.yuroyami:kitejs-quickjs:0.8.0
 ```
 
 To build from source instead:
@@ -37,7 +37,7 @@ To build from source instead:
 If you also want the suspending API, add the second artifact:
 
 ```kotlin
-implementation("io.github.yuroyami:kitejs-coroutines:0.7.0")
+implementation("io.github.yuroyami:kitejs-coroutines:0.8.0")
 ```
 
 ## Run a script
