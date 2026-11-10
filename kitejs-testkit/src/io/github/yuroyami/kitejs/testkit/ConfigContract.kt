@@ -203,6 +203,10 @@ public abstract class ConfigContract<C : KiteJsConfig>(engine: JsEngine<C>) : En
         // A generic object may claim a length of 2**53 - 1, and each of these built-ins then loops
         // over every index. The call must end: through the hook, which an engine asks while one
         // call runs, or with an error of its own, as Rhino gives for a length past its capacity.
+        // The hook stops the call the third time it is asked: Rhino asks it every 100,000 steps,
+        // and fill and copyWithin write a property each step, so the 50 asks this waited for
+        // grew the object by millions of entries and took 51 s on Linux and over the minute's
+        // limit on Windows. Two asks already show the hook is reached inside one call.
         for (call in listOf(
             "Array.prototype.join.call({length: 2**53 - 1}, '')",
             "Array.prototype.reverse.call({length: 2**53 - 1})",
@@ -210,7 +214,7 @@ public abstract class ConfigContract<C : KiteJsConfig>(engine: JsEngine<C>) : En
             "Array.prototype.copyWithin.call({length: 2**53 - 1}, 1, 0)",
         )) {
             var asked = 0
-            open { interruptWhen = { ++asked > 50 } }.use { js ->
+            open { interruptWhen = { ++asked > 2 } }.use { js ->
                 assertFails(call) { js.evaluate(call) }
             }
         }
