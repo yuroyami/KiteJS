@@ -71,3 +71,22 @@ The `test262 parity` workflow runs nightly and on manual dispatch. It creates on
 ```sh
 python3 -B -m unittest discover -s tools -p 'test_test262_corpus.py'
 ```
+
+## Release
+
+The version of every published module is `publishing.version` in `library.module-template.yaml`.
+
+1. Set the version. Move the `Unreleased` notes of `CHANGELOG.md` under it, and update the version in `README.md` and `docs/`.
+2. Merge the change to `main`, and wait for the `CI` and `QuickJS` workflows to pass on that commit. The `Publish` workflow runs no tests.
+3. Publish a GitHub release whose tag is the version, with or without a leading `v`. The `Publish` workflow then builds every platform on one Mac, runs the ABI checks, signs the artifacts and publishes them to Maven Central.
+
+A release on Maven Central cannot be removed, and `publishingMode: auto` releases the deployment without a manual review on the Central Portal. To test a release first, run the `Publish` workflow by hand with `dry_run` on. A dry run builds and signs into Maven Local, lists the files and uploads nothing.
+
+The workflow reads four repository secrets:
+
+| Secret | Value |
+| --- | --- |
+| `MAVEN_CENTRAL_USERNAME` | The name of a user token of the Central Portal |
+| `MAVEN_CENTRAL_PASSWORD` | The password of that user token |
+| `SIGNING_KEY` | An ASCII-armored private PGP key |
+| `SIGNING_KEY_PASSWORD` | The passphrase of that key |
