@@ -77,16 +77,19 @@ jobs:
       # up to 3 GB per task with no limit, so each native platform compiles in a call of its own.
       - name: Compile the native and web platforms, one platform at a time
         run: |
-          modules="kitejs-api kitejs-rhino kitejs-coroutines kitejs kitejs-quickjs"
+          modules="kitejs-api kitejs-rhino kitejs-coroutines kitejs"
           for platform in IosArm64 IosSimulatorArm64 IosX64 MacosArm64 LinuxX64 LinuxArm64 MingwX64; do
             echo "::group::$platform"
             tasks=()
             for module in $modules; do tasks+=(":$module:compile${platform}Release"); done
             ./kotlin task "${tasks[@]}"
+            # kitejs-quickjs reads the Kotlin/Native compiler that the call above unpacks. In the same
+            # call it can find the folder before the unpack finishes.
+            ./kotlin task ":kitejs-quickjs:compile${platform}Release"
             echo "::endgroup::"
           done
           tasks=()
-          for module in $modules; do tasks+=(":$module:compileJs" ":$module:compileWasmJs"); done
+          for module in $modules kitejs-quickjs; do tasks+=(":$module:compileJs" ":$module:compileWasmJs"); done
           ./kotlin task "${tasks[@]}"
 
       # A release whose public API differs from the committed references does not go out.
