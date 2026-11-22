@@ -71,23 +71,23 @@ jobs:
             exit 1
           fi
 
-      # Three builds, one after another, so the runner compiles one group of platforms at a time.
-      - name: Build (JVM and Android)
-        run: >
-          ./kotlin build
-          -m kitejs-api -m kitejs-rhino -m kitejs-coroutines -m kitejs
-          -m kitejs-quickjs -m kitejs-quickjs-android-natives
-          -p jvm -p android
-
-      - name: Build (native and web, the Kotlin modules)
-        run: >
-          ./kotlin build -m kitejs-api -m kitejs-rhino -m kitejs-coroutines -m kitejs
-          -p iosArm64 -p iosSimulatorArm64 -p iosX64 -p macosArm64 -p linuxX64 -p linuxArm64 -p mingwX64 -p js -p wasmJs
-
-      - name: Build (native and web, kitejs-quickjs)
-        run: >
-          ./kotlin build -m kitejs-quickjs
-          -p iosArm64 -p iosSimulatorArm64 -p iosX64 -p macosArm64 -p linuxX64 -p linuxArm64 -p mingwX64 -p js -p wasmJs
+      # Only the code a release ships compiles here, in the release variant that the publish below
+      # reuses. `./kotlin build` also compiled and linked every test source set of every platform,
+      # which took most of a three-hour run. The toolchain starts one Kotlin/Native compiler JVM of
+      # up to 3 GB per task with no limit, so each native platform compiles in a call of its own.
+      - name: Compile the native and web platforms, one platform at a time
+        run: |
+          modules="kitejs-api kitejs-rhino kitejs-coroutines kitejs kitejs-quickjs"
+          for platform in IosArm64 IosSimulatorArm64 IosX64 MacosArm64 LinuxX64 LinuxArm64 MingwX64; do
+            echo "::group::$platform"
+            tasks=()
+            for module in $modules; do tasks+=(":$module:compile${platform}Release"); done
+            ./kotlin task "${tasks[@]}"
+            echo "::endgroup::"
+          done
+          tasks=()
+          for module in $modules; do tasks+=(":$module:compileJs" ":$module:compileWasmJs"); done
+          ./kotlin task "${tasks[@]}"
 
       # A release whose public API differs from the committed references does not go out.
       - name: Check the public JVM API
