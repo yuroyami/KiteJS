@@ -295,11 +295,11 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
         val working = Array<Any?>(len) { js_get(it) }
         if (args.isNotEmpty() && Undefined.instance !== args[0]) {
             val comparator = ArrayLikeAbstractOperations.getSortComparator(cx, scope, args)
-            sortStable(working) { a, b -> comparator.compare(a, b) }
+            ArrayLikeAbstractOperations.sortStable(working) { a, b -> comparator.compare(a, b) }
         } else {
             // The default order for a typed array is numeric, not the string order Array uses.
             // compareTo, not <, so it is the total order: -0 before 0, and NaN last.
-            sortStable(working) { a, b ->
+            ArrayLikeAbstractOperations.sortStable(working) { a, b ->
                 if (a is KBigInt && b is KBigInt) {
                     a.compareTo(b)
                 } else {
@@ -999,34 +999,6 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
             if (result.length < args.size) throw ScriptRuntime.typeErrorById("msg.typed.array.length.too.small")
             for (k in args.indices) result.setArrayElement(k, args[k])
             return result
-        }
-
-        /** A stable merge sort. An insertion sort took minutes on 1024 elements in reverse order. */
-        private fun sortStable(a: Array<Any?>, compare: (Any?, Any?) -> Int) {
-            if (a.size < 2) return
-            var from = a
-            var to = arrayOfNulls<Any?>(a.size)
-            var width = 1
-            while (width < a.size) {
-                var lo = 0
-                while (lo < a.size) {
-                    val mid = minOf(lo + width, a.size)
-                    val hi = minOf(lo + 2 * width, a.size)
-                    var i = lo
-                    var j = mid
-                    var k = lo
-                    // Taking from the left run on a tie keeps equal elements in order.
-                    while (i < mid && j < hi) to[k++] = if (compare(from[i], from[j]) <= 0) from[i++] else from[j++]
-                    while (i < mid) to[k++] = from[i++]
-                    while (j < hi) to[k++] = from[j++]
-                    lo = hi
-                }
-                val swap = from
-                from = to
-                to = swap
-                width *= 2
-            }
-            if (from !== a) from.copyInto(a)
         }
     }
 }

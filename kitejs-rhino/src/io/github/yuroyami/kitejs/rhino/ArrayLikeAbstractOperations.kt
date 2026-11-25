@@ -288,6 +288,39 @@ public object ArrayLikeAbstractOperations {
         return value
     }
 
+    /**
+     * A stable merge sort, the same on every target. An insertion sort took minutes on 1024 elements
+     * in reverse order, and the JVM's TimSort throws on a comparator that breaks its contract.
+     */
+    internal fun sortStable(a: Array<Any?>, compare: (Any?, Any?) -> Int) {
+        if (a.size < 2) return
+        var from = a
+        var to = arrayOfNulls<Any?>(a.size)
+        var width = 1
+        while (width < a.size) {
+            var lo = 0
+            while (lo < a.size) {
+                val mid = minOf(lo + width, a.size)
+                val hi = minOf(lo + 2 * width, a.size)
+                var i = lo
+                var j = mid
+                var k = lo
+                // The right run's element goes first only when the comparator says it is less, asked
+                // as V8 asks: later element first. A tie keeps the left one, so the sort is stable, and
+                // a comparator that never answers below zero, such as `a > b`, moves nothing, as in V8.
+                while (i < mid && j < hi) to[k++] = if (compare(from[j], from[i]) < 0) from[j++] else from[i++]
+                while (i < mid) to[k++] = from[i++]
+                while (j < hi) to[k++] = from[j++]
+                lo = hi
+            }
+            val swap = from
+            from = to
+            to = swap
+            width *= 2
+        }
+        if (from !== a) from.copyInto(a)
+    }
+
     public fun getSortComparator(cx: Context, scope: Scriptable, args: Array<Any?>): Comparator<Any?> =
         if (args.isNotEmpty() && Undefined.instance !== args[0]) {
             getSortComparatorFromArguments(cx, scope, args)

@@ -999,16 +999,15 @@ public class NativeArray : ScriptableObject {
                 throw Context.reportRuntimeErrorById("msg.arraylength.too.big", llength.toString())
             }
             // copy the JS array into a working array, so it can be sorted cheaply.
-            val working = ArrayList<Any?>(length)
+            val present = ArrayList<Any?>(length)
             for (i in 0 until length) {
-                if (ArrayLikeAbstractOperations.hasElem(o, i.toLong())) working.add(getElem(cx, o, i.toLong()))
+                if (ArrayLikeAbstractOperations.hasElem(o, i.toLong())) present.add(getElem(cx, o, i.toLong()))
             }
-            try {
-                working.sortWith(comparator)
-            } catch (e: IllegalArgumentException) {
-                // A comparator that breaks its own contract; leave the array as it was.
-                return o
-            }
+            // The port's own merge sort, so a comparator that breaks its contract gives the same
+            // order on every target. Upstream used Arrays.sort and left the array as it was when
+            // the JVM's TimSort noticed.
+            val working = present.toTypedArray()
+            ArrayLikeAbstractOperations.sortStable(working) { a, b -> comparator.compare(a, b) }
             // copy the working array back into thisObj
             for (i in working.indices) setElem(cx, o, i.toLong(), working[i])
             for (i in working.size until length) deleteElem(o, i.toLong())
