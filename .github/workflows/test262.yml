@@ -29,6 +29,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          persist-credentials: false
           ref: ${{ github.sha }}
       - uses: actions/setup-python@v7
         with:
@@ -86,6 +87,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          persist-credentials: false
           ref: ${{ github.sha }}
       - uses: actions/setup-python@v7
         with:
