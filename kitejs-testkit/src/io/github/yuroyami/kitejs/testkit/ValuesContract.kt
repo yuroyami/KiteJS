@@ -29,6 +29,52 @@ private class CollectionBox(var child: Any? = null)
 /** Values in both directions: what comes back from a script, and what a Kotlin value becomes. */
 public abstract class ValuesContract<C : KiteJsConfig>(engine: JsEngine<C>) : EngineContract<C>(engine) {
 
+    /**
+     * Strings that each platform copies its own way: lone surrogates, a NUL, and a pair outside the
+     * Basic Multilingual Plane. Built from chars, because a lone surrogate in a Kotlin/JS string
+     * literal becomes a question mark.
+     */
+    private val awkwardStrings = listOf(
+        charArrayOf('a', '\uD800', 'b').concatToString(),
+        charArrayOf('a', '\uDC00', 'b').concatToString(),
+        charArrayOf('a', '\u0000', 'b').concatToString(),
+        charArrayOf('a', '\uD835', '\uDC65', 'b').concatToString(),
+    )
+
+    @Test
+    public fun awkwardStringsCrossBetweenTheHostAndTheScriptIntact(): TestResult = withEngine { js ->
+        var seen: String? = null
+        js.global.function("echo", 1) { args -> args[0].asString().also { seen = it } }
+        for (s in awkwardStrings) {
+            val units = s.map { it.code }
+            js.global["v"] = s
+            assertEquals(units, js.evaluate("v").asString().map { it.code }, "read back")
+            assertEquals(s.length, js.evaluate("v.length").asInt(), "length")
+            assertEquals(units, js.evaluate("echo(v)").asString().map { it.code }, "through a host function")
+            assertEquals(units, seen?.map { it.code }, "as a host function argument")
+            // As a raw string literal in the source.
+            assertEquals(units, js.evaluate("'$s'").asString().map { it.code }, "in a literal")
+            // As the name of a host function.
+            js.global.function(s, 0) { null }
+            assertEquals(units, js.global[s].asFunction()["name"].asString().map { it.code }, "as a function name")
+        }
+    }
+
+    @Test
+    public fun anIdentifierOutsideTheBasicMultilingualPlaneParses(): TestResult = withEngine { js ->
+        val x = charArrayOf('\uD835', '\uDC65').concatToString()
+        assertEquals(6.0, js.evaluate("var $x = 2; $x * 3").asDouble())
+        val kanji = charArrayOf('\uD842', '\uDFB7').concatToString()
+        assertEquals(4.0, js.evaluate("var $kanji = 4; $kanji").asDouble())
+    }
+
+    @Test
+    public fun aFileNameOutsideTheBasicMultilingualPlaneReachesTheStack(): TestResult = withEngine { js ->
+        val file = "a" + charArrayOf('\uD835', '\uDC65').concatToString() + ".js"
+        val error = assertFailsWith<JsError> { js.evaluate("throw new Error('x')", file) }
+        assertEquals(file, error.scriptStack.firstOrNull()?.fileName, "${error.scriptStack}")
+    }
+
     @Test
     public fun everyKindOfValueComesBackWithItsType(): TestResult = withEngine { js ->
         assertEquals(JsType.NUMBER, js.evaluate("1 + 1").type)

@@ -343,13 +343,15 @@ KiteEngine *kite_new(int32_t id, double memory_limit, double stack_size, int32_t
                         (options & KITE_OPT_TIME_ZONE) ? tz_offset_hook : NULL);
     e->ask_host = (options & KITE_OPT_INTERRUPT) != 0;
 
-    e->capacity = 64;
-    e->slots = malloc(sizeof(JSValue) * e->capacity);
-    e->next = malloc(sizeof(int32_t) * e->capacity);
+    /* The capacity is set once both arrays exist and are filled, so kite_free never reads a
+     * slot of a table that a failed allocation left missing or unwritten. */
+    int32_t capacity = 64;
+    e->slots = malloc(sizeof(JSValue) * capacity);
+    e->next = malloc(sizeof(int32_t) * capacity);
     if (!e->slots || !e->next)
         goto fail;
     e->free_head = -1;
-    for (int32_t i = e->capacity - 1; i >= FIXED_HANDLES; i--) {
+    for (int32_t i = capacity - 1; i >= FIXED_HANDLES; i--) {
         e->slots[i] = JS_UNDEFINED;
         e->next[i] = e->free_head;
         e->free_head = i;
@@ -360,6 +362,7 @@ KiteEngine *kite_new(int32_t id, double memory_limit, double stack_size, int32_t
     e->slots[KITE_FALSE] = JS_FALSE;
     for (int32_t i = 0; i < FIXED_HANDLES; i++)
         e->next[i] = -3;
+    e->capacity = capacity;
     return e;
 
 fail:
@@ -628,7 +631,10 @@ int32_t kite_compile(KiteEngine *e, const uint16_t *source, int32_t length,
         return -1;
     }
     size_t utf8_length;
-    const char *utf8 = JS_ToCStringLen2(ctx, &utf8_length, text, true);
+    /* UTF-8, not CESU-8: the lexer reads a pair written as two 3-byte halves as two code points,
+     * so an identifier outside the Basic Multilingual Plane would not parse. A lone surrogate
+     * still takes 3 bytes, so string literals keep it. */
+    const char *utf8 = JS_ToCStringLen2(ctx, &utf8_length, text, false);
     const char *file_utf8 = JS_ToCString(ctx, name);
     JS_FreeValue(ctx, text);
     JS_FreeValue(ctx, name);
@@ -787,18 +793,36 @@ int32_t kite_new_function(KiteEngine *e, int32_t fn, const uint16_t *name, int32
     if (JS_IsException(text))
         return -1;
     const char *utf8 = JS_ToCString(ctx, text);
-    JS_FreeValue(ctx, text);
-    if (!utf8)
+    if (!utf8) {
+        JS_FreeValue(ctx, text);
         return -1;
+    }
     JSValue token = JS_NewObjectClass(ctx, e->host_class);
     if (JS_IsException(token)) {
         JS_FreeCString(ctx, utf8);
+        JS_FreeValue(ctx, text);
         return -1;
     }
     JS_SetOpaque(token, (void *)(intptr_t)(fn + 1));
     JSValue f = JS_NewCFunctionData2(ctx, host_function, utf8, arity, 0, 1, (JSValueConst *)&token);
     JS_FreeValue(ctx, token);
     JS_FreeCString(ctx, utf8);
+    /* The C name ends at the first NUL, so a name that holds one is set again from the string. */
+    bool has_nul = false;
+    for (int32_t i = 0; i < name_length; i++) {
+        if (name[i] == 0) {
+            has_nul = true;
+            break;
+        }
+    }
+    if (has_nul && !JS_IsException(f)) {
+        if (JS_DefinePropertyValueStr(ctx, f, "name", text, JS_PROP_CONFIGURABLE) < 0) {
+            JS_FreeValue(ctx, f);
+            return -1;
+        }
+    } else {
+        JS_FreeValue(ctx, text);
+    }
     return answer(e, f);
 }
 

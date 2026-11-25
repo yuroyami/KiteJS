@@ -365,7 +365,8 @@ internal class QuickJsKiteJs private constructor(
     }
 
     private fun compileHandle(source: String, fileName: String): Int {
-        val h = bridge.compile(ptr, source, fileName)
+        // QuickJS takes the file name as a C string, which would end at a NUL.
+        val h = bridge.compile(ptr, source, fileName.replace('\u0000', '\uFFFD'))
         if (h >= 0) return h
         val thrown = bridge.exception(ptr)
         val value = toJs(thrown)
