@@ -59,6 +59,11 @@ settings:
   publishing:
     pom:
       name: KiteJS QuickJS
+      # The C engine in this artifact is QuickJS-ng, which keeps its MIT licence. The toolchain adds
+      # this entry to the MPL-2.0 entry of library.module-template.yaml.
+      licenses:
+        - name: The MIT License
+          url: https://github.com/quickjs-ng/quickjs/blob/main/LICENSE
 
 plugins:
   quickjs-native:

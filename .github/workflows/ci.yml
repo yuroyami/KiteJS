@@ -20,6 +20,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # Each published module carries LICENSE and NOTICE in resources/META-INF, so they reach its
+      # jar. The QuickJS modules also carry the MIT licence of QuickJS-ng.
+      - name: Check the licence files that the jars carry
+        run: |
+          for m in kitejs kitejs-api kitejs-rhino kitejs-coroutines kitejs-quickjs kitejs-quickjs-android-natives; do
+            cmp LICENSE "$m/resources/META-INF/LICENSE"
+            cmp NOTICE "$m/resources/META-INF/NOTICE"
+          done
+          for m in kitejs-quickjs kitejs-quickjs-android-natives; do
+            cmp kitejs-quickjs/native/quickjs/LICENSE "$m/resources/META-INF/LICENSE-quickjs-ng"
+          done
       - name: Cache the Kotlin Toolchain downloads
         uses: actions/cache@v5
         with:
