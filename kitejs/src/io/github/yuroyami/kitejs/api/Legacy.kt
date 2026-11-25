@@ -12,6 +12,7 @@ import io.github.yuroyami.kitejs.rhino.RhinoConfig
     "Name the engine: KiteJs(Rhino) { }. This goes away at 1.0.",
     ReplaceWith("KiteJs(Rhino, configure)", "io.github.yuroyami.kitejs.rhino.Rhino"),
 )
+@Throws(JsException::class)
 public fun KiteJs(configure: RhinoConfig.() -> Unit = {}): KiteJs = KiteJs(Rhino, configure)
 
 /** Where [io.github.yuroyami.kitejs.rhino.LanguageVersion] used to live. */

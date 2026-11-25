@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.coroutines
 
+import io.github.yuroyami.kitejs.api.JsException
 import io.github.yuroyami.kitejs.api.JsEngine
 import io.github.yuroyami.kitejs.api.JsEngineError
 import io.github.yuroyami.kitejs.api.JsError
@@ -63,6 +64,7 @@ public class AsyncKiteJs internal constructor(
     private val closed = AtomicBoolean(false)
 
     /** Runs [block] on the engine's dispatcher with the engine in hand. */
+    @Throws(JsException::class, CancellationException::class)
     public suspend fun <T> onEngine(block: (KiteJs) -> T): T {
         check(!closed.load()) { "this engine is closed" }
         val caller = coroutineContext[Job]
@@ -91,14 +93,17 @@ public class AsyncKiteJs internal constructor(
     }
 
     /** Parses and runs [source] on the engine's dispatcher. */
+    @Throws(JsException::class, CancellationException::class)
     public suspend fun evaluate(source: String, fileName: String = "<eval>"): JsValue =
         onEngine { it.evaluate(source, fileName) }
 
     /** Parses [source] once, for running more than once. */
+    @Throws(JsException::class, CancellationException::class)
     public suspend fun compile(source: String, fileName: String = "<script>"): JsScript =
         onEngine { it.compile(source, fileName) }
 
     /** Runs [source] and, if it answers a promise, waits for that promise to settle. */
+    @Throws(JsException::class, CancellationException::class)
     public suspend fun evaluateAwaiting(source: String, fileName: String = "<eval>"): JsValue =
         await(evaluate(source, fileName))
 
@@ -111,6 +116,7 @@ public class AsyncKiteJs internal constructor(
      * Closing the engine while this waits ends the wait with [IllegalStateException], since
      * nothing can settle the promise any more.
      */
+    @Throws(JsException::class, CancellationException::class)
     public suspend fun await(value: JsValue): JsValue {
         val settled = CompletableDeferred<JsValue>()
         val registered = onEngine { js ->
@@ -146,6 +152,7 @@ public class AsyncKiteJs internal constructor(
      * cancelled, or [scope] is cancelled before it is awaited, the promise rejects with the
      * failure's message.
      */
+    @Throws(JsException::class, CancellationException::class)
     public suspend fun <T> deferredToPromise(deferred: Deferred<T>, scope: CoroutineScope): JsObject {
         val handle = onEngine { it.newPromise() }
         bridge(handle, scope) { deferred.await() }
@@ -160,6 +167,7 @@ public class AsyncKiteJs internal constructor(
      * [body] runs off the engine's thread, so its arguments follow the rule above: scalars can be
      * read as they are, and an object or a function argument is read inside [onEngine].
      */
+    @Throws(JsException::class, CancellationException::class)
     public suspend fun suspendFunction(
         target: JsObject,
         name: String,
@@ -285,6 +293,7 @@ internal class EngineState(dispatcher: CoroutineDispatcher) {
  * the hook between instructions, and a cancelled job answers "stop". It needs no instruction
  * budget, and an `instructionBudget` you set does not delay it.
  */
+@Throws(JsException::class, CancellationException::class)
 public suspend fun <C : KiteJsConfig> asyncKiteJs(
     engine: JsEngine<C>,
     dispatcher: CoroutineDispatcher = EngineThread(),

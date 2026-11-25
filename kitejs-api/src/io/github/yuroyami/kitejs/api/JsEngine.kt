@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.api
 
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.datetime.TimeZone
 
 /**
@@ -27,6 +28,7 @@ public interface JsEngine<C : KiteJsConfig> {
      * main thread for a module that size. Everywhere else this returns at once. Calling it again
      * once it is done costs nothing.
      */
+    @Throws(JsException::class, CancellationException::class)
     public suspend fun load() {}
 
     /** True once [load] has finished, and from the start where the engine has nothing to load. */
@@ -52,6 +54,7 @@ public interface JsEngine<C : KiteJsConfig> {
  * Builds an engine on [engine], on this thread. See [KiteJsConfig] for what every engine takes and
  * the engine's own configuration for the rest.
  */
+@Throws(JsException::class)
 public fun <C : KiteJsConfig> KiteJs(engine: JsEngine<C>, configure: C.() -> Unit = {}): KiteJs =
     engine.open(engine.newConfig().apply(configure))
 

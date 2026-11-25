@@ -11,11 +11,13 @@ public class JsPromiseHandle(
     private val rejectFn: JsFunction,
 ) {
     /** Settles the promise with [value]. Later calls do nothing, as in a script. */
+    @Throws(JsException::class)
     public fun resolve(value: Any?) {
         resolveFn(value)
     }
 
     /** Rejects the promise with [reason]. */
+    @Throws(JsException::class)
     public fun reject(reason: Any?) {
         rejectFn(reason)
     }
@@ -26,6 +28,7 @@ private const val PROMISE_MAKER =
         " return { promise: p, resolve: r, reject: j } })"
 
 /** A promise the host settles later. */
+@Throws(JsException::class)
 public fun KiteJs.newPromise(): JsPromiseHandle {
     // Parsed once per engine: a parse cost several times the call (#154).
     val maker = promiseMaker ?: evaluate(PROMISE_MAKER, "<promise>").asFunction().also { promiseMaker = it }
@@ -59,5 +62,6 @@ public val JsValue.isThenable: Boolean
  * as it returns, this one included, so for a promise that has already settled it runs before this
  * returns. An exception it throws comes out of the call that drained the queue.
  */
+@Throws(JsException::class)
 public fun KiteJs.onSettled(value: JsValue, onSettled: (JsValue, JsValue?) -> Unit): Boolean =
     watchSettlement(value, onSettled)

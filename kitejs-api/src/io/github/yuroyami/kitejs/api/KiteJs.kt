@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.api
 
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -38,9 +39,11 @@ public abstract class KiteJs @InternalKiteJsApi constructor() : AutoCloseable {
     public abstract val version: String
 
     /** Parses and runs [source]. The answer is the last expression's value. */
+    // No @Throws on calls that answer a JsValue: Objective-C export fails on a value class result (#156).
     public abstract fun evaluate(source: String, fileName: String = "<eval>"): JsValue
 
     /** Parses [source] once so it can be run many times. */
+    @Throws(JsException::class)
     public abstract fun compile(source: String, fileName: String = "<script>"): JsScript
 
     /**
@@ -49,6 +52,7 @@ public abstract class KiteJs @InternalKiteJsApi constructor() : AutoCloseable {
      * so load only bytecode the host wrote itself, never bytes from a document or the network.
      * Throws a [JsEngineError] on an engine that has no bytecode, and for bytes it cannot read.
      */
+    @Throws(JsException::class)
     public open fun loadBytecode(bytecode: ByteArray): JsScript =
         throw JsEngineError("${engine.name} has no bytecode")
 
@@ -68,6 +72,7 @@ public abstract class KiteJs @InternalKiteJsApi constructor() : AutoCloseable {
      * [JsEngineError]; other engines stay usable. Where the script cannot pause, it runs to the
      * end in one go.
      */
+    @Throws(JsException::class, CancellationException::class)
     public open suspend fun evaluatePausing(
         source: String,
         fileName: String = "<eval>",
@@ -78,15 +83,18 @@ public abstract class KiteJs @InternalKiteJsApi constructor() : AutoCloseable {
      * Runs whatever the promise callbacks have queued. Evaluating already drains the queue at the
      * end of the call, so this is only for work queued from a host callback afterwards.
      */
+    @Throws(JsException::class)
     public abstract fun runMicrotasks()
 
     /** A Kotlin value as the engine sees it, collections and all. See [Converters]. */
     public abstract fun valueOf(value: Any?): JsValue
 
     /** A fresh empty object, the same as `{}` in a script. */
+    @Throws(JsException::class)
     public abstract fun newObject(): JsObject
 
     /** A fresh array holding [elements]. */
+    @Throws(JsException::class)
     public abstract fun newArray(vararg elements: Any?): JsArray
 
     /**
@@ -103,6 +111,7 @@ public abstract class KiteJs @InternalKiteJsApi constructor() : AutoCloseable {
      * back through [Converters].
      */
     @InternalKiteJsApi
+    @Throws(JsException::class)
     public abstract fun newFunction(
         name: String,
         arity: Int,
@@ -111,6 +120,7 @@ public abstract class KiteJs @InternalKiteJsApi constructor() : AutoCloseable {
 
     /** A host constructor: `new` makes a plain object and hands it to [build] to fill in. */
     @InternalKiteJsApi
+    @Throws(JsException::class)
     public abstract fun newConstructor(
         name: String,
         arity: Int,
@@ -119,10 +129,12 @@ public abstract class KiteJs @InternalKiteJsApi constructor() : AutoCloseable {
 
     /** Whether [obj] has a callable `then`, read once, as a host call. */
     @InternalKiteJsApi
+    @Throws(JsException::class)
     public abstract fun thenableCheck(obj: JsObject): Boolean
 
     /** What [onSettled] does; see there. */
     @InternalKiteJsApi
+    @Throws(JsException::class)
     public abstract fun watchSettlement(value: JsValue, onSettled: (JsValue, JsValue?) -> Unit): Boolean
 
     /** The function behind [newPromise], compiled on the first call and kept for the engine's life. */

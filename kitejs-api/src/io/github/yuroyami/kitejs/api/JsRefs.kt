@@ -4,6 +4,7 @@
 
 package io.github.yuroyami.kitejs.api
 
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -35,14 +36,18 @@ public abstract class JsObject @InternalKiteJsApi constructor() {
 
     public abstract operator fun get(index: Int): JsValue
 
+    @Throws(JsException::class)
     public abstract operator fun set(name: String, value: Any?)
 
+    @Throws(JsException::class)
     public abstract operator fun set(index: Int, value: Any?)
 
     /** Whether the object has [name], its own or inherited, as the `in` operator answers. */
+    @Throws(JsException::class)
     public abstract fun has(name: String): Boolean
 
     /** Deletes [name] from the object, as the `delete` operator does. */
+    @Throws(JsException::class)
     public abstract fun delete(name: String)
 
     /** The object's own enumerable string keys, in the order `Object.keys` gives them. */
@@ -60,6 +65,7 @@ public abstract class JsObject @InternalKiteJsApi constructor() {
 
     /** A plain Kotlin map, all the way down. Cycles come back as the [JsObject] that closed them. */
     @Suppress("UNCHECKED_CAST")
+    @Throws(JsException::class)
     public fun toMap(): Map<String, Any?> = Converters.toKotlinMap(this, HashSet()) as Map<String, Any?>
 
     /**
@@ -96,10 +102,12 @@ public abstract class JsObject @InternalKiteJsApi constructor() {
 
     /** Defines a data property, as `Object.defineProperty` would. */
     @InternalKiteJsApi
+    @Throws(JsException::class)
     public abstract fun defineValue(name: String, value: Any?, flags: PropertyFlags)
 
     /** Defines an accessor property whose halves call back into the host. Either can be null. */
     @InternalKiteJsApi
+    @Throws(JsException::class)
     public abstract fun defineAccessor(
         name: String,
         read: (() -> Any?)?,
@@ -125,6 +133,7 @@ public abstract class JsArray @InternalKiteJsApi constructor() : JsObject() {
         }
 
     /** Appends at [length], or refuses an array already at JavaScript's maximum length. */
+    @Throws(JsException::class)
     public fun add(value: Any?) {
         val next = length
         if (next >= 4294967295L) throw JsEngineError("an array at the maximum JavaScript length cannot grow")
@@ -133,9 +142,11 @@ public abstract class JsArray @InternalKiteJsApi constructor() : JsObject() {
 
     /** A plain Kotlin list, all the way down. */
     @Suppress("UNCHECKED_CAST")
+    @Throws(JsException::class)
     public fun toList(): List<Any?> = Converters.toKotlin(value, HashSet()) as List<Any?>
 
     /** Every element as a [JsValue], or [JsEngineError] if [length] exceeds [Int.MAX_VALUE]. */
+    @Throws(JsException::class)
     public fun values(): List<JsValue> = (0 until size).map { this[it] }
 }
 
@@ -152,9 +163,11 @@ public abstract class JsFunction @InternalKiteJsApi constructor() : JsObject() {
     public abstract fun callOn(thisArg: Any?, vararg args: Any?): JsValue
 
     /** Calls it with `new`. */
+    @Throws(JsException::class)
     public abstract fun construct(vararg args: Any?): JsObject
 
     /** A new function with `this` and the leading arguments fixed, as `Function.prototype.bind` does. */
+    @Throws(JsException::class)
     public abstract fun bind(thisArg: Any?, vararg args: Any?): JsFunction
 }
 
@@ -185,6 +198,7 @@ public abstract class JsScript @InternalKiteJsApi constructor() {
     public abstract fun run(): JsValue
 
     /** Runs it as [KiteJs.evaluatePausing] runs source: pausing about every [slice] where the engine can. */
+    @Throws(JsException::class, CancellationException::class)
     public open suspend fun runPausing(slice: Duration = 16.milliseconds): JsValue = run()
 
     /**
@@ -193,5 +207,6 @@ public abstract class JsScript @InternalKiteJsApi constructor() {
      * Bytecode fits only the build of the engine that wrote it, so keep it for this process, or
      * key a saved copy on [KiteJs.version].
      */
+    @Throws(JsException::class)
     public open fun bytecode(): ByteArray? = null
 }

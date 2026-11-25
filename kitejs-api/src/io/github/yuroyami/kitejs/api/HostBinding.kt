@@ -13,11 +13,13 @@ public class PropertyFlags(public val writable: Boolean = true, public val enume
 // ---- Values ---------------------------------------------------------------------------------
 
 /** Puts a value on the object. */
+@Throws(JsException::class)
 public fun JsObject.property(name: String, value: Any?, flags: PropertyFlags = PropertyFlags()) {
     defineValue(name, value, flags)
 }
 
 /** Puts a value that a script can read but not change. */
+@Throws(JsException::class)
 public fun JsObject.constant(name: String, value: Any?) {
     property(name, value, PropertyFlags(writable = false, configurable = false))
 }
@@ -25,16 +27,19 @@ public fun JsObject.constant(name: String, value: Any?) {
 // ---- Accessors ------------------------------------------------------------------------------
 
 /** A property computed on every read. */
+@Throws(JsException::class)
 public fun JsObject.getter(name: String, flags: PropertyFlags = PropertyFlags(), read: () -> Any?) {
     defineAccessor(name, read, null, flags)
 }
 
 /** A property that only accepts writes. */
+@Throws(JsException::class)
 public fun JsObject.setter(name: String, flags: PropertyFlags = PropertyFlags(), write: (JsValue) -> Unit) {
     defineAccessor(name, null, write, flags)
 }
 
 /** A property with both halves. */
+@Throws(JsException::class)
 public fun JsObject.accessor(
     name: String,
     flags: PropertyFlags = PropertyFlags(),
@@ -47,6 +52,7 @@ public fun JsObject.accessor(
 // ---- Functions ------------------------------------------------------------------------------
 
 /** A host function that takes the arguments as they came. */
+@Throws(JsException::class)
 public fun JsObject.function(
     name: String,
     arity: Int = 0,
@@ -59,6 +65,7 @@ public fun JsObject.function(
 }
 
 /** A host function that also wants the `this` it was called on. */
+@Throws(JsException::class)
 public fun JsObject.method(
     name: String,
     arity: Int = 0,
@@ -71,6 +78,7 @@ public fun JsObject.method(
 }
 
 /** A host constructor, callable with `new`. [build] fills in the object it is given. */
+@Throws(JsException::class)
 public fun JsObject.constructor(
     name: String,
     arity: Int = 0,
@@ -85,6 +93,7 @@ public fun JsObject.constructor(
 // ---- Nesting --------------------------------------------------------------------------------
 
 /** A nested object, built by [build]. Returns it so you can keep a handle. */
+@Throws(JsException::class)
 public fun JsObject.obj(name: String, build: JsObject.() -> Unit = {}): JsObject {
     val child = engine.newObject()
     child.build()
@@ -123,6 +132,7 @@ public class BindScope<T : Any> internal constructor(private val obj: JsObject, 
  * }
  * ```
  */
+@Throws(JsException::class)
 public fun <T : Any> JsObject.bind(name: String, instance: T, build: BindScope<T>.() -> Unit): JsObject {
     val child = obj(name)
     BindScope(child, instance).build()
