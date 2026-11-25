@@ -71,6 +71,20 @@ public abstract class ConfigContract<C : KiteJsConfig>(engine: JsEngine<C>) : En
     }
 
     @Test
+    public fun theYearMinusZeroIsNotADate(): TestResult = withEngine({ timeZone = TimeZone.UTC }) { js ->
+        // ECMA-262 21.4.1.32.1: "The representation of the year 0 as -000000 is invalid."
+        assertEquals(
+            "NaN NaN NaN",
+            js.evaluate(
+                "[Date.parse('-000000-01-01T00:00:00Z'), Date.parse('-000000-01-01'), " +
+                    "new Date('-000000-01-01T00:00:00.000Z').getTime()].join(' ')",
+            ).asString(),
+        )
+        assertEquals(-62167219200000.0, js.evaluate("Date.parse('+000000-01-01T00:00:00Z')").asDouble())
+        assertEquals(-62198755200000.0, js.evaluate("Date.parse('-000001-01-01T00:00:00Z')").asDouble())
+    }
+
+    @Test
     public fun anotherZoneOnTheOtherSide(): TestResult = withEngine({ timeZone = TimeZone.of("America/New_York") }) { js ->
         assertEquals(19.0, js.evaluate("new Date(Date.UTC(2024, 0, 2, 0)).getHours()").asDouble())
         assertEquals(240.0, js.evaluate("new Date(Date.UTC(2024, 6, 2)).getTimezoneOffset()").asDouble())

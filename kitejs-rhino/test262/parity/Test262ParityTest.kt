@@ -857,6 +857,10 @@ class Test262ParityTest {
         // unit off for powers of two: Math.log2(8) is 2.9999999999999996.
         put("built-ins/Math/log2/log2-basicTests.js", "log2 is fdlibm's here and exact for powers of two")
 
+        // ECMA-262 makes the expanded year -000000 invalid. Upstream reads it as the year 0.
+        put("built-ins/Date/parse/year-zero.js", "#151: Date.parse refuses the year -000000 here")
+        put("built-ins/Date/year-zero.js", "#151: the Date constructor refuses the year -000000 here")
+
         // toReversed and toSorted validate their receiver, and with converts a bigint view's
         // replacement with ToBigInt. Upstream does neither.
         for (path in listOf(

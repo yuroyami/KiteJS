@@ -732,6 +732,8 @@ internal class NativeDate private constructor() : IdScriptableObject() {
             val msec = values[MSEC]
             val tzhour = values[TZHOUR]
             val tzmin = values[TZMIN]
+            // ECMA-262 21.4.1.32.1: "The representation of the year 0 as -000000 is invalid."
+            if (year == 0 && yearmod == -1) return ScriptRuntime.NaN
             if (year > 275943 || // ceil(1e8/365) + 1970
                 (month < 1 || month > 12) ||
                 (day < 1 || day > DaysInMonth(year, month)) ||
@@ -796,6 +798,8 @@ internal class NativeDate private constructor() : IdScriptableObject() {
         private fun date_parseString(cx: Context, s: String): Double {
             val d = parseISOString(cx, s)
             if (!d.isNaN()) return d
+            // The loose formats must not take the year -000000 that the ISO form refuses.
+            if (s.startsWith("-000000")) return ScriptRuntime.NaN
             parseLooseYearFirstDate(cx, s)?.let { return it }
 
             var year = -1
