@@ -382,11 +382,11 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
                 defineMethod(ta, s, "findLast", 1) { cx2, s2, t, a -> iterative(cx2, s2, t, a, ArrayLikeAbstractOperations.IterativeOperation.FIND_LAST) }
                 defineMethod(ta, s, "findLastIndex", 1) { cx2, s2, t, a -> iterative(cx2, s2, t, a, ArrayLikeAbstractOperations.IterativeOperation.FIND_LAST_INDEX) }
                 defineMethod(ta, s, "forEach", 1) { cx2, s2, t, a -> iterative(cx2, s2, t, a, ArrayLikeAbstractOperations.IterativeOperation.FOR_EACH) }
-                defineMethod(ta, s, "includes", 1) { cx2, s2, t, a -> js_includes(t, a) }
-                defineMethod(ta, s, "indexOf", 1) { cx2, s2, t, a -> js_indexOf(t, a) }
+                defineMethod(ta, s, "includes", 1) { cx2, s2, t, a -> js_includes(cx2, t, a) }
+                defineMethod(ta, s, "indexOf", 1) { cx2, s2, t, a -> js_indexOf(cx2, t, a) }
                 defineMethod(ta, s, "join", 1) { cx2, s2, t, a -> js_join(t, a) }
                 defineMethod(ta, s, "keys", 0) { cx2, s2, t, a -> js_iteratorOf(s2, t, NativeArrayIterator.ARRAY_ITERATOR_TYPE.KEYS) }
-                defineMethod(ta, s, "lastIndexOf", 1) { cx2, s2, t, a -> js_lastIndexOf(t, a) }
+                defineMethod(ta, s, "lastIndexOf", 1) { cx2, s2, t, a -> js_lastIndexOf(cx2, t, a) }
                 defineMethod(ta, s, "map", 1) { cx2, s2, t, a -> js_map(cx2, s2, t, a) }
                 defineMethod(ta, s, "reduce", 1) { cx2, s2, t, a -> reduce(cx2, s2, t, a, ArrayLikeAbstractOperations.ReduceOperation.REDUCE) }
                 defineMethod(ta, s, "reduceRight", 1) { cx2, s2, t, a -> reduce(cx2, s2, t, a, ArrayLikeAbstractOperations.ReduceOperation.REDUCE_RIGHT) }
@@ -663,7 +663,7 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
             return a
         }
 
-        private fun js_includes(thisObj: Scriptable?, args: Array<Any?>): Boolean {
+        private fun js_includes(cx: Context, thisObj: Scriptable?, args: Array<Any?>): Boolean {
             val self = realThis(thisObj)
             val len = self.validateAndGetLength()
             val compareTo = if (args.isNotEmpty()) args[0] else Undefined.instance
@@ -681,12 +681,14 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
                 if (start > len - 1) return false
             }
             for (i in start.toInt() until len.toInt()) {
+                // A view can hold two billion elements: each step counts, so the budget and the interrupt hook reach this loop.
+                cx.addInstructionCount(1)
                 if (ScriptRuntime.sameZero(self.js_get(i), compareTo)) return true
             }
             return false
         }
 
-        private fun js_indexOf(thisObj: Scriptable?, args: Array<Any?>): Any {
+        private fun js_indexOf(cx: Context, thisObj: Scriptable?, args: Array<Any?>): Any {
             val self = realThis(thisObj)
             val len = self.validateAndGetLength()
             val compareTo = if (args.isNotEmpty()) args[0] else Undefined.instance
@@ -704,6 +706,7 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
                 if (start > len - 1) return -1
             }
             for (i in start.toInt() until len.toInt()) {
+                cx.addInstructionCount(1)
                 if (self.has(i, self)) {
                     val v = self.js_get(i)
                     if (v !== Scriptable.NOT_FOUND && ScriptRuntime.shallowEq(v, compareTo)) return i.toLong()
@@ -712,7 +715,7 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
             return -1
         }
 
-        private fun js_lastIndexOf(thisObj: Scriptable?, args: Array<Any?>): Any {
+        private fun js_lastIndexOf(cx: Context, thisObj: Scriptable?, args: Array<Any?>): Any {
             val self = realThis(thisObj)
             val len = self.validateAndGetLength()
             val compareTo = if (args.isNotEmpty()) args[0] else Undefined.instance
@@ -727,6 +730,7 @@ public abstract class NativeTypedArrayView : NativeArrayBufferView, ExternalArra
                 if (start < 0) return -1
             }
             for (i in start.toInt() downTo 0) {
+                cx.addInstructionCount(1)
                 if (self.has(i, self)) {
                     val v = self.js_get(i)
                     if (v !== Scriptable.NOT_FOUND && ScriptRuntime.shallowEq(v, compareTo)) return i.toLong()

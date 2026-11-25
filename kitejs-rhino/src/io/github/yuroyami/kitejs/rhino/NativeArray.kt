@@ -1423,6 +1423,8 @@ public class NativeArray : ScriptableObject {
                 }
             }
             for (i in start until length) {
+                // A generic object may claim a length of 2**53 - 1: each step counts, so the budget and the interrupt hook reach this loop.
+                cx.addInstructionCount(1)
                 val v = getRawElem(o, i)
                 if (v !== Scriptable.NOT_FOUND && ScriptRuntime.shallowEq(v, compareTo)) {
                     return i
@@ -1475,6 +1477,7 @@ public class NativeArray : ScriptableObject {
             }
             var i = start
             while (i >= 0) {
+                cx.addInstructionCount(1)
                 val v = getRawElem(o, i)
                 if (v !== Scriptable.NOT_FOUND && ScriptRuntime.shallowEq(v, compareTo)) {
                     return i
@@ -1519,6 +1522,7 @@ public class NativeArray : ScriptableObject {
                 }
             }
             while (k < len) {
+                cx.addInstructionCount(1)
                 var elementK = getRawElem(o, k)
                 if (elementK === Scriptable.NOT_FOUND) elementK = Undefined.instance
                 if (ScriptRuntime.sameZero(elementK, compareTo)) return true

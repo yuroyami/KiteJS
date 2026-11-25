@@ -212,11 +212,42 @@ public abstract class ConfigContract<C : KiteJsConfig>(engine: JsEngine<C>) : En
             "Array.prototype.reverse.call({length: 2**53 - 1})",
             "Array.prototype.fill.call({length: 2**53 - 1}, 0)",
             "Array.prototype.copyWithin.call({length: 2**53 - 1}, 1, 0)",
+            "Array.prototype.indexOf.call({length: 2**53 - 1}, 1)",
+            "Array.prototype.lastIndexOf.call({length: 2**53 - 1}, 1)",
+            "Array.prototype.includes.call({length: 2**53 - 1}, 1)",
         )) {
             var asked = 0
             open { interruptWhen = { ++asked > 2 } }.use { js ->
                 assertFails(call) { js.evaluate(call) }
             }
+        }
+    }
+
+    @Test
+    public fun theBudgetStopsOneLongBuiltInCall(): TestResult = test {
+        // These three read and never write, so nothing but the budget ends them on a generic object.
+        for (call in listOf(
+            "Array.prototype.indexOf.call({length: 2**53 - 1}, 1)",
+            "Array.prototype.lastIndexOf.call({length: 2**53 - 1}, 1)",
+            "Array.prototype.includes.call({length: 2**53 - 1}, 1)",
+        )) {
+            open { instructionBudget = 100_000 }.use { js ->
+                assertFailsWith<JsEngineError>(call) { js.evaluate(call) }
+            }
+        }
+    }
+
+    @Test
+    public fun theInterruptHookIsAskedWhenABudgetIsSet(): TestResult = test {
+        // A budget far larger than the script reaches before the hook stops it: the hook keeps its own pace.
+        var asked = 0
+        open { instructionBudget = 1_000_000_000; interruptWhen = { ++asked > 2 } }.use { js ->
+            val e = assertFailsWith<JsEngineError> { js.evaluate("for (;;) {}") }
+            assertTrue(asked > 2, "the hook was asked $asked times: ${e.message}")
+        }
+        // And the budget still stops a script that the hook lets run.
+        open { instructionBudget = 5_000_000; interruptWhen = { false } }.use { js ->
+            assertFailsWith<JsEngineError> { js.evaluate("for (;;) {}") }
         }
     }
 

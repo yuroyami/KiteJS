@@ -282,8 +282,8 @@ internal class EngineState(dispatcher: CoroutineDispatcher) {
  * not work, because it moves calls between the threads of the pool.
  *
  * Cancelling the coroutine that called into the engine stops the running script: the engine asks
- * the hook between instructions, and a cancelled job answers "stop". That needs an instruction
- * budget to be set, so one is set for you when you do not name one.
+ * the hook between instructions, and a cancelled job answers "stop". It needs no instruction
+ * budget, and an `instructionBudget` you set does not delay it.
  */
 public suspend fun <C : KiteJsConfig> asyncKiteJs(
     engine: JsEngine<C>,

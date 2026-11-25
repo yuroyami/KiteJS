@@ -343,7 +343,7 @@ internal class RhinoKiteJs private constructor(
         e.scriptStack.map { JsStackFrame(it.functionName, it.fileName, it.lineNumber) }
 
     companion object {
-        /** How often the interrupt hook is asked when there is no budget to pace it. */
+        /** How often the interrupt hook is asked, in instructions. */
         private const val INTERRUPT_SLICE = 100_000
 
         fun open(config: RhinoConfig): RhinoKiteJs {
@@ -365,10 +365,15 @@ internal class RhinoKiteJs private constructor(
                 config.clock?.let { cx.clock = it }
                 if (config.instructionBudget > 0 || config.interruptWhen != null) {
                     cx.setGenerateObserverCount(true)
-                    // With no budget the observer exists only to ask the interrupt hook, so it
-                    // needs a slice small enough to notice a stop but large enough to stay cheap.
+                    // The hook needs a slice small enough to notice a stop but large enough to stay
+                    // cheap, whatever the budget is. A budget alone is checked once, when it is spent.
+                    val budget = config.instructionBudget
                     cx.setInstructionObserverThreshold(
-                        if (config.instructionBudget > 0) config.instructionBudget else INTERRUPT_SLICE,
+                        when {
+                            config.interruptWhen == null -> budget
+                            budget > 0 -> minOf(budget, INTERRUPT_SLICE)
+                            else -> INTERRUPT_SLICE
+                        },
                     )
                 }
                 val scope =
