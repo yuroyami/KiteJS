@@ -269,6 +269,16 @@ internal class QuickJsKiteJs private constructor(
             return result
         } catch (e: Throwable) {
             if (!outermost) throw e
+            // A script that threw still runs the reactions it queued before the call returns, as a
+            // browser does after a script that threw. What a reaction throws then is dropped, so the
+            // caller sees the first error. A stop drops the reactions instead.
+            if (drain && e is JsError && bridge.stopReason(ptr) == QuickJsBridge.STOP_NONE) {
+                while (drainJobs() < 0) {
+                    bridge.release(ptr, bridge.exception(ptr))
+                    if (bridge.stopReason(ptr) != QuickJsBridge.STOP_NONE) break
+                }
+                hostFailure = null
+            }
             if (bridge.stopReason(ptr) != QuickJsBridge.STOP_NONE) bridge.discardJobs(ptr)
             throw when (e) {
                 is JsException -> e

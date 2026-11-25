@@ -170,7 +170,12 @@ internal class RhinoKiteJs private constructor(
         try {
             if (!outermost) return inTopCall(top, body)
             return metered {
-                val out = inTopCall(top, body)
+                val out = try {
+                    inTopCall(top, body)
+                } catch (e: Throwable) {
+                    if (drain && !factory.stopped && isScriptError(e)) drainAfterScriptError()
+                    throw e
+                }
                 if (drain) cx.processMicrotasks()
                 out
             }
@@ -213,6 +218,24 @@ internal class RhinoKiteJs private constructor(
                 cx.discardMicrotasks()
             }
             throw e
+        }
+    }
+
+    private fun isScriptError(e: Throwable): Boolean = e is JavaScriptException || e is EcmaError || e is JsError
+
+    /**
+     * Runs the reactions that a script queued before it threw, as a browser does after a script
+     * that threw. What a reaction throws is dropped, so the caller sees the first error. A stop ends
+     * the drain, and [metered] drops what is left.
+     */
+    private fun drainAfterScriptError() {
+        while (true) {
+            try {
+                cx.processMicrotasks()
+                return
+            } catch (e: Throwable) {
+                if (factory.stopped || !isScriptError(e)) return
+            }
         }
     }
 

@@ -36,6 +36,23 @@ public abstract class PromisesContract<C : KiteJsConfig>(engine: JsEngine<C>) : 
     }
 
     @Test
+    public fun theReactionsOfACallThatThrewRunBeforeItReturns(): TestResult = withEngine { js ->
+        assertFailsWith<JsError> {
+            js.evaluate("globalThis.log = []; Promise.resolve().then(function () { log.push('reaction') }); throw new Error('boom')")
+        }
+        assertEquals("reaction,next", js.evaluate("log.push('next'); log.join()").asString())
+        // A reaction that throws does not take the place of the error the script threw.
+        val error = assertFailsWith<JsError> {
+            js.evaluate(
+                "log = []; Promise.resolve().then(function () { log.push('a'); throw new Error('later') }); " +
+                    "Promise.resolve().then(function () { log.push('b') }); throw new Error('first')",
+            )
+        }
+        assertEquals("first", error.errorMessage)
+        assertEquals("a,b", js.evaluate("log.join()").asString())
+    }
+
+    @Test
     public fun asyncFunctionsFinishWithinTheCall(): TestResult = withEngine { js ->
         js.evaluate("var out; (async function () { out = await Promise.resolve(5) + await 6 })()")
         assertEquals(11.0, js.evaluate("out").asDouble())

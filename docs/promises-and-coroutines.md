@@ -14,6 +14,11 @@ KiteJs(Rhino).use { js ->
 
 The reaction has already run by the time `evaluate` returns. That is why the second line sees it.
 
+The queue also drains when the script throws. The call then throws the script's error, after the
+reactions have run, as a browser runs them after a script that threw. An error that a reaction
+throws then is dropped, so you see the first one. When the budget or the interrupt hook stops a
+script, its reactions are dropped instead.
+
 If a host callback settles a promise after the call has finished, drain the queue yourself:
 
 ```kotlin
