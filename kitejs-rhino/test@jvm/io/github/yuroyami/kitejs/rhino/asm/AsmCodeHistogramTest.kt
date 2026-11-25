@@ -20,9 +20,14 @@ import kotlin.test.Test
  * removes a dispatch and a round trip through the stack. Guessing which pairs those are is how an
  * interpreter grows instructions nobody uses, so they are counted instead.
  *
- * Point `KITEJS_ASM_FILE` at a script holding an asm.js module. Opt in with `KITEJS_PROFILE=true`.
+ * Point `KITEJS_ASM_FILE` at a script holding an asm.js module, and set `KITEJS_PROFILE` to `true`.
+ * It skips without both:
+ *
+ * ```sh
+ * KITEJS_PROFILE=true KITEJS_ASM_FILE=/path/to/module.js ./kotlin test -m kitejs-rhino -p jvm --include-classes='*AsmCodeHistogramTest'
+ * ```
  */
-class AsmCodeHistogram {
+class AsmCodeHistogramTest {
 
     @Test
     fun count_the_instructions_a_real_module_compiles_to() {

@@ -11,9 +11,13 @@ import org.junit.Assume.assumeTrue
  * finds. The count is not a measurement of the whole program: it says which methods the engine is
  * inside, which is what decides whether a faster path is worth building and where it has to sit.
  *
- * Opt in with `KITEJS_PROFILE=true`. It never fails.
+ * It skips unless `KITEJS_PROFILE` is `true`, and it never fails:
+ *
+ * ```sh
+ * KITEJS_PROFILE=true ./kotlin test -m kitejs-rhino -p jvm --include-classes='*AsmProfileProbeTest'
+ * ```
  */
-class AsmProfileProbe {
+class AsmProfileProbeTest {
 
     private val kernel = """
         var buffer = new ArrayBuffer(1 << 20);

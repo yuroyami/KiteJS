@@ -15,9 +15,13 @@ import org.junit.Assume.assumeTrue
  *
  * It exists for real Emscripten output, which is far larger and stranger than anything a test
  * writes by hand. Point `KITEJS_ASM_FILE` at a script holding one, and the report names the first
- * thing in it the compiler does not accept.
+ * thing in it the compiler does not accept. It skips when the variable is not set:
+ *
+ * ```sh
+ * KITEJS_ASM_FILE=/path/to/module.js ./kotlin test -m kitejs-rhino -p jvm --include-classes='*AsmRealModuleProbeTest'
+ * ```
  */
-class AsmRealModuleProbe {
+class AsmRealModuleProbeTest {
 
     @Test
     fun compile_a_module_from_a_file() {

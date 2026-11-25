@@ -25,6 +25,18 @@ python3 tools/web-tests/run.py --platform js --module kitejs-rhino
 
 Always name the platforms. Without `-p`, `./kotlin test` also runs the Wasm tests in headless Chrome. There only kitejs-api passes, because the other modules import the npm package `@js-joda/timezone` and the toolchain cannot add it to its browser page. The toolchain runs no JavaScript tests at all, so `tools/web-tests/run.py` covers JavaScript and Wasm.
 
+Three JVM tests of kitejs-rhino are profiling probes for asm.js. They skip unless you set their
+environment variables, so a normal run reports them as skipped. To run one, set the variables and
+select it with `--include-classes`:
+
+```sh
+KITEJS_PROFILE=true ./kotlin test -m kitejs-rhino -p jvm --include-classes='*AsmProfileProbeTest'
+KITEJS_ASM_FILE=/path/to/module.js ./kotlin test -m kitejs-rhino -p jvm --include-classes='*AsmRealModuleProbeTest'
+KITEJS_PROFILE=true KITEJS_ASM_FILE=/path/to/module.js ./kotlin test -m kitejs-rhino -p jvm --include-classes='*AsmCodeHistogramTest'
+```
+
+`KITEJS_ASM_FILE` names a script that holds an asm.js module, such as Emscripten output.
+
 kitejs-quickjs compiles C code. It needs [zig](https://ziglang.org) on the `PATH`, or its path in `ZIG`. For Android it also needs an NDK in `ANDROID_NDK_HOME` or in the Android SDK. The web tests need Node 26 or later and npm.
 
 ### Produce a replay artifact
