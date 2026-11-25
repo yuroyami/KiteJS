@@ -38,6 +38,12 @@ public object DecimalParser {
 
     private val TEN = KBigInt.fromLong(10L)
 
+    /**
+     * How many significant digits the exact path reads. A point halfway between two doubles
+     * never needs more than 767, so the digits past this one can only say "a little more".
+     */
+    private const val MAX_SIGNIFICANT_DIGITS = 800
+
     /** Where the significand of a normal double starts: it always has 53 bits. */
     private const val SIGNIFICAND_BITS = 53
 
@@ -113,8 +119,14 @@ public object DecimalParser {
             end--
             droppedZeros++
         }
-        val significant = digits.substring(0, end)
-        val exp10 = exponent - digitsAfterDot + droppedZeros
+        var significant = digits.substring(0, end)
+        var exp10 = exponent - digitsAfterDot + droppedZeros
+        // The exact path costs the square of the digit count, so keep the digits that can decide
+        // the rounding and one sticky 1 for the rest. The last digit is not zero, so the rest is not.
+        if (significant.length > MAX_SIGNIFICANT_DIGITS) {
+            exp10 += significant.length - (MAX_SIGNIFICANT_DIGITS + 1)
+            significant = significant.substring(0, MAX_SIGNIFICANT_DIGITS) + "1"
+        }
 
         // Where the leading digit sits. Outside these bounds the answer cannot be anything but
         // infinity or zero, and saying so here keeps a silly exponent from building a silly
