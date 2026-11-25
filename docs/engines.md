@@ -94,6 +94,12 @@ A script that goes past `memoryLimit` ends the call with a `JsEngineError`, even
 tries to catch it, and the engine stays usable afterwards. A script that recurses past
 `maxStackSize` gets a `RangeError`, which it can catch like any other.
 
+The limit must also fit in the stack of the thread that runs the engine. On Apple platforms,
+Linux and Android, each call from the host lowers the limit to what the thread has left, less
+128 KiB for the host's own frames. So a thread with a small stack, such as a secondary thread on
+iOS at 512 KiB, also gets the `RangeError`. On Windows, keep `maxStackSize` below the stack of
+the thread, which is 1 MiB by default.
+
 On JavaScript and WebAssembly, the browser's own stack is about 1 MiB and runs out first, so
 `maxStackSize` is 256 KiB at most there. That is about 800 levels of plain calls, 200 nested
 parentheses in a source, and 50 calls that pass through a host function. Each call into a host

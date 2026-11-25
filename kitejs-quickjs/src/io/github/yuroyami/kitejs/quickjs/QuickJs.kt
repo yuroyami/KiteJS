@@ -55,11 +55,12 @@ public class QuickJsConfig @InternalKiteJsApi constructor() : KiteJsConfig() {
     public var memoryLimit: Long = 0
 
     /**
-     * How deep, in bytes of native stack, a script may recurse before it gets a RangeError. It
-     * has to fit in the stack of the thread the engine runs on, with room left for the host's
-     * own frames: the default suits the 1 MiB a JVM or Android thread has, and a thread with a
-     * smaller stack, such as a secondary thread on iOS at 512 KiB, needs a smaller value. On
-     * JavaScript and WebAssembly the browser's own stack runs out first, so the limit there is
+     * How deep, in bytes of native stack, a script may recurse before it gets a RangeError. Zero
+     * means no limit of its own. On Apple platforms, Linux and Android, each call from the host
+     * lowers the limit to the stack that the thread has left, less 128 KiB for the host's own
+     * frames, so a thread with a small stack, such as a secondary thread on iOS at 512 KiB, gets the
+     * RangeError too. On Windows the limit has to fit the thread's stack, which is 1 MiB by default.
+     * On JavaScript and WebAssembly the browser's own stack runs out first, so the limit there is
      * 256 KiB at most, about 800 plain calls.
      */
     public var maxStackSize: Long = 512L * 1024

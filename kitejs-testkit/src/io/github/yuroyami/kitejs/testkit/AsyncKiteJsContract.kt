@@ -37,6 +37,18 @@ public abstract class AsyncKiteJsContract<C : KiteJsConfig>(private val engine: 
     }
 
     @Test
+    fun deepRecursionOnTheEngineThreadIsARangeError() = runTest {
+        // The thread that asyncKiteJs makes has the platform's default stack, 512 KiB on Apple.
+        val js = asyncKiteJs(engine) { instructionBudget = 2_000_000 }
+        try {
+            assertEquals("RangeError", js.evaluate("try { (function f() { return f() + 1 })() } catch (e) { e.name }").asString())
+            assertEquals(2.0, js.evaluate("1 + 1").asDouble())
+        } finally {
+            js.close()
+        }
+    }
+
+    @Test
     fun theEngineIsReachableForBindingToo() = runTest {
         val js = asyncKiteJs(engine)
         try {

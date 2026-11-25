@@ -10,6 +10,10 @@
 #include "kitejs_quickjs.h"
 #include "quickjs/quickjs.h"
 
+#if defined(__APPLE__) || defined(__linux__)
+#include <pthread.h>
+#endif
+
 /* How many interrupt checks the budget counts one poll of the handler as. Kept in step with
  * JS_INTERRUPT_COUNTER_INIT, which the build sets. */
 #ifndef JS_INTERRUPT_COUNTER_INIT
@@ -50,6 +54,9 @@ struct KiteEngine {
     int32_t *dead;
     int32_t dead_count;
     int32_t dead_capacity;
+
+    /* The stack limit that the host asked for, in bytes, or 0 for none. */
+    size_t max_stack;
 
     double budget;      /* what is left, when has_budget */
     int32_t host_depth; /* host functions running, which a pause cannot wait inside */
@@ -327,8 +334,10 @@ KiteEngine *kite_new(int32_t id, double memory_limit, double stack_size, int32_t
     if (stack_size <= 0 || stack_size > KITEJS_WASM_STACK_LIMIT)
         stack_size = KITEJS_WASM_STACK_LIMIT;
 #endif
-    if (stack_size > 0)
-        JS_SetMaxStackSize(e->rt, (size_t)stack_size);
+    if (stack_size > 0) {
+        e->max_stack = (size_t)stack_size;
+        JS_SetMaxStackSize(e->rt, e->max_stack);
+    }
     e->ctx = JS_NewContext(e->rt);
     if (!e->ctx)
         goto fail;
@@ -395,9 +404,57 @@ void kite_free(KiteEngine *e)
     free(e);
 }
 
+/* The lowest address of the current thread's stack, or 0 when the platform cannot say. Read once
+ * per thread: on the main thread of Linux it parses /proc/self/maps. */
+#if defined(__APPLE__) || defined(__linux__)
+static __thread uintptr_t kite_thread_stack_low;
+static __thread int kite_thread_stack_known;
+
+static uintptr_t kite_stack_low(void)
+{
+    if (!kite_thread_stack_known) {
+        kite_thread_stack_known = 1;
+#if defined(__APPLE__)
+        pthread_t self = pthread_self();
+        uintptr_t top = (uintptr_t)pthread_get_stackaddr_np(self);
+        size_t size = pthread_get_stacksize_np(self);
+        kite_thread_stack_low = top > size ? top - size : 0;
+#else
+        pthread_attr_t attr;
+        if (pthread_getattr_np(pthread_self(), &attr) == 0) {
+            void *addr = NULL;
+            size_t size = 0;
+            if (pthread_attr_getstack(&attr, &addr, &size) == 0)
+                kite_thread_stack_low = (uintptr_t)addr;
+            pthread_attr_destroy(&attr);
+        }
+#endif
+    }
+    return kite_thread_stack_low;
+}
+#else
+static uintptr_t kite_stack_low(void)
+{
+    return 0;
+}
+#endif
+
+/* What the host's own frames need below the deepest script frame: a host function the script
+ * calls, and the RangeError itself. */
+#define KITE_STACK_RESERVE (128 * 1024)
+
 void kite_enter(KiteEngine *e)
 {
     JS_UpdateStackTop(e->rt);
+    /* A thread with less stack left than the limit, such as a secondary thread on Apple at
+     * 512 KiB, would overflow before QuickJS throws its RangeError. Lower the limit to fit. */
+    uintptr_t low = kite_stack_low();
+    if (low != 0) {
+        uintptr_t sp = (uintptr_t)__builtin_frame_address(0);
+        size_t room = sp > low + KITE_STACK_RESERVE ? (size_t)(sp - low - KITE_STACK_RESERVE) : 1;
+        size_t limit = e->max_stack != 0 && e->max_stack < room ? e->max_stack : room;
+        JS_SetMaxStackSize(e->rt, limit);
+    }
     e->stop_reason = KITE_STOP_NONE;
     e->out_of_memory = JS_KiteOutOfMemoryCount(e->rt);
 }
