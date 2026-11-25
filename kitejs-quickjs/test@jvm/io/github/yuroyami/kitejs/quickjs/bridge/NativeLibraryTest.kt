@@ -4,18 +4,24 @@
 
 package io.github.yuroyami.kitejs.quickjs.bridge
 
+import io.github.yuroyami.kitejs.api.JsEngineError
+import io.github.yuroyami.kitejs.quickjs.QuickJs
 import java.io.File
+import java.net.URLClassLoader
 import java.nio.file.Files
 import java.nio.file.attribute.PosixFilePermissions
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
-/** The copy of the JNI library that later processes load from the same path (#125). */
+/** The copy of the JNI library that later processes load from the same path (#125), and how a load fails. */
 class NativeLibraryTest {
 
     private val root = Files.createTempDirectory("kitejs-native-library-test").toFile()
@@ -77,5 +83,46 @@ class NativeLibraryTest {
         val base = File(root, "made")
         assertNotNull(libraryCopy(base, "lib.so", byteArrayOf(1)))
         if (posix) assertEquals("rwx------", PosixFilePermissions.toString(Files.getPosixFilePermissions(base.toPath())))
+    }
+
+    @Test
+    fun a_load_that_fails_is_an_engine_error_every_time() {
+        var tries = 0
+        val load = LibraryLoad { tries++; throw UnsatisfiedLinkError("no such file") }
+        repeat(2) {
+            val e = assertFailsWith<JsEngineError> { load.ensure() }
+            assertTrue(e.message!!.contains("no such file"), e.message)
+        }
+        assertFalse(load.loaded)
+        assertEquals(1, tries, "the load is tried once")
+        // The loader's own message reaches the caller as it is.
+        val own = LibraryLoad { throw JsEngineError("QuickJS has no JNI library for linux on riscv64") }
+        assertEquals("QuickJS has no JNI library for linux on riscv64", assertFailsWith<JsEngineError> { own.ensure() }.message)
+    }
+
+    @Test
+    fun a_shared_copy_that_does_not_load_falls_back_to_a_private_copy() {
+        val shared = File(root, "shared.so")
+        val fresh = File(root, "fresh.so")
+        val loaded = mutableListOf<File>()
+        loadCopy(shared, { fresh }) { if (it == shared) throw UnsatisfiedLinkError("already loaded in another classloader") else loaded += it }
+        assertEquals(listOf(fresh), loaded)
+        loaded.clear()
+        loadCopy(null, { fresh }) { loaded += it }
+        assertEquals(listOf(fresh), loaded)
+    }
+
+    @Test
+    fun a_second_class_loader_loads_the_library_too() {
+        assertTrue(QuickJs.isLoaded)
+        val urls = System.getProperty("java.class.path").split(File.pathSeparator).map { File(it).toURI().toURL() }
+        repeat(2) {
+            URLClassLoader(urls.toTypedArray(), ClassLoader.getPlatformClassLoader()).use { loader ->
+                val quickJs = loader.loadClass(QuickJs::class.java.name)
+                assertTrue(quickJs !== QuickJs::class.java, "the class came from the class path again")
+                val instance = quickJs.getField("INSTANCE").get(null)
+                assertEquals(true, quickJs.getMethod("isLoaded").invoke(instance))
+            }
+        }
     }
 }

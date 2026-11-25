@@ -25,7 +25,10 @@ import java.security.MessageDigest
  *
  * The copy keeps one path for each build of the library, so a later process loads the same file.
  * macOS checks each library file it has not seen before, which made the first engine of every
- * process take about 350 ms longer.
+ * process take about 350 ms longer. A JVM loads one library file into one class loader only, so a
+ * second class loader that finds the shared copy taken loads a private copy instead. The system
+ * property `kitejs.quickjs.tmpdir` names the folder for the copies, for a temporary folder that
+ * is mounted `noexec`.
  */
 internal fun loadNativeLibrary() {
     System.getProperty("kitejs.quickjs.library")?.let { path ->
@@ -59,9 +62,63 @@ internal fun loadNativeLibrary() {
         )
     val bytes = stream.use { it.readBytes() }
     val user = System.getProperty("user.name").orEmpty().filter { it.isLetterOrDigit() || it == '-' || it == '_' }
-    val base = File(System.getProperty("java.io.tmpdir"), "kitejs-quickjs-$user")
-    val target = libraryCopy(base, file, bytes) ?: freshCopy(file, bytes)
-    System.load(target.absolutePath)
+    val tmp = System.getProperty("kitejs.quickjs.tmpdir")?.let(::File)
+    val base = File(tmp ?: File(System.getProperty("java.io.tmpdir")), "kitejs-quickjs-$user")
+    loadCopy(libraryCopy(base, file, bytes), { freshCopy(file, bytes, tmp) }) { System.load(it.absolutePath) }
+}
+
+/**
+ * Loads [shared] with [load], and a private copy from [fresh] when there is no shared copy or it
+ * does not load: another class loader may hold it already.
+ */
+internal fun loadCopy(shared: File?, fresh: () -> File, load: (File) -> Unit) {
+    if (shared != null) {
+        try {
+            load(shared)
+            return
+        } catch (e: UnsatisfiedLinkError) {
+            try {
+                load(fresh())
+                return
+            } catch (second: Throwable) {
+                second.addSuppressed(e)
+                throw second
+            }
+        }
+    }
+    load(fresh())
+}
+
+/**
+ * Loads the library on first use and keeps the outcome. A load that fails stays failed, and every
+ * later use throws a new [JsEngineError] with the loader's message, never a JVM linkage error.
+ */
+internal class LibraryLoad(private val load: () -> Unit) {
+
+    private val failure: Throwable? by lazy {
+        try {
+            load()
+            null
+        } catch (e: JsEngineError) {
+            e
+        } catch (e: LinkageError) {
+            e
+        } catch (e: IOException) {
+            e
+        } catch (e: SecurityException) {
+            e
+        }
+    }
+
+    /** Whether the library is loaded. Asking loads it. */
+    val loaded: Boolean get() = failure == null
+
+    /** Loads the library, or throws why it cannot be loaded. */
+    fun ensure() {
+        val f = failure ?: return
+        val reason = f.message ?: f::class.simpleName
+        throw JsEngineError(if (f is JsEngineError) reason ?: "QuickJS could not load" else "QuickJS could not load its JNI library: $reason", f)
+    }
 }
 
 /**
@@ -120,9 +177,9 @@ private fun privateFolder(dir: File): Boolean {
     return PosixFilePermission.GROUP_WRITE !in permissions && PosixFilePermission.OTHERS_WRITE !in permissions
 }
 
-/** A copy of the library in a new temporary folder, deleted when the process ends. */
-private fun freshCopy(name: String, bytes: ByteArray): File {
-    val dir = Files.createTempDirectory("kitejs-quickjs").toFile()
+/** A copy of the library in a new temporary folder, under [parent] when given, deleted when the process ends. */
+private fun freshCopy(name: String, bytes: ByteArray, parent: File?): File {
+    val dir = (if (parent != null) Files.createTempDirectory(parent.toPath(), "kitejs-quickjs") else Files.createTempDirectory("kitejs-quickjs")).toFile()
     val target = File(dir, name)
     target.writeBytes(bytes)
     target.deleteOnExit()

@@ -32,6 +32,10 @@ public object QuickJs : JsEngine<QuickJsConfig> {
         loadBridge()
     }
 
+    /**
+     * Whether an engine can open here. On the JVM, asking loads the JNI library, and the answer is
+     * false where no library loads; opening an engine then throws a JsEngineError that says why.
+     */
     override val isLoaded: Boolean get() = bridgeLoaded()
 
     @InternalKiteJsApi

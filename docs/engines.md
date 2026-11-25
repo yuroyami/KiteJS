@@ -107,8 +107,13 @@ uses much more stack than the KiteJS frames around it can still run the browser 
   Windows on x64, and loads the one for the machine it runs on. The library has to be a file to
   load, so the first process copies it to a folder under the temporary folder that only the user
   can write, named for the library's SHA-256. Later processes load that file again, which macOS
-  then does not check a second time. For any other platform, build the library yourself from the
+  then does not check a second time. A JVM loads one library file into one class loader only, so
+  a second class loader in the same process loads a private copy. Set the system property
+  `kitejs.quickjs.tmpdir` to put the copies in another folder, for example when the temporary
+  folder is mounted `noexec`. For any other platform, build the library yourself from the
   module's `native` folder and set the system property `kitejs.quickjs.library` to its path.
+  Where no library loads, `QuickJs.isLoaded` answers false and opening an engine throws a
+  `JsEngineError` that says why.
 - **Android**: the `kitejs-quickjs-android-natives` jar, which kitejs-quickjs depends on for
   Android, carries a JNI library for arm64-v8a, armeabi-v7a, x86_64 and x86, aligned for 16 KB
   pages, and keep rules so R8 leaves the classes it calls alone. The Android Gradle plugin packages

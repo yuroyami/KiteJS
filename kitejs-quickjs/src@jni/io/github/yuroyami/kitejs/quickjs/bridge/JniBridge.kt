@@ -59,12 +59,15 @@ internal object JniHost {
     @JvmStatic fun timeZoneOffset(engine: Int, time: Double): Int = QuickJsHost.timeZoneOffset(engine, time)
 }
 
-/** QuickJS through JNI, once loadNativeLibrary, which the JVM and Android each have, has loaded the library. */
-private object JniBridge : QuickJsBridge {
+/**
+ * The load of the JNI library, outside any static initializer: there the JVM would wrap the
+ * loader's error in an ExceptionInInitializerError, then answer every later use with a
+ * NoClassDefFoundError, none of them a JsEngineError.
+ */
+private val library = LibraryLoad(::loadNativeLibrary)
 
-    init {
-        loadNativeLibrary()
-    }
+/** QuickJS through JNI, once [library] has loaded the library. */
+private object JniBridge : QuickJsBridge {
 
     override fun newEngine(id: Int, memoryLimit: Double, stackSize: Double, options: Int): Long =
         JniNatives.newEngine(id, memoryLimit, stackSize, options)
@@ -110,11 +113,14 @@ private object JniBridge : QuickJsBridge {
     override fun cbArg(e: Long, index: Int): Int = JniNatives.cbArg(e, index)
 }
 
-internal actual fun bridge(): QuickJsBridge = JniBridge
+internal actual fun bridge(): QuickJsBridge {
+    library.ensure()
+    return JniBridge
+}
 
 internal actual suspend fun loadBridge() {}
 
-internal actual fun bridgeLoaded(): Boolean = true
+internal actual fun bridgeLoaded(): Boolean = library.loaded
 
 internal actual fun currentThreadToken(): Any = Thread.currentThread()
 
