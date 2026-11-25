@@ -15,6 +15,9 @@ public class JsonParser(private val cx: Context, private val scope: Scriptable) 
     private var length = 0
     private var src = ""
 
+    /** How many objects and arrays enclose the value being read. */
+    private var depth = 0
+
     public fun parseValue(json: String?): Any? {
         if (json == null) throw ParseException("Input string may not be null")
         pos = 0
@@ -31,8 +34,8 @@ public class JsonParser(private val cx: Context, private val scope: Scriptable) 
         while (pos < length) {
             val c = src[pos++]
             return when (c) {
-                '{' -> readObject()
-                '[' -> readArray()
+                '{' -> nested { readObject() }
+                '[' -> nested { readArray() }
                 't' -> readTrue()
                 'f' -> readFalse()
                 '"' -> readString()
@@ -281,6 +284,35 @@ public class JsonParser(private val cx: Context, private val scope: Scriptable) 
         throw ParseException("Expected $token found $c")
     }
 
+    /**
+     * Runs [body] one level deeper. Each level is a pair of host frames that no other limit counts,
+     * so deep text ends in a RangeError the script can catch, not a host stack overflow.
+     */
+    private inline fun <T> nested(body: () -> T): T {
+        if (++depth > MAX_DEPTH ||
+            (depth % STACK_CHECK_INTERVAL == 0 && !cx.hasNativeStackSpace())
+        ) {
+            depth--
+            throw tooDeep()
+        }
+        try {
+            return body()
+        } finally {
+            depth--
+        }
+    }
+
     /** The JSON text did not parse. */
     public class ParseException(message: String) : Exception(message)
+
+    internal companion object {
+        /** The deepest nesting that `JSON.parse` reads and `JSON.stringify` writes, as for source text. */
+        internal const val MAX_DEPTH: Int = 1000
+
+        /** How many levels go by between two checks of the native stack. */
+        internal const val STACK_CHECK_INTERVAL: Int = 16
+
+        /** The error that deep JSON ends in, the same one that deep recursion gives. */
+        internal fun tooDeep(): Throwable = ScriptRuntime.rangeError("Maximum call stack size exceeded")
+    }
 }

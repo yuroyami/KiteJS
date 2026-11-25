@@ -72,6 +72,19 @@ public abstract class ErrorsContract<C : KiteJsConfig>(engine: JsEngine<C>) : En
     }
 
     @Test
+    public fun deepJsonIsARangeErrorTheScriptCanCatch(): TestResult = withEngine { js ->
+        val parse = "try { JSON.parse('['.repeat(1e5) + ']'.repeat(1e5)); 'parsed' } catch (e) { e.name }"
+        assertEquals("RangeError", js.evaluate(parse).asString())
+        val stringify = "var o = {}; for (var i = 0; i < 1e5; i++) o = {a: o}; try { JSON.stringify(o).length } catch (e) { e.name }"
+        assertEquals("RangeError", js.evaluate(stringify).asString())
+        // Nesting that real data has still reads and writes.
+        assertEquals(
+            200.0,
+            js.evaluate("var t = JSON.stringify(JSON.parse('['.repeat(100) + ']'.repeat(100))); t.length").asDouble(),
+        )
+    }
+
+    @Test
     public fun aRecursionThroughTheHostEndsInTheRangeError(): TestResult = withEngine { js ->
         js.global.function("viaHost", 1) { args -> args[0].asFunction()() }
         val error = assertFailsWith<JsError> { js.evaluate("function f() { viaHost(f); } f()") }

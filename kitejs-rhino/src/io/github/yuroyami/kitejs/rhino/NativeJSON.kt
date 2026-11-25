@@ -250,6 +250,16 @@ public class NativeJSON private constructor() : ScriptableObject() {
             return Undefined.instance
         }
 
+        /** Deep data ends in a RangeError the script can catch, as deep text does in [JsonParser]. */
+        private fun checkDepth(state: StringifyState) {
+            val depth = state.stack.size + 1
+            if (depth > JsonParser.MAX_DEPTH ||
+                (depth % JsonParser.STACK_CHECK_INTERVAL == 0 && !state.cx.hasNativeStackSpace())
+            ) {
+                throw JsonParser.tooDeep()
+            }
+        }
+
         private fun join(objs: Collection<Any?>, delimiter: String): String {
             if (objs.isEmpty()) return ""
             val iter = objs.iterator()
@@ -266,6 +276,7 @@ public class NativeJSON private constructor() : ScriptableObject() {
             if (state.stack.contains(trackValue)) {
                 throw ScriptRuntime.typeErrorById("msg.cyclic.value", trackValue::class.simpleName)
             }
+            checkDepth(state)
             state.stack.addFirst(trackValue)
             val stepback = state.indent
             state.indent = state.indent + state.gap
@@ -304,6 +315,7 @@ public class NativeJSON private constructor() : ScriptableObject() {
             if (state.stack.contains(trackValue)) {
                 throw ScriptRuntime.typeErrorById("msg.cyclic.value", trackValue::class.simpleName)
             }
+            checkDepth(state)
             state.stack.addFirst(trackValue)
             val stepback = state.indent
             state.indent = state.indent + state.gap
