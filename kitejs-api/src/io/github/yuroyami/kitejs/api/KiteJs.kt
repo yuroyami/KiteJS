@@ -124,4 +124,7 @@ public abstract class KiteJs @InternalKiteJsApi constructor() : AutoCloseable {
     /** What [onSettled] does; see there. */
     @InternalKiteJsApi
     public abstract fun watchSettlement(value: JsValue, onSettled: (JsValue, JsValue?) -> Unit): Boolean
+
+    /** The function behind [newPromise], compiled on the first call and kept for the engine's life. */
+    internal var promiseMaker: JsFunction? = null
 }

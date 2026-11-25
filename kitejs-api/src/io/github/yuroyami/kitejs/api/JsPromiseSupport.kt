@@ -23,11 +23,13 @@ public class JsPromiseHandle(
 
 private const val PROMISE_MAKER =
     "(function () { var r, j; var p = new Promise(function (res, rej) { r = res; j = rej });" +
-        " return { promise: p, resolve: r, reject: j } })()"
+        " return { promise: p, resolve: r, reject: j } })"
 
 /** A promise the host settles later. */
 public fun KiteJs.newPromise(): JsPromiseHandle {
-    val parts = evaluate(PROMISE_MAKER, "<promise>").asObject()
+    // Parsed once per engine: a parse cost several times the call (#154).
+    val maker = promiseMaker ?: evaluate(PROMISE_MAKER, "<promise>").asFunction().also { promiseMaker = it }
+    val parts = maker().asObject()
     return JsPromiseHandle(parts["promise"].asObject(), parts["resolve"].asFunction(), parts["reject"].asFunction())
 }
 
