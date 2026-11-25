@@ -2,14 +2,17 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-package io.github.yuroyami.kitejs.coroutines
+package io.github.yuroyami.kitejs.testkit
 
+import io.github.yuroyami.kitejs.api.JsEngine
 import io.github.yuroyami.kitejs.api.JsEngineError
 import io.github.yuroyami.kitejs.api.JsError
 import io.github.yuroyami.kitejs.api.JsValue
+import io.github.yuroyami.kitejs.api.KiteJsConfig
 import io.github.yuroyami.kitejs.api.function
 import io.github.yuroyami.kitejs.api.newPromise
-import io.github.yuroyami.kitejs.rhino.Rhino
+import io.github.yuroyami.kitejs.coroutines.AsyncKiteJs
+import io.github.yuroyami.kitejs.coroutines.asyncKiteJs
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -20,11 +23,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 
 /** The engine behind suspending functions. */
-class AsyncKiteJsTest {
+public abstract class AsyncKiteJsContract<C : KiteJsConfig>(private val engine: JsEngine<C>) {
 
     @Test
     fun evaluateAnswersOnTheEnginesDispatcher() = runTest {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         try {
             assertEquals(4.0, js.evaluate("2 + 2").asDouble())
             assertEquals("HI", js.evaluate("'hi'.toUpperCase()").asString())
@@ -35,7 +38,7 @@ class AsyncKiteJsTest {
 
     @Test
     fun theEngineIsReachableForBindingToo() = runTest {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         try {
             js.onEngine { engine ->
                 engine.global.function("double") { args -> args.first().asDouble() * 2 }
@@ -48,7 +51,7 @@ class AsyncKiteJsTest {
 
     @Test
     fun aCompiledScriptRunsOnTheDispatcher() = runTest {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         try {
             val script = js.compile("n = (typeof n === 'undefined' ? 0 : n) + 1")
             js.onEngine { script.run() }
@@ -61,7 +64,7 @@ class AsyncKiteJsTest {
 
     @Test
     fun aScriptErrorArrivesAsJsError() = runTest {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         try {
             val e = assertFailsWith<JsError> { js.evaluate("throw new RangeError('too far')") }
             assertEquals("RangeError", e.name)
@@ -75,7 +78,7 @@ class AsyncKiteJsTest {
 
     @Test
     fun anAlreadySettledPromiseIsAwaited() = runTest {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         try {
             assertEquals(7.0, js.evaluateAwaiting("Promise.resolve(7)").asDouble())
             assertEquals("done", js.evaluateAwaiting("Promise.resolve('done')").asString())
@@ -86,7 +89,7 @@ class AsyncKiteJsTest {
 
     @Test
     fun aChainOfThensIsAwaited() = runTest {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         try {
             val v = js.evaluateAwaiting(
                 "Promise.resolve(1).then(function (n) { return n + 1 }).then(function (n) { return n * 10 })",
@@ -99,7 +102,7 @@ class AsyncKiteJsTest {
 
     @Test
     fun aRejectedPromiseThrowsWhatItCarried() = runTest {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         try {
             val e = assertFailsWith<JsError> { js.evaluateAwaiting("Promise.reject(new TypeError('nope'))") }
             assertEquals("TypeError", e.name)
@@ -111,7 +114,7 @@ class AsyncKiteJsTest {
 
     @Test
     fun awaitingAPlainValueGivesItBack() = runTest {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         try {
             assertEquals(5.0, js.await(js.evaluate("5")).asDouble())
             assertTrue(js.await(js.evaluate("undefined")).isUndefined)
@@ -122,7 +125,7 @@ class AsyncKiteJsTest {
 
     @Test
     fun aPromiseSettledFromKotlinIsAwaited() = runTest {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         try {
             val handle = js.onEngine { it.newPromise() }
             js.onEngine { engine ->
@@ -142,7 +145,7 @@ class AsyncKiteJsTest {
      */
     @Test
     fun aDeferredBecomesAPromiseTheScriptCanUse() = runTest {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         try {
             val deferred = CompletableDeferred<String>()
             val promise = js.deferredToPromise(deferred, this)
@@ -157,7 +160,7 @@ class AsyncKiteJsTest {
 
     @Test
     fun aHostSuspendFunctionLooksLikeAPromiseToTheScript() = runTest {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         try {
             js.suspendFunction(js.onEngine { it.global }, "fetchThing", 1, this) { args ->
                 delay(5)
@@ -173,7 +176,7 @@ class AsyncKiteJsTest {
 
     @Test
     fun aFailingHostSuspendFunctionRejects() = runTest {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         try {
             js.suspendFunction(js.onEngine { it.global }, "boom", 0, this) { _ ->
                 throw IllegalStateException("host gave up")
@@ -195,7 +198,7 @@ class AsyncKiteJsTest {
     @Test
     fun aDeadlineStopsARunawayScript() = runTest {
         var asked = 0
-        val js = asyncKiteJs(Rhino) { interruptWhen = { ++asked > 3 } }
+        val js = asyncKiteJs(engine) { interruptWhen = { ++asked > 3 } }
         try {
             assertFailsWith<JsEngineError> { js.evaluate("for (;;) {}") }
             assertTrue(asked > 3, "the hook was never asked")
@@ -207,7 +210,7 @@ class AsyncKiteJsTest {
 
     @Test
     fun aBudgetStillStopsARunawayScript() = runTest {
-        val js = asyncKiteJs(Rhino) { instructionBudget = 200_000 }
+        val js = asyncKiteJs(engine) { instructionBudget = 200_000 }
         try {
             assertFailsWith<JsEngineError> { js.evaluate("while (true) {}") }
             assertEquals(3.0, js.evaluate("1 + 2").asDouble())
@@ -218,7 +221,7 @@ class AsyncKiteJsTest {
 
     @Test
     fun normalScriptsAreNotDisturbedByTheInterruptHook() = runTest {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         try {
             assertEquals(499500.0, js.evaluate("var t = 0; for (var i = 0; i < 1000; i++) t += i; t").asDouble())
         } finally {
@@ -228,7 +231,7 @@ class AsyncKiteJsTest {
 
     @Test
     fun aClosedAsyncEngineRefusesToRun() = runTest {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         js.close()
         assertFailsWith<IllegalStateException> { js.evaluate("1") }
     }

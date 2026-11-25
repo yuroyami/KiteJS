@@ -2,22 +2,24 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-package io.github.yuroyami.kitejs.coroutines
+package io.github.yuroyami.kitejs.testkit
 
+import io.github.yuroyami.kitejs.api.JsEngine
 import io.github.yuroyami.kitejs.api.JsError
 import io.github.yuroyami.kitejs.api.JsType
-import io.github.yuroyami.kitejs.rhino.Rhino
+import io.github.yuroyami.kitejs.api.KiteJsConfig
+import io.github.yuroyami.kitejs.coroutines.asyncKiteJs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlinx.coroutines.test.runTest
 
 /** `await` resolves a value the way `await` does in a script, and always comes back. */
-class AwaitTest {
+public abstract class AwaitContract<C : KiteJsConfig>(private val engine: JsEngine<C>) {
 
     @Test
     fun aThenableThatAnswersWithAPromiseComesBackAsItsValue() = runTest {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         try {
             val v = js.evaluateAwaiting("({ then: function (resolve) { resolve(Promise.resolve(7)) } })")
             assertEquals(JsType.NUMBER, v.type)
@@ -30,7 +32,7 @@ class AwaitTest {
 
     @Test
     fun aThenableThatFailsRejects() = runTest {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         try {
             val inner = assertFailsWith<JsError> {
                 js.evaluateAwaiting("({ then: function (r) { r({ then: function (_, j) { j(new TypeError('inner')) } }) } })")
@@ -47,7 +49,7 @@ class AwaitTest {
 
     @Test
     fun aRejectionWhoseReasonCannotBeReadStillEndsTheWait() = runTest {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         try {
             for (source in listOf(
                 "Promise.reject({ get name() { throw new Error('bad name') } })",

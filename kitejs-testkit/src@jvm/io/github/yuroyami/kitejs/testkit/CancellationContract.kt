@@ -2,10 +2,12 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-package io.github.yuroyami.kitejs.coroutines
+package io.github.yuroyami.kitejs.testkit
 
+import io.github.yuroyami.kitejs.api.JsEngine
+import io.github.yuroyami.kitejs.api.KiteJsConfig
 import io.github.yuroyami.kitejs.api.function
-import io.github.yuroyami.kitejs.rhino.Rhino
+import io.github.yuroyami.kitejs.coroutines.asyncKiteJs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -23,11 +25,11 @@ import kotlinx.coroutines.withTimeoutOrNull
  * on different threads, so it lives here rather than in the common tests: Kotlin/JS has one thread,
  * and an endless script there leaves nothing else able to run. Real time, not the test scheduler.
  */
-class CancellationTest {
+public abstract class CancellationContract<C : KiteJsConfig>(private val engine: JsEngine<C>) {
 
     @Test
     fun cancellingTheCallerStopsARunawayScript() = runBlocking {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         try {
             val runner = async(Dispatchers.Default) { js.evaluate("for (;;) {}") }
             // Let it get going, on the real clock.
@@ -49,7 +51,7 @@ class CancellationTest {
 
     @Test
     fun aTimeoutAroundTheCallStopsTheScriptToo() = runBlocking {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         try {
             val answer = withTimeoutOrNull(1_000) {
                 withContextDefault { js.evaluate("for (;;) {}") }
@@ -63,7 +65,7 @@ class CancellationTest {
 
     @Test
     fun aCancelledCallerGetsCancellation() = runBlocking {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         try {
             val runner = async(Dispatchers.Default) { js.evaluate("for (;;) {}") }
             delay(300)
@@ -81,7 +83,7 @@ class CancellationTest {
     /** A chain of reactions that queue one another never branches, and still hears the cancel. */
     @Test
     fun cancellingTheCallerStopsAnEndlessChainOfReactions() = runBlocking {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         try {
             val runner = async(Dispatchers.Default) {
                 js.evaluate("var n = 0; function spin() { n++; Promise.resolve().then(spin) } Promise.resolve().then(spin)")
@@ -113,7 +115,7 @@ class CancellationTest {
      */
     @Test
     fun closingTheEngineEndsAWaitOnAnotherThread() = runBlocking {
-        val js = asyncKiteJs(Rhino)
+        val js = asyncKiteJs(engine)
         val never = js.evaluate("new Promise(function () {})")
         val registered = CompletableDeferred<Unit>()
         // Reading `then` happens as the wait is registered, so this says when it is.

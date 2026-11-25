@@ -33,7 +33,9 @@ dependencies:
 
 test-dependencies:
   - $libs.kotlinx.coroutines.test
-  # Any engine will do for the tests; Rhino needs no native code on any target.
+  # The suites live in kitejs-testkit. This module runs them on Rhino, which needs no native code
+  # on any target, and kitejs-quickjs runs them on QuickJS.
+  - ../kitejs-testkit
   - ../kitejs-rhino
 
 settings:

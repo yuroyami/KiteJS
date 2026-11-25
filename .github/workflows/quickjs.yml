@@ -10,6 +10,7 @@ on:
     branches: [main]
     paths:
       - 'kitejs-quickjs/**'
+      - 'kitejs-coroutines/**'
       - 'kitejs-quickjs-android-natives/**'
       - 'kitejs-api/**'
       - 'kitejs-testkit/**'
@@ -23,6 +24,7 @@ on:
   pull_request:
     paths:
       - 'kitejs-quickjs/**'
+      - 'kitejs-coroutines/**'
       - 'kitejs-quickjs-android-natives/**'
       - 'kitejs-api/**'
       - 'kitejs-testkit/**'

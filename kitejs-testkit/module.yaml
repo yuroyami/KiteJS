@@ -23,6 +23,8 @@ apply:
 
 dependencies:
   - ../kitejs-api: exported
+  # The coroutine suites, which kitejs-coroutines and kitejs-quickjs both run.
+  - ../kitejs-coroutines: exported
   - $kotlin.test: exported
   - $libs.kotlinx.coroutines.test: exported
 

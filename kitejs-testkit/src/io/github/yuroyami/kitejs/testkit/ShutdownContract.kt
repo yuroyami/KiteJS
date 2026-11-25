@@ -2,13 +2,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-package io.github.yuroyami.kitejs.coroutines
+package io.github.yuroyami.kitejs.testkit
 
+import io.github.yuroyami.kitejs.api.JsEngine
 import io.github.yuroyami.kitejs.api.JsEngineError
 import io.github.yuroyami.kitejs.api.JsError
 import io.github.yuroyami.kitejs.api.JsValue
+import io.github.yuroyami.kitejs.api.KiteJsConfig
 import io.github.yuroyami.kitejs.api.newPromise
-import io.github.yuroyami.kitejs.rhino.Rhino
+import io.github.yuroyami.kitejs.coroutines.AsyncKiteJs
+import io.github.yuroyami.kitejs.coroutines.asyncKiteJs
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -34,10 +37,10 @@ import kotlinx.coroutines.test.runTest
  * exactly when `runCurrent` says it does.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
-class ShutdownTest {
+public abstract class ShutdownContract<C : KiteJsConfig>(private val engine: JsEngine<C>) {
 
     private suspend fun TestScope.engine(budget: Int = 0): AsyncKiteJs =
-        asyncKiteJs(Rhino, StandardTestDispatcher(testScheduler)) { instructionBudget = budget }
+        asyncKiteJs(engine, StandardTestDispatcher(testScheduler)) { instructionBudget = budget }
 
     /**
      * Closes [js] and lets the release run, even after a failed assertion, so the engine does not
