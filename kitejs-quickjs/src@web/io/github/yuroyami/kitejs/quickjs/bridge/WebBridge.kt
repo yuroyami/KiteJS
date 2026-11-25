@@ -158,22 +158,31 @@ internal actual fun bridge(): QuickJsBridge {
 
 internal actual fun bridgeLoaded(): Boolean = glue.loaded()
 
+/**
+ * The load on its way, if any. A second call while it runs waits on the same one, rather than
+ * decompress and instantiate the module again. There is one thread, so this needs no lock.
+ */
+private var pendingLoad: Thenable? = null
+
 internal actual suspend fun loadBridge() {
     if (glue.loaded()) return
-    val loading = glue.load(
+    val loading = pendingLoad ?: glue.load(
         QUICKJS_WASM.joinToString(""),
         { engine, fn, argc -> QuickJsHost.call(engine, fn, argc) },
         { engine -> QuickJsHost.interrupt(engine) },
         { engine -> QuickJsHost.now(engine) },
         { engine, time -> QuickJsHost.timeZoneOffset(engine, time) },
-    )
+    ).also { pendingLoad = it }
     suspendCoroutine { continuation ->
         loading.then(
             { _ ->
+                pendingLoad = null
                 continuation.resume(Unit)
                 null
             },
             { error ->
+                // A later call tries again.
+                pendingLoad = null
                 continuation.resumeWithException(JsEngineError("QuickJS failed to load: $error"))
                 null
             },
