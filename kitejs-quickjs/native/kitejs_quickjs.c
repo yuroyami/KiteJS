@@ -250,8 +250,15 @@ static JSValue host_function(JSContext *ctx, JSValueConst this_val, int argc, JS
     e->cb_this = saved_this;
     e->cb_argv = saved_argv;
     e->cb_argc = saved_argc;
-    if (result < 0)
+    if (result == -1)
         return throw_uncatchable(ctx, "the host threw");
+    if (result < -1) {
+        /* The host threw a value for the script to catch, at handle -2 - result. */
+        int32_t h = -2 - result;
+        JSValue thrown = JS_DupValue(ctx, at(e, h));
+        kite_release(e, h);
+        return JS_Throw(ctx, thrown);
+    }
     JSValue v = JS_DupValue(ctx, at(e, result));
     kite_release(e, result);
     return v;

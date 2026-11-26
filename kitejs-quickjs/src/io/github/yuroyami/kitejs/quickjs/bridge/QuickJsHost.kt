@@ -38,7 +38,10 @@ internal object QuickJsHost {
 
     private fun engine(id: Int): QuickJsKiteJs = engines.load().getValue(id)
 
-    /** Runs host function [fn]: a handle the engine takes over, or -1 when the host threw. */
+    /**
+     * Runs host function [fn]: a handle the engine takes over, -1 when the host threw, or -2 - h
+     * for a value at handle h that the script is to throw.
+     */
     fun call(engine: Int, fn: Int, argc: Int): Int = engine(engine).hostCall(fn, argc)
 
     /** 0 to go on, 1 to stop, 2 when the hook threw. */

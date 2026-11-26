@@ -64,7 +64,8 @@ typedef struct KiteEngine KiteEngine;
 /*
  * Calls host function [fn] with [argc] arguments, read with kite_cb_this and kite_cb_arg before
  * anything else runs. Answers a handle the engine takes over, or -1 when the host threw: then
- * the script stops with an error no catch sees.
+ * the script stops with an error no catch sees. -2 - h throws the value at handle h in the
+ * script, where a catch sees it, and the engine takes the handle over.
  */
 typedef int32_t (*kite_host_call_fn)(int32_t engine, int32_t fn, int32_t argc);
 /* 0 to go on, 1 to stop, 2 when the host threw while deciding, 3 to pause (KITE_INTERRUPT_PAUSE). */

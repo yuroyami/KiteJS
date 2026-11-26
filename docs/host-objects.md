@@ -41,6 +41,27 @@ js.global.method("describe") { self, _ ->
 js.evaluate("var o = { n: 4, d: describe }; o.d()")   // "n=4"
 ```
 
+### Throwing an error the script can catch
+
+A host function that throws `JsThrow` throws its value in the script, where a `try` can catch
+it. `newError` makes the error object with a constructor of the global object:
+
+```kotlin
+js.global.function<Double, Double>("checkedSqrt") { x ->
+    if (x < 0) throw JsThrow(js.newError("RangeError", "negative input").value)
+    sqrt(x)
+}
+
+js.evaluate("try { checkedSqrt(-1) } catch (e) { e instanceof RangeError }")   // true
+```
+
+- `newError` takes any constructor that the global object has, such as `TypeError`, or a
+  `DOMException` that a script defined.
+- `JsThrow` can throw any value, not only an error.
+- A `JsThrow` that no `try` catches comes out of the call as a `JsError`, like any script error.
+- Any other exception from a host function is not a script exception. No `catch` in the script
+  sees it, and it ends the call from the host.
+
 ## Values and properties
 
 ```kotlin

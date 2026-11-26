@@ -51,6 +51,15 @@ public fun JsObject.accessor(
 
 // ---- Functions ------------------------------------------------------------------------------
 
+/**
+ * A new error object, made as `new globalThis[constructor](message)` makes it in a script. Any
+ * constructor of the global object works: `TypeError`, `RangeError`, or a `DOMException` that a
+ * script defined. Throw it in the script with [JsThrow].
+ */
+@Throws(JsException::class)
+public fun KiteJs.newError(constructor: String, message: String): JsObject =
+    global[constructor].asFunction().construct(message)
+
 /** A host function that takes the arguments as they came. */
 @Throws(JsException::class)
 public fun JsObject.function(

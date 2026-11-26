@@ -23,7 +23,8 @@ import kotlin.time.Duration.Companion.milliseconds
  * [JsFunction] or a method, runs the Promise reactions it queued before it returns. Work queued
  * later, from a host callback, waits for the next such call or for [runMicrotasks].
  *
- * An exception a host function throws is not a JavaScript exception: no `catch` in the script sees
+ * A host function throws a value in the script, where a `catch` sees it, with [JsThrow]. Any other
+ * exception a host function throws is not a JavaScript exception: no `catch` in the script sees
  * it, and it comes out of the call that started the script as itself when it is a [JsException],
  * or inside a [JsEngineError] otherwise.
  */

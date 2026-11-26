@@ -65,5 +65,19 @@ public class JsSyntaxError(
     cause: Throwable?,
 ) : JsException(message, cause)
 
+/**
+ * What a host function throws to throw [value] in the script, where a `try` can catch it. Build
+ * an error object for it with [newError]. A `JsThrow` that no `try` catches comes out of the call
+ * from the host as a [JsError]. Any other exception from a host function keeps its meaning: no
+ * `catch` in the script sees it.
+ *
+ * ```
+ * js.global.function("check") { args ->
+ *     if (args.isEmpty()) throw JsThrow(js.newError("TypeError", "check needs a value").value)
+ * }
+ * ```
+ */
+public class JsThrow(public val value: JsValue) : RuntimeException("a host function threw a value into the script")
+
 /** The engine itself could not go on: it is closed, misused, out of budget or out of memory. */
 public class JsEngineError(message: String, cause: Throwable? = null) : JsException(message, cause)

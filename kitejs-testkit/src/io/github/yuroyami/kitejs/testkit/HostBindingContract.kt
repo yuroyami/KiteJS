@@ -7,6 +7,7 @@ package io.github.yuroyami.kitejs.testkit
 import io.github.yuroyami.kitejs.api.JsEngine
 import io.github.yuroyami.kitejs.api.JsEngineError
 import io.github.yuroyami.kitejs.api.JsError
+import io.github.yuroyami.kitejs.api.JsThrow
 import io.github.yuroyami.kitejs.api.JsType
 import io.github.yuroyami.kitejs.api.JsValue
 import io.github.yuroyami.kitejs.api.KiteJsConfig
@@ -18,6 +19,7 @@ import io.github.yuroyami.kitejs.api.constructor
 import io.github.yuroyami.kitejs.api.function
 import io.github.yuroyami.kitejs.api.getter
 import io.github.yuroyami.kitejs.api.method
+import io.github.yuroyami.kitejs.api.newError
 import io.github.yuroyami.kitejs.api.obj
 import io.github.yuroyami.kitejs.api.property
 import io.github.yuroyami.kitejs.api.setter
@@ -173,6 +175,38 @@ public abstract class HostBindingContract<C : KiteJsConfig>(engine: JsEngine<C>)
         assertTrue(e.cause is IllegalStateException, "${e.cause}")
         // The engine carries on.
         assertEquals(2.0, js.evaluate("1 + 1").asDouble())
+    }
+
+    @Test
+    public fun aHostFunctionThrowsAnErrorTheScriptCanCatch(): TestResult = withEngine { js ->
+        js.global.function("fail") { throw JsThrow(js.newError("TypeError", "bad").value) }
+        assertTrue(js.evaluate("try { fail(); false } catch (e) { e instanceof TypeError && e.message === 'bad' }").asBoolean())
+        assertEquals(2, js.evaluate("1 + 1").asInt())
+    }
+
+    @Test
+    public fun aJsThrowThatNoTryCatchesComesOutAsAJsError(): TestResult = withEngine { js ->
+        js.global.function("fail") { throw JsThrow(js.newError("RangeError", "far").value) }
+        val e = assertFailsWith<JsError> { js.evaluate("fail()") }
+        assertEquals("RangeError", e.name)
+        assertEquals("far", e.errorMessage)
+    }
+
+    @Test
+    public fun aHostThrowsAnyValueAndAnErrorOfAConstructorTheScriptDefined(): TestResult = withEngine { js ->
+        js.evaluate("function NotFound(message) { this.name = 'NotFoundError'; this.message = message }")
+        js.global.function("missing") { throw JsThrow(js.newError("NotFound", "gone").value) }
+        js.global.function("seven") { throw JsThrow(JsValue.of(7)) }
+        assertEquals("NotFoundError: gone", js.evaluate("try { missing() } catch (e) { e instanceof NotFound && e.name + ': ' + e.message }").asString())
+        assertEquals(7, js.evaluate("try { seven() } catch (e) { e }").asInt())
+    }
+
+    @Test
+    public fun aGetterAndAConstructorThrowWhatTheScriptCanCatch(): TestResult = withEngine { js ->
+        js.global.getter("broken") { throw JsThrow(js.newError("TypeError", "no read").value) }
+        js.global.constructor("Picky") { _, _ -> throw JsThrow(js.newError("RangeError", "no build").value) }
+        assertEquals("no read", js.evaluate("try { broken } catch (e) { e.message }").asString())
+        assertEquals("no build", js.evaluate("try { new Picky() } catch (e) { e.message }").asString())
     }
 
     @Test

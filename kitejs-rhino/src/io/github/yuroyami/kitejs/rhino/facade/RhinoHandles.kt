@@ -101,8 +101,8 @@ internal interface RhinoHandle {
             holder().defineProperty(
                 engine.cx,
                 name,
-                read?.let { r -> ScriptableObject.LambdaGetterFunction { engine.toRhino(r()) } },
-                write?.let { w -> ScriptableObject.LambdaSetterFunction { _, v -> w(engine.toJs(v)) } },
+                read?.let { r -> ScriptableObject.LambdaGetterFunction { engine.host { engine.toRhino(r()) } } },
+                write?.let { w -> ScriptableObject.LambdaSetterFunction { _, v -> engine.host { w(engine.toJs(v)) } } },
                 flags.attributes() and ScriptableObject.READONLY.inv(),
             )
         }

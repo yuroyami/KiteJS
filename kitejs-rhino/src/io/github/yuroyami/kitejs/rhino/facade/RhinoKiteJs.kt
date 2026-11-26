@@ -18,6 +18,7 @@ import io.github.yuroyami.kitejs.api.JsScript
 import io.github.yuroyami.kitejs.api.JsStackFrame
 import io.github.yuroyami.kitejs.api.JsSymbol
 import io.github.yuroyami.kitejs.api.JsSyntaxError
+import io.github.yuroyami.kitejs.api.JsThrow
 import io.github.yuroyami.kitejs.api.JsUndefined
 import io.github.yuroyami.kitejs.api.JsValue
 import io.github.yuroyami.kitejs.api.KBigInt
@@ -112,7 +113,7 @@ internal class RhinoKiteJs private constructor(
                 scope,
                 name,
                 arity,
-                SerializableCallable { _, _, thisObj, args -> toRhino(body(toJs(thisObj), args.map(::toJs))) },
+                SerializableCallable { _, _, thisObj, args -> host { toRhino(body(toJs(thisObj), args.map(::toJs))) } },
             )
             RhinoFunction(this, fn)
         }
@@ -125,7 +126,7 @@ internal class RhinoKiteJs private constructor(
                 arity,
                 SerializableConstructable { cx, s, args ->
                     val obj = cx.newObject(s)
-                    build(RhinoObject(this, obj), args.map(::toJs))
+                    host { build(RhinoObject(this, obj), args.map(::toJs)) }
                     obj
                 },
             )
@@ -239,6 +240,13 @@ internal class RhinoKiteJs private constructor(
                 if (factory.stopped || !isScriptError(e)) return
             }
         }
+    }
+
+    /** Runs host code, turning a [JsThrow] into a value the script can catch. */
+    inline fun <T> host(body: () -> T): T = try {
+        body()
+    } catch (e: JsThrow) {
+        throw JavaScriptException(toRhino(e.value), null, 0)
     }
 
     private fun wrongThread(): JsEngineError =

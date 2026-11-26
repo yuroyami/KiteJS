@@ -63,6 +63,7 @@ public final class io/github/yuroyami/kitejs/api/HostBindingKt {
 	public static synthetic fun getter$default (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;Lio/github/yuroyami/kitejs/api/PropertyFlags;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)V
 	public static final fun method (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;ILio/github/yuroyami/kitejs/api/PropertyFlags;Lkotlin/jvm/functions/Function2;)Lio/github/yuroyami/kitejs/api/JsFunction;
 	public static synthetic fun method$default (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;ILio/github/yuroyami/kitejs/api/PropertyFlags;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsFunction;
+	public static final fun newError (Lio/github/yuroyami/kitejs/api/KiteJs;Ljava/lang/String;Ljava/lang/String;)Lio/github/yuroyami/kitejs/api/JsObject;
 	public static final fun obj (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lio/github/yuroyami/kitejs/api/JsObject;
 	public static synthetic fun obj$default (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lio/github/yuroyami/kitejs/api/JsObject;
 	public static final fun property (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;Ljava/lang/Object;Lio/github/yuroyami/kitejs/api/PropertyFlags;)V
@@ -210,6 +211,11 @@ public final class io/github/yuroyami/kitejs/api/JsSyntaxError : io/github/yuroy
 	public final fun getFileName ()Ljava/lang/String;
 	public final fun getLineNumber ()I
 	public final fun getLineSource ()Ljava/lang/String;
+}
+
+public final class io/github/yuroyami/kitejs/api/JsThrow : java/lang/RuntimeException {
+	public fun <init> (Lio/github/yuroyami/kitejs/api/JsValue;)V
+	public final fun getValue ()Lio/github/yuroyami/kitejs/api/JsValue;
 }
 
 public final class io/github/yuroyami/kitejs/api/JsType : java/lang/Enum {

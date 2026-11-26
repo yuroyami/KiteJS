@@ -16,6 +16,7 @@ import io.github.yuroyami.kitejs.api.JsScript
 import io.github.yuroyami.kitejs.api.JsStackFrame
 import io.github.yuroyami.kitejs.api.JsSymbol
 import io.github.yuroyami.kitejs.api.JsSyntaxError
+import io.github.yuroyami.kitejs.api.JsThrow
 import io.github.yuroyami.kitejs.api.JsType
 import io.github.yuroyami.kitejs.api.JsUndefined
 import io.github.yuroyami.kitejs.api.JsValue
@@ -457,7 +458,12 @@ internal class QuickJsKiteJs private constructor(
             val self = toJs(selfHandle)
             val args = argHandles.map { toJs(it) }
             val body = functions[fn] ?: throw JsEngineError("this host function belongs to an engine that has let it go")
-            toHandle(body(self, args))
+            try {
+                toHandle(body(self, args))
+            } catch (thrown: JsThrow) {
+                // The C side throws the value at handle h when it gets -2 - h.
+                -2 - toHandle(thrown.value)
+            }
         } catch (t: Throwable) {
             hostFailure = t
             -1
