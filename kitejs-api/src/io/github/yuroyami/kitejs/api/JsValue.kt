@@ -4,8 +4,6 @@
 
 package io.github.yuroyami.kitejs.api
 
-import kotlin.jvm.JvmInline
-
 /**
  * What a [JsValue] holds. A `when` over this covers every JavaScript value, so the compiler can
  * tell you when you have missed one.
@@ -33,8 +31,11 @@ public object JsUndefined {
 }
 
 /**
- * One value from an engine. It costs nothing at runtime: the wrapper disappears and only the value
- * itself is passed around.
+ * One value from an engine.
+ *
+ * It is a small object around the value. A value class would cost nothing, but Kotlin/Native does
+ * not export a value class to Objective-C, so Swift would see only `Any`. As a class, a Swift
+ * caller gets [type] and every reader below. Two values are equal when they hold the same value.
  *
  * A number, a string, a boolean, a BigInt, null or undefined is a copy, the same whichever engine
  * it came from, and works anywhere, even after its engine is closed. A symbol, an object, an array
@@ -44,8 +45,7 @@ public object JsUndefined {
  * The `asX` readers coerce the way JavaScript does, so `asString()` on the number 5 gives `"5"`,
  * the same answer `String(5)` gives in a script. Use [type] first when you need the exact kind.
  */
-@JvmInline
-public value class JsValue @InternalKiteJsApi constructor(
+public class JsValue @InternalKiteJsApi constructor(
     /**
      * The value itself: [JsUndefined], null, a [Boolean], a [Double], a [String], a [KBigInt], a
      * [JsSymbol] or a [JsObject]. Engines build and read these; nothing else should.
@@ -101,6 +101,7 @@ public value class JsValue @InternalKiteJsApi constructor(
     }
 
     /** ToNumber. An object is turned into a primitive first, which can run its script. */
+    @Throws(JsException::class)
     public fun asDouble(): Double = when (val r = raw) {
         null -> 0.0
         JsUndefined -> Double.NaN
@@ -114,6 +115,7 @@ public value class JsValue @InternalKiteJsApi constructor(
     }
 
     /** ToInt32: the number wrapped into a 32-bit integer, as the bitwise operators see it. */
+    @Throws(JsException::class)
     public fun asInt(): Int = JsNumbers.toInt32(asDouble())
 
     /**
@@ -123,6 +125,7 @@ public value class JsValue @InternalKiteJsApi constructor(
      * never wraps, truncates or saturates. A Number already rounded by JavaScript keeps that
      * represented value; use BigInt when the original integer must retain all its digits.
      */
+    @Throws(JsException::class)
     public fun asLong(): Long {
         val r = raw
         if (r is JsObject) return r.toPrimitive(PrimitiveHint.NUMBER).asLong()
@@ -142,6 +145,7 @@ public value class JsValue @InternalKiteJsApi constructor(
         JsError(undefined, "RangeError", "value is not an exact integer in the Kotlin Long range", emptyList(), null)
 
     /** ToString. An object is turned into a primitive first, which can run its script. */
+    @Throws(JsException::class)
     public fun asString(): String = when (val r = raw) {
         null -> "null"
         JsUndefined -> "undefined"
@@ -155,16 +159,21 @@ public value class JsValue @InternalKiteJsApi constructor(
     }
 
     /** Throws unless this really is a BigInt. There is no coercion from a number, as in a script. */
+    @Throws(JsException::class)
     public fun asBigInt(): KBigInt = raw as? KBigInt ?: throw wrongType("a BigInt")
 
     // ---- Exact readers, which throw rather than guess -----------------------------------------
 
+    @Throws(JsException::class)
     public fun asObject(): JsObject = asObjectOrNull() ?: throw wrongType("an object")
 
+    @Throws(JsException::class)
     public fun asArray(): JsArray = asArrayOrNull() ?: throw wrongType("an array")
 
+    @Throws(JsException::class)
     public fun asFunction(): JsFunction = asFunctionOrNull() ?: throw wrongType("a function")
 
+    @Throws(JsException::class)
     public fun asSymbol(): JsSymbol = raw as? JsSymbol ?: throw wrongType("a symbol")
 
     public fun asObjectOrNull(): JsObject? = raw as? JsObject
@@ -180,6 +189,7 @@ public value class JsValue @InternalKiteJsApi constructor(
      * [JsSymbol], since they have no Kotlin twin, and an object that closes a cycle stays the
      * [JsObject] it is.
      */
+    @Throws(JsException::class)
     public fun toKotlin(): Any? = Converters.toKotlin(this, HashSet())
 
     /**
@@ -194,16 +204,31 @@ public value class JsValue @InternalKiteJsApi constructor(
 
     private fun wrongType(wanted: String): JsError = typeError("expected $wanted, got $typeOf")
 
+    override fun equals(other: Any?): Boolean = other is JsValue && raw == other.raw
+
+    override fun hashCode(): Int = raw.hashCode()
+
     public companion object {
         public val undefined: JsValue = JsValue(JsUndefined)
         public val nullValue: JsValue = JsValue(null)
         public val `true`: JsValue = JsValue(true)
         public val `false`: JsValue = JsValue(false)
 
+        /** [raw] as a value, with the four shared constants reused. Engines call this; nothing else should. */
+        @InternalKiteJsApi
+        public fun wrap(raw: Any?): JsValue = when (raw) {
+            JsUndefined -> undefined
+            null -> nullValue
+            true -> `true`
+            false -> `false`
+            else -> JsValue(raw)
+        }
+
         /**
          * A Kotlin scalar as a JavaScript value: see [Converters] for the table. A collection
          * needs an engine to build its object in, so it goes through `KiteJs.valueOf` instead.
          */
+        @Throws(IllegalArgumentException::class)
         public fun of(value: Any?): JsValue {
             val canonical = Converters.canonical(value)
             if (Converters.isCollection(canonical)) {

@@ -247,7 +247,7 @@ internal class RhinoKiteJs private constructor(
     // ---- Values -------------------------------------------------------------------------------
 
     /** A value from the engine as the API holds it. */
-    fun toJs(raw: Any?): JsValue = JsValue(
+    fun toJs(raw: Any?): JsValue = JsValue.wrap(
         when {
             raw == null -> null
             Undefined.isUndefined(raw) || raw === Scriptable.NOT_FOUND -> JsUndefined

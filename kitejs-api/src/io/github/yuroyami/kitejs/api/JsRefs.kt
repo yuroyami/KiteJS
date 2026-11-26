@@ -30,10 +30,12 @@ public abstract class JsObject @InternalKiteJsApi constructor() {
     public abstract val engine: KiteJs
 
     /** The value this wrapper holds, for handing back to the engine. */
-    public val value: JsValue get() = JsValue(this)
+    public val value: JsValue = JsValue(this)
 
+    @Throws(JsException::class)
     public abstract operator fun get(name: String): JsValue
 
+    @Throws(JsException::class)
     public abstract operator fun get(index: Int): JsValue
 
     @Throws(JsException::class)
@@ -54,6 +56,7 @@ public abstract class JsObject @InternalKiteJsApi constructor() {
     public abstract val keys: List<String>
 
     /** Calls a method on this object, the way `obj.name(...)` does in a script. */
+    @Throws(JsException::class)
     public abstract fun call(name: String, vararg args: Any?): JsValue
 
     /**
@@ -90,6 +93,7 @@ public abstract class JsObject @InternalKiteJsApi constructor() {
 
     /** ToPrimitive with [hint], which can run the object's script. */
     @InternalKiteJsApi
+    @Throws(JsException::class)
     public abstract fun toPrimitive(hint: PrimitiveHint): JsValue
 
     /** True when the engine is open and this is its thread, so the object can be touched here. */
@@ -157,9 +161,11 @@ public abstract class JsFunction @InternalKiteJsApi constructor() : JsObject() {
     public open val arity: Int get() = this["length"].asInt()
 
     /** Calls the function as `f(...)` in a script would, with no particular `this`. */
+    @Throws(JsException::class)
     public operator fun invoke(vararg args: Any?): JsValue = callOn(null, *args)
 
     /** Calls the function with an explicit `this`. */
+    @Throws(JsException::class)
     public abstract fun callOn(thisArg: Any?, vararg args: Any?): JsValue
 
     /** Calls it with `new`. */
@@ -202,6 +208,7 @@ public abstract class JsSymbol @InternalKiteJsApi constructor() {
 public abstract class JsScript @InternalKiteJsApi constructor() : AutoCloseable {
 
     /** Runs it in the engine's global scope. The answer is its last expression's value. */
+    @Throws(JsException::class)
     public abstract fun run(): JsValue
 
     /** Runs it as [KiteJs.evaluatePausing] runs source: pausing about every [slice] where the engine can. */

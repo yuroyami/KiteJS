@@ -511,7 +511,7 @@ internal class QuickJsKiteJs private constructor(
         return when (bridge.type(ptr, h)) {
             QuickJsBridge.TYPE_UNDEFINED -> scalar(h, JsValue.undefined)
             QuickJsBridge.TYPE_NULL -> scalar(h, JsValue.nullValue)
-            QuickJsBridge.TYPE_BOOLEAN -> scalar(h, JsValue(bridge.number(ptr, h) != 0.0))
+            QuickJsBridge.TYPE_BOOLEAN -> scalar(h, JsValue.wrap(bridge.number(ptr, h) != 0.0))
             QuickJsBridge.TYPE_NUMBER -> scalar(h, JsValue(bridge.number(ptr, h)))
             QuickJsBridge.TYPE_STRING -> scalar(h, JsValue(bridge.string(ptr, h) ?: ""))
             QuickJsBridge.TYPE_BIGINT -> scalar(h, JsValue(KBigInt.parse(bridge.string(ptr, h) ?: "0")))

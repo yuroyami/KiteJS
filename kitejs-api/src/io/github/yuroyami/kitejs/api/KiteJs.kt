@@ -39,7 +39,7 @@ public abstract class KiteJs @InternalKiteJsApi constructor() : AutoCloseable {
     public abstract val version: String
 
     /** Parses and runs [source]. The answer is the last expression's value. */
-    // No @Throws on calls that answer a JsValue: Objective-C export fails on a value class result (#156).
+    @Throws(JsException::class)
     public abstract fun evaluate(source: String, fileName: String = "<eval>"): JsValue
 
     /** Parses [source] once so it can be run many times. */
@@ -87,6 +87,7 @@ public abstract class KiteJs @InternalKiteJsApi constructor() : AutoCloseable {
     public abstract fun runMicrotasks()
 
     /** A Kotlin value as the engine sees it, collections and all. See [Converters]. */
+    @Throws(JsException::class)
     public abstract fun valueOf(value: Any?): JsValue
 
     /** A fresh empty object, the same as `{}` in a script. */

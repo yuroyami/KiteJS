@@ -71,6 +71,29 @@ If you need the engine from suspending code, use `kitejs-coroutines`. It gives e
 thread of its own and moves every call onto that thread, so callers never overlap. See
 [Promises and coroutines](promises-and-coroutines.md).
 
+## From Swift
+
+On iOS and macOS, `tools/apple_frameworks.py` links an Apple framework for each module. Swift sees
+the same API, with two rules:
+
+- A call into an engine that can fail is a `throws` function. A script error, a syntax error and a
+  stop by a limit all reach the `catch` as an error, and the app goes on.
+- `JsValue` is a class. `type` and `typeOf` say what it holds, and `asString()`, `asDouble()`,
+  `asBoolean()`, `asObject()` and `toKotlin()` read it.
+
+```swift
+do {
+    let answer = try js.evaluate(source: "6 * 7", fileName: "<eval>")
+    print(answer.typeOf, try answer.asDouble())   // number 42.0
+} catch {
+    print(error)
+}
+```
+
+Objective-C has no default arguments, so Swift passes every argument, such as `fileName` above.
+`close()` and the property getters, such as `keys` and `length`, cannot be marked `throws`. Call
+`close()` on the engine's thread, and read the getters only while the engine is open.
+
 ## Configure it
 
 Everything is optional and has a working default:
