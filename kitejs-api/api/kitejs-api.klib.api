@@ -134,9 +134,10 @@ abstract class io.github.yuroyami.kitejs.api/JsObject { // io.github.yuroyami.ki
     open fun toString(): kotlin/String // io.github.yuroyami.kitejs.api/JsObject.toString|toString(){}[0]
 }
 
-abstract class io.github.yuroyami.kitejs.api/JsScript { // io.github.yuroyami.kitejs.api/JsScript|null[0]
+abstract class io.github.yuroyami.kitejs.api/JsScript : kotlin/AutoCloseable { // io.github.yuroyami.kitejs.api/JsScript|null[0]
     constructor <init>() // io.github.yuroyami.kitejs.api/JsScript.<init>|<init>(){}[0]
 
+    abstract fun close() // io.github.yuroyami.kitejs.api/JsScript.close|close(){}[0]
     abstract fun run(): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.api/JsScript.run|run(){}[0]
     open fun bytecode(): kotlin/ByteArray? // io.github.yuroyami.kitejs.api/JsScript.bytecode|bytecode(){}[0]
     open suspend fun runPausing(kotlin.time/Duration = ...): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.api/JsScript.runPausing|runPausing(kotlin.time.Duration){}[0]
@@ -295,6 +296,62 @@ final class io.github.yuroyami.kitejs.api/JsSyntaxError : io.github.yuroyami.kit
         final fun <get-lineSource>(): kotlin/String? // io.github.yuroyami.kitejs.api/JsSyntaxError.lineSource.<get-lineSource>|<get-lineSource>(){}[0]
 }
 
+final class io.github.yuroyami.kitejs.api/JsThrow : kotlin/RuntimeException { // io.github.yuroyami.kitejs.api/JsThrow|null[0]
+    constructor <init>(io.github.yuroyami.kitejs.api/JsValue) // io.github.yuroyami.kitejs.api/JsThrow.<init>|<init>(io.github.yuroyami.kitejs.api.JsValue){}[0]
+
+    final val value // io.github.yuroyami.kitejs.api/JsThrow.value|{}value[0]
+        final fun <get-value>(): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.api/JsThrow.value.<get-value>|<get-value>(){}[0]
+}
+
+final class io.github.yuroyami.kitejs.api/JsValue { // io.github.yuroyami.kitejs.api/JsValue|null[0]
+    constructor <init>(kotlin/Any?) // io.github.yuroyami.kitejs.api/JsValue.<init>|<init>(kotlin.Any?){}[0]
+
+    final val isNull // io.github.yuroyami.kitejs.api/JsValue.isNull|{}isNull[0]
+        final fun <get-isNull>(): kotlin/Boolean // io.github.yuroyami.kitejs.api/JsValue.isNull.<get-isNull>|<get-isNull>(){}[0]
+    final val isNullish // io.github.yuroyami.kitejs.api/JsValue.isNullish|{}isNullish[0]
+        final fun <get-isNullish>(): kotlin/Boolean // io.github.yuroyami.kitejs.api/JsValue.isNullish.<get-isNullish>|<get-isNullish>(){}[0]
+    final val isUndefined // io.github.yuroyami.kitejs.api/JsValue.isUndefined|{}isUndefined[0]
+        final fun <get-isUndefined>(): kotlin/Boolean // io.github.yuroyami.kitejs.api/JsValue.isUndefined.<get-isUndefined>|<get-isUndefined>(){}[0]
+    final val raw // io.github.yuroyami.kitejs.api/JsValue.raw|{}raw[0]
+        final fun <get-raw>(): kotlin/Any? // io.github.yuroyami.kitejs.api/JsValue.raw.<get-raw>|<get-raw>(){}[0]
+    final val type // io.github.yuroyami.kitejs.api/JsValue.type|{}type[0]
+        final fun <get-type>(): io.github.yuroyami.kitejs.api/JsType // io.github.yuroyami.kitejs.api/JsValue.type.<get-type>|<get-type>(){}[0]
+    final val typeOf // io.github.yuroyami.kitejs.api/JsValue.typeOf|{}typeOf[0]
+        final fun <get-typeOf>(): kotlin/String // io.github.yuroyami.kitejs.api/JsValue.typeOf.<get-typeOf>|<get-typeOf>(){}[0]
+
+    final fun asArray(): io.github.yuroyami.kitejs.api/JsArray // io.github.yuroyami.kitejs.api/JsValue.asArray|asArray(){}[0]
+    final fun asArrayOrNull(): io.github.yuroyami.kitejs.api/JsArray? // io.github.yuroyami.kitejs.api/JsValue.asArrayOrNull|asArrayOrNull(){}[0]
+    final fun asBigInt(): io.github.yuroyami.kitejs.api/KBigInt // io.github.yuroyami.kitejs.api/JsValue.asBigInt|asBigInt(){}[0]
+    final fun asBoolean(): kotlin/Boolean // io.github.yuroyami.kitejs.api/JsValue.asBoolean|asBoolean(){}[0]
+    final fun asDouble(): kotlin/Double // io.github.yuroyami.kitejs.api/JsValue.asDouble|asDouble(){}[0]
+    final fun asFunction(): io.github.yuroyami.kitejs.api/JsFunction // io.github.yuroyami.kitejs.api/JsValue.asFunction|asFunction(){}[0]
+    final fun asFunctionOrNull(): io.github.yuroyami.kitejs.api/JsFunction? // io.github.yuroyami.kitejs.api/JsValue.asFunctionOrNull|asFunctionOrNull(){}[0]
+    final fun asInt(): kotlin/Int // io.github.yuroyami.kitejs.api/JsValue.asInt|asInt(){}[0]
+    final fun asLong(): kotlin/Long // io.github.yuroyami.kitejs.api/JsValue.asLong|asLong(){}[0]
+    final fun asObject(): io.github.yuroyami.kitejs.api/JsObject // io.github.yuroyami.kitejs.api/JsValue.asObject|asObject(){}[0]
+    final fun asObjectOrNull(): io.github.yuroyami.kitejs.api/JsObject? // io.github.yuroyami.kitejs.api/JsValue.asObjectOrNull|asObjectOrNull(){}[0]
+    final fun asString(): kotlin/String // io.github.yuroyami.kitejs.api/JsValue.asString|asString(){}[0]
+    final fun asSymbol(): io.github.yuroyami.kitejs.api/JsSymbol // io.github.yuroyami.kitejs.api/JsValue.asSymbol|asSymbol(){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // io.github.yuroyami.kitejs.api/JsValue.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // io.github.yuroyami.kitejs.api/JsValue.hashCode|hashCode(){}[0]
+    final fun toKotlin(): kotlin/Any? // io.github.yuroyami.kitejs.api/JsValue.toKotlin|toKotlin(){}[0]
+    final fun toString(): kotlin/String // io.github.yuroyami.kitejs.api/JsValue.toString|toString(){}[0]
+
+    final object Companion { // io.github.yuroyami.kitejs.api/JsValue.Companion|null[0]
+        final val false // io.github.yuroyami.kitejs.api/JsValue.Companion.false|{}false[0]
+            final fun <get-false>(): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.api/JsValue.Companion.false.<get-false>|<get-false>(){}[0]
+        final val nullValue // io.github.yuroyami.kitejs.api/JsValue.Companion.nullValue|{}nullValue[0]
+            final fun <get-nullValue>(): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.api/JsValue.Companion.nullValue.<get-nullValue>|<get-nullValue>(){}[0]
+        final val true // io.github.yuroyami.kitejs.api/JsValue.Companion.true|{}true[0]
+            final fun <get-true>(): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.api/JsValue.Companion.true.<get-true>|<get-true>(){}[0]
+        final val undefined // io.github.yuroyami.kitejs.api/JsValue.Companion.undefined|{}undefined[0]
+            final fun <get-undefined>(): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.api/JsValue.Companion.undefined.<get-undefined>|<get-undefined>(){}[0]
+
+        final fun of(kotlin/Any?): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.api/JsValue.Companion.of|of(kotlin.Any?){}[0]
+        final fun wrap(kotlin/Any?): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.api/JsValue.Companion.wrap|wrap(kotlin.Any?){}[0]
+    }
+}
+
 final class io.github.yuroyami.kitejs.api/KBigInt : kotlin/Comparable<io.github.yuroyami.kitejs.api/KBigInt> { // io.github.yuroyami.kitejs.api/KBigInt|null[0]
     constructor <init>(kotlin/String, kotlin/Int) // io.github.yuroyami.kitejs.api/KBigInt.<init>|<init>(kotlin.String;kotlin.Int){}[0]
 
@@ -361,54 +418,6 @@ final class io.github.yuroyami.kitejs.api/PropertyFlags { // io.github.yuroyami.
         final fun <get-writable>(): kotlin/Boolean // io.github.yuroyami.kitejs.api/PropertyFlags.writable.<get-writable>|<get-writable>(){}[0]
 }
 
-final value class io.github.yuroyami.kitejs.api/JsValue { // io.github.yuroyami.kitejs.api/JsValue|null[0]
-    constructor <init>(kotlin/Any?) // io.github.yuroyami.kitejs.api/JsValue.<init>|<init>(kotlin.Any?){}[0]
-
-    final val isNull // io.github.yuroyami.kitejs.api/JsValue.isNull|{}isNull[0]
-        final fun <get-isNull>(): kotlin/Boolean // io.github.yuroyami.kitejs.api/JsValue.isNull.<get-isNull>|<get-isNull>(){}[0]
-    final val isNullish // io.github.yuroyami.kitejs.api/JsValue.isNullish|{}isNullish[0]
-        final fun <get-isNullish>(): kotlin/Boolean // io.github.yuroyami.kitejs.api/JsValue.isNullish.<get-isNullish>|<get-isNullish>(){}[0]
-    final val isUndefined // io.github.yuroyami.kitejs.api/JsValue.isUndefined|{}isUndefined[0]
-        final fun <get-isUndefined>(): kotlin/Boolean // io.github.yuroyami.kitejs.api/JsValue.isUndefined.<get-isUndefined>|<get-isUndefined>(){}[0]
-    final val raw // io.github.yuroyami.kitejs.api/JsValue.raw|{}raw[0]
-        final fun <get-raw>(): kotlin/Any? // io.github.yuroyami.kitejs.api/JsValue.raw.<get-raw>|<get-raw>(){}[0]
-    final val type // io.github.yuroyami.kitejs.api/JsValue.type|{}type[0]
-        final fun <get-type>(): io.github.yuroyami.kitejs.api/JsType // io.github.yuroyami.kitejs.api/JsValue.type.<get-type>|<get-type>(){}[0]
-    final val typeOf // io.github.yuroyami.kitejs.api/JsValue.typeOf|{}typeOf[0]
-        final fun <get-typeOf>(): kotlin/String // io.github.yuroyami.kitejs.api/JsValue.typeOf.<get-typeOf>|<get-typeOf>(){}[0]
-
-    final fun asArray(): io.github.yuroyami.kitejs.api/JsArray // io.github.yuroyami.kitejs.api/JsValue.asArray|asArray(){}[0]
-    final fun asArrayOrNull(): io.github.yuroyami.kitejs.api/JsArray? // io.github.yuroyami.kitejs.api/JsValue.asArrayOrNull|asArrayOrNull(){}[0]
-    final fun asBigInt(): io.github.yuroyami.kitejs.api/KBigInt // io.github.yuroyami.kitejs.api/JsValue.asBigInt|asBigInt(){}[0]
-    final fun asBoolean(): kotlin/Boolean // io.github.yuroyami.kitejs.api/JsValue.asBoolean|asBoolean(){}[0]
-    final fun asDouble(): kotlin/Double // io.github.yuroyami.kitejs.api/JsValue.asDouble|asDouble(){}[0]
-    final fun asFunction(): io.github.yuroyami.kitejs.api/JsFunction // io.github.yuroyami.kitejs.api/JsValue.asFunction|asFunction(){}[0]
-    final fun asFunctionOrNull(): io.github.yuroyami.kitejs.api/JsFunction? // io.github.yuroyami.kitejs.api/JsValue.asFunctionOrNull|asFunctionOrNull(){}[0]
-    final fun asInt(): kotlin/Int // io.github.yuroyami.kitejs.api/JsValue.asInt|asInt(){}[0]
-    final fun asLong(): kotlin/Long // io.github.yuroyami.kitejs.api/JsValue.asLong|asLong(){}[0]
-    final fun asObject(): io.github.yuroyami.kitejs.api/JsObject // io.github.yuroyami.kitejs.api/JsValue.asObject|asObject(){}[0]
-    final fun asObjectOrNull(): io.github.yuroyami.kitejs.api/JsObject? // io.github.yuroyami.kitejs.api/JsValue.asObjectOrNull|asObjectOrNull(){}[0]
-    final fun asString(): kotlin/String // io.github.yuroyami.kitejs.api/JsValue.asString|asString(){}[0]
-    final fun asSymbol(): io.github.yuroyami.kitejs.api/JsSymbol // io.github.yuroyami.kitejs.api/JsValue.asSymbol|asSymbol(){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // io.github.yuroyami.kitejs.api/JsValue.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // io.github.yuroyami.kitejs.api/JsValue.hashCode|hashCode(){}[0]
-    final fun toKotlin(): kotlin/Any? // io.github.yuroyami.kitejs.api/JsValue.toKotlin|toKotlin(){}[0]
-    final fun toString(): kotlin/String // io.github.yuroyami.kitejs.api/JsValue.toString|toString(){}[0]
-
-    final object Companion { // io.github.yuroyami.kitejs.api/JsValue.Companion|null[0]
-        final val false // io.github.yuroyami.kitejs.api/JsValue.Companion.false|{}false[0]
-            final fun <get-false>(): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.api/JsValue.Companion.false.<get-false>|<get-false>(){}[0]
-        final val nullValue // io.github.yuroyami.kitejs.api/JsValue.Companion.nullValue|{}nullValue[0]
-            final fun <get-nullValue>(): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.api/JsValue.Companion.nullValue.<get-nullValue>|<get-nullValue>(){}[0]
-        final val true // io.github.yuroyami.kitejs.api/JsValue.Companion.true|{}true[0]
-            final fun <get-true>(): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.api/JsValue.Companion.true.<get-true>|<get-true>(){}[0]
-        final val undefined // io.github.yuroyami.kitejs.api/JsValue.Companion.undefined|{}undefined[0]
-            final fun <get-undefined>(): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.api/JsValue.Companion.undefined.<get-undefined>|<get-undefined>(){}[0]
-
-        final fun of(kotlin/Any?): io.github.yuroyami.kitejs.api/JsValue // io.github.yuroyami.kitejs.api/JsValue.Companion.of|of(kotlin.Any?){}[0]
-    }
-}
-
 open class io.github.yuroyami.kitejs.api/KiteJsConfig { // io.github.yuroyami.kitejs.api/KiteJsConfig|null[0]
     constructor <init>() // io.github.yuroyami.kitejs.api/KiteJsConfig.<init>|<init>(){}[0]
 
@@ -424,6 +433,9 @@ open class io.github.yuroyami.kitejs.api/KiteJsConfig { // io.github.yuroyami.ki
     final var interruptWhen // io.github.yuroyami.kitejs.api/KiteJsConfig.interruptWhen|{}interruptWhen[0]
         final fun <get-interruptWhen>(): kotlin/Function0<kotlin/Boolean>? // io.github.yuroyami.kitejs.api/KiteJsConfig.interruptWhen.<get-interruptWhen>|<get-interruptWhen>(){}[0]
         final fun <set-interruptWhen>(kotlin/Function0<kotlin/Boolean>?) // io.github.yuroyami.kitejs.api/KiteJsConfig.interruptWhen.<set-interruptWhen>|<set-interruptWhen>(kotlin.Function0<kotlin.Boolean>?){}[0]
+    final var onUnhandledRejection // io.github.yuroyami.kitejs.api/KiteJsConfig.onUnhandledRejection|{}onUnhandledRejection[0]
+        final fun <get-onUnhandledRejection>(): kotlin/Function1<io.github.yuroyami.kitejs.api/JsValue, kotlin/Unit>? // io.github.yuroyami.kitejs.api/KiteJsConfig.onUnhandledRejection.<get-onUnhandledRejection>|<get-onUnhandledRejection>(){}[0]
+        final fun <set-onUnhandledRejection>(kotlin/Function1<io.github.yuroyami.kitejs.api/JsValue, kotlin/Unit>?) // io.github.yuroyami.kitejs.api/KiteJsConfig.onUnhandledRejection.<set-onUnhandledRejection>|<set-onUnhandledRejection>(kotlin.Function1<io.github.yuroyami.kitejs.api.JsValue,kotlin.Unit>?){}[0]
     final var sealBuiltins // io.github.yuroyami.kitejs.api/KiteJsConfig.sealBuiltins|{}sealBuiltins[0]
         final fun <get-sealBuiltins>(): kotlin/Boolean // io.github.yuroyami.kitejs.api/KiteJsConfig.sealBuiltins.<get-sealBuiltins>|<get-sealBuiltins>(){}[0]
         final fun <set-sealBuiltins>(kotlin/Boolean) // io.github.yuroyami.kitejs.api/KiteJsConfig.sealBuiltins.<set-sealBuiltins>|<set-sealBuiltins>(kotlin.Boolean){}[0]
@@ -487,6 +499,7 @@ final fun (io.github.yuroyami.kitejs.api/JsObject).io.github.yuroyami.kitejs.api
 final fun (io.github.yuroyami.kitejs.api/JsObject).io.github.yuroyami.kitejs.api/obj(kotlin/String, kotlin/Function1<io.github.yuroyami.kitejs.api/JsObject, kotlin/Unit> = ...): io.github.yuroyami.kitejs.api/JsObject // io.github.yuroyami.kitejs.api/obj|obj@io.github.yuroyami.kitejs.api.JsObject(kotlin.String;kotlin.Function1<io.github.yuroyami.kitejs.api.JsObject,kotlin.Unit>){}[0]
 final fun (io.github.yuroyami.kitejs.api/JsObject).io.github.yuroyami.kitejs.api/property(kotlin/String, kotlin/Any?, io.github.yuroyami.kitejs.api/PropertyFlags = ...) // io.github.yuroyami.kitejs.api/property|property@io.github.yuroyami.kitejs.api.JsObject(kotlin.String;kotlin.Any?;io.github.yuroyami.kitejs.api.PropertyFlags){}[0]
 final fun (io.github.yuroyami.kitejs.api/JsObject).io.github.yuroyami.kitejs.api/setter(kotlin/String, io.github.yuroyami.kitejs.api/PropertyFlags = ..., kotlin/Function1<io.github.yuroyami.kitejs.api/JsValue, kotlin/Unit>) // io.github.yuroyami.kitejs.api/setter|setter@io.github.yuroyami.kitejs.api.JsObject(kotlin.String;io.github.yuroyami.kitejs.api.PropertyFlags;kotlin.Function1<io.github.yuroyami.kitejs.api.JsValue,kotlin.Unit>){}[0]
+final fun (io.github.yuroyami.kitejs.api/KiteJs).io.github.yuroyami.kitejs.api/newError(kotlin/String, kotlin/String): io.github.yuroyami.kitejs.api/JsObject // io.github.yuroyami.kitejs.api/newError|newError@io.github.yuroyami.kitejs.api.KiteJs(kotlin.String;kotlin.String){}[0]
 final fun (io.github.yuroyami.kitejs.api/KiteJs).io.github.yuroyami.kitejs.api/newPromise(): io.github.yuroyami.kitejs.api/JsPromiseHandle // io.github.yuroyami.kitejs.api/newPromise|newPromise@io.github.yuroyami.kitejs.api.KiteJs(){}[0]
 final fun (io.github.yuroyami.kitejs.api/KiteJs).io.github.yuroyami.kitejs.api/onSettled(io.github.yuroyami.kitejs.api/JsValue, kotlin/Function2<io.github.yuroyami.kitejs.api/JsValue, io.github.yuroyami.kitejs.api/JsValue?, kotlin/Unit>): kotlin/Boolean // io.github.yuroyami.kitejs.api/onSettled|onSettled@io.github.yuroyami.kitejs.api.KiteJs(io.github.yuroyami.kitejs.api.JsValue;kotlin.Function2<io.github.yuroyami.kitejs.api.JsValue,io.github.yuroyami.kitejs.api.JsValue?,kotlin.Unit>){}[0]
 final fun <#A: io.github.yuroyami.kitejs.api/KiteJsConfig> io.github.yuroyami.kitejs.api/KiteJs(io.github.yuroyami.kitejs.api/JsEngine<#A>, kotlin/Function1<#A, kotlin/Unit> = ...): io.github.yuroyami.kitejs.api/KiteJs // io.github.yuroyami.kitejs.api/KiteJs|KiteJs(io.github.yuroyami.kitejs.api.JsEngine<0:0>;kotlin.Function1<0:0,kotlin.Unit>){0§<io.github.yuroyami.kitejs.api.KiteJsConfig>}[0]
