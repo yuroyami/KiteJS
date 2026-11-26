@@ -69,7 +69,9 @@ internal external interface KiteGlue : JsAny {
     fun cbThis(e: Int): Int
     fun cbArg(e: Int, index: Int): Int
     fun newRegistry(release: (Int) -> Unit): JsAny?
-    fun watch(registry: JsAny, owner: JsAny, handle: Int)
+    /** Answers the token that [unwatch] takes. */
+    fun watch(registry: JsAny, owner: JsAny, handle: Int): JsAny
+    fun unwatch(registry: JsAny, token: JsAny)
 }
 
 /** A promise, as far as waiting for one goes. */
@@ -190,10 +192,16 @@ internal actual class HandleCleaner actual constructor(release: (Int) -> Unit) {
     /** Null where there is no FinalizationRegistry; handles then live until the engine closes. */
     private val registry: JsAny? = glue.newRegistry(release)
 
-    actual fun register(owner: Any, handle: Int): Any? {
-        registry?.let { glue.watch(it, owner.toJsReference(), handle) }
-        return null
-    }
+    /** The unregister token of one watch, in a Kotlin class, since Wasm cannot type-check a JsAny. */
+    private class Watch(val token: JsAny)
+
+    actual fun register(owner: Any, handle: Int): Any? =
+        registry?.let { Watch(glue.watch(it, owner.toJsReference(), handle)) }
 
     actual fun poll() {}
+
+    actual fun cancel(watch: Any?) {
+        val r = registry ?: return
+        if (watch is Watch) glue.unwatch(r, watch.token)
+    }
 }

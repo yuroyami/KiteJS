@@ -52,6 +52,14 @@ class QuickJsOnlyTest : EngineContract<QuickJsConfig>(QuickJs) {
         assertEquals(2, js.evaluate("1 + 1").asInt())
     }
 
+    /** Without close, the dead scripts fill the limit before the host's collector takes them, near run 190. */
+    @Test
+    fun aClosedScriptGivesItsMemoryBackAtOnce() = withEngine({ memoryLimit = 16L shl 20 }) { js ->
+        val source = "(function () { var x = 0; " + "x += 1; ".repeat(8000) + "return x })()"
+        val bytes = js.compile(source).use { it.bytecode()!! }
+        repeat(600) { assertEquals(8000, js.loadBytecode(bytes).use { it.run() }.asInt()) }
+    }
+
     @Test
     fun aFailedCollectionConversionReleasesItsTemporaryHandles() = withEngine({ memoryLimit = 4L * 1024 * 1024 }) { js ->
         val refused = listOf("x".repeat(128 * 1024), object {})

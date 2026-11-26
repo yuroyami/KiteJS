@@ -134,8 +134,15 @@ internal actual class HandleCleaner actual constructor(private val release: (Int
     private class Watch(owner: Any, queue: ReferenceQueue<Any>, val handle: Int) : PhantomReference<Any>(owner, queue)
 
     actual fun register(owner: Any, handle: Int): Any? {
-        live += Watch(owner, queue, handle)
-        return null
+        val watch = Watch(owner, queue, handle)
+        live += watch
+        return watch
+    }
+
+    actual fun cancel(watch: Any?) {
+        if (watch !is Watch) return
+        live -= watch
+        watch.clear()
     }
 
     actual fun poll() {

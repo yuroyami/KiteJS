@@ -235,7 +235,12 @@ internal const val GLUE: String = """(function () {
         cbThis: function (e) { return exports.kite_cb_this(e); },
         cbArg: function (e, i) { return exports.kite_cb_arg(e, i); },
 
-        watch: function (registry, owner, handle) { registry.register(owner, handle); },
+        watch: function (registry, owner, handle) {
+            var token = {};
+            registry.register(owner, handle, token);
+            return token;
+        },
+        unwatch: function (registry, token) { registry.unregister(token); },
         newRegistry: function (release) {
             return typeof FinalizationRegistry === 'function' ? new FinalizationRegistry(release) : null;
         },

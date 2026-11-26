@@ -191,8 +191,15 @@ public abstract class JsSymbol @InternalKiteJsApi constructor() {
     abstract override fun hashCode(): Int
 }
 
-/** A parsed script, ready to run more than once. */
-public abstract class JsScript @InternalKiteJsApi constructor() {
+/**
+ * A parsed script, ready to run more than once.
+ *
+ * On QuickJS the compiled script lives in the engine's own memory, which counts against
+ * `memoryLimit`. Without [close], that memory comes back only after the host's garbage collector
+ * has taken this object, which can be long after a native budget runs out. So close a script when
+ * you are done with it, or use `use { }`, above all when you compile or load scripts in a loop.
+ */
+public abstract class JsScript @InternalKiteJsApi constructor() : AutoCloseable {
 
     /** Runs it in the engine's global scope. The answer is its last expression's value. */
     public abstract fun run(): JsValue
@@ -209,4 +216,11 @@ public abstract class JsScript @InternalKiteJsApi constructor() {
      */
     @Throws(JsException::class)
     public open fun bytecode(): ByteArray? = null
+
+    /**
+     * Releases the compiled script now. A script that is closed throws a [JsEngineError] when it
+     * runs or writes its bytecode. Closing it again, or after its engine is closed, does nothing.
+     * Only the engine's thread can close it, as for every other call into the engine.
+     */
+    abstract override fun close()
 }

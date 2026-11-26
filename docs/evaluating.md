@@ -151,6 +151,17 @@ for (order in orders) {
 }
 ```
 
+On QuickJS a compiled script lives in the engine's own memory, which counts against
+`memoryLimit`. That memory comes back only after the host's garbage collector takes the
+`JsScript`, which can be too late for a small limit. Close a script when you are done with it, or
+run it inside `use { }`:
+
+```kotlin
+js.compile(source, "step.js").use { it.run() }
+```
+
+A closed script throws a `JsEngineError` when it runs. Closing it again does nothing.
+
 ## Running the same script in many engines
 
 A `JsScript` belongs to its engine. To skip the parse in other engines, keep its bytecode and load

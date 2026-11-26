@@ -7,6 +7,7 @@ package io.github.yuroyami.kitejs.testkit
 import io.github.yuroyami.kitejs.api.JsEngine
 import io.github.yuroyami.kitejs.api.JsEngineError
 import io.github.yuroyami.kitejs.api.JsError
+import io.github.yuroyami.kitejs.api.JsScript
 import io.github.yuroyami.kitejs.api.JsType
 import io.github.yuroyami.kitejs.api.JsValue
 import io.github.yuroyami.kitejs.api.KiteJsConfig
@@ -167,6 +168,31 @@ public abstract class HandlesContract<C : KiteJsConfig>(engine: JsEngine<C>) : E
         script.run()
         script.run()
         assertEquals(3.0, script.run().asDouble())
+    }
+
+    @Test
+    public fun aClosedScriptRefusesToRunAndClosingItAgainDoesNothing(): TestResult = withEngine { js ->
+        val script = js.compile("6 * 7")
+        assertEquals(42, script.use { it.run().asInt() })
+        assertFailsWith<JsEngineError> { script.run() }
+        assertFailsWith<JsEngineError> { script.bytecode() }
+        script.close()
+        assertEquals(2, js.evaluate("1 + 1").asInt())
+    }
+
+    @Test
+    public fun aScriptThatIsClosedWhileItRunsFinishesTheRun(): TestResult = withEngine { js ->
+        lateinit var script: JsScript
+        js.global.function("closeIt") { _ -> script.close() }
+        script = js.compile("closeIt(); 'done'")
+        assertEquals("done", script.run().asString())
+        assertFailsWith<JsEngineError> { script.run() }
+    }
+
+    @Test
+    public fun closingAScriptAfterItsEngineDoesNothing(): TestResult = test {
+        val script = open().use { it.compile("1") }
+        script.close()
     }
 
     @Test

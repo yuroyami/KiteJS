@@ -54,6 +54,8 @@ import io.github.yuroyami.kitejs.quickjs.cinterop.kite_type
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_version
 import kotlin.experimental.ExperimentalNativeApi
 import kotlin.native.concurrent.ThreadLocal
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.native.ref.Cleaner
 import kotlin.native.ref.createCleaner
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -211,10 +213,20 @@ internal actual fun currentThreadToken(): Any = ThreadToken
 
 @OptIn(ExperimentalNativeApi::class)
 internal actual class HandleCleaner actual constructor(private val release: (Int) -> Unit) {
-    actual fun register(owner: Any, handle: Int): Any? =
-        createCleaner(Pending(release, handle)) { it.release(it.handle) }
+    actual fun register(owner: Any, handle: Int): Any? {
+        val pending = Pending(release, AtomicInt(handle))
+        return Watch(pending, createCleaner(pending) { p -> p.handle.exchange(-1).let { if (it >= 0) p.release(it) } })
+    }
 
-    private class Pending(val release: (Int) -> Unit, val handle: Int)
+    /** The handle is -1 once the watch is cancelled. The cleaner runs on another thread, hence the atomic. */
+    private class Pending(val release: (Int) -> Unit, val handle: AtomicInt)
+
+    /** Keeps the cleaner reachable from the owner, as Kotlin/Native runs a cleaner once the cleaner itself is collected. */
+    private class Watch(val pending: Pending, @Suppress("unused") val cleaner: Cleaner)
 
     actual fun poll() {}
+
+    actual fun cancel(watch: Any?) {
+        if (watch is Watch) watch.pending.handle.store(-1)
+    }
 }

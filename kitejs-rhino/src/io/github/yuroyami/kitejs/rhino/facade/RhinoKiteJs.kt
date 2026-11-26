@@ -152,6 +152,8 @@ internal class RhinoKiteJs private constructor(
     /** True when this engine is open and this is its thread, so its handles can be used here. */
     val isUsableHere: Boolean get() = !closed && Context.getCurrentContext() === cx
 
+    val isClosed: Boolean get() = closed
+
     /**
      * Runs [body] as a call from the host: on this engine's thread, with what it throws in the
      * API's shape. The outermost call is one call to the instruction budget and, when [drain] is

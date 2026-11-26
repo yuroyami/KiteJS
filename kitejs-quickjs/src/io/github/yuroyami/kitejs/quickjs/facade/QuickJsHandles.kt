@@ -194,8 +194,11 @@ internal class QuickJsSymbol(
     override fun hashCode(): Int = identity.hashCode()
 }
 
-internal class QuickJsScript(private val engine: QuickJsKiteJs, val handle: Int) : JsScript() {
-    @Suppress("unused")
+internal class QuickJsScript(private val engine: QuickJsKiteJs, handle: Int) : JsScript() {
+    /** The compiled function, or -1 once the script is closed. */
+    var handle: Int = handle
+        private set
+
     private val cleanup = engine.register(this, handle)
 
     override fun run(): JsValue = engine.run(this)
@@ -203,4 +206,10 @@ internal class QuickJsScript(private val engine: QuickJsKiteJs, val handle: Int)
     override suspend fun runPausing(slice: Duration): JsValue = engine.runPausing(this, slice)
 
     override fun bytecode(): ByteArray = engine.bytecode(this)
+
+    override fun close() {
+        if (handle < 0) return
+        engine.closeScript(cleanup, handle)
+        handle = -1
+    }
 }

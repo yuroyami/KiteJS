@@ -229,6 +229,20 @@ internal class RhinoSymbol(override val engine: RhinoKiteJs, val key: SymbolKey)
     override fun hashCode(): Int = key.hashCode()
 }
 
-internal class RhinoScript(private val engine: RhinoKiteJs, private val script: Script) : JsScript() {
-    override fun run(): JsValue = engine.run(script)
+internal class RhinoScript(private val engine: RhinoKiteJs, private var script: Script?) : JsScript() {
+    override fun run(): JsValue = engine.run(script ?: throw closedError())
+
+    /** Rhino has no bytecode, but a closed script still says it is closed. */
+    override fun bytecode(): ByteArray? = if (script == null) throw closedError() else null
+
+    private fun closedError() = JsEngineError("this script is closed")
+
+    /** Rhino's script is an ordinary object, so closing only lets it go. */
+    override fun close() {
+        if (script == null) return
+        if (!engine.isClosed && !engine.isUsableHere) {
+            throw JsEngineError("this engine belongs to the thread that opened it; use it and close it there")
+        }
+        script = null
+    }
 }

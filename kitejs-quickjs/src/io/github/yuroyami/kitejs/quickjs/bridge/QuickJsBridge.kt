@@ -131,4 +131,10 @@ internal expect class HandleCleaner(release: (Int) -> Unit) {
 
     /** Hands over what has been collected, where the platform has to be asked. Engine thread only. */
     fun poll()
+
+    /**
+     * Stops the watch that [register] answered [watch] for, so its handle is not released twice
+     * when the host has released it itself. Engine thread only.
+     */
+    fun cancel(watch: Any?)
 }

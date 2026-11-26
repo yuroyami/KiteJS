@@ -138,10 +138,25 @@ internal class QuickJsKiteJs private constructor(
         QuickJsScript(this, compileHandle(source, fileName))
     }
 
-    fun run(script: QuickJsScript): JsValue = call { toJs(check(bridge.run(ptr, script.handle))) }
+    fun run(script: QuickJsScript): JsValue = call { toJs(check(bridge.run(ptr, open(script)))) }
 
     fun bytecode(script: QuickJsScript): ByteArray = call(drain = false) {
-        bridge.writeScript(ptr, script.handle) ?: raise()
+        bridge.writeScript(ptr, open(script)) ?: raise()
+    }
+
+    /** The compiled function of [script], which has to be open. */
+    private fun open(script: QuickJsScript): Int =
+        script.handle.takeIf { it >= 0 } ?: throw JsEngineError("this script is closed")
+
+    /**
+     * Releases a script's [handle] now and stops the watch on it, or does nothing on a closed engine.
+     * A run of the script in progress keeps its own reference.
+     */
+    fun closeScript(watch: Any?, handle: Int) {
+        if (closed) return
+        if (currentThreadToken() !== owner) throw wrongThread()
+        cleaner.cancel(watch)
+        bridge.release(ptr, handle)
     }
 
     override fun loadBytecode(bytecode: ByteArray): JsScript = call(drain = false) {
@@ -169,7 +184,7 @@ internal class QuickJsKiteJs private constructor(
 
     suspend fun runPausing(script: QuickJsScript, slice: Duration): JsValue {
         if (!canPauseNow()) return run(script)
-        return pausingCall(slice) { toJs(check(pausable { bridge.runPausing(ptr, script.handle) })) }
+        return pausingCall(slice) { toJs(check(pausable { bridge.runPausing(ptr, open(script)) })) }
     }
 
     /** Whether a run may pause now: one pausing run at a time in the module, as they share one native stack. */

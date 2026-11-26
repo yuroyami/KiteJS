@@ -171,9 +171,10 @@ public final class io/github/yuroyami/kitejs/api/JsPromiseSupportKt {
 	public static final fun onSettled-kGFlo64 (Lio/github/yuroyami/kitejs/api/KiteJs;Ljava/lang/Object;Lkotlin/jvm/functions/Function2;)Z
 }
 
-public abstract class io/github/yuroyami/kitejs/api/JsScript {
+public abstract class io/github/yuroyami/kitejs/api/JsScript : java/lang/AutoCloseable {
 	public fun <init> ()V
 	public fun bytecode ()[B
+	public abstract fun close ()V
 	public abstract fun run-msBJVuE ()Ljava/lang/Object;
 	public fun runPausing-rFnFneQ (JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun runPausing-rFnFneQ$default (Lio/github/yuroyami/kitejs/api/JsScript;JLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
