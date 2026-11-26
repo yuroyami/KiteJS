@@ -778,3 +778,14 @@
          default:
              abort();
          }
+--- a/quickjs.c
++++ b/quickjs.c
+@@ -2894,6 +2894,8 @@
+     ctx->class_proto = js_malloc_rt(rt, sizeof(ctx->class_proto[0]) *
+                                     rt->class_count);
+     if (!ctx->class_proto) {
++        /* KiteJS: the context is already on the GC list, which JS_FreeRuntime walks */
++        remove_gc_object(&ctx->header);
+         js_free_rt(rt, ctx);
+         return NULL;
+     }

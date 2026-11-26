@@ -39,6 +39,12 @@ KITEJS_PROFILE=true KITEJS_ASM_FILE=/path/to/module.js ./kotlin test -m kitejs-r
 
 kitejs-quickjs compiles C code. It needs [zig](https://ziglang.org) on the `PATH`, or its path in `ZIG`. For Android it also needs an NDK in `ANDROID_NDK_HOME` or in the Android SDK. The web tests need Node 26 or later and npm.
 
+The C glue of kitejs-quickjs has one test of its own. It fails each allocation that `kite_new` makes, one at a time, under AddressSanitizer. It needs a C compiler with AddressSanitizer as `cc`, or in `CC`:
+
+```sh
+kitejs-quickjs/native/test/run.sh
+```
+
 ### Produce a replay artifact
 
 Run these commands from the repository root, with Python 3.11 or later:

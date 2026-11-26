@@ -78,6 +78,8 @@ jobs:
         run: ./kotlin build -m kitejs-quickjs -m kitejs-quickjs-android-natives -p jvm -p android -p js -p wasmJs -p linuxX64 -p linuxArm64 -p mingwX64
       - name: Test (JVM, Android host tests, Linux)
         run: ./kotlin test -m kitejs-quickjs -p jvm -p android -p linuxX64
+      - name: Test the C glue when an allocation fails
+        run: kitejs-quickjs/native/test/run.sh
       - name: Test (JavaScript and Wasm on Node)
         run: python3 tools/web-tests/run.py --module kitejs-quickjs
       - name: Check the public JVM API
