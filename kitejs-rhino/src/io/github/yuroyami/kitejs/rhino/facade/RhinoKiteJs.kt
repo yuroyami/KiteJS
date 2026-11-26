@@ -60,6 +60,7 @@ internal class RhinoKiteJs private constructor(
     private val factory: EngineFactory,
     internal val cx: Context,
     internal val scope: ScriptableObject,
+    private val onUnhandledRejection: ((JsValue) -> Unit)?,
 ) : KiteJs() {
 
     private var closed = false
@@ -176,10 +177,16 @@ internal class RhinoKiteJs private constructor(
                 val out = try {
                     inTopCall(top, body)
                 } catch (e: Throwable) {
-                    if (drain && !factory.stopped && isScriptError(e)) drainAfterScriptError()
+                    if (drain && !factory.stopped && isScriptError(e)) {
+                        drainAfterScriptError()
+                        if (!factory.stopped) reportRejections()
+                    }
                     throw e
                 }
-                if (drain) cx.processMicrotasks()
+                if (drain) {
+                    cx.processMicrotasks()
+                    reportRejections()
+                }
                 out
             }
         } catch (e: Throwable) {
@@ -219,8 +226,24 @@ internal class RhinoKiteJs private constructor(
             if (factory.stopped) {
                 factory.stopped = false
                 cx.discardMicrotasks()
+                cx.unhandledPromiseTracker.process { }
             }
             throw e
+        }
+    }
+
+    /** Hands each rejection that no handler took to the hook, which may throw nothing that counts. */
+    private fun reportRejections() {
+        val hook = onUnhandledRejection ?: return
+        // A copy first, since the hook can run script that rejects more promises.
+        val reasons = cx.unhandledPromiseTracker.enumerate()
+        cx.unhandledPromiseTracker.process { }
+        for (reason in reasons) {
+            try {
+                hook(toJs(reason))
+            } catch (e: Throwable) {
+                // Ignored, as the configuration says.
+            }
         }
     }
 
@@ -413,7 +436,8 @@ internal class RhinoKiteJs private constructor(
                     if (config.safeBuiltins) cx.initSafeStandardObjects(null, config.sealBuiltins)
                     else cx.initStandardObjects(null, config.sealBuiltins)
                 config.console?.let { NativeConsole.init(scope, config.sealBuiltins, consoleOf(it)) }
-                RhinoKiteJs(factory, cx, scope)
+                if (config.onUnhandledRejection != null) cx.trackUnhandledPromiseRejections(true)
+                RhinoKiteJs(factory, cx, scope, config.onUnhandledRejection)
             } catch (e: Throwable) {
                 Context.exit()
                 throw when (e) {

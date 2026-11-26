@@ -38,6 +38,26 @@ if (promise.isThenable) {
 
 There is no `async`/`await`. See [Differences from a browser](differences.md).
 
+## Rejections nobody handles
+
+A browser prints "Uncaught (in promise)" for a rejected promise that has no handler. To hear about
+one in Kotlin, set `onUnhandledRejection`:
+
+```kotlin
+KiteJs(QuickJs) {
+    onUnhandledRejection = { reason -> failures += reason.toString() }
+}.use { js ->
+    js.evaluate("Promise.reject(new Error('x'))")   // failures holds "Error: x"
+}
+```
+
+- The hook runs when an outermost call has drained its reactions, so a handler that the same call
+  adds later, in a reaction, still counts.
+- It runs on the engine's thread, after the script. It can read the reason, and an exception that
+  it throws is ignored.
+- When the budget or the interrupt hook stops a script, its rejections are dropped with its
+  reactions and are not reported.
+
 ## The suspending API
 
 `kitejs-coroutines` is a separate artifact. Add it when you want the engine from suspending code.

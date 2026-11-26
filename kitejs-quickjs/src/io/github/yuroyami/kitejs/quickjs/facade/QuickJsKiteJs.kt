@@ -282,6 +282,7 @@ internal class QuickJsKiteJs private constructor(
                 throw failure
             }
             stopError()?.let { throw it }
+            if (outermost && drain) reportRejections()
             return result
         } catch (e: Throwable) {
             if (!outermost) throw e
@@ -294,6 +295,7 @@ internal class QuickJsKiteJs private constructor(
                     if (bridge.stopReason(ptr) != QuickJsBridge.STOP_NONE) break
                 }
                 hostFailure = null
+                if (bridge.stopReason(ptr) == QuickJsBridge.STOP_NONE) reportRejections()
             }
             if (bridge.stopReason(ptr) != QuickJsBridge.STOP_NONE) bridge.discardJobs(ptr)
             throw when (e) {
@@ -307,6 +309,24 @@ internal class QuickJsKiteJs private constructor(
 
     private fun wrongThread(): JsEngineError =
         JsEngineError("this engine belongs to the thread that opened it; use it and close it there")
+
+    /**
+     * Hands each rejection that no handler took to the hook, still inside the outermost call, so
+     * the hook can read the reason. What the hook throws is ignored.
+     */
+    private fun reportRejections() {
+        val hook = config.onUnhandledRejection ?: return
+        while (true) {
+            val h = bridge.takeRejection(ptr)
+            if (h < 0) return
+            try {
+                hook(toJs(h))
+            } catch (e: Throwable) {
+                // Ignored, as the configuration says.
+            }
+            hostFailure = null
+        }
+    }
 
     /** Frees what the collector took and forgets the host functions QuickJS let go of. */
     private fun sweep() {
@@ -670,6 +690,7 @@ internal class QuickJsKiteJs private constructor(
     private fun start() {
         var options = QuickJsBridge.OPT_TIME_ZONE
         if (config.clock != null) options = options or QuickJsBridge.OPT_CLOCK
+        if (config.onUnhandledRejection != null) options = options or QuickJsBridge.OPT_REJECTIONS
         ptr = bridge.newEngine(id, config.memoryLimit.toDouble(), config.maxStackSize.toDouble(), options)
         if (ptr == 0L) throw JsEngineError("QuickJS could not start")
         call(drain = false) {

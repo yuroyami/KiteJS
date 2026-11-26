@@ -63,6 +63,7 @@ internal external interface KiteGlue : JsAny {
     fun construct(e: Int, fn: Int): Int
     fun drain(e: Int): Int
     fun discardJobs(e: Int)
+    fun takeRejection(e: Int): Int
     fun exception(e: Int): Int
     fun newFunction(e: Int, fn: Int, name: String, arity: Int): Int
     fun deadFunction(e: Int): Int
@@ -144,6 +145,7 @@ private object WebBridge : QuickJsBridge {
     override fun construct(e: Long, fn: Int): Int = glue.construct(e.toInt(), fn)
     override fun drain(e: Long): Int = glue.drain(e.toInt())
     override fun discardJobs(e: Long) = glue.discardJobs(e.toInt())
+    override fun takeRejection(e: Long): Int = glue.takeRejection(e.toInt())
     override fun exception(e: Long): Int = glue.exception(e.toInt())
     override fun newFunction(e: Long, fn: Int, name: String, arity: Int): Int = glue.newFunction(e.toInt(), fn, name, arity)
     override fun deadFunction(e: Long): Int = glue.deadFunction(e.toInt())

@@ -332,6 +332,11 @@ JNIEXPORT void JNICALL NATIVE(discardJobs)(JNIEnv *env, jclass cls, jlong e)
     kite_discard_jobs(ENGINE(e));
 }
 
+JNIEXPORT jint JNICALL NATIVE(takeRejection)(JNIEnv *env, jclass cls, jlong e)
+{
+    return kite_take_rejection(ENGINE(e));
+}
+
 JNIEXPORT jint JNICALL NATIVE(exception)(JNIEnv *env, jclass cls, jlong e)
 {
     return kite_exception(ENGINE(e));

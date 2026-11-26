@@ -47,6 +47,7 @@ import io.github.yuroyami.kitejs.quickjs.cinterop.kite_run
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_set_budget
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_set_host
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_stop_reason
+import io.github.yuroyami.kitejs.quickjs.cinterop.kite_take_rejection
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_string
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_string_free
 import io.github.yuroyami.kitejs.quickjs.cinterop.kite_string_length
@@ -182,6 +183,7 @@ private object NativeBridge : QuickJsBridge {
     override fun construct(e: Long, fn: Int): Int = kite_construct(e(e), fn)
     override fun drain(e: Long): Int = kite_drain(e(e))
     override fun discardJobs(e: Long) = kite_discard_jobs(e(e))
+    override fun takeRejection(e: Long): Int = kite_take_rejection(e(e))
     override fun exception(e: Long): Int = kite_exception(e(e))
 
     override fun newFunction(e: Long, fn: Int, name: String, arity: Int): Int =

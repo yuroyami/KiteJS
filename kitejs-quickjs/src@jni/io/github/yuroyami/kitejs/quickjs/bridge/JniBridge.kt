@@ -44,6 +44,7 @@ internal object JniNatives {
     @JvmStatic external fun construct(e: Long, fn: Int): Int
     @JvmStatic external fun drain(e: Long): Int
     @JvmStatic external fun discardJobs(e: Long)
+    @JvmStatic external fun takeRejection(e: Long): Int
     @JvmStatic external fun exception(e: Long): Int
     @JvmStatic external fun newFunction(e: Long, fn: Int, name: String, arity: Int): Int
     @JvmStatic external fun deadFunction(e: Long): Int
@@ -106,6 +107,7 @@ private object JniBridge : QuickJsBridge {
     override fun construct(e: Long, fn: Int): Int = JniNatives.construct(e, fn)
     override fun drain(e: Long): Int = JniNatives.drain(e)
     override fun discardJobs(e: Long) = JniNatives.discardJobs(e)
+    override fun takeRejection(e: Long): Int = JniNatives.takeRejection(e)
     override fun exception(e: Long): Int = JniNatives.exception(e)
     override fun newFunction(e: Long, fn: Int, name: String, arity: Int): Int = JniNatives.newFunction(e, fn, name, arity)
     override fun deadFunction(e: Long): Int = JniNatives.deadFunction(e)

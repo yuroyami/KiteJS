@@ -70,6 +70,9 @@ internal interface QuickJsBridge {
     fun construct(e: Long, fn: Int): Int
     fun drain(e: Long): Int
     fun discardJobs(e: Long)
+
+    /** The reason of the oldest rejection that no handler took, or -1. Needs [OPT_REJECTIONS]. */
+    fun takeRejection(e: Long): Int
     fun exception(e: Long): Int
 
     fun newFunction(e: Long, fn: Int, name: String, arity: Int): Int
@@ -106,6 +109,7 @@ internal interface QuickJsBridge {
         const val OPT_CLOCK = 1
         const val OPT_TIME_ZONE = 2
         const val OPT_INTERRUPT = 4
+        const val OPT_REJECTIONS = 8
     }
 }
 

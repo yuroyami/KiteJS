@@ -358,12 +358,14 @@ public class io/github/yuroyami/kitejs/api/KiteJsConfig {
 	public final fun getConsole ()Lio/github/yuroyami/kitejs/api/ConsolePrinter;
 	public final fun getInstructionBudget ()I
 	public final fun getInterruptWhen ()Lkotlin/jvm/functions/Function0;
+	public final fun getOnUnhandledRejection ()Lkotlin/jvm/functions/Function1;
 	public final fun getSealBuiltins ()Z
 	public final fun getTimeZone ()Lkotlinx/datetime/TimeZone;
 	public final fun setClock (Lkotlin/jvm/functions/Function0;)V
 	public final fun setConsole (Lio/github/yuroyami/kitejs/api/ConsolePrinter;)V
 	public final fun setInstructionBudget (I)V
 	public final fun setInterruptWhen (Lkotlin/jvm/functions/Function0;)V
+	public final fun setOnUnhandledRejection (Lkotlin/jvm/functions/Function1;)V
 	public final fun setSealBuiltins (Z)V
 	public final fun setTimeZone (Lkotlinx/datetime/TimeZone;)V
 }

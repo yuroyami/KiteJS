@@ -119,6 +119,7 @@ These work on both engines:
 | `instructionBudget` | How many instructions one call may run before the engine gives up |
 | `interruptWhen` | Asked now and then while a script runs. Answer `true` to stop it |
 | `sealBuiltins` | Makes the built-ins read only, so a script cannot replace `Array.prototype.push` |
+| `onUnhandledRejection` | Told about each rejected promise that has no handler |
 
 These are Rhino's own:
 

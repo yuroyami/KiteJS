@@ -60,6 +60,7 @@ typedef struct KiteEngine KiteEngine;
 #define KITE_OPT_CLOCK 1      /* Date.now() asks the host */
 #define KITE_OPT_TIME_ZONE 2  /* local time asks the host */
 #define KITE_OPT_INTERRUPT 4  /* the host is asked now and then whether to stop */
+#define KITE_OPT_REJECTIONS 8 /* rejections that no handler takes are kept for kite_take_rejection */
 
 /*
  * Calls host function [fn] with [argc] arguments, read with kite_cb_this and kite_cb_arg before
@@ -157,6 +158,10 @@ int32_t kite_construct(KiteEngine *e, int32_t fn);
 /* Runs pending jobs until there are none (0) or one fails (-1). */
 int32_t kite_drain(KiteEngine *e);
 void kite_discard_jobs(KiteEngine *e);
+
+/* The reason of the oldest rejection that still has no handler, which it forgets, or -1 when
+ * there is none. Needs KITE_OPT_REJECTIONS. kite_discard_jobs forgets them all. */
+int32_t kite_take_rejection(KiteEngine *e);
 int32_t kite_exception(KiteEngine *e);
 
 /* A host function: calling it calls the host with [fn]. */

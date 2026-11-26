@@ -36,6 +36,57 @@ public abstract class PromisesContract<C : KiteJsConfig>(engine: JsEngine<C>) : 
     }
 
     @Test
+    public fun anUnhandledRejectionReachesTheHook(): TestResult = test {
+        val reasons = ArrayList<String>()
+        open { onUnhandledRejection = { reasons += it.asObject()["message"].asString() } }.use { js ->
+            js.evaluate("Promise.reject(new Error('x'))")
+            assertEquals(listOf("x"), reasons)
+            // Each rejection is reported once.
+            js.evaluate("1")
+            assertEquals(listOf("x"), reasons)
+        }
+    }
+
+    @Test
+    public fun aRejectionWithAHandlerIsNotReported(): TestResult = test {
+        val reasons = ArrayList<JsValue>()
+        open { onUnhandledRejection = { reasons += it } }.use { js ->
+            js.evaluate("Promise.reject(1).catch(function () {})")
+            // A handler that a reaction of the same call adds still counts.
+            js.evaluate("var p = Promise.reject(2); Promise.resolve().then(function () { p.catch(function () {}) })")
+            assertEquals(emptyList(), reasons)
+        }
+    }
+
+    @Test
+    public fun theRejectionHookIsReadAfterAScriptThatThrewAndWhatItThrowsIsIgnored(): TestResult = test {
+        var calls = 0
+        open {
+            onUnhandledRejection = {
+                calls++
+                throw IllegalStateException("ignored")
+            }
+        }.use { js ->
+            assertFailsWith<JsError> { js.evaluate("Promise.reject(3); throw new Error('after')") }
+            assertEquals(1, calls)
+            assertEquals(2, js.evaluate("1 + 1").asInt())
+        }
+    }
+
+    @Test
+    public fun aStoppedScriptReportsNoRejection(): TestResult = test {
+        var calls = 0
+        open {
+            instructionBudget = 100_000
+            onUnhandledRejection = { calls++ }
+        }.use { js ->
+            assertFailsWith<JsEngineError> { js.evaluate("Promise.reject(4); for (;;) {}") }
+            js.evaluate("1")
+            assertEquals(0, calls)
+        }
+    }
+
+    @Test
     public fun theReactionsOfACallThatThrewRunBeforeItReturns(): TestResult = withEngine { js ->
         assertFailsWith<JsError> {
             js.evaluate("globalThis.log = []; Promise.resolve().then(function () { log.push('reaction') }); throw new Error('boom')")

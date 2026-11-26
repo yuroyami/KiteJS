@@ -226,6 +226,7 @@ internal const val GLUE: String = """(function () {
         construct: function (e, fn) { return exports.kite_construct(e, fn); },
         drain: function (e) { return exports.kite_drain(e); },
         discardJobs: function (e) { exports.kite_discard_jobs(e); },
+        takeRejection: function (e) { return exports.kite_take_rejection(e); },
         exception: function (e) { return exports.kite_exception(e); },
 
         newFunction: function (e, fn, name, arity) {

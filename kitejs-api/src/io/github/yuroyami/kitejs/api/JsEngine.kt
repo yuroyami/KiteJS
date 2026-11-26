@@ -96,4 +96,13 @@ public open class KiteJsConfig @InternalKiteJsApi constructor() {
 
     /** Makes the built-ins read-only, so a script cannot redefine `Array.prototype.push`. */
     public var sealBuiltins: Boolean = false
+
+    /**
+     * Told about each rejected promise that has no handler, as a browser prints "Uncaught (in
+     * promise)". It runs when an outermost call has drained its Promise reactions, so a handler
+     * that a reaction of the same call adds still counts. It runs on the engine's thread, after
+     * the script, and an exception that it throws is ignored. When the budget or the hook stops
+     * a script, its rejections are dropped and not reported. Null, the default, tracks nothing.
+     */
+    public var onUnhandledRejection: ((reason: JsValue) -> Unit)? = null
 }

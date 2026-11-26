@@ -58,6 +58,12 @@ struct KiteEngine {
     /* The stack limit that the host asked for, in bytes, or 0 for none. */
     size_t max_stack;
 
+    /* Rejected promises that no handler has taken yet, with their reasons, oldest first. */
+    JSValue *rejected;
+    JSValue *reasons;
+    int32_t rejected_count;
+    int32_t rejected_capacity;
+
     double budget;      /* what is left, when has_budget */
     int32_t host_depth; /* host functions running, which a pause cannot wait inside */
     int has_budget;
@@ -214,6 +220,51 @@ static JSValue throw_uncatchable(JSContext *ctx, const char *message)
     return JS_Throw(ctx, error);
 }
 
+/* Keeps each rejection that has no handler, and forgets it when a handler comes later. */
+static void rejection_tracker(JSContext *ctx, JSValueConst promise, JSValueConst reason,
+                              bool is_handled, void *opaque)
+{
+    KiteEngine *e = opaque;
+    if (is_handled) {
+        for (int32_t i = 0; i < e->rejected_count; i++) {
+            if (JS_VALUE_GET_PTR(e->rejected[i]) != JS_VALUE_GET_PTR(promise))
+                continue;
+            JS_FreeValue(ctx, e->rejected[i]);
+            JS_FreeValue(ctx, e->reasons[i]);
+            int32_t rest = e->rejected_count - i - 1;
+            memmove(&e->rejected[i], &e->rejected[i + 1], sizeof(JSValue) * rest);
+            memmove(&e->reasons[i], &e->reasons[i + 1], sizeof(JSValue) * rest);
+            e->rejected_count--;
+            return;
+        }
+        return;
+    }
+    if (e->rejected_count == e->rejected_capacity) {
+        int32_t capacity = e->rejected_capacity ? e->rejected_capacity * 2 : 8;
+        JSValue *rejected = realloc(e->rejected, sizeof(JSValue) * capacity);
+        if (!rejected)
+            return;
+        e->rejected = rejected;
+        JSValue *reasons = realloc(e->reasons, sizeof(JSValue) * capacity);
+        if (!reasons)
+            return;
+        e->reasons = reasons;
+        e->rejected_capacity = capacity;
+    }
+    e->rejected[e->rejected_count] = JS_DupValue(ctx, promise);
+    e->reasons[e->rejected_count] = JS_DupValue(ctx, reason);
+    e->rejected_count++;
+}
+
+static void discard_rejections(KiteEngine *e)
+{
+    for (int32_t i = 0; i < e->rejected_count; i++) {
+        JS_FreeValue(e->ctx, e->rejected[i]);
+        JS_FreeValue(e->ctx, e->reasons[i]);
+    }
+    e->rejected_count = 0;
+}
+
 /* Each host function carries one of these, so the host hears when it is collected. */
 static void host_token_finalizer(JSRuntime *rt, JSValueConst val)
 {
@@ -358,6 +409,8 @@ KiteEngine *kite_new(int32_t id, double memory_limit, double stack_size, int32_t
     JS_KiteSetDateHooks(e->rt, (options & KITE_OPT_CLOCK) ? now_hook : NULL,
                         (options & KITE_OPT_TIME_ZONE) ? tz_offset_hook : NULL);
     e->ask_host = (options & KITE_OPT_INTERRUPT) != 0;
+    if (options & KITE_OPT_REJECTIONS)
+        JS_SetHostPromiseRejectionTracker(e->rt, rejection_tracker, e);
 
     /* The capacity is set once both arrays exist and are filled, so kite_free never reads a
      * slot of a table that a failed allocation left missing or unwritten. */
@@ -399,6 +452,7 @@ void kite_free(KiteEngine *e)
             if (e->next[i] == -2)
                 JS_FreeValue(e->ctx, e->slots[i]);
         }
+        discard_rejections(e);
         JS_KiteDiscardPendingJobs(e->rt);
         JS_FreeContext(e->ctx);
     }
@@ -406,6 +460,8 @@ void kite_free(KiteEngine *e)
         JS_FreeRuntime(e->rt);
     free(e->args);
     free(e->dead);
+    free(e->rejected);
+    free(e->reasons);
     free(e->slots);
     free(e->next);
     free(e);
@@ -840,6 +896,20 @@ int32_t kite_drain(KiteEngine *e)
 void kite_discard_jobs(KiteEngine *e)
 {
     JS_KiteDiscardPendingJobs(e->rt);
+    discard_rejections(e);
+}
+
+int32_t kite_take_rejection(KiteEngine *e)
+{
+    if (e->rejected_count == 0)
+        return -1;
+    JS_FreeValue(e->ctx, e->rejected[0]);
+    JSValue reason = e->reasons[0];
+    int32_t rest = e->rejected_count - 1;
+    memmove(&e->rejected[0], &e->rejected[1], sizeof(JSValue) * rest);
+    memmove(&e->reasons[0], &e->reasons[1], sizeof(JSValue) * rest);
+    e->rejected_count--;
+    return keep(e, reason);
 }
 
 int32_t kite_exception(KiteEngine *e)
