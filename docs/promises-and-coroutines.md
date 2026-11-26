@@ -164,6 +164,21 @@ Settling a promise runs the script's reactions to it. If one of them fails in a 
 cannot catch, such as running out of its instruction budget, the failure goes to the
 `CoroutineExceptionHandler` in `scope`, or to the platform's handler if there is none.
 
+## Long scripts on the web
+
+`evaluatePausing` lets a long script pause so the page stays responsive, as `KiteJs.evaluatePausing`
+does ([Evaluating scripts](evaluating.md)):
+
+```kotlin
+val answer = js.evaluatePausing(longScript, "long.js", slice = 16.milliseconds)
+```
+
+- While the script is paused, every other call to this engine waits until the script ends.
+- Cancelling the caller stops the script at its next pause.
+- Closing the engine stops the script too. The script's caller then gets an
+  `IllegalStateException`, and the engine is released once the script has ended.
+- Where the script cannot pause, it runs like `evaluate`.
+
 ## Cancellation
 
 Cancelling the coroutine that called into the engine stops the running script.

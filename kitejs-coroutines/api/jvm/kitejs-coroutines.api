@@ -8,6 +8,8 @@ public final class io/github/yuroyami/kitejs/coroutines/AsyncKiteJs : java/lang/
 	public static synthetic fun evaluate$default (Lio/github/yuroyami/kitejs/coroutines/AsyncKiteJs;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun evaluateAwaiting (Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun evaluateAwaiting$default (Lio/github/yuroyami/kitejs/coroutines/AsyncKiteJs;Ljava/lang/String;Ljava/lang/String;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
+	public final fun evaluatePausing-exY8QGI (Ljava/lang/String;Ljava/lang/String;JLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public static synthetic fun evaluatePausing-exY8QGI$default (Lio/github/yuroyami/kitejs/coroutines/AsyncKiteJs;Ljava/lang/String;Ljava/lang/String;JLkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;
 	public final fun onEngine (Lkotlin/jvm/functions/Function1;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public final fun suspendFunction (Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;ILkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;)Ljava/lang/Object;
 	public static synthetic fun suspendFunction$default (Lio/github/yuroyami/kitejs/coroutines/AsyncKiteJs;Lio/github/yuroyami/kitejs/api/JsObject;Ljava/lang/String;ILkotlinx/coroutines/CoroutineScope;Lkotlin/jvm/functions/Function2;Lkotlin/coroutines/Continuation;ILjava/lang/Object;)Ljava/lang/Object;

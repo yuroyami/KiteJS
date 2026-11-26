@@ -10,6 +10,7 @@ import io.github.yuroyami.kitejs.api.JsEngineError
 import io.github.yuroyami.kitejs.api.JsError
 import io.github.yuroyami.kitejs.api.KiteJs
 import io.github.yuroyami.kitejs.api.function
+import io.github.yuroyami.kitejs.coroutines.asyncKiteJs
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 import kotlin.test.Test
@@ -17,6 +18,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 
@@ -124,5 +126,62 @@ class WebPauseTest {
                 assertEquals(2, js.evaluatePausing("1 + 1").asInt())
             }
         }
+    }
+
+    // ---- The same through AsyncKiteJs (#161) -------------------------------------------------------
+
+    @Test
+    fun anAsyncEngineLetsTimersRunWhileItsScriptPauses() = runTest {
+        val js = asyncKiteJs(QuickJs)
+        try {
+            js.onEngine { it.global.function("ticks") { ticks() } }
+            val timer = startTicking()
+            try {
+                val passed = js.evaluatePausing("var a = ticks(); ${busy(200)}; ticks() - a", slice = 5.milliseconds).asInt()
+                assertTrue(passed > 3, "only $passed timer ticks ran during the script")
+            } finally {
+                stopTicking(timer)
+            }
+        } finally {
+            js.close()
+        }
+    }
+
+    @Test
+    fun aCallWhileTheAsyncScriptPausesWaitsForTheScript() = runTest {
+        val js = asyncKiteJs(QuickJs)
+        try {
+            val run = async { js.evaluatePausing("${busy(150)}; globalThis.ended = true; 'done'", slice = 2.milliseconds) }
+            realWait(30)
+            assertTrue(js.evaluate("globalThis.ended === true").asBoolean())
+            assertEquals("done", run.await().asString())
+        } finally {
+            js.close()
+        }
+    }
+
+    @Test
+    fun cancellingTheCallerStopsAPausedAsyncScript() = runTest {
+        val js = asyncKiteJs(QuickJs)
+        try {
+            val run = async { js.evaluatePausing("for (;;) {}", slice = 2.milliseconds) }
+            realWait(30)
+            run.cancel()
+            assertFailsWith<CancellationException> { run.await() }
+            assertEquals(2, js.evaluate("1 + 1").asInt())
+        } finally {
+            js.close()
+        }
+    }
+
+    @Test
+    fun closingDuringAPausedAsyncScriptStopsItAndReleasesTheEngine() = runTest {
+        val js = asyncKiteJs(QuickJs)
+        val run = async { runCatching { js.evaluatePausing("for (;;) {}", slice = 2.milliseconds) } }
+        realWait(30)
+        js.close()
+        val failure = run.await().exceptionOrNull()
+        assertTrue(failure is IllegalStateException, "$failure")
+        assertFailsWith<IllegalStateException> { js.evaluate("1") }
     }
 }

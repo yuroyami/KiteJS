@@ -30,11 +30,15 @@ import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.coroutines.coroutineContext
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * An engine that lives on one thread, so suspending code can use it from anywhere.
@@ -65,23 +69,55 @@ public class AsyncKiteJs internal constructor(
 
     /** Runs [block] on the engine's dispatcher with the engine in hand. */
     @Throws(JsException::class, CancellationException::class)
-    public suspend fun <T> onEngine(block: (KiteJs) -> T): T {
+    public suspend fun <T> onEngine(block: (KiteJs) -> T): T = reach(pausing = false) { block(it) }
+
+    /**
+     * Runs [source] as [KiteJs.evaluatePausing] does, on the engine's dispatcher: where the engine
+     * can pause, the script pauses about every [slice] and lets the event loop run. Elsewhere it
+     * runs like [evaluate].
+     *
+     * While the script is paused, every other call to this engine waits for it to end. Cancelling
+     * the caller stops the script at its next pause, as it stops [evaluate]. Closing the engine
+     * stops the script too, and releases the engine once the script has ended.
+     */
+    @Throws(JsException::class, CancellationException::class)
+    public suspend fun evaluatePausing(
+        source: String,
+        fileName: String = "<eval>",
+        slice: Duration = 16.milliseconds,
+    ): JsValue = reach(pausing = true) { it.evaluatePausing(source, fileName, slice) }
+
+    /**
+     * Runs [block] on the engine's dispatcher, one call at a time. A [pausing] block may suspend
+     * on the engine's thread, and the gate keeps every other call out until it ends.
+     */
+    private suspend fun <T> reach(pausing: Boolean, block: suspend (KiteJs) -> T): T {
         check(!closed.load()) { "this engine is closed" }
         val caller = coroutineContext[Job]
         try {
-            return withContext(dispatcher) {
-                // A close that raced the check above has already released the engine on this thread.
-                check(!state.released) { "this engine is closed" }
-                state.runningJob = caller
-                try {
-                    block(engine)
-                } catch (e: JsEngineError) {
-                    // The interrupt hook stops the script with this; a cancelled caller wants the
-                    // cancellation, not an engine failure.
-                    if (caller?.isActive == false) throw CancellationException(e.message ?: "cancelled")
-                    throw e
-                } finally {
-                    state.runningJob = null
+            return state.gate.withLock {
+                withContext(dispatcher) {
+                    // A close that raced the check above has already released the engine on this thread.
+                    check(!state.released) { "this engine is closed" }
+                    state.runningJob = caller
+                    state.pausingRun = pausing
+                    try {
+                        block(engine)
+                    } catch (e: JsEngineError) {
+                        // The interrupt hook stops the script with this; a cancelled caller wants the
+                        // cancellation, not an engine failure.
+                        if (caller?.isActive == false) throw CancellationException(e.message ?: "cancelled")
+                        if (state.closing) throw IllegalStateException("this engine is closed", e)
+                        throw e
+                    } finally {
+                        state.runningJob = null
+                        state.pausingRun = false
+                        // A close while the script was paused left the release to this run.
+                        state.deferredRelease?.let {
+                            state.deferredRelease = null
+                            it()
+                        }
+                    }
                 }
             }
         } catch (e: CancellationException) {
@@ -199,18 +235,23 @@ public class AsyncKiteJs internal constructor(
         job.invokeOnCompletion { cause ->
             val result = outcome ?: Result.failure(cause ?: CancellationException("the work never ran"))
             state.settling.launch(handler) {
-                if (state.released) return@launch
-                result.fold(
-                    onSuccess = {
-                        // A value the engine cannot take still has to settle the promise. Settling
-                        // runs the reactions, so what they throw stays out of this catch.
-                        val value = runCatching { engine.valueOf(it) }
-                        value.fold(handle::resolve) { e -> handle.reject(reasonOf(e)) }
-                    },
-                    onFailure = { handle.reject(reasonOf(it)) },
-                )
+                // Settling runs the script's reactions, so it waits while a paused script holds the engine.
+                state.gate.withLock { settle(result, handle) }
             }
         }
+    }
+
+    private fun settle(result: Result<Any?>, handle: JsPromiseHandle) {
+        if (state.released) return
+        result.fold(
+            onSuccess = {
+                // A value the engine cannot take still has to settle the promise. Settling
+                // runs the reactions, so what they throw stays out of this catch.
+                val value = runCatching { engine.valueOf(it) }
+                value.fold(handle::resolve) { e -> handle.reject(reasonOf(e)) }
+            },
+            onFailure = { handle.reject(reasonOf(it)) },
+        )
     }
 
     private fun reasonOf(failure: Throwable): String = failure.message ?: failure::class.simpleName ?: "failed"
@@ -226,10 +267,19 @@ public class AsyncKiteJs internal constructor(
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
         state.settling.cancel()
-        // Only the thread that opened the engine can release it.
+        // Only the thread that opened the engine can release it. A paused script holds the engine,
+        // so then the interrupt hook stops it, and the release waits for the run to end.
         val release = {
-            state.release()
-            engine.close()
+            val now = {
+                state.release()
+                engine.close()
+            }
+            if (state.pausingRun) {
+                state.closing = true
+                state.deferredRelease = now
+            } else {
+                now()
+            }
         }
         if (dispatcher is EngineThread) dispatcher.finish(release)
         else dispatcher.dispatch(EmptyCoroutineContext, Runnable(release))
@@ -248,6 +298,18 @@ internal class EngineState(dispatcher: CoroutineDispatcher) {
 
     /** Set as the engine is released; nothing reaches the engine afterwards. */
     var released = false
+
+    /** Lets one call reach the engine at a time, so a call waits while a paused script holds it. */
+    val gate = Mutex()
+
+    /** Set while [AsyncKiteJs.evaluatePausing] runs, which can suspend with the engine in use. */
+    var pausingRun = false
+
+    /** Set by a close during a pausing run, so the interrupt hook stops the script. */
+    var closing = false
+
+    /** The release that such a close left for the pausing run to do as it ends. */
+    var deferredRelease: (() -> Unit)? = null
 
     /** Where bridged promises are settled. Cancelled on close, so nothing queued there runs. */
     val settling = CoroutineScope(SupervisorJob() + dispatcher)
@@ -312,7 +374,7 @@ public suspend fun <C : KiteJsConfig> asyncKiteJs(
                 val caller = state
                 interruptWhen = {
                     val job = caller.runningJob
-                    (job != null && !job.isActive) || theirs?.invoke() == true
+                    caller.closing || (job != null && !job.isActive) || theirs?.invoke() == true
                 }
             }
         }

@@ -37,6 +37,19 @@ public abstract class AsyncKiteJsContract<C : KiteJsConfig>(private val engine: 
     }
 
     @Test
+    fun evaluatePausingAnswersAsEvaluateDoes() = runTest {
+        val js = asyncKiteJs(engine)
+        try {
+            assertEquals(4.0, js.evaluatePausing("2 + 2").asDouble())
+            val e = assertFailsWith<JsError> { js.evaluatePausing("throw new TypeError('no')", "pause.js") }
+            assertEquals("TypeError", e.name)
+            assertEquals(2.0, js.evaluate("1 + 1").asDouble())
+        } finally {
+            js.close()
+        }
+    }
+
+    @Test
     fun deepRecursionOnTheEngineThreadIsARangeError() = runTest {
         // The thread that asyncKiteJs makes has the platform's default stack, 512 KiB on Apple.
         val js = asyncKiteJs(engine) { instructionBudget = 2_000_000 }

@@ -203,6 +203,9 @@ scope.launch {
   paused runs to the end in one go.
 - While its script is paused, the engine refuses every other call with a `JsEngineError`. Other
   engines stay usable.
+- `AsyncKiteJs.evaluatePausing` does the same through the suspending API. There a call while the
+  script is paused waits for the script to end, and cancelling the caller stops the script at its
+  next pause. See [Promises and coroutines](promises-and-coroutines.md).
 
 ## Building values
 
